@@ -34,7 +34,7 @@
 %token Flip Mux Validif Invalid Mem Wire Reg With Reset Inst Of Node Is Attach
 %token When Else Stop Printf Skip Input Output
 %token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit
-%token Class Target Firrtl Version
+%token Class Target Firrtl Version INDENT DEDENT
 %token RightArrow "=>"
 %token LeftArrow "<="
 %token Leftarrow "<-"
@@ -53,9 +53,10 @@
 %nonassoc LOWER_THAN_ELSE
 %nonassoc Else
 
+
 %%
 /* remove version */
-circuit: Circuit ID ':' annotations info cir_mods { $$ = newNode(P_CIRCUIT, $6, NULL); $$ = ; root = $$; }
+circuit: Circuit ID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, $7, NULL); $$ = ; root = $$; }
 	;
 /* Fileinfo communicates Chisel source file and line/column info */
 linecol: INT ':' INT    { $$ = $1 + ":" + $3}
@@ -141,7 +142,7 @@ mem_readwriter: { $$ = NULL; }
     ;
 mem_optional: mem_reader mem_writer mem_readwriter { $$ = new PList(); $$.append(3, $1, $2, $3); }
     ;
-memory: Mem ID ':' info mem_compulsory mem_optional { $$ = newNode(P_MEMORY, $4, $2); $$.appendChildList($5); $$.appendChildList($6); }
+memory: Mem ID ':' info INDENT mem_compulsory mem_optional DEDENT { $$ = newNode(P_MEMORY, $4, $2); $$.appendChildList($6); $$.appendChildList($7); }
     ;
 /* statements */
 references:
@@ -151,7 +152,7 @@ statements: { $$ = new PList(); }
     | statement statements { $$ =  $2; $$.appendChild($1); }
     ;
 when_else:  %prec LOWER_THAN_ELSE { $$ = NULL; }
-    | Else ':' statements { $$ = newNode(P_ELSE, "", $3); }
+    | Else ':' INDENT statements DEDENT { $$ = newNode(P_ELSE, "", $4); }
     ;
 statement: Wire ID ':' type info    { $$ = newNode(P_WIRE_DEF, $5, $2, 1, $4); }
     | Reg ID ':' type expr '(' With ':' '{' Reset "=>" '(' expr ',' expr ')' '}' ')' info { $$ = newNode(P_REG_DEF, $19, $2, 4, $4, $5, $13, $15); }
@@ -162,7 +163,7 @@ statement: Wire ID ':' type info    { $$ = newNode(P_WIRE_DEF, $5, $2, 1, $4); }
     | reference "<-" expr info  { TODO(); }
     | reference Is Invalid info { TODO(); }
     | Attach '(' references ')' info { TODO(); }
-    | When expr ':' info statements when_else   { $$ = newNode(P_WHEN, $4, "", 3, $2, $5, $6)} /* expected newline before statement */
+    | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $4, "", 3, $2, $6, $8)} /* expected newline before statement */
     | Stop '(' expr ',' expr ',' INT ')' info   { TODO(); }
     | Printf '(' expr ',' expr ',' String exprs ')' ':' ID info { TODO(); }
     | Printf '(' expr ',' expr ',' String exprs ')' info    { TODO(); }
@@ -175,7 +176,7 @@ port: Input ID ':' type info    { $$ = newNode(P_INPUT, $5, $2, 1, $4); }
 ports:  { $$ = new PNode(P_PORTS); }
     | port ports    { $$ = $2; $$.appendChild($1); }
     ;
-module: Module ID ':' info ports statements { $$ = newNode(P_MOD, $4, $2, 2, $5, $6); }
+module: Module ID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, $4, $2, 2, $6, $7); }
     ;
 ext_defname:
     | Defname '=' ID            { TODO(); }
@@ -186,9 +187,9 @@ params:
 param: Parameter ID '=' String  { TODO(); }
     | Parameter ID '=' INT      { TODO(); }
     ;
-extmodule: Extmodule ID ':' info ports ext_defname params   { TODO(); }
+extmodule: Extmodule ID ':' info INDENT ports ext_defname params DEDENT  { TODO(); }
     ;
-intmodule: Intmodule ID ':' info ports Intrinsic '=' ID params 	{ TODO(); }
+intmodule: Intmodule ID ':' info INDENT ports Intrinsic '=' ID params DEDENT	{ TODO(); }
 		;
 /* in-line anotations */
 jsons:
