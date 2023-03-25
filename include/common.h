@@ -7,6 +7,7 @@
 #include <vector>
 #include <fstream>
 #include <stdlib.h>
+#include <cstring>
 #include <string.h>
 
 #include "debug.h"

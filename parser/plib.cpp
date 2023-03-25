@@ -7,6 +7,7 @@ static inline int bit(char c, int base) {
                     ((c >= 'A' && c <= 'Z') ? c - 'A' : c - 'a');
     default: Assert("Invalid char %c with base %d\n", &c, base);
   }
+  return -1;
 }
 
 int p_stoi(char* str) { // oct/dec/hex string to int

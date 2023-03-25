@@ -1,14 +1,19 @@
 BUILD_DIR = ./build
-SRCS = $(shell find src -name "*.cpp")
 
-CXXFLAGS = -O2 -I include -DOBJ_DIR=\"obj\"
+PARSER_DIR = ./parser
+LEXICAL_SRC = $(PARSER_DIR)/lexical.l
+SYNTAX_SRC = $(PARSER_DIR)/syntax.y
+PARSER_BUILD = $(PARSER_DIR)/build
+
+SRCS = $(shell find src $(PARSER_DIR) -name "*.cpp" -o -name "*.cc")
+INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
+
+CXXFLAGS = -O2 -DOBJ_DIR=\"obj\" $(addprefix -I,$(INCLUDE_DIR))
 CXX = g++
 TARGET = sim
 
-LEXICAL_SRC = ./parser/lexical.l
-SYNTAX_SRC = ./parser/syntax.y
 
-run:
+run: $(PARSER_BUILD)/syntax.cc
 	mkdir -p build
 	mkdir -p obj
 	$(CXX) $(CXXFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET)
@@ -17,8 +22,9 @@ run:
 clean:
 	rm -rf obj
 
-parser:
-	flex $(LEXICAL_SRC)
-	bison -v -d $(SYNTAX_SRC) -Wcounterexamples
+$(PARSER_BUILD)/syntax.cc: $(LEXICAL_SRC) $(SYNTAX_SRC)
+	mkdir -p $(PARSER_BUILD)
+	flex -o $(PARSER_BUILD)/lexical.cc $(LEXICAL_SRC)
+	bison -v -d $(SYNTAX_SRC) -o $(PARSER_BUILD)/syntax.cc
 
-.PHONY: run clean parser
+.PHONY: run clean

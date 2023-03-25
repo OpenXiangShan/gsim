@@ -2,20 +2,43 @@
   #include <iostream>
   #include "common.h"
   #include "PNode.h"
+  #include "syntax.hh"
+  #include "Parser.h"
   PNode* root;
 
   int p_stoi(char* str);
+//   int  yylex (yy::parser::value_type* yylval);
+  PNode* newNode(int type, char* info, char* name, int num, ...);
+  PNode* newNode(int type, char* info, PList* plist);
+  char* emptyStr = NULL;
 %}
 
 %language "c++"
+%require "3.2"
+
+%define api.parser.class {Syntax}
+%define api.namespace {Parser}
+%parse-param {Lexical* scanner}
+
+%code requires
+{
+    namespace Parser {
+        class Lexical;
+    } // namespace calc
+}
+
+%code
+{
+    #define yylex(x) scanner->lex(x)
+}
 
 %union {
-  std::string name;
-  std::string strVal;
-  std::string typeGround;
-  std::string typeAggregate;
-  std::string typeOP;
-  std::string typeRUW;
+  char*       name;
+  char*       strVal;
+  char*       typeGround;
+  char*       typeAggregate;
+  char*       typeOP;
+  char*       typeRUW;
   int         intVal;
   PNode*      pnode;
   PList*      plist;
@@ -31,6 +54,7 @@
 
 %token <typeOP> E2OP E1OP E1I1OP E1I2OP  
 %token <typeRUW> Ruw
+%token <strVal> Linecol
 %token Flip Mux Validif Invalid Mem Wire Reg With Reset Inst Of Node Is Attach
 %token When Else Stop Printf Skip Input Output
 %token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit
@@ -47,7 +71,7 @@
 %type <pnode> mem_datatype mem_depth mem_rlatency mem_wlatency mem_ruw
 %type <pnode> reference expr primop_2expr primop_1expr primop_1expr1int primop_1expr2int
 %type <pnode> field type_aggregate type_ground circuit
-%type <strVal> info linecol
+%type <strVal> info
 /* %token <pnode> */
 
 %nonassoc LOWER_THAN_ELSE
@@ -56,14 +80,14 @@
 
 %%
 /* remove version */
-circuit: Circuit ID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, $7, NULL); $$ = ; root = $$; }
+circuit: Circuit ID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, $5, $7); root = $$; }
 	;
 /* Fileinfo communicates Chisel source file and line/column info */
-linecol: INT ':' INT    { $$ = $1 + ":" + $3}
-    ;
-info:               { $$ = std::string("");}
-    | '@' '[' ']'   { $$ = std::string("");}
-    | '@' '[' String linecol ']'    { $$ = $3 + $4}
+/* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
+    ; */
+info:               { $$ = NULL;}
+    | '@' '[' ']'   { $$ = NULL;}
+    | '@' '[' String Linecol ']'    { $$ = (char*)malloc(strlen($3) + strlen($4) + 2); strcpy($$, $3); strcat($$, " "); strcat($$, $4);}
     ;
 /* type definition */
 width:                { $$ = 0; } /* infered width */
@@ -72,98 +96,98 @@ width:                { $$ = 0; } /* infered width */
 binary_point: 
     | "<<" INT ">>"   { TODO(); }
     ;
-type_ground: Clock    { $$ = new Node(P_Clock); }
-    | IntType width   { $$ = newNode(P_INT_TYPE, "", $1, 0); $$.setWidth($2) }
+type_ground: Clock    { $$ = new PNode(P_Clock); }
+    | IntType width   { $$ = newNode(P_INT_TYPE, $1, 0); $$->setWidth($2); }
     | anaType width   { TODO(); }
     | FixedType width binary_point  { TODO(); }
     ;
 fields:                 { $$ = new PList(); }
-    | field ',' fields  { $$ = $3; $$.append($1); }
-    | field             { $$ = new Plist($1); }
+    | field ',' fields  { $$ = $3; $$->append($1); }
+    | field             { $$ = new PList($1); }
     ;
-type_aggregate: '{' fields '}'  { $$ = new PNode(P_AG_FIELDS); $$.appendChildList($2); }
-    | type '[' INT ']'          { $$ = newNode(P_AG_TYPE, "", "", 1, $1); $$.appendExtraInfo($3); }
+type_aggregate: '{' fields '}'  { $$ = new PNode(P_AG_FIELDS); $$->appendChildList($2); }
+    | type '[' INT ']'          { $$ = newNode(P_AG_TYPE, emptyStr, 1, $1); $$->appendExtraInfo($3); }
     ;
-field: ID ':' type { $$ = newNode(P_FIELD, "", $1, 1, $3); }
-    | Flip ID ':' type  { $$ = newNode(P_FLIP_FIELD, "", $2, 1, $4); }
+field: ID ':' type { $$ = newNode(P_FIELD, $1, 1, $3); }
+    | Flip ID ':' type  { $$ = newNode(P_FLIP_FIELD, $2, 1, $4); }
     ;
 type: type_ground  { $$ = $1; }
     | type_aggregate { $$ = $1; }
     ;
 /* primitive operations */
-primop_2expr: E2OP '(' expr ',' expr ')' { $$ = newNode(P_2EXPR, "", $1, 2, $3, $5); }
+primop_2expr: E2OP '(' expr ',' expr ')' { $$ = newNode(P_2EXPR, $1, 2, $3, $5); }
     ;
-primop_1expr: E1OP '(' expr ')' { $$ = newNode(P_1EXPR, "", $1, 1, $3); }
+primop_1expr: E1OP '(' expr ')' { $$ = newNode(P_1EXPR, $1, 1, $3); }
     ;
-primop_1expr1int: E1I1OP '(' expr ',' INT ')' { $$ = newNode(P_1EXPR1INT, "", 1, $3); $$.appendExtraInfo($5); }
+primop_1expr1int: E1I1OP '(' expr ',' INT ')' { $$ = newNode(P_1EXPR1INT, $1, 1, $3); $$->appendExtraInfo($5); }
     ;
-primop_1expr2int: E1I2OP '(' expr ',' INT ',' INT ')' { $$ = newNode(P_1EXPR2INT, "", 1, $3); $$.appendExtraInfo($5); $$.appendExtraInfo($7); }
+primop_1expr2int: E1I2OP '(' expr ',' INT ',' INT ')' { $$ = newNode(P_1EXPR2INT, $1, 1, $3); $$->appendExtraInfo($5); $$->appendExtraInfo($7); }
     ;
 /* expression definitions */
 exprs:
     | expr exprs    { TODO(); }
     ;
-expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, "", $1, 0); $$.setWidth($2);}
-    | IntType width '(' INT ')' { $$ = newNode(P_EXPR_INT_INIT, "", $1, 0); $$.setWidth($2); $$.appendExtraInfo($4);}
+expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, $1, 0); $$->setWidth($2);}
+    | IntType width '(' INT ')' { $$ = newNode(P_EXPR_INT_INIT, $1, 0); $$->setWidth($2); $$->appendExtraInfo($4);}
     | reference { $$ = $1; }
-    | Mux '(' expr ',' expr ',' expr ')' { $$ = newNode(P_EXPR_MUX, "", "", 3, $3, $5, $7); }
+    | Mux '(' expr ',' expr ',' expr ')' { $$ = newNode(P_EXPR_MUX, NULL, 3, $3, $5, $7); }
     | Validif '(' expr ',' expr ')' { TODO(); }
     | primop_2expr  { $$ = $1; }
     | primop_1expr  { $$ = $1; }
     | primop_1expr1int  { $$ = $1; }
     | primop_1expr2int  { $$ = $1; }
     ;
-reference: ID  { $$ = newNode(P_REF, "", $1, 0); }
-    | reference '.' ID  { $$ = $1; $1.appendChild(newNode(P_REF_DOT, "", $3, 0)); }
-    | reference '[' INT ']' { $$ = $1; $1.appendChild(newNode(P_REF_IDX, "", $3, 0)); }
-    | reference '[' expr ']' { $$ = $1; $1.appendChild($3); }
+reference: ID  { $$ = newNode(P_REF, $1, 0); }
+    | reference '.' ID  { $$ = $1; $1->appendChild(newNode(P_REF_DOT, $3, 0)); }
+    | reference '[' INT ']' { $$ = $1; $1->appendChild(newNode(P_REF_IDX, $3, 0)); }
+    | reference '[' expr ']' { $$ = $1; $1->appendChild($3); }
     ;
 /* Memory */
-mem_datatype: DataType "=>" type { $$ = newNode(P_DATATYPE, "", "", 1, $3); }
+mem_datatype: DataType "=>" type { $$ = newNode(P_DATATYPE, NULL, 1, $3); }
     ;
-mem_depth: Depth "=>" INT   { $$ = newNode(P_DEPTH, "", $3, 0); }
+mem_depth: Depth "=>" INT   { $$ = newNode(P_DEPTH, $3, 0); }
     ;
-mem_rlatency: ReadLatency "=>" INT  { $$ = newNode(P_RLATENCT, "", $3, 0); }
+mem_rlatency: ReadLatency "=>" INT  { $$ = newNode(P_RLATENCT, $3, 0); }
     ;
-mem_wlatency: WriteLatency "=>" INT { $$ = newNode(P_WLATENCT, "", $3, 0); }
+mem_wlatency: WriteLatency "=>" INT { $$ = newNode(P_WLATENCT, $3, 0); }
     ;
-mem_ruw: ReadUnderwrite "=>" Ruw { $$ = newNode(P_RUW, "", $3, 0); }
+mem_ruw: ReadUnderwrite "=>" Ruw { $$ = newNode(P_RUW, $3, 0); }
     ;
-mem_compulsory: mem_datatype mem_depth mem_rlatency mem_wlatency mem_ruw { $$ = new PList(); $$.append(5, $1, $2, $3, $4, $5); }
+mem_compulsory: mem_datatype mem_depth mem_rlatency mem_wlatency mem_ruw { $$ = new PList(); $$->append(5, $1, $2, $3, $4, $5); }
     ;
 mem_reader: { $$ = NULL; }
-    | Reader "=>" ID    { $$ = newNode(P_READER, "", $3, 0);}
+    | Reader "=>" ID    { $$ = newNode(P_READER, $3, 0);}
     ;
 mem_writer: { $$ = NULL; }
-    | Writer "=>" ID    { $$ = newNode(P_WRITER, "", $3, 0);}
+    | Writer "=>" ID    { $$ = newNode(P_WRITER, $3, 0);}
     ;
 mem_readwriter: { $$ = NULL; }
-    | Readwriter "=>" ID    { $$ = newNode(P_READWRITER, "", $3, 0);}
+    | Readwriter "=>" ID    { $$ = newNode(P_READWRITER, $3, 0);}
     ;
-mem_optional: mem_reader mem_writer mem_readwriter { $$ = new PList(); $$.append(3, $1, $2, $3); }
+mem_optional: mem_reader mem_writer mem_readwriter { $$ = new PList(); $$->append(3, $1, $2, $3); }
     ;
-memory: Mem ID ':' info INDENT mem_compulsory mem_optional DEDENT { $$ = newNode(P_MEMORY, $4, $2); $$.appendChildList($6); $$.appendChildList($7); }
+memory: Mem ID ':' info INDENT mem_compulsory mem_optional DEDENT { $$ = newNode(P_MEMORY, $4, $2, 0); $$->appendChildList($6); $$->appendChildList($7); }
     ;
 /* statements */
 references:
     | reference references  { TODO(); }
     ;
 statements: { $$ = new PList(); }
-    | statement statements { $$ =  $2; $$.appendChild($1); }
+    | statement statements { $$ =  $2; $$->append($1); }
     ;
 when_else:  %prec LOWER_THAN_ELSE { $$ = NULL; }
-    | Else ':' INDENT statements DEDENT { $$ = newNode(P_ELSE, "", $4); }
+    | Else ':' INDENT statements DEDENT { $$ = newNode(P_ELSE, NULL, $4); }
     ;
 statement: Wire ID ':' type info    { $$ = newNode(P_WIRE_DEF, $5, $2, 1, $4); }
     | Reg ID ':' type expr '(' With ':' '{' Reset "=>" '(' expr ',' expr ')' '}' ')' info { $$ = newNode(P_REG_DEF, $19, $2, 4, $4, $5, $13, $15); }
     | memory    { $$ = $1;}
-    | Inst ID Of ID info    { $$ = newNode(P_INST, $5, $2, 0); $$.appendExtraInfo($4); }
+    | Inst ID Of ID info    { $$ = newNode(P_INST, $5, $2, 0); $$->appendExtraInfo($4); }
     | Node ID '=' expr info { $$ = newNode(P_NODE, $5, $2, 1, $4); }
-    | reference "<=" expr info  { $$ = newNode(P_CONNECT, $4, "", 2, $1, $3); }
+    | reference "<=" expr info  { $$ = newNode(P_CONNECT, $4, NULL, 2, $1, $3); }
     | reference "<-" expr info  { TODO(); }
     | reference Is Invalid info { TODO(); }
     | Attach '(' references ')' info { TODO(); }
-    | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $4, "", 3, $2, $6, $8)} /* expected newline before statement */
+    | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $4, NULL, 3, $2, $6, $8); } /* expected newline before statement */
     | Stop '(' expr ',' expr ',' INT ')' info   { TODO(); }
     | Printf '(' expr ',' expr ',' String exprs ')' ':' ID info { TODO(); }
     | Printf '(' expr ',' expr ',' String exprs ')' info    { TODO(); }
@@ -174,7 +198,7 @@ port: Input ID ':' type info    { $$ = newNode(P_INPUT, $5, $2, 1, $4); }
     | Output ID ':' type info   { $$ = newNode(P_OUTPUT, $5, $2, 1, $4); }
     ;
 ports:  { $$ = new PNode(P_PORTS); }
-    | port ports    { $$ = $2; $$.appendChild($1); }
+    | port ports    { $$ = $2; $$->appendChild($1); }
     ;
 module: Module ID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, $4, $2, 2, $6, $7); }
     ;
@@ -208,7 +232,13 @@ version: Firrtl Version INT '.' INT '.' INT { TODO(); }
 		;
 */
 cir_mods:                       { $$ = new PList(); }
-		| module cir_mods       { $$ = $2; $$.push_back($1); }
+		| module cir_mods       { $$ = $2; $$->append($1); }
 		| extmodule cir_mods    { TODO(); }
 		| intmodule cir_mods    { TODO(); }
 		;
+
+%%
+
+void Parser::Syntax::error(const std::string& msg) {
+    std::cerr << msg << '\n';
+}

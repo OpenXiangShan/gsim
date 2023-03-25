@@ -1,14 +1,23 @@
 %{
+  #include <stack>
+  #include <string>
+  #include "common.h"
+  #include "PNode.h"
+  #include "syntax.hh"
+  #include "Parser.h"
   int curr_indent = 0;
   static int TAB_WIDTH = 2;
   std::stack<int>indentLevels;
   #define YY_USER_INIT { \
-    indentLevels.push(0);
-    BEGIN(indent);
+    indentLevels.push(0); \
+    BEGIN(indent); \
   }
+  typedef Parser::Syntax::token token;
+  #define YY_DECL int Parser::Lexical::lex(Parser::Syntax::semantic_type* yylval)
 %}
 
-%option c++
+%option c++ noyywrap noyylineno nodefault
+
 /* Integer literal definitions */
 digit_bin   0|1
 digit_oct   [0-7]
@@ -38,82 +47,87 @@ info        @\[({string} {linecol})*\]
                 if(curr_indent > indentLevels.top()) {
                   BEGIN(normal); 
                   indentLevels.push(curr_indent);
-                  return INDENT;
+                  return token::INDENT;
                 } else if(curr_indent < indentLevels.top()) {
                   /* may need to return multiple DEDENT */
                   indentLevels.pop();
-                  return DEDENT;
+                  return token::DEDENT;
                 } else {
                   BEGIN(normal);
                 }
               }
 <indent><<EOF>> { if(indentLevels.top() != 0) {
                     indentLevels.pop();
-                    return DEDENT;
+                    return token::DEDENT;
                   } else {
                     yyterminate();
                   }
                 }
 
-<normal>"<<"    { return DoubleLeft; }
-<normal>">>"    { return DoubleRight; }
-<normal>Clock|Reset|AsyncReset  { yylval.typeGround = std::string(yytext); return Clock; }
-<normal>UInt|SInt               { yylval.typeGround = std::string(yytext); return IntType; }
-<normal>Analog                  { yylval.typeGround = std::string(yytext); return anaType; }
-<normal>Fixed                   { yylval.typeGround = std::string(yytext); return FixedType; }
-<normal>flip                    { return Flip;}
-<normal>add|sub|mul|div|mod|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat { yylval.typeOP = std::string(yytext); return E2OP; }
-<normal>asUInt|asSInt|asClock|cvt|neg|not|andr|orr|xorr { yylval.typeOP = std::string(yytext); return E1OP; }
-<normal>pad|shl|shr|head|tail   { yylval.typeOP = std::string(yytext); return E1I1OP; }
-<normal>bits                    { yylval.typeOP = std::string(yytext); return E1I2OP; }
-<normal>mux                     { return Mux; }
-<normal>validif                 { return Validif; }
-<normal>old|new|undefined       { yylval.typeRUW = std::string(yytext); return Ruw; }
-<normal>mem                     { return Mem; }
+<normal>"<<"    { return token::DoubleLeft; }
+<normal>">>"    { return token::DoubleRight; }
+<normal>Clock|Reset|AsyncReset  { yylval->typeGround = strdup(yytext); return token::Clock; }
+<normal>UInt|SInt               { yylval->typeGround = strdup(yytext); return token::IntType; }
+<normal>Analog                  { yylval->typeGround = strdup(yytext); return token::anaType; }
+<normal>Fixed                   { yylval->typeGround = strdup(yytext); return token::FixedType; }
+<normal>flip                    { return token::Flip;}
+<normal>add|sub|mul|div|mod|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat { yylval->typeOP = strdup(yytext); return token::E2OP; }
+<normal>asUInt|asSInt|asClock|cvt|neg|not|andr|orr|xorr { yylval->typeOP = strdup(yytext); return token::E1OP; }
+<normal>pad|shl|shr|head|tail   { yylval->typeOP = strdup(yytext); return token::E1I1OP; }
+<normal>bits                    { yylval->typeOP = strdup(yytext); return token::E1I2OP; }
+<normal>mux                     { return token::Mux; }
+<normal>validif                 { return token::Validif; }
+<normal>old|new|undefined       { yylval->typeRUW = strdup(yytext); return token::Ruw; }
+<normal>mem                     { return token::Mem; }
+<normal>{int}:{int}             { yylval->strVal = strdup(yytext); return token::Linecol; }
 <normal>[.,:=@%<>()\[\]{}""]    { return yytext[0]; }
-<normal>{int}                   { yylval.strVal = std::string(yytext); return INT; }
-<normal>"=>"                    { return RightArrow; }
-<normal>"<="                    { return LeftArrow; }
-<normal>"<-"                    { return Leftarrow; }
-<normal>data-type               { return DataType; }
-<normal>depth                   { return Depth; }
-<normal>read-latency            { return ReadLatency; }
-<normal>write-latency           { return WriteLatency; }
-<normal>read-under-write        { return ReadUnderwrite; }
-<normal>reader                  { return Reader; }
-<normal>writer                  { return Writer; }
-<normal>readwriter              { return Readwriter; }
-<normal>wire                    { return Wire; }
-<normal>reg                     { return Reg; }
-<normal>with                    { return With; }
-<normal>reset                   { return Reset;} /* Reset & reset */
-<normal>inst                    { return Inst; }
-<normal>of                      { return Of; }
-<normal>node                    { return Node; }
-<normal>is                      { return Is; }
-<normal>invalid                 { return Invalid; }
-<normal>attach                  { return Attach; }
-<normal>when                    { return When; }
-<normal>else                    { return Else; }
-<normal>stop                    { return Stop; }
-<normal>printf                  { return Printf; }
-<normal>skip                    { return Skip; }
-<normal>input                   { return Input; }
-<normal>output                  { return Output; }
-<normal>module                  { return Module; }
-<normal>extmodule               { return Extmodule; }
-<normal>defname                 { return Defname; }
-<normal>parameter               { return Parameter; }
-<normal>intmodule               { return Intmodule; }
-<normal>intrinsic               { return Intrinsic; }
-<normal>class                   { return Class; }
-<normal>target                  { return Target; }
-<normal>FIRRTL                  { return Firrtl; }
-<normal>version                 { return Version; }
-<normal>circuit                 { return Circuit; }
-<normal>{string}                { yylval.strVal = std::string(yytext); return String; }
+<normal>{int}                   { yylval->strVal = strdup(yytext); return token::INT; }
+<normal>"=>"                    { return token::RightArrow; }
+<normal>"<="                    { return token::LeftArrow; }
+<normal>"<-"                    { return token::Leftarrow; }
+<normal>data-type               { return token::DataType; }
+<normal>depth                   { return token::Depth; }
+<normal>read-latency            { return token::ReadLatency; }
+<normal>write-latency           { return token::WriteLatency; }
+<normal>read-under-write        { return token::ReadUnderwrite; }
+<normal>reader                  { return token::Reader; }
+<normal>writer                  { return token::Writer; }
+<normal>readwriter              { return token::Readwriter; }
+<normal>wire                    { return token::Wire; }
+<normal>reg                     { return token::Reg; }
+<normal>with                    { return token::With; }
+<normal>reset                   { return token::Reset;} /* Reset & reset */
+<normal>inst                    { return token::Inst; }
+<normal>of                      { return token::Of; }
+<normal>node                    { return token::Node; }
+<normal>is                      { return token::Is; }
+<normal>invalid                 { return token::Invalid; }
+<normal>attach                  { return token::Attach; }
+<normal>when                    { return token::When; }
+<normal>else                    { return token::Else; }
+<normal>stop                    { return token::Stop; }
+<normal>printf                  { return token::Printf; }
+<normal>skip                    { return token::Skip; }
+<normal>input                   { return token::Input; }
+<normal>output                  { return token::Output; }
+<normal>module                  { return token::Module; }
+<normal>extmodule               { return token::Extmodule; }
+<normal>defname                 { return token::Defname; }
+<normal>parameter               { return token::Parameter; }
+<normal>intmodule               { return token::Intmodule; }
+<normal>intrinsic               { return token::Intrinsic; }
+<normal>class                   { return token::Class; }
+<normal>target                  { return token::Target; }
+<normal>FIRRTL                  { return token::Firrtl; }
+<normal>version                 { return token::Version; }
+<normal>circuit                 { return token::Circuit; }
+<normal>{string}                { yylval->strVal = strdup(yytext); return token::String; }
 <normal>[ \t]                   { }
 <normal>\n                      { curr_indent = 0; BEGIN(indent); }
 <normal>.                       { std::cout << "Mysterious character: " << yytext << std::endl; }
 
 %%
+
+int yyFlexLexer::yylex() {
+    throw std::runtime_error("Invalid call to yyFlexLexer::yylex()");
+}
