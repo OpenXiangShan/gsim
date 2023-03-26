@@ -21,8 +21,7 @@ void pnewNode(PNode* parent, int num, va_list valist) {
   }
 }
 PNode* newNode(int type, char* info, char* name, int num, ...){
-    PNode* parent = new PNode();
-    parent->type = type;
+    PNode* parent = new PNode(type);
     if(info) parent->info = std::string(info);
     if(name) parent->name = std::string(name);
     va_list valist;
@@ -33,8 +32,7 @@ PNode* newNode(int type, char* info, char* name, int num, ...){
 }
 
 PNode* newNode(int type, char* name, int num, ...) {
-  PNode* parent = new PNode();
-  parent->type = type;
+  PNode* parent = new PNode(type);
   if(name) parent->name = std::string(name);
   va_list valist;
   va_start(valist, num);
@@ -44,9 +42,8 @@ PNode* newNode(int type, char* name, int num, ...) {
 }
 
 PNode* newNode(int type, char* info, PList* plist) {
-  PNode* parent = new PNode();
-  parent->type = type;
-  parent->info = std::string(info);
+  PNode* parent = new PNode(type);
+  if(info) parent->info = std::string(info);
   if(plist)
     parent->child.assign(plist->siblings.begin(), plist->siblings.end());
   return parent;
