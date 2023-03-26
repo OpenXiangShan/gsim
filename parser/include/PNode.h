@@ -32,6 +32,8 @@ public:
   void appendExtraInfo(char* info);
   void appendChildList(PList* plist);
   void setWidth(int _width);
+  int getChildNum();
+  PNode* getChild(int idx);
 };
 
 class PList{

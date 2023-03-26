@@ -12,15 +12,17 @@ CXXFLAGS = -O2 -DOBJ_DIR=\"obj\" $(addprefix -I,$(INCLUDE_DIR))
 CXX = g++
 TARGET = sim
 
+FIRRTL_FILE = scala/build/_add.lo.fir
 
 run: $(PARSER_BUILD)/syntax.cc
 	mkdir -p build
 	mkdir -p obj
 	$(CXX) $(CXXFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET)
-	$(BUILD_DIR)/$(TARGET)
+	$(BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
 
 clean:
 	rm -rf obj
+	rm -rf parser/build
 
 $(PARSER_BUILD)/syntax.cc: $(LEXICAL_SRC) $(SYNTAX_SRC)
 	mkdir -p $(PARSER_BUILD)

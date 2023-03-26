@@ -14,6 +14,15 @@ void PNode::appendChildList(PList* plist) {
 void PNode::setWidth(int _width) {
   width = _width;
 }
+
+int PNode::getChildNum() {
+  return child.size();
+}
+
+PNode* PNode::getChild(int idx) {
+  return child[idx];
+}
+
 void pnewNode(PNode* parent, int num, va_list valist) {
   for(int i = 0; i < num; i++){
     PNode* next = va_arg(valist, PNode*);
