@@ -126,7 +126,7 @@ info        @\[({string} {linecol})*\]
 <normal>FIRRTL                  { return token::Firrtl; }
 <normal>version                 { return token::Version; }
 <normal>circuit                 { return token::Circuit; }
-<normal>{id}                    { return token::ID; }
+<normal>{id}                    { yylval->name = strdup(yytext); return token::ID; }
 <normal>{string}                { yylval->strVal = strdup(yytext); return token::String; }
 <normal>"=>"                    { return token::RightArrow; }
 <normal>"<="                    { return token::LeftArrow; }
