@@ -59,8 +59,9 @@ PNode* newNode(int type, char* info, PList* plist) {
 }
 
 void PList::append(PNode* pnode) {
-    if(pnode) siblings.push_back(pnode);
-  }
+  if(pnode) siblings.push_back(pnode);
+}
+
 void PList::append(int num, ...) {
   va_list valist;
   va_start(valist, num);

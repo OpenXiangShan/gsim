@@ -17,7 +17,7 @@ void preorder_traversal(PNode* root) {
   while(!s.empty()) {
     std::tie(node, depth) = s.top();
     for(int i = 0; i < depth; i++) std::cout << "  ";
-    std::cout << typeName[node->type] << ":" << node->name << std::endl;
+    std::cout << typeName[node->type] << " : " << node->name << std::endl;
     s.pop();
     for(int i = node->getChildNum()-1; i >= 0; i--) {
       s.push(std::make_pair(node->getChild(i), depth + 1));

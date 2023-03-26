@@ -30,6 +30,7 @@
 %code
 {
     #define yylex(x) scanner->lex(x)
+    /* #define yylex(x) scanner->lex_debug(x) */
 }
 
 %union {
@@ -65,8 +66,8 @@
 %token DataType Depth ReadLatency WriteLatency ReadUnderwrite Reader Writer Readwriter
 /* internal node */
 %type <intVal> width
-%type <plist> cir_mods statements mem_compulsory mem_optional fields
-%type <pnode> module ports port type statement when_else memory
+%type <plist> cir_mods mem_compulsory mem_optional fields
+%type <pnode> module ports statements port type statement when_else memory
 %type <pnode> mem_reader mem_writer mem_readwriter
 %type <pnode> mem_datatype mem_depth mem_rlatency mem_wlatency mem_ruw
 %type <pnode> reference expr primop_2expr primop_1expr primop_1expr1int primop_1expr2int
@@ -171,11 +172,11 @@ memory: Mem ID ':' info INDENT mem_compulsory mem_optional DEDENT { $$ = newNode
 references:
     | reference references  { TODO(); }
     ;
-statements: { $$ = new PList(); }
-    | statement statements { $$ =  $2; $$->append($1); }
+statements: { $$ = new PNode(P_STATEMENTS); }
+    | statement statements { $$ =  $2; $$->appendChild($1); }
     ;
 when_else:  %prec LOWER_THAN_ELSE { $$ = NULL; }
-    | Else ':' INDENT statements DEDENT { $$ = newNode(P_ELSE, NULL, $4); }
+    | Else ':' INDENT statements DEDENT { $$ = newNode(P_ELSE, NULL, NULL, 1, $4); }
     ;
 statement: Wire ID ':' type info    { $$ = newNode(P_WIRE_DEF, $5, $2, 1, $4); }
     | Reg ID ':' type expr '(' WithReset '(' expr ',' expr ')' '}' ')' info { $$ = newNode(P_REG_DEF, $15, $2, 4, $4, $5, $9, $11); }
