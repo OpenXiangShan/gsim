@@ -14,6 +14,11 @@
   }
   typedef Parser::Syntax::token token;
   #define YY_DECL int Parser::Lexical::lex(Parser::Syntax::semantic_type* yylval)
+  int Parser::Lexical::lex_debug(Parser::Syntax::semantic_type* yylval) {
+    int ret = lex(yylval);
+    std::cout << ret << " " << yytext << std::endl;
+    return ret;
+  }
 %}
 
 %option c++ noyywrap noyylineno nodefault
