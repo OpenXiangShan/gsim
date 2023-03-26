@@ -102,7 +102,7 @@ type_ground: Clock    { $$ = new PNode(P_Clock); }
     | FixedType width binary_point  { TODO(); }
     ;
 fields:                 { $$ = new PList(); }
-    | field ',' fields  { $$ = $3; $$->append($1); }
+    | fields ',' field  { $$ = $1; $$->append($3); }
     | field             { $$ = new PList($1); }
     ;
 type_aggregate: '{' fields '}'  { $$ = new PNode(P_AG_FIELDS); $$->appendChildList($2); }
@@ -125,7 +125,7 @@ primop_1expr2int: E1I2OP '(' expr ',' INT ',' INT ')' { $$ = newNode(P_1EXPR2INT
     ;
 /* expression definitions */
 exprs:
-    | expr exprs    { TODO(); }
+    | exprs expr    { TODO(); }
     ;
 expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, $1, 0); $$->setWidth($2);}
     | IntType width '(' INT ')' { $$ = newNode(P_EXPR_INT_INIT, $1, 0); $$->setWidth($2); $$->appendExtraInfo($4);}
@@ -170,10 +170,10 @@ memory: Mem ID ':' info INDENT mem_compulsory mem_optional DEDENT { $$ = newNode
     ;
 /* statements */
 references:
-    | reference references  { TODO(); }
+    | references reference { TODO(); }
     ;
 statements: { $$ = new PNode(P_STATEMENTS); }
-    | statement statements { $$ =  $2; $$->appendChild($1); }
+    | statements statement { $$ =  $1; $1->appendChild($2); }
     ;
 when_else:  %prec LOWER_THAN_ELSE { $$ = NULL; }
     | Else ':' INDENT statements DEDENT { $$ = newNode(P_ELSE, NULL, NULL, 1, $4); }
@@ -198,7 +198,7 @@ port: Input ID ':' type info    { $$ = newNode(P_INPUT, $5, $2, 1, $4); }
     | Output ID ':' type info   { $$ = newNode(P_OUTPUT, $5, $2, 1, $4); }
     ;
 ports:  { $$ = new PNode(P_PORTS); }
-    | port ports    { $$ = $2; $$->appendChild($1); }
+    | ports port    { $$ = $1; $$->appendChild($2); }
     ;
 module: Module ID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, $4, $2, 2, $6, $7); }
     ;
@@ -206,7 +206,7 @@ ext_defname:
     | Defname '=' ID            { TODO(); }
     ;
 params: 
-    | param params              { TODO(); }
+    | params param              { TODO(); }
     ;
 param: Parameter ID '=' String  { TODO(); }
     | Parameter ID '=' INT      { TODO(); }
@@ -217,7 +217,7 @@ intmodule: Intmodule ID ':' info INDENT ports Intrinsic '=' ID params DEDENT	{ T
 		;
 /* in-line anotations */
 jsons:
-		| json jsons    { TODO(); }
+		| jsons json    { TODO(); }
 		;
 json: '"' Class '"' ':' String '"' Target '"' ':' String    { TODO(); }
 		;
