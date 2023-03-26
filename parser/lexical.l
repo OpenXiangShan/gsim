@@ -26,15 +26,16 @@ digit_hex   [0-9A-Fa-f]
 /* Integer */
 int         \"b-?{digit_bin}+\"|\"o-?{digit_oct}+\"|\"h-?{digit_hex}+\"|-?{digit_dec}+
 /* Identifiers define legal FIRRTL or Verilog names */
-letter      [A-Fa-f]
+letter      [A-Za-z]
 id          (_|{letter})(_|{letter}|{digit_dec})*
-string      [0-9A-Za-z]+
+string      [0-9A-Za-z.]+
 /* Fileinfo communicates Chisel source file and line/column info */
 linecol     {digit_dec}+:{digit_dec}+
 info        @\[({string} {linecol})*\]
 
 /* %x initial */
 %x indent
+%x info
 %s normal
 
 %%
@@ -64,6 +65,11 @@ info        @\[({string} {linecol})*\]
                   }
                 }
 
+<info>"["       { }
+<info>{string}\ {int}:{int} { yylval->strVal = strdup(yytext); return token::Info; }
+<info>"]"       { BEGIN(normal); }
+
+<normal>"@"     { BEGIN(info); }
 <normal>"<<"    { return token::DoubleLeft; }
 <normal>">>"    { return token::DoubleRight; }
 <normal>Clock|Reset|AsyncReset  { yylval->typeGround = strdup(yytext); return token::Clock; }
@@ -79,12 +85,7 @@ info        @\[({string} {linecol})*\]
 <normal>validif                 { return token::Validif; }
 <normal>old|new|undefined       { yylval->typeRUW = strdup(yytext); return token::Ruw; }
 <normal>mem                     { return token::Mem; }
-<normal>{int}:{int}             { yylval->strVal = strdup(yytext); return token::Linecol; }
-<normal>[.,:=@%<>()\[\]{}""]    { return yytext[0]; }
 <normal>{int}                   { yylval->strVal = strdup(yytext); return token::INT; }
-<normal>"=>"                    { return token::RightArrow; }
-<normal>"<="                    { return token::LeftArrow; }
-<normal>"<-"                    { return token::Leftarrow; }
 <normal>data-type               { return token::DataType; }
 <normal>depth                   { return token::Depth; }
 <normal>read-latency            { return token::ReadLatency; }
@@ -95,8 +96,7 @@ info        @\[({string} {linecol})*\]
 <normal>readwriter              { return token::Readwriter; }
 <normal>wire                    { return token::Wire; }
 <normal>reg                     { return token::Reg; }
-<normal>with                    { return token::With; }
-<normal>reset                   { return token::Reset;} /* Reset & reset */
+<normal>"with : (reset =>"      { return token::WithReset; }
 <normal>inst                    { return token::Inst; }
 <normal>of                      { return token::Of; }
 <normal>node                    { return token::Node; }
@@ -121,7 +121,12 @@ info        @\[({string} {linecol})*\]
 <normal>FIRRTL                  { return token::Firrtl; }
 <normal>version                 { return token::Version; }
 <normal>circuit                 { return token::Circuit; }
+<normal>{id}                    { return token::ID; }
 <normal>{string}                { yylval->strVal = strdup(yytext); return token::String; }
+<normal>"=>"                    { return token::RightArrow; }
+<normal>"<="                    { return token::LeftArrow; }
+<normal>"<-"                    { return token::Leftarrow; }
+<normal>[.,:=@%<>()\[\]{}""]    { return yytext[0]; }
 <normal>[ \t]                   { }
 <normal>\n                      { curr_indent = 0; BEGIN(indent); }
 <normal>.                       { std::cout << "Mysterious character: " << yytext << std::endl; }

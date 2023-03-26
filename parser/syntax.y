@@ -54,8 +54,8 @@
 
 %token <typeOP> E2OP E1OP E1I1OP E1I2OP  
 %token <typeRUW> Ruw
-%token <strVal> Linecol
-%token Flip Mux Validif Invalid Mem Wire Reg With Reset Inst Of Node Is Attach
+%token <strVal> Info
+%token Flip Mux Validif Invalid Mem Wire Reg WithReset Inst Of Node Is Attach
 %token When Else Stop Printf Skip Input Output
 %token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit
 %token Class Target Firrtl Version INDENT DEDENT
@@ -86,8 +86,7 @@ circuit: Circuit ID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
     ; */
 info:               { $$ = NULL;}
-    | '@' '[' ']'   { $$ = NULL;}
-    | '@' '[' String Linecol ']'    { $$ = (char*)malloc(strlen($3) + strlen($4) + 2); strcpy($$, $3); strcat($$, " "); strcat($$, $4);}
+    | Info          { $$ = $1;}
     ;
 /* type definition */
 width:                { $$ = 0; } /* infered width */
@@ -179,7 +178,7 @@ when_else:  %prec LOWER_THAN_ELSE { $$ = NULL; }
     | Else ':' INDENT statements DEDENT { $$ = newNode(P_ELSE, NULL, $4); }
     ;
 statement: Wire ID ':' type info    { $$ = newNode(P_WIRE_DEF, $5, $2, 1, $4); }
-    | Reg ID ':' type expr '(' With ':' '{' Reset "=>" '(' expr ',' expr ')' '}' ')' info { $$ = newNode(P_REG_DEF, $19, $2, 4, $4, $5, $13, $15); }
+    | Reg ID ':' type expr '(' WithReset '(' expr ',' expr ')' '}' ')' info { $$ = newNode(P_REG_DEF, $15, $2, 4, $4, $5, $9, $11); }
     | memory    { $$ = $1;}
     | Inst ID Of ID info    { $$ = newNode(P_INST, $5, $2, 0); $$->appendExtraInfo($4); }
     | Node ID '=' expr info { $$ = newNode(P_NODE, $5, $2, 1, $4); }
