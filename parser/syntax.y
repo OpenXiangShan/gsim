@@ -93,7 +93,7 @@ info:               { $$ = NULL;}
 width:                { $$ = 0; } /* infered width */
     | '<' INT '>'     { $$ = p_stoi($2); }
     ;
-binary_point: 
+binary_point:
     | "<<" INT ">>"   { TODO(); }
     ;
 type_ground: Clock    { $$ = new PNode(P_Clock); }

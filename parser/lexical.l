@@ -33,7 +33,7 @@ int         \"b-?{digit_bin}+\"|\"o-?{digit_oct}+\"|\"h-?{digit_hex}+\"|-?{digit
 /* Identifiers define legal FIRRTL or Verilog names */
 letter      [A-Za-z]
 id          (_|{letter})(_|{letter}|{digit_dec})*
-string      [0-9A-Za-z.]+
+string      [0-9A-Za-z]+
 /* Fileinfo communicates Chisel source file and line/column info */
 linecol     {digit_dec}+:{digit_dec}+
 info        @\[({string} {linecol})*\]
@@ -71,7 +71,7 @@ info        @\[({string} {linecol})*\]
                 }
 
 <info>"["       { }
-<info>{string}\ {int}:{int} { yylval->strVal = strdup(yytext); return token::Info; }
+<info>{string}.{string}\ {int}:{int} { yylval->strVal = strdup(yytext); return token::Info; }
 <info>"]"       { BEGIN(normal); }
 
 <normal>"@"     { BEGIN(info); }
