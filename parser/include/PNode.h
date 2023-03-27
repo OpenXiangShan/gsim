@@ -51,5 +51,5 @@ public:
 
 PNode* newNode(int type, char* info, char* name, int num, ...);
 PNode* newNode(int type, char* name, int num, ...);
-PNode* newNode(int type, char* info, PList* plist);
+PNode* newNode(int type, char* info, char* name, PList* plist);
 #endif

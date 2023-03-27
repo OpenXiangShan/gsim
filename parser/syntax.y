@@ -81,7 +81,7 @@
 
 %%
 /* remove version */
-circuit: Circuit ID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, $5, $7); root = $$; }
+circuit: Circuit ID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, $5, $2, $7); root = $$; }
 	;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
