@@ -28,12 +28,15 @@ public:
   std::vector<std::string> extraInfo;
   int type;
   int width;
+
   void appendChild(PNode* p);
   void appendExtraInfo(char* info);
   void appendChildList(PList* plist);
   void setWidth(int _width);
   int getChildNum();
   PNode* getChild(int idx);
+  int getExtraNum() { return extraInfo.size(); }
+  std::string getExtra(int idx) { return extraInfo[idx]; }
 };
 
 class PList{

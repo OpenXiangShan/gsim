@@ -9,8 +9,9 @@ public:
     defined = 0;
   }
   std::string name; // concat the module name in order (member in structure / temp variable)
-  int id;
-  int type; // register ? mid
+  int id;   // unused
+  int type; // unused register ? mid
+  int width;
   std::vector<Node*> next;
   std::string op;  // replace the variable names with new names
   // std::vector<Node*> prev; // keep the order in sources file

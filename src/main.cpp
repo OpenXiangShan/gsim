@@ -8,6 +8,7 @@
 void generator(graph* g, std::string header, std::string src);
 void randomGraph(graph* g);
 void preorder_traversal(PNode* root);
+graph* AST2Garph(PNode* root);
 extern PNode* root;
 
 int main(int argc, char** argv) {
@@ -24,4 +25,6 @@ int main(int argc, char** argv) {
   syntax.parse();
   std::cout << "after parser\n";
   preorder_traversal(root);
+  graph* g = AST2Garph(root);
+  generator(g, "top", "top");
 }
