@@ -21,10 +21,9 @@ int main(int argc, char** argv) {
   std::ifstream infile(argv[1]);
   Parser::Lexical lexical{infile, std::cout};
   Parser::Syntax syntax{&lexical};
-  std::cout << "before parser\n";
   syntax.parse();
-  std::cout << "after parser\n";
-  preorder_traversal(root);
+  MUX_DEBUG(std::cout << "after parser\n");
+  MUX_DEBUG(preorder_traversal(root));
   graph* g = AST2Garph(root);
   generator(g, "top", "top");
 }

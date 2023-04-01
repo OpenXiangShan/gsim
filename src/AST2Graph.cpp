@@ -123,7 +123,8 @@ Node* visitNode(std::string prefix, PNode* node) { // generate new node and conn
 void visitConnect(std::string prefix, PNode* connect) {
   Assert(connect->getChildNum() == 2, "Invalid childNum for connect %s\n", connect->name.c_str());
   std::string strDst = visitReference(prefix, connect->getChild(0));
-  visitExpr(prefix, str2Node(strDst), connect->getChild(1));
+  Node* dst = str2Node(strDst);
+  dst->op = visitExpr(prefix, dst, connect->getChild(1));
 }
 
 void visitStmts(std::string prefix, graph* g, PNode* stmts) {

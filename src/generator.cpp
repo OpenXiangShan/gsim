@@ -10,6 +10,13 @@ void genHeader(graph* g, std::string headerFile) {
   hfile << "#ifndef " << headerFile << "_H\n";
   hfile << "#define " << headerFile << "\n";
   hfile << "class S" << g->name << "{\n" << "public:\n";
+  // ports
+  for(Node* node: g->input) {
+    hfile << "int " << node->name << ";\n";
+  }
+  for(Node* node: g->output) {
+    hfile << "int " << node->name << ";\n";
+  }
   // variables
   for(Node* node: g->sources) {
     hfile << "int " << node->name << ";\n";
