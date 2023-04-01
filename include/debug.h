@@ -3,6 +3,8 @@
 
 #include <assert.h>
 
+// #define DEBUG
+
 #define Assert(cond, ...) \
   do { \
     if (!(cond)) { \
@@ -15,3 +17,8 @@
 #endif
 
 #define TODO() Assert(0, "Implement ME!")
+#ifdef DEBUG
+  #define MUX_DEBUG(...) __VA_ARGS__
+#else
+  #define MUX_DEBUG(...)
+#endif
