@@ -12,6 +12,7 @@ void genHeader(graph* g, std::string headerFile) {
 
   hfile << "#ifndef " << headerFile << "_H\n";
   hfile << "#define " << headerFile << "\n";
+  INCLUDE_LIB(hfile, "iostream");
   INCLUDE_LIB(hfile, "vector");
   hfile << "class S" << g->name << "{\n" << "public:\n";
 /*
@@ -32,14 +33,24 @@ void genHeader(graph* g, std::string headerFile) {
   hfile << "}\n";
 
 // active flags
-  hfile << "std::vector<bool> activeFlags = " << "std::vector<bool>(" <<g->sorted.size() << ", false);\n";
+  hfile << "std::vector<bool> activeFlags = " << "std::vector<bool>(" <<g->sorted.size() << ", true);\n";
+// all sigs
   for (Node* node: g->sorted) {
     hfile << "int " << node->name << ";\n";
   }
+// set functions
+  for (Node* node: g->input) {
+    hfile << "void set_" << node->name << "(int val) {\n";
+    hfile << node->name << " = val;\n";
+    for (Node* next: node->next)
+      hfile << "activeFlags[" << next->id << "] = true;\n";
+    hfile << "}\n";
+  }
+// step functions
   for (int i = 0; i < g->sorted.size(); i++) {
     hfile << "void step" << i << "();\n";
   }
-  // functions
+// functions
   hfile << "void step();\n";
   hfile << "};\n";
   hfile << "#endif\n";
@@ -54,17 +65,21 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
     if(node->op.length() == 0) continue;
     // generate function
     sfile << "void S" << g->name << "::step" << node->id << "() {\n";
+
+
     sfile << "activeFlags[" << node->id << "] = false;\n";
     sfile << "int oldVal = " << node->name << ";\n";
     sfile << node->name << " = " << node->op << ";\n";
     for(Node* next: node->next) {
       sfile << "if(" << "oldVal != " << node->name << ") activeFlags[" << next->id << "] = true;\n";
     }
+    // sfile << "std::cout << \"" << node->name << ": \" << oldVal << " <<  "\"->\" << " << node->name << "<<std::endl;\n";
     sfile << "}\n";
   }
 
   sfile << "" <<"void S" << g->name << "::step() {\n";
   for(int i = 0; i < g->sorted.size(); i++) {
+    if(g->sorted[i]->op.length() == 0) continue;
     sfile << "if(activeFlags[" << i << "]) " << "step" << i << "();\n";
   }
   // for(Node* node: g->sorted) {
