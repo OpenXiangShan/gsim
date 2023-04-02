@@ -172,6 +172,7 @@ void visitTopModule(graph* g, PNode* topModule) {
 
 graph* AST2Garph(PNode* root) {
   graph* g = new graph();
+  g->name = root->name;
   PNode* topModule = NULL;
   for (int i = 0; i < root->getChildNum(); i++) {
     PNode* module = root->getChild(i);
