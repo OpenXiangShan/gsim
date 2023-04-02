@@ -6,7 +6,7 @@
   #include "Parser.h"
   PNode* root;
 
-  int p_stoi(char* str);
+int p_stoi(const char* str);
 //   int  yylex (yy::parser::value_type* yylval);
   PNode* newNode(int type, char* info, char* name, int num, ...);
   PNode* newNode(int type, char* info, PList* plist);
@@ -56,7 +56,7 @@
 %token <typeOP> E2OP E1OP E1I1OP E1I2OP  
 %token <typeRUW> Ruw
 %token <strVal> Info
-%token Flip Mux Validif Invalid Mem Wire Reg WithReset Inst Of Node Is Attach
+%token Flip Mux Validif Invalid Mem Wire Reg RegWith RegReset Inst Of Node Is Attach
 %token When Else Stop Printf Skip Input Output
 %token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit
 %token Class Target Firrtl Version INDENT DEDENT
@@ -179,7 +179,7 @@ when_else:  %prec LOWER_THAN_ELSE { $$ = NULL; }
     | Else ':' INDENT statements DEDENT { $$ = newNode(P_ELSE, NULL, NULL, 1, $4); }
     ;
 statement: Wire ID ':' type info    { $$ = newNode(P_WIRE_DEF, $5, $2, 1, $4); }
-    | Reg ID ':' type expr '(' WithReset '(' expr ',' expr ')' '}' ')' info { $$ = newNode(P_REG_DEF, $15, $2, 4, $4, $5, $9, $11); }
+    | Reg ID ':' type ',' expr RegWith INDENT RegReset '(' expr ',' expr ')' info DEDENT { $$ = newNode(P_REG_DEF, $15, $2, 4, $4, $6, $11, $13); }
     | memory    { $$ = $1;}
     | Inst ID Of ID info    { $$ = newNode(P_INST, $5, $2, 0); $$->appendExtraInfo($4); }
     | Node ID '=' expr info { $$ = newNode(P_NODE, $5, $2, 1, $4); }

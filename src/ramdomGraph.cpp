@@ -15,7 +15,7 @@ void randomGraph(graph* g) {
     Node* ptr = new Node();
     g->sources.push_back(ptr);
     ptr->name = std::string("REG_") + std::to_string(i);
-    ptr->type = NODE_REG;
+    ptr->type = NODE_REG_SRC;
     ptr->inEdge = 0;
   }
 

@@ -25,5 +25,7 @@ int main(int argc, char** argv) {
   MUX_DEBUG(std::cout << "after parser\n");
   MUX_DEBUG(preorder_traversal(root));
   graph* g = AST2Garph(root);
+  MUX_DEBUG(std::cout << "graph generated\n");
   generator(g, "top", "top");
+  return 0;
 }

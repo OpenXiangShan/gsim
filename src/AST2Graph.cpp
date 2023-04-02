@@ -10,6 +10,7 @@ void visitStmts(std::string prefix, graph* g, PNode* stmts);
 std::string visitExpr(std::string prefix, Node* n, PNode* expr);
 void visitType(Node* n, PNode* ptype);
 
+int p_stoi(const char* str);
 
 void addSignal(std::string s, Node* n) {
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
@@ -100,12 +101,35 @@ std::string visitReference(std::string prefix, PNode* expr) { // return ref name
   Assert(expr->getChildNum() == 0, "TODO: expr %s with childNum %d\n", expr->name, expr->getChildNum());
 }
 
+std::string visitMux(std::string prefix, Node* n, PNode* mux) {
+  Assert(mux->getChildNum() == 3, "Invalid childNum for Mux\n");
+  return "(" + visitExpr(prefix, n, mux->getChild(0)) + "? " + visitExpr(prefix, n, mux->getChild(1)) + " : " + visitExpr(prefix, n, mux->getChild(2)) + ")";
+}
+
+std::string cons2str(std::string s) {
+  if (s.length() <= 1) return s;
+  std::string ret;
+  int idx = 1;
+  if (s[1] == '-') {
+    ret += "-";
+    idx = 2;
+  }
+  if (s[0] == 'b') ret += "0b";
+  else if(s[0] == 'o') ret += "0";
+  else if(s[0] == 'h') ret += "0x";
+  else idx = 0;
+  ret += s.substr(idx);
+  return ret;
+}
+
 std::string visitExpr(std::string prefix, Node* n, PNode* expr) { // return op & update connect
   std::string ret;
   switch(expr->type) {
     case P_1EXPR1INT: return visit1Expr1Int(prefix, n, expr);
     case P_2EXPR: return visit2Expr(prefix, n, expr);
     case P_REF: ret = visitReference(prefix, expr); addEdge(ret, n); return ret;
+    case P_EXPR_MUX: return visitMux(prefix, n, expr);
+    case P_EXPR_INT_INIT: return cons2str(expr->getExtra(0).substr(1, expr->getExtra(0).length()-2));
     default: TODO();
   }
 
@@ -124,7 +148,21 @@ void visitConnect(std::string prefix, PNode* connect) {
   Assert(connect->getChildNum() == 2, "Invalid childNum for connect %s\n", connect->name.c_str());
   std::string strDst = visitReference(prefix, connect->getChild(0));
   Node* dst = str2Node(strDst);
+  if(dst->type == NODE_REG_SRC) dst = dst->regNext;
   dst->op = visitExpr(prefix, dst, connect->getChild(1));
+}
+
+void visitRegDef(std::string prefix, graph* g, PNode* reg) {
+  Node* newReg = new Node();
+  newReg->name = prefix + reg->name;
+  newReg->type = NODE_REG_SRC;
+  Node* nextReg = new Node();
+  nextReg->name = newReg->name + "_next";
+  nextReg->type = NODE_REG_DST;
+  newReg->regNext = nextReg;
+  addSignal(newReg->name, newReg);
+  addSignal(nextReg->name, nextReg);
+  g->sources.push_back(newReg);
 }
 
 void visitStmts(std::string prefix, graph* g, PNode* stmts) {
@@ -140,6 +178,9 @@ void visitStmts(std::string prefix, graph* g, PNode* stmts) {
         break;
       case P_CONNECT :
         visitConnect(prefix, stmt);
+        break;
+      case P_REG_DEF:
+        visitRegDef(prefix, g, stmt);
         break;
       default: Assert(0, "Invalid stmt %s\n", stmt->name.c_str());
     }

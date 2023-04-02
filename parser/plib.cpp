@@ -10,7 +10,7 @@ static inline int bit(char c, int base) {
   return -1;
 }
 
-int p_stoi(char* str) { // oct/dec/hex string to int
+int p_stoi(const char* str) { // oct/dec/hex string to int
   int len = strlen(str);
   if (len  == 0) return 0;
   int val = 0;
