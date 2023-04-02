@@ -3,7 +3,7 @@
 #include "common.h"
 
 void topoSort(graph* g) {
-  int time = 1;
+  int idx = 0;
   std::vector<Node*> s(g->sources);
   s.insert(s.end(), g->input.begin(), g->input.end());
   // for (Node* node : g->sources) {
@@ -11,6 +11,7 @@ void topoSort(graph* g) {
   // }
   while(!s.empty()) {
     Node* top = s.back();
+    top->id = idx ++;
     g->sorted.push_back(top);
     s.pop_back();
     for(Node* next : top->next) {
