@@ -17,6 +17,11 @@ FIRRTL_FILE = scala/build/_add.lo.fir
 EMU_SRC = emu/simadd.cpp
 EMU_TARGET = emu_test
 
+ifeq ($(DEBUG),1)
+	CXXFLAGS += -DDEBUG
+endif
+
+
 run: $(PARSER_BUILD)/syntax.cc
 	mkdir -p build
 	mkdir -p obj

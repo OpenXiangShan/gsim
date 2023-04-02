@@ -3,8 +3,6 @@
 
 #include <assert.h>
 
-// #define DEBUG
-
 #define Assert(cond, ...) \
   do { \
     if (!(cond)) { \
