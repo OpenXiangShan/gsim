@@ -12,7 +12,7 @@ CXXFLAGS = -O2 -DOBJ_DIR=\"obj\" $(addprefix -I,$(INCLUDE_DIR))
 CXX = g++
 TARGET = GraphEmu
 
-FIRRTL_FILE = scala/build/_add.lo.fir
+FIRRTL_FILE = scala/build/addreg.lo.fir
 
 EMU_SRC = emu/simadd.cpp
 EMU_TARGET = emu_test
