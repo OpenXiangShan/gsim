@@ -41,7 +41,7 @@ void genHeader(graph* g, std::string headerFile) {
   }
   // functions
   hfile << "void step();\n";
-  hfile << "}\n";
+  hfile << "};\n";
   hfile << "#endif\n";
   hfile.close();
 }
