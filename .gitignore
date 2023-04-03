@@ -3,3 +3,4 @@ obj/
 .vscode/
 out/
 log
+obj_dir
