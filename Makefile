@@ -8,23 +8,34 @@ PARSER_BUILD = $(PARSER_DIR)/build
 SRCS = $(shell find src $(PARSER_DIR) -name "*.cpp" -o -name "*.cc")
 INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 
-CXXFLAGS = -O2 -DOBJ_DIR=\"obj\" $(addprefix -I,$(INCLUDE_DIR))
+OBJ_DIR = obj
+
+CXXFLAGS = -O2 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR))
 CXX = g++
 TARGET = GraphEmu
 
-FIRRTL_FILE = scala/build/addreg.lo.fir
+NAME = addreg
+TEST_FILE = scala/build/$(NAME)
+FIRRTL_FILE = $(TEST_FILE).lo.fir
 
-EMU_SRC = emu/simadd.cpp
+EMU_DIR = emu
+EMU_SRC = $(EMU_DIR)/sim$(NAME).cpp
 EMU_TARGET = emu_test
 
 ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
 endif
 
+VERI_INC_DIR = $(OBJ_DIR)
+VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME)
+VERI_CFLAGS = -O3 $(addprefix -I../, $(VERI_INC_DIR))
+VERI_LDFLAGS = -O3
+VERI_VSRCS = $(TEST_FILE).v
+VERI_CSRCS = $(shell find $(OBJ_DIR) -name "*.cpp") $(EMU_DIR)/difftest.cpp
 
-run: $(PARSER_BUILD)/syntax.cc
+compile: $(PARSER_BUILD)/syntax.cc
 	mkdir -p build
-	mkdir -p obj
+	mkdir -p $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET)
 	$(BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
 
@@ -41,4 +52,8 @@ $(PARSER_BUILD)/syntax.cc: $(LEXICAL_SRC) $(SYNTAX_SRC)
 	flex -o $(PARSER_BUILD)/lexical.cc $(LEXICAL_SRC)
 	bison -v -d $(SYNTAX_SRC) -o $(PARSER_BUILD)/syntax.cc
 
-.PHONY: run clean emu
+difftest:
+	verilator $(VERI_VFLAGS) -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
+	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
+
+.PHONY: compile clean emu difftest
