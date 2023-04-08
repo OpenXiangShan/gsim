@@ -154,6 +154,7 @@ void visitRegDef(std::string prefix, graph* g, PNode* reg) {
   nextReg->name = newReg->name + "_next";
   nextReg->type = NODE_REG_DST;
   newReg->regNext = nextReg;
+  nextReg->regNext = newReg;
   addSignal(newReg->name, newReg);
   addSignal(nextReg->name, nextReg);
   g->sources.push_back(newReg);

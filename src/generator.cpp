@@ -105,7 +105,8 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
     sfile << "activeFlags[" << node->id << "] = false;\n";
     sfile << "int oldVal = " << node->name << ";\n";
     sfile << node->name << " = " << node->op << ";\n";
-    for(Node* next: node->next) {
+    Node* activeNode = node->type == NODE_REG_DST ? node->regNext : node;
+    for(Node* next: activeNode->next) {
       sfile << "if(" << "oldVal != " << node->name << ") activeFlags[" << next->id << "] = true;\n";
     }
     // sfile << "std::cout << \"" << node->name << ": \" << oldVal << " <<  "\"->\" << " << node->name << "<<std::endl;\n";
