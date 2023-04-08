@@ -73,13 +73,7 @@ std::string visit1Expr1Int(std::string prefix, Node* n, PNode* expr) { // pad|sh
 
 std::string visit2Expr(std::string prefix, Node* n, PNode* expr) { // add|sub|mul|div|mod|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat
   Assert(expr->getChildNum() == 2, "Invalid childNum for expr %s\n", expr->name.c_str());
-  if(expr->name == "add") {
-    return visitExpr(prefix, n, expr->getChild(0)) + " + " + visitExpr(prefix, n, expr->getChild(1));
-  } else if(expr->name == "sub") {
-    return visitExpr(prefix, n, expr->getChild(0)) + " - " + visitExpr(prefix, n, expr->getChild(1));
-  } else {
-    Assert(0, "Invalid E2OP %s\n", expr->name.c_str());
-  }
+  return "__" + expr->name + "(" + visitExpr(prefix, n, expr->getChild(0)) + ", " +  visitExpr(prefix, n, expr->getChild(1)) + ")";
 }
 
 std::string visitReference(std::string prefix, PNode* expr) { // return ref name

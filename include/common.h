@@ -12,4 +12,6 @@
 
 #include "debug.h"
 
+#define LENGTH(a) (sizeof(a) / sizeof(a[0]))
+
 #endif
