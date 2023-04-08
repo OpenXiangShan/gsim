@@ -22,18 +22,35 @@ void ref_reset(){
     ref->reset = 0;
 }
 
+void check(MOD_NAME* mod, REF_NAME* ref) {
+  if((mod->io_outputValid != ref->io_outputValid) || (mod->io_outputGCD != ref->io_outputGCD))
+    std::cout << "fail (" << mod->io_outputValid << ","<< mod->io_outputGCD << ") (" << (int)ref->io_outputValid << "," << ref->io_outputGCD << ")" << std::endl;
+  else
+    std::cout << "pass!\n";
+}
+
 int main() {
   mod = new MOD_NAME();
   ref = new REF_NAME();
   ref_reset();
-  for (int i = 1; i < 10; i++) {
-    mod->set_io_a(i);
-    mod->set_io_b(i+1);
+  for (int i = 2; i < 10; i++) {
+    mod->set_io_value1(i * 21);
+    mod->set_io_value2(i+1);
+    mod->set_io_loadingValues(1);
+    ref->io_value1 = i * 21;
+    ref->io_value2 = i+1;
+    ref->io_loadingValues=1;
     mod->step();
-    ref->io_a = i;
-    ref->io_b = i+1;
-    ref->eval();
-    std::cout << mod->io_result << " " << ref->io_result << std::endl;
     ref_cycle(1);
+    mod->set_io_loadingValues(0);
+    ref->io_loadingValues = 0;
+    while(!ref->io_outputValid) {
+      mod->step();
+      std::cout << "(" << mod->io_outputValid << ","<< mod->io_outputGCD << ") (" << (int)ref->io_outputValid << "," << ref->io_outputGCD << ")" << std::endl;
+      ref_cycle(1);
+
+    }
+    mod->step();
+    check(mod, ref);
   }
 }

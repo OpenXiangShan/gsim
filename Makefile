@@ -14,7 +14,7 @@ CXXFLAGS = -O2 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR))
 CXX = g++
 TARGET = GraphEmu
 
-NAME = gcd
+NAME = GCD
 TEST_FILE = scala/build/$(NAME)
 FIRRTL_FILE = $(TEST_FILE).lo.fir
 
