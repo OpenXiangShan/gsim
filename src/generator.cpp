@@ -109,7 +109,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
     for(Node* next: activeNode->next) {
       sfile << "if(" << "oldVal != " << node->name << ") activeFlags[" << next->id << "] = true;\n";
     }
-    // sfile << "std::cout << \"" << node->name << ": \" << oldVal << " <<  "\"->\" << " << node->name << "<<std::endl;\n";
+    // sfile << "std::cout << \"" << node->id  << ": " << node->name << ": \" << oldVal << " <<  "\"->\" << " << node->name << "<<std::endl;\n";
     sfile << "}\n";
   }
 
