@@ -14,7 +14,7 @@ CXXFLAGS = -O2 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR))
 CXX = g++
 TARGET = GraphEmu
 
-NAME = addreg
+NAME = add
 TEST_FILE = scala/build/$(NAME)
 FIRRTL_FILE = $(TEST_FILE).lo.fir
 
@@ -29,6 +29,7 @@ endif
 VERI_INC_DIR = $(OBJ_DIR)
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME)
 VERI_CFLAGS = -O3 $(addprefix -I../, $(VERI_INC_DIR))
+VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\"
 VERI_LDFLAGS = -O3
 VERI_VSRCS = $(TEST_FILE).v
 VERI_CSRCS = $(shell find $(OBJ_DIR) -name "*.cpp") $(EMU_DIR)/difftest.cpp
@@ -40,8 +41,7 @@ compile: $(PARSER_BUILD)/syntax.cc
 	$(BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
 
 clean:
-	rm -rf obj
-	rm -rf parser/build
+	rm -rf obj parser/build obj_dir
 
 emu: obj/top.cpp $(EMU_SRC)
 	g++ $(EMU_SRC) obj/top.cpp -Iobj -o $(BUILD_DIR)/$(EMU_TARGET)
@@ -52,8 +52,9 @@ $(PARSER_BUILD)/syntax.cc: $(LEXICAL_SRC) $(SYNTAX_SRC)
 	flex -o $(PARSER_BUILD)/lexical.cc $(LEXICAL_SRC)
 	bison -v -d $(SYNTAX_SRC) -o $(PARSER_BUILD)/syntax.cc
 
-difftest:
+difftest: compile
 	verilator $(VERI_VFLAGS) -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
 	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
+	./obj_dir/V$(NAME)
 
 .PHONY: compile clean emu difftest

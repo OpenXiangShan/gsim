@@ -1,10 +1,10 @@
 #include <iostream>
 #include <top.h>
 #include "verilated.h"
-#include "Vaddreg__Syms.h"
+#include HEADER
 
-Saddreg* mod;
-Vaddreg* ref;
+MOD_NAME* mod;
+REF_NAME* ref;
 
 void ref_cycle(int n) {
   while(n --){
@@ -23,8 +23,8 @@ void ref_reset(){
 }
 
 int main() {
-  mod = new Saddreg();
-  ref = new Vaddreg();
+  mod = new MOD_NAME();
+  ref = new REF_NAME();
   ref_reset();
   for (int i = 1; i < 10; i++) {
     mod->set_io_a(i);
