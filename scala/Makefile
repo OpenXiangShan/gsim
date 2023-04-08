@@ -6,7 +6,7 @@ test:
 
 verilog:
 	mkdir -p $(BUILD_DIR)
-	mill -i __.test.runMain addtop -td $(BUILD_DIR) -X high -X low
+	mill -i __.test.runMain Elaborate -td $(BUILD_DIR) -X high -X low -X verilog
 
 help:
 	mill -i __.test.runMain addtop --help
