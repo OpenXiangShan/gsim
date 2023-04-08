@@ -115,13 +115,13 @@ type: type_ground  { $$ = $1; }
     | type_aggregate { $$ = $1; }
     ;
 /* primitive operations */
-primop_2expr: E2OP '(' expr ',' expr ')' { $$ = newNode(P_2EXPR, $1, 2, $3, $5); }
+primop_2expr: E2OP expr ',' expr ')' { $$ = newNode(P_2EXPR, $1, 2, $2, $4); }
     ;
-primop_1expr: E1OP '(' expr ')' { $$ = newNode(P_1EXPR, $1, 1, $3); }
+primop_1expr: E1OP expr ')' { $$ = newNode(P_1EXPR, $1, 1, $2); }
     ;
-primop_1expr1int: E1I1OP '(' expr ',' INT ')' { $$ = newNode(P_1EXPR1INT, $1, 1, $3); $$->appendExtraInfo($5); }
+primop_1expr1int: E1I1OP expr ',' INT ')' { $$ = newNode(P_1EXPR1INT, $1, 1, $2); $$->appendExtraInfo($4); }
     ;
-primop_1expr2int: E1I2OP '(' expr ',' INT ',' INT ')' { $$ = newNode(P_1EXPR2INT, $1, 1, $3); $$->appendExtraInfo($5); $$->appendExtraInfo($7); }
+primop_1expr2int: E1I2OP expr ',' INT ',' INT ')' { $$ = newNode(P_1EXPR2INT, $1, 1, $2); $$->appendExtraInfo($4); $$->appendExtraInfo($6); }
     ;
 /* expression definitions */
 exprs:
