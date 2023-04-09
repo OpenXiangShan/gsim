@@ -5,28 +5,6 @@
 #define INCLUDE_LIB(f, s) f << "#include <" << s << ">\n";
 #define INCLUDE(f, s) f << "#include \"" << s << "\"\n";
 
-const char* allOP[][2] = {
-  {"add", "a + b"},
-  {"sub", "a - b"},
-  {"mul", "a * b"},
-  {"div", "a / b"},
-  {"mod", "a % b"},
-  {"lt", "a < b"},
-  {"leq", "a <= b"},
-  {"gt", "a > b"},
-  {"geq", "a >= b"},
-  {"eq", "a == b"},
-  {"neq", "a != b"},
-  {"dshl", "a << b"},
-  {"dshr", "(int)a >> b"},
-  {"and", "a & b"},
-  {"or", "a | b"},
-  {"xor", "a ^ b"},
-  // {"cat"}
-  // {}
-};
-
-
 void topoSort(graph* g);
 
 void genHeader(graph* g, std::string headerFile) {
@@ -36,6 +14,8 @@ void genHeader(graph* g, std::string headerFile) {
   hfile << "#define " << headerFile << "\n";
   INCLUDE_LIB(hfile, "iostream");
   INCLUDE_LIB(hfile, "vector");
+  INCLUDE(hfile, "UInt.h");
+  INCLUDE(hfile, "SInt.h");
   hfile << "class S" << g->name << "{\n" << "public:\n";
 /*
   // ports
@@ -58,11 +38,11 @@ void genHeader(graph* g, std::string headerFile) {
   hfile << "std::vector<bool> activeFlags = " << "std::vector<bool>(" <<g->sorted.size() << ", true);\n";
 // all sigs
   for (Node* node: g->sorted) {
-    hfile << "int " << node->name << ";\n";
+    hfile << ((node->sign)? "SInt<" : "UInt<") << node->width << ">" << node->name << ";\n";
   }
 // set functions
   for (Node* node: g->input) {
-    hfile << "void set_" << node->name << "(int val) {\n";
+    hfile << "void set_" << node->name << "(" << ((node->sign)? "SInt<" : "UInt<") << node->width << ">val) {\n";
     hfile << node->name << " = val;\n";
     for (Node* next: node->next)
       hfile << "activeFlags[" << next->id << "] = true;\n";
@@ -72,10 +52,7 @@ void genHeader(graph* g, std::string headerFile) {
   for (int i = 0; i < g->sorted.size(); i++) {
     hfile << "void step" << i << "();\n";
   }
-// op functions
-  for (int i = 0; i < LENGTH(allOP); i++) {
-    hfile << "int __" << allOP[i][0] << "(int a, int b);\n";
-  }
+
 // functions
   hfile << "void step();\n";
   hfile << "};\n";
@@ -83,19 +60,10 @@ void genHeader(graph* g, std::string headerFile) {
   hfile.close();
 }
 
-void genOperations(std::string prefix, std::ofstream& file) {
-  for(int i = 0; i < LENGTH(allOP); i ++) {
-    file << "int " << prefix << allOP[i][0] << "(int a, int b) {\n";
-    file << "return " << allOP[i][1] << ";\n";
-    file << "}\n";
-  }
-}
-
 void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   std::ofstream sfile(std::string(OBJ_DIR) + "/" + srcFile + ".cpp");
   INCLUDE(sfile, headerFile + ".h");
-// func step
-  genOperations("S" + g->name + "::__", sfile);
+
   for(Node* node: g->sorted) {
     if(node->op.length() == 0) continue;
     // generate function
@@ -103,7 +71,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 
 
     sfile << "activeFlags[" << node->id << "] = false;\n";
-    sfile << "int oldVal = " << node->name << ";\n";
+    sfile << ((node->sign)? "SInt<" : "UInt<") << node->width << "> oldVal = " << node->name << ";\n";
     sfile << node->name << " = " << node->op << ";\n";
     Node* activeNode = node->type == NODE_REG_DST ? node->regNext : node;
     for(Node* next: activeNode->next) {

@@ -97,7 +97,7 @@ binary_point:
     | "<<" INT ">>"   { TODO(); }
     ;
 type_ground: Clock    { $$ = new PNode(P_Clock); }
-    | IntType width   { $$ = newNode(P_INT_TYPE, $1, 0); $$->setWidth($2); }
+    | IntType width   { $$ = newNode(P_INT_TYPE, $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); }
     | anaType width   { TODO(); }
     | FixedType width binary_point  { TODO(); }
     ;
@@ -127,8 +127,8 @@ primop_1expr2int: E1I2OP expr ',' INT ',' INT ')' { $$ = newNode(P_1EXPR2INT, $1
 exprs:
     | exprs expr    { TODO(); }
     ;
-expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, $1, 0); $$->setWidth($2);}
-    | IntType width '(' INT ')' { $$ = newNode(P_EXPR_INT_INIT, $1, 0); $$->setWidth($2); $$->appendExtraInfo($4);}
+expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S');}
+    | IntType width '(' INT ')' { $$ = newNode(P_EXPR_INT_INIT, $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); $$->appendExtraInfo($4);}
     | reference { $$ = $1; }
     | Mux '(' expr ',' expr ',' expr ')' { $$ = newNode(P_EXPR_MUX, NULL, 3, $3, $5, $7); }
     | Validif '(' expr ',' expr ')' { TODO(); }

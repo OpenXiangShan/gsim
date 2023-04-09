@@ -13,6 +13,7 @@ public:
   int id;   // unused
   int type; // unused register ? mid
   int width;
+  int sign;
   std::vector<Node*> next;
   std::string op;  // replace the variable names with new names
   // std::vector<Node*> prev; // keep the order in sources file

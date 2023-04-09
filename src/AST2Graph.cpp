@@ -3,6 +3,84 @@
 #include "Node.h"
 #include "graph.h"
 #include <map>
+
+#define SET_TYPE(x, y) do{ x->width = y->width; x->sign = y->sign;} while(0)
+#define COMMU 1
+#define NO_COMMU 0
+
+static int maxWidth(int a, int b, bool sign = 0) {
+  return MAX(a, b);
+}
+
+static int minWidth(int a, int b, bool sign = 0) {
+  return MAX(a, b);
+}
+
+static int maxWidthPlus1(int a, int b, bool sign = 0) {
+  return MAX(a, b) + 1;
+}
+
+static int sumWidth(int a, int b, bool sign = 0) {
+  return a + b;
+}
+
+static int minusWidthPos(int a, int b, bool sign = 0) {
+  return MAX(1, a - b);
+}
+
+static int minusWidth(int a, int b, bool sign = 0) {
+  return a - b;
+}
+
+static int divWidth(int a, int b, bool sign = 0) {
+  return sign? a + 1 : a;
+}
+
+static int boolWidth(int a, int b, bool sign = 0) {
+  return 1;
+}
+
+static int dshlWidth(int a, int b, bool sign = 0) {
+  return a + 1 << b -1;
+}
+
+static int firstWidth(int a, int b, bool sign = 0){
+  return a;
+}
+
+static int secondWidth(int a, int b, bool sign = 0){
+  return b;
+}
+
+                              // sign  op    widthFunc
+std::map<std::string, std::tuple<bool, const char*, bool, int (*)(int, int, bool)>> expr2Map = {
+  {"add",   {1, "+",  COMMU,    maxWidthPlus1}},
+  {"sub",   {1, "-",  NO_COMMU, maxWidthPlus1}},
+  {"mul",   {1, "*",  COMMU,    sumWidth}},
+  {"div",   {1, "/",  NO_COMMU, divWidth}},
+  {"rem",   {1, "%",  NO_COMMU, minWidth}},
+  {"lt",    {0, "<",  NO_COMMU, boolWidth}},
+  {"leq",   {0, "<=", NO_COMMU, boolWidth}},
+  {"gt",    {0, ">",  NO_COMMU, boolWidth}},
+  {"geq",   {0, ">=", NO_COMMU, boolWidth}},
+  {"eq",    {0, "==", COMMU, boolWidth}},
+  {"neq",   {0, "!=", COMMU, boolWidth}},
+  {"dshl",  {1, "<<", NO_COMMU, dshlWidth}},
+  {"dshr",  {1, ">>", NO_COMMU, firstWidth}},
+  {"and",   {0, "&",  COMMU, maxWidth}},
+  {"or",    {0, "|",  COMMU, maxWidth}},
+  {"xor",   {0, "^",  COMMU, maxWidth}},
+};
+
+                                            // width num
+std::map<std::string, std::tuple<bool, int (*)(int, int, bool)>> expr1int1Map = {
+  {"pad", {1, maxWidth}},
+  {"shl", {1, sumWidth}},
+  {"shr", {1, minusWidthPos}},
+  {"head", {0, secondWidth}},
+  {"tail", {0, minusWidth}},
+};
+
 static std::map<std::string, PNode*> moduleMap;
 static std::map<std::string, Node*> allSignals;
 void visitStmts(std::string prefix, graph* g, PNode* stmts);
@@ -11,6 +89,7 @@ std::string visitExpr(std::string prefix, Node* n, PNode* expr);
 void visitType(Node* n, PNode* ptype);
 
 int p_stoi(const char* str);
+std::string cons2str(std::string s);
 
 void addSignal(std::string s, Node* n) {
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
@@ -53,27 +132,32 @@ void visitModule(std::string prefix, graph* g, PNode* module) {
 void visitType(Node* n, PNode* ptype) {
   switch(ptype->type) {
     case P_Clock: n->width = 1; break;
-    case P_INT_TYPE: n->width = 32; break;  //TODO: UInt & SInt
+    case P_INT_TYPE: SET_TYPE(n, ptype); break;  //TODO: UInt & SInt
     default: TODO();
   }
 }
 
 std::string visit1Expr1Int(std::string prefix, Node* n, PNode* expr) { // pad|shl|shr|head|tail
-  if(expr->name == "pad") TODO();
-  else if(expr->name == "shl") TODO();
-  else if(expr->name == "shr") TODO();
-  else if(expr->name == "head") TODO();
-  else if(expr->name == "tail") {
-    // TODO: truncate
-    return visitExpr(prefix, n, expr->getChild(0));
-  } else {
-    Assert(0, "Invalid E1I1OP %s\n", expr->name.c_str());
-  }
+  Assert(expr1int1Map.find(expr->name) != expr1int1Map.end(), "Operation %s not found\n", expr->name.c_str());
+  std::tuple<bool, int (*)(int, int, bool)>info = expr1int1Map[expr->name];
+  std::string str = visitExpr(prefix, n, expr->getChild(0));
+  expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
+  expr->width = std::get<1>(info)(expr->getChild(0)->width, p_stoi(expr->getExtra(0).c_str()), false);
+  return visitExpr(prefix, n, expr->getChild(0)) + "." + expr->name + "<" + cons2str(expr->getExtra(0)) + ">()";
 }
 
 std::string visit2Expr(std::string prefix, Node* n, PNode* expr) { // add|sub|mul|div|mod|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat
   Assert(expr->getChildNum() == 2, "Invalid childNum for expr %s\n", expr->name.c_str());
-  return "__" + expr->name + "(" + visitExpr(prefix, n, expr->getChild(0)) + ", " +  visitExpr(prefix, n, expr->getChild(1)) + ")";
+  std::string left = visitExpr(prefix, n, expr->getChild(0));
+  std::string right = visitExpr(prefix, n, expr->getChild(1));
+  Assert(expr2Map.find(expr->name) != expr2Map.end(), "Operation %s not found\n", expr->name.c_str());
+  std::tuple<bool, const char*, bool, int (*)(int, int, bool)>info = expr2Map[expr->name];
+  expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
+  expr->width = std::get<3>(info)(expr->getChild(0)->width, expr->getChild(1)->width, expr->sign);
+  if(std::get<2>(info) && (expr->getChild(1)->width > expr->getChild(0)->width))
+    return "(" + right + std::get<1>(info) + left + ")";
+  else
+    return "(" + left + std::get<1>(info) + right + ")";
 }
 
 std::string visitReference(std::string prefix, PNode* expr) { // return ref name
@@ -84,6 +168,7 @@ std::string visitReference(std::string prefix, PNode* expr) { // return ref name
     return ret;
   } else {
     PNode* child = expr->getChild(0);
+    SET_TYPE(expr, expr->getChild(0));
     switch(child->type) {
       case P_REF_DOT: 
         ret = prefix + expr->name + "_" + visitReference("", child);
@@ -97,7 +182,9 @@ std::string visitReference(std::string prefix, PNode* expr) { // return ref name
 
 std::string visitMux(std::string prefix, Node* n, PNode* mux) {
   Assert(mux->getChildNum() == 3, "Invalid childNum for Mux\n");
-  return "(" + visitExpr(prefix, n, mux->getChild(0)) + "? " + visitExpr(prefix, n, mux->getChild(1)) + " : " + visitExpr(prefix, n, mux->getChild(2)) + ")";
+  std::string ret = "(" + visitExpr(prefix, n, mux->getChild(0)) + "? " + visitExpr(prefix, n, mux->getChild(1)) + " : " + visitExpr(prefix, n, mux->getChild(2)) + ")";;
+  SET_TYPE(mux, mux->getChild(1));
+  return ret;
 }
 
 std::string cons2str(std::string s) {
@@ -121,9 +208,9 @@ std::string visitExpr(std::string prefix, Node* n, PNode* expr) { // return op &
   switch(expr->type) {
     case P_1EXPR1INT: return visit1Expr1Int(prefix, n, expr);
     case P_2EXPR: return visit2Expr(prefix, n, expr);
-    case P_REF: ret = visitReference(prefix, expr); addEdge(ret, n); return ret;
+    case P_REF: ret = visitReference(prefix, expr); addEdge(ret, n); SET_TYPE(expr, allSignals[ret]); return ret;
     case P_EXPR_MUX: return visitMux(prefix, n, expr);
-    case P_EXPR_INT_INIT: return cons2str(expr->getExtra(0).substr(1, expr->getExtra(0).length()-2));
+    case P_EXPR_INT_INIT: return (expr->sign ? "SInt<" : "UInt<") + std::to_string(expr->width) + ">(" + cons2str(expr->getExtra(0).substr(1, expr->getExtra(0).length()-2)) + ")";
     default: TODO();
   }
 
@@ -135,6 +222,7 @@ Node* visitNode(std::string prefix, PNode* node) { // generate new node and conn
   addSignal(newSig->name, newSig);
   Assert(node->getChildNum() >= 1, "Invalid childNum for node %s\n", node->name.c_str());
   newSig->op = visitExpr(prefix, newSig, node->getChild(0));
+  SET_TYPE(newSig, node->getChild(0));
   return newSig;
 }
 
@@ -150,9 +238,11 @@ void visitRegDef(std::string prefix, graph* g, PNode* reg) {
   Node* newReg = new Node();
   newReg->name = prefix + reg->name;
   newReg->type = NODE_REG_SRC;
+  visitType(newReg, reg->getChild(0));
   Node* nextReg = new Node();
   nextReg->name = newReg->name + "_next";
   nextReg->type = NODE_REG_DST;
+  SET_TYPE(nextReg, newReg);
   newReg->regNext = nextReg;
   nextReg->regNext = newReg;
   addSignal(newReg->name, newReg);
