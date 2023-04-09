@@ -81,7 +81,7 @@ info        [0-9A-Za-z.{}:, ]+
 <normal>Analog                  { yylval->typeGround = strdup(yytext); return token::anaType; }
 <normal>Fixed                   { yylval->typeGround = strdup(yytext); return token::FixedType; }
 <normal>flip                    { return token::Flip;}
-<normal>(add|sub|mul|div|mod|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat)[(] { yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E2OP; }
+<normal>(add|sub|mul|div|rem|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat)[(] { yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E2OP; }
 <normal>(asUInt|asSInt|asClock|cvt|neg|not|andr|orr|xorr)[(] { yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1OP; }
 <normal>(pad|shl|shr|head|tail)[(]   { yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1I1OP; }
 <normal>bits[(]                 { yylval->typeOP = strdup(yytext); return token::E1I2OP; }
