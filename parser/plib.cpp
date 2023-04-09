@@ -28,7 +28,7 @@ int p_stoi(const char* str) { // oct/dec/hex string to int
     neg = 1;
   }
   for(int i = idx; i < len; i++) {
-    val = val << base + bit(str[i], base);
+    val = val * base + bit(str[i], base);
   }
   if(neg) return -val;
   return val;
