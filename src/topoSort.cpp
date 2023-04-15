@@ -17,8 +17,12 @@ void topoSort(graph* g) {
     for(Node* next : top->next) {
       Assert(next->inEdge > 0, "Invalid inEdge %d for node(%d)\n", next->inEdge, next->id);
       next->inEdge --;
-      if(!next->inEdge) s.push_back(next);
+      if(!next->inEdge && next->type != NODE_REG_DST) s.push_back(next);
     }
+  }
+  for(Node* node: g->sources) {
+    node->regNext->id = idx ++;
+    g->sorted.push_back(node->regNext);
   }
   
 }
