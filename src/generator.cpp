@@ -5,6 +5,8 @@
 #define INCLUDE_LIB(f, s) f << "#include <" << s << ">\n";
 #define INCLUDE(f, s) f << "#include \"" << s << "\"\n";
 
+const char* cmpOP[][2] = {{"s_mpz_lt", "<"}, {"s_mpz_leq", "<="}, {"s_mpz_gt", ">"}, {"s_mpz_geq", ">="}, {"s_mpz_eq", "=="}, {"s_mpz_neq", "!="}};
+
 void topoSort(graph* g);
 
 void genHeader(graph* g, std::string headerFile) {
@@ -67,6 +69,24 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   std::ofstream sfile(std::string(OBJ_DIR) + "/" + srcFile + ".cpp");
   INCLUDE(sfile, headerFile + ".h");
 
+  // operations based on libgmp
+  for(int i = 0; i < LENGTH(cmpOP); i++) {
+    sfile << "void " << cmpOP[i][0] << "(mpz_t& dst, mpz_t& op1, mpz_t& op2) {\n";
+    sfile << "  mpz_set_ui(dst, mpz_cmp(op1, op2)" << cmpOP[i][1] << "0);\n}\n";
+    sfile << "void " << cmpOP[i][0] << "(mpz_t& dst, mpz_t& op1, unsigned long int op2) {\n";
+    sfile << "  mpz_set_ui(dst, mpz_cmp_ui(op1, op2)" << cmpOP[i][1] << "0);\n}\n";
+  }
+
+  sfile << "void s_tail(mpz_t& dst, mpz_t& src, unsigned long n) {\n";
+  sfile << "mpz_set(dst, src);\n";
+  sfile << "if(mpz_size(dst) == 0) return;\n";
+  sfile << "int libms_num = (n + 63) / 64;\n";
+  sfile << "unsigned long mask = ((unsigned long)1 << (n % 64)) - 1;\n";
+  sfile << "mp_limb_t* data = mpz_limbs_modify(dst, libms_num);\n";
+  sfile << "*data = *data & mask;\n";
+  sfile << "mpz_limbs_finish(dst, libms_num);\n";
+  sfile << "}\n";
+
   for(Node* node: g->sorted) {
     if(node->op.length() == 0) continue;
     // generate function
@@ -77,10 +97,14 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
     sfile << "mpz_set(oldVal, " << node->name << ");\n";
     sfile << node->op << ";\n";
     Node* activeNode = node->type == NODE_REG_DST ? node->regNext : node;
-    for(Node* next: activeNode->next) {
-      sfile << "if(" << "mpz_cmp(oldVal," << node->name << ") != 0) activeFlags[" << next->id << "] = true;\n";
+    if(activeNode->next.size() > 0){
+      sfile << "if(" << "mpz_cmp(oldVal," << node->name << ") != 0){\n";
+      for(Node* next: activeNode->next) {
+        sfile << "activeFlags[" << next->id << "] = true;\n";
+      }
+      sfile << "}\n";
     }
-    // sfile << "std::cout << \"" << node->id  << ": " << node->name << ": \" << oldVal << " <<  "\"->\" << " << node->name << "<<std::endl;\n";
+    // sfile << "std::cout << \"" << node->id  << ": " << node->name << ": \" << mpz_get_ui(oldVal) << " <<  "\"->\" << mpz_get_ui(" << node->name << ")<< \" \" <<(mpz_cmp(oldVal, " << node->name << ")!=0)<<std::endl;\n";
     sfile << "}\n";
   }
 
@@ -101,6 +125,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   for(Node* node: g->sources) {
     sfile << "mpz_set(" << node->name << ", " << node->name << "_next);\n";
   }
+  // sfile << "std::cout << \"------\\n\";\n";
   sfile << "}";
 }
 

@@ -84,12 +84,12 @@ std::map<std::string, std::tuple<bool, const char*, bool, int (*)(int, int, bool
 };
 
                                             // width num
-std::map<std::string, std::tuple<bool, int (*)(int, int, bool)>> expr1int1Map = {
-  {"pad", {1, maxWidth}},
-  {"shl", {1, sumWidth}},
-  {"shr", {1, minusWidthPos}},
-  {"head", {0, secondWidth}},
-  {"tail", {0, minusWidth}},
+std::map<std::string, std::tuple<bool, bool, int (*)(int, int, bool)>> expr1int1Map = {
+  {"pad", {1, 0, maxWidth}},
+  {"shl", {1, 0, sumWidth}},
+  {"shr", {1, 0, minusWidthPos}},
+  {"head", {0, 1, secondWidth}},
+  {"tail", {0, 1, minusWidth}},
 };
 
 // 0: uint 1: reverse child sign
@@ -126,6 +126,7 @@ void addSignal(std::string s, Node* n) {
 void addEdge(Node* src, Node* dst) {
   dst->inEdge ++;
   src->next.push_back(dst);
+  // std::cout << src->name << " -> " << dst->name << std::endl;
 }
 
 void addEdge(std::string str, Node* dst) {
@@ -166,11 +167,11 @@ void visitType(Node* n, PNode* ptype) {
 
 std::string visit1Expr1Int(std::string& name, std::string prefix, Node* n, PNode* expr) { // pad|shl|shr|head|tail
   Assert(expr1int1Map.find(expr->name) != expr1int1Map.end(), "Operation %s not found\n", expr->name.c_str());
-  std::tuple<bool, int (*)(int, int, bool)>info = expr1int1Map[expr->name];
+  std::tuple<bool, bool, int (*)(int, int, bool)>info = expr1int1Map[expr->name];
   std::string str = visitExpr(tmp, prefix, n, expr->getChild(0));
   expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
-  expr->width = std::get<1>(info)(expr->getChild(0)->width, p_stoi(expr->getExtra(0).c_str()), false);
-  return FUNC_NAME(expr->name) + "(" + name + ", " + str + ", " + cons2str(expr->getExtra(0)) + ")";
+  expr->width = std::get<2>(info)(expr->getChild(0)->width, p_stoi(expr->getExtra(0).c_str()), false);
+  return FUNC_NAME(expr->name) + "(" + name + ", " + str + ", " + (std::get<1>(info) ? std::to_string(expr->width) : cons2str(expr->getExtra(0))) + ")";
 }
 
 std::string visit1Expr2Int(std::string& name, std::string prefix, Node* n, PNode* expr){ // bits
@@ -225,8 +226,8 @@ std::string visitReference(std::string prefix, PNode* expr) { // return ref name
 std::string visitMux(std::string& name, std::string prefix, Node* n, PNode* mux) {
   Assert(mux->getChildNum() == 3 && mux->getChild(0)->type == P_REF, "Invalid childNum or child0 for Mux\n");
 
-  // std::string expr = visitExpr(tmp, prefix, n, mux->getChild(0))
-  std::string ret = "(mpz_cmp_ui(" + visitReference(prefix, mux->getChild(0)) + ", 0)? " + visitExpr(name, prefix, n, mux->getChild(1)) + " : " + visitExpr(name, prefix, n, mux->getChild(2)) + ")";
+  visitExpr(tmp, prefix, n, mux->getChild(0));
+  std::string ret = std::string("mpz_set(") + name + ", (mpz_cmp_ui(" + visitReference(prefix, mux->getChild(0)) + ", 0)? " + visitExpr(name, prefix, n, mux->getChild(1)) + " : " + visitExpr(name, prefix, n, mux->getChild(2)) + "))";
   SET_TYPE(mux, mux->getChild(1));
   return ret;
 }
@@ -254,7 +255,7 @@ std::string visitExpr(std::string& name, std::string prefix, Node* n, PNode* exp
     case P_2EXPR: return visit2Expr(name, prefix, n, expr);
     case P_REF: ret = visitReference(prefix, expr); addEdge(ret, n); SET_TYPE(expr, allSignals[ret]); return ret;
     case P_EXPR_MUX: return visitMux(name, prefix, n, expr);
-    case P_EXPR_INT_INIT: return (expr->sign ? "SInt<" : "UInt<") + std::to_string(expr->width) + ">(" + cons2str(expr->getExtra(0).substr(1, expr->getExtra(0).length()-2)) + ")";
+    case P_EXPR_INT_INIT: return cons2str(expr->getExtra(0).substr(1, expr->getExtra(0).length()-2));
     case P_1EXPR: return visit1Expr(name, prefix, n, expr);
     case P_1EXPR2INT: return visit1Expr2Int(name, prefix, n, expr);
     default: std::cout << expr->type << std::endl; TODO();
@@ -277,7 +278,7 @@ void visitConnect(std::string prefix, PNode* connect) {
   std::string strDst = visitReference(prefix, connect->getChild(0));
   Node* dst = str2Node(strDst);
   if(dst->type == NODE_REG_SRC) dst = dst->regNext;
-  dst->op = visitExpr(dst->name, prefix, dst, connect->getChild(1));
+  dst->op = std::string("mpz_set(") + dst->name + "," + visitExpr(dst->name, prefix, dst, connect->getChild(1)) + ")";
 }
 
 void visitRegDef(std::string prefix, graph* g, PNode* reg) {
