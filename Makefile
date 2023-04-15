@@ -10,7 +10,7 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 
 OBJ_DIR = obj
 
-CXXFLAGS = -O2 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR))
+CXXFLAGS = -O2 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -lgmp
 CXX = g++
 TARGET = GraphEmu
 
@@ -30,7 +30,7 @@ VERI_INC_DIR = $(OBJ_DIR) $(EMU_DIR)/include include
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME)
 VERI_CFLAGS = -O3 $(addprefix -I../, $(VERI_INC_DIR))
 VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\"
-VERI_LDFLAGS = -O3
+VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
 VERI_CSRCS = $(shell find $(OBJ_DIR) -name "*.cpp") $(EMU_DIR)/difftest.cpp
 
