@@ -14,8 +14,7 @@ void genHeader(graph* g, std::string headerFile) {
   hfile << "#define " << headerFile << "\n";
   INCLUDE_LIB(hfile, "iostream");
   INCLUDE_LIB(hfile, "vector");
-  INCLUDE(hfile, "UInt.h");
-  INCLUDE(hfile, "SInt.h");
+  INCLUDE_LIB(hfile, "gmp.h");
   hfile << "class S" << g->name << "{\n" << "public:\n";
 /*
   // ports
@@ -32,18 +31,22 @@ void genHeader(graph* g, std::string headerFile) {
 */
 // constructor
   hfile << "S" << g->name << "() {" << std::endl;
+  for(Node* node: g->sorted) hfile << "mpz_init2(" << node->name << ", " << node->width << ");\n";
+  hfile << "mpz_init(oldVal);\n";
   hfile << "}\n";
 
 // active flags
   hfile << "std::vector<bool> activeFlags = " << "std::vector<bool>(" <<g->sorted.size() << ", true);\n";
 // all sigs
   for (Node* node: g->sorted) {
-    hfile << ((node->sign)? "SInt<" : "UInt<") << node->width << ">" << node->name << ";\n";
+    hfile << "mpz_t " << node->name << ";\n";
   }
+// unique oldVal
+    hfile << "mpz_t oldVal;\n";
 // set functions
   for (Node* node: g->input) {
-    hfile << "void set_" << node->name << "(" << ((node->sign)? "SInt<" : "UInt<") << node->width << ">val) {\n";
-    hfile << node->name << " = val;\n";
+    hfile << "void set_" << node->name << "(mpz_t val) {\n";
+    hfile <<"mpz_set(" << node->name << ", val);\n";
     for (Node* next: node->next)
       hfile << "activeFlags[" << next->id << "] = true;\n";
     hfile << "}\n";
@@ -71,11 +74,11 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 
 
     sfile << "activeFlags[" << node->id << "] = false;\n";
-    sfile << ((node->sign)? "SInt<" : "UInt<") << node->width << "> oldVal = " << node->name << ";\n";
-    sfile << node->name << " = " << node->op << ";\n";
+    sfile << "mpz_set(oldVal, " << node->name << ");\n";
+    sfile << node->op << ";\n";
     Node* activeNode = node->type == NODE_REG_DST ? node->regNext : node;
     for(Node* next: activeNode->next) {
-      sfile << "if(" << "oldVal != " << node->name << ") activeFlags[" << next->id << "] = true;\n";
+      sfile << "if(" << "mpz_cmp(oldVal," << node->name << ") != 0) activeFlags[" << next->id << "] = true;\n";
     }
     // sfile << "std::cout << \"" << node->id  << ": " << node->name << ": \" << oldVal << " <<  "\"->\" << " << node->name << "<<std::endl;\n";
     sfile << "}\n";
@@ -96,7 +99,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 
   // update registers
   for(Node* node: g->sources) {
-    sfile << node->name << " = " << node->name << "_next;\n";
+    sfile << "mpz_set(" << node->name << ", " << node->name << "_next);\n";
   }
   sfile << "}";
 }
