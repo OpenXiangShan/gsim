@@ -72,7 +72,7 @@ int p_stoi(const char* str);
 %type <pnode> mem_datatype mem_depth mem_rlatency mem_wlatency mem_ruw
 %type <pnode> reference expr primop_2expr primop_1expr primop_1expr1int primop_1expr2int
 %type <pnode> field type_aggregate type_ground circuit
-%type <strVal> info
+%type <strVal> info ALLID
 /* %token <pnode> */
 
 %nonassoc LOWER_THAN_ELSE
@@ -81,8 +81,11 @@ int p_stoi(const char* str);
 
 %%
 /* remove version */
-circuit: Circuit ID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, $5, $2, $7); root = $$; }
+circuit: Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, $5, $2, $7); root = $$; }
 	;
+ALLID: Inst { $$ = "inst"; }
+    | ID {$$ = $1; }
+    ;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
     ; */
@@ -108,8 +111,8 @@ fields:                 { $$ = new PList(); }
 type_aggregate: '{' fields '}'  { $$ = new PNode(P_AG_FIELDS); $$->appendChildList($2); }
     | type '[' INT ']'          { $$ = newNode(P_AG_TYPE, emptyStr, 1, $1); $$->appendExtraInfo($3); }
     ;
-field: ID ':' type { $$ = newNode(P_FIELD, $1, 1, $3); }
-    | Flip ID ':' type  { $$ = newNode(P_FLIP_FIELD, $2, 1, $4); }
+field: ALLID ':' type { $$ = newNode(P_FIELD, $1, 1, $3); }
+    | Flip ALLID ':' type  { $$ = newNode(P_FLIP_FIELD, $2, 1, $4); }
     ;
 type: type_ground  { $$ = $1; }
     | type_aggregate { $$ = $1; }
@@ -131,14 +134,14 @@ expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, $1, 0); $$->se
     | IntType width '(' INT ')' { $$ = newNode(P_EXPR_INT_INIT, $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); $$->appendExtraInfo($4);}
     | reference { $$ = $1; }
     | Mux '(' expr ',' expr ',' expr ')' { $$ = newNode(P_EXPR_MUX, NULL, 3, $3, $5, $7); }
-    | Validif '(' expr ',' expr ')' { TODO(); }
+    | Validif '(' expr ',' expr ')' { $$ = $5; }
     | primop_2expr  { $$ = $1; }
     | primop_1expr  { $$ = $1; }
     | primop_1expr1int  { $$ = $1; }
     | primop_1expr2int  { $$ = $1; }
     ;
-reference: ID  { $$ = newNode(P_REF, $1, 0); }
-    | reference '.' ID  { $$ = $1; $1->appendChild(newNode(P_REF_DOT, $3, 0)); }
+reference: ALLID  { $$ = newNode(P_REF, $1, 0); }
+    | reference '.' ALLID  { $$ = $1; $1->appendChild(newNode(P_REF_DOT, $3, 0)); }
     | reference '[' INT ']' { $$ = $1; $1->appendChild(newNode(P_REF_IDX, $3, 0)); }
     | reference '[' expr ']' { $$ = $1; $1->appendChild($3); }
     ;
@@ -156,17 +159,17 @@ mem_ruw: ReadUnderwrite "=>" Ruw { $$ = newNode(P_RUW, $3, 0); }
 mem_compulsory: mem_datatype mem_depth mem_rlatency mem_wlatency mem_ruw { $$ = new PList(); $$->append(5, $1, $2, $3, $4, $5); }
     ;
 mem_reader: { $$ = NULL; }
-    | Reader "=>" ID    { $$ = newNode(P_READER, $3, 0);}
+    | Reader "=>" ALLID    { $$ = newNode(P_READER, $3, 0);}
     ;
 mem_writer: { $$ = NULL; }
-    | Writer "=>" ID    { $$ = newNode(P_WRITER, $3, 0);}
+    | Writer "=>" ALLID    { $$ = newNode(P_WRITER, $3, 0);}
     ;
 mem_readwriter: { $$ = NULL; }
-    | Readwriter "=>" ID    { $$ = newNode(P_READWRITER, $3, 0);}
+    | Readwriter "=>" ALLID    { $$ = newNode(P_READWRITER, $3, 0);}
     ;
 mem_optional: mem_reader mem_writer mem_readwriter { $$ = new PList(); $$->append(3, $1, $2, $3); }
     ;
-memory: Mem ID ':' info INDENT mem_compulsory mem_optional DEDENT { $$ = newNode(P_MEMORY, $4, $2, 0); $$->appendChildList($6); $$->appendChildList($7); }
+memory: Mem ALLID ':' info INDENT mem_compulsory mem_optional DEDENT { $$ = newNode(P_MEMORY, $4, $2, 0); $$->appendChildList($6); $$->appendChildList($7); }
     ;
 /* statements */
 references:
@@ -178,42 +181,42 @@ statements: { $$ = new PNode(P_STATEMENTS); }
 when_else:  %prec LOWER_THAN_ELSE { $$ = NULL; }
     | Else ':' INDENT statements DEDENT { $$ = newNode(P_ELSE, NULL, NULL, 1, $4); }
     ;
-statement: Wire ID ':' type info    { $$ = newNode(P_WIRE_DEF, $5, $2, 1, $4); }
-    | Reg ID ':' type ',' expr RegWith INDENT RegReset '(' expr ',' expr ')' info DEDENT { $$ = newNode(P_REG_DEF, $15, $2, 4, $4, $6, $11, $13); }
+statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $5, $2, 1, $4); }
+    | Reg ALLID ':' type ',' expr RegWith INDENT RegReset '(' expr ',' expr ')' info DEDENT { $$ = newNode(P_REG_DEF, $15, $2, 4, $4, $6, $11, $13); }
     | memory    { $$ = $1;}
-    | Inst ID Of ID info    { $$ = newNode(P_INST, $5, $2, 0); $$->appendExtraInfo($4); }
-    | Node ID '=' expr info { $$ = newNode(P_NODE, $5, $2, 1, $4); }
+    | Inst ALLID Of ALLID info    { $$ = newNode(P_INST, $5, $2, 0); $$->appendExtraInfo($4); }
+    | Node ALLID '=' expr info { $$ = newNode(P_NODE, $5, $2, 1, $4); }
     | reference "<=" expr info  { $$ = newNode(P_CONNECT, $4, NULL, 2, $1, $3); }
     | reference "<-" expr info  { TODO(); }
     | reference Is Invalid info { TODO(); }
     | Attach '(' references ')' info { TODO(); }
     | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $4, NULL, 3, $2, $6, $8); } /* expected newline before statement */
     | Stop '(' expr ',' expr ',' INT ')' info   { TODO(); }
-    | Printf '(' expr ',' expr ',' String exprs ')' ':' ID info { TODO(); }
+    | Printf '(' expr ',' expr ',' String exprs ')' ':' ALLID info { TODO(); }
     | Printf '(' expr ',' expr ',' String exprs ')' info    { TODO(); }
     | Skip info { $$ = NULL; }
     ;
 /* module definitions */
-port: Input ID ':' type info    { $$ = newNode(P_INPUT, $5, $2, 1, $4); }
-    | Output ID ':' type info   { $$ = newNode(P_OUTPUT, $5, $2, 1, $4); }
+port: Input ALLID ':' type info    { $$ = newNode(P_INPUT, $5, $2, 1, $4); }
+    | Output ALLID ':' type info   { $$ = newNode(P_OUTPUT, $5, $2, 1, $4); }
     ;
 ports:  { $$ = new PNode(P_PORTS); }
     | ports port    { $$ = $1; $$->appendChild($2); }
     ;
-module: Module ID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, $4, $2, 2, $6, $7); }
+module: Module ALLID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, $4, $2, 2, $6, $7); }
     ;
 ext_defname:
-    | Defname '=' ID            { TODO(); }
+    | Defname '=' ALLID            { TODO(); }
     ;
 params: 
     | params param              { TODO(); }
     ;
-param: Parameter ID '=' String  { TODO(); }
-    | Parameter ID '=' INT      { TODO(); }
+param: Parameter ALLID '=' String  { TODO(); }
+    | Parameter ALLID '=' INT      { TODO(); }
     ;
-extmodule: Extmodule ID ':' info INDENT ports ext_defname params DEDENT  { TODO(); }
+extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { TODO(); }
     ;
-intmodule: Intmodule ID ':' info INDENT ports Intrinsic '=' ID params DEDENT	{ TODO(); }
+intmodule: Intmodule ALLID ':' info INDENT ports Intrinsic '=' ALLID params DEDENT	{ TODO(); }
 		;
 /* in-line anotations */
 jsons:
