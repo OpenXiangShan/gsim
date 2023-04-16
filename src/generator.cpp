@@ -17,6 +17,7 @@ void genHeader(graph* g, std::string headerFile) {
   INCLUDE_LIB(hfile, "iostream");
   INCLUDE_LIB(hfile, "vector");
   INCLUDE_LIB(hfile, "gmp.h");
+  INCLUDE(hfile, "functions.h");
   hfile << "class S" << g->name << "{\n" << "public:\n";
 /*
   // ports
@@ -73,19 +74,9 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   for(int i = 0; i < LENGTH(cmpOP); i++) {
     sfile << "void " << cmpOP[i][0] << "(mpz_t& dst, mpz_t& op1, mpz_t& op2) {\n";
     sfile << "  mpz_set_ui(dst, mpz_cmp(op1, op2)" << cmpOP[i][1] << "0);\n}\n";
-    sfile << "void " << cmpOP[i][0] << "(mpz_t& dst, mpz_t& op1, unsigned long int op2) {\n";
-    sfile << "  mpz_set_ui(dst, mpz_cmp_ui(op1, op2)" << cmpOP[i][1] << "0);\n}\n";
+    // sfile << "void " << cmpOP[i][0] << "(mpz_t& dst, mpz_t& op1, unsigned long int op2) {\n";
+    // sfile << "  mpz_set_ui(dst, mpz_cmp_ui(op1, op2)" << cmpOP[i][1] << "0);\n}\n";
   }
-
-  sfile << "void s_tail(mpz_t& dst, mpz_t& src, unsigned long n) {\n";
-  sfile << "mpz_set(dst, src);\n";
-  sfile << "if(mpz_size(dst) == 0) return;\n";
-  sfile << "int libms_num = (n + 63) / 64;\n";
-  sfile << "unsigned long mask = ((unsigned long)1 << (n % 64)) - 1;\n";
-  sfile << "mp_limb_t* data = mpz_limbs_modify(dst, libms_num);\n";
-  sfile << "*data = *data & mask;\n";
-  sfile << "mpz_limbs_finish(dst, libms_num);\n";
-  sfile << "}\n";
 
   for(Node* node: g->sorted) {
     if(node->insts.size() == 0) continue;

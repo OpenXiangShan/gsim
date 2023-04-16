@@ -111,7 +111,7 @@ std::map<std::string, std::tuple<bool, const char*, bool, int (*)(int, int, bool
   {"and",   {0, "mpz_and",  COMMU, maxWidth}},
   {"or",    {0, "mpz_ior",  COMMU, maxWidth}},
   {"xor",   {0, "mpz_xor",  COMMU, maxWidth}},
-  {"cat",   {0, "s_mpz_cat", NO_COMMU, sumWidth}},
+  {"cat",   {0, "s_cat", NO_COMMU, sumWidth}},
 };
 
                                             // width num
