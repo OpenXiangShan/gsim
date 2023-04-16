@@ -81,7 +81,7 @@ int p_stoi(const char* str);
 
 %%
 /* remove version */
-circuit: Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, $5, $2, $7); root = $$; }
+circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, $6, $3, $8); root = $$; }
 	;
 ALLID: Inst { $$ = "inst"; }
     | ID {$$ = $1; }
@@ -230,10 +230,8 @@ annotations:
 		| '%' '[' json_array ']' { TODO(); }
 		;
 /* version definition */
-/*
-version: Firrtl Version INT '.' INT '.' INT { TODO(); }
+version: Firrtl Version INT '.' INT '.' INT { }
 		;
-*/
 cir_mods:                       { $$ = new PList(); }
 		| module cir_mods       { $$ = $2; $$->append($1); }
 		| extmodule cir_mods    { TODO(); }
