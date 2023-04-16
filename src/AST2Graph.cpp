@@ -13,6 +13,36 @@
 #define SIGN_NEG_CHILD 3
 #define FUNC_NAME(s) (std::string("s_") + s)
 
+static int tmpIdx = 0;
+#define CUR_TMP (tmp = (std::string("tmp") + std::to_string(tmpIdx)))
+#define NEW_TMP (tmp = (std::string("tmp") + std::to_string(tmpIdx ++)))
+#define clear_tmp tmpIdx = 0
+std::string tmp;
+
+#define EXPR_CONSTANT 0
+#define EXPR_VAR 1
+#define expr_type std::pair<int, std::string>
+
+static inline void insts_set_neq(Node* node, std::string& srcStr) {
+  if(node->name != srcStr)
+      node->insts.push_back(std::string("mpz_set(") + node->name + ", " + srcStr + ")");
+}
+static inline void insts_set_neq_ui(Node* node, std::string& srcStr) {
+  node->insts.push_back(std::string("mpz_set_ui(") + node->name + ", " + srcStr + ")");
+}
+static inline void insts_set_expr_neq(Node* n, expr_type& src) {
+  if(src.first) {
+    insts_set_neq(n, src.second);
+  } else {
+    insts_set_neq_ui(n, src.second);
+  }
+}
+#define insts_1expr(n, func, dst, expr1) \
+  n->insts.push_back(func + "(" + dst + ", " + expr1 + ")")
+#define insts_2expr(n, func, dst, expr1, expr2) \
+  n->insts.push_back(func + "(" + dst + ", " + expr1 + ", " + expr2 + ")")
+#define insts_3expr(n, func, dst, expr1, expr2, expr3) \
+  n->insts.push_back(func + "(" + dst + ", " + expr1 + ", " + expr2 + ", " + expr3 + ")")
 
 static int maxWidth(int a, int b, bool sign = 0) {
   return MAX(a, b);
@@ -109,10 +139,8 @@ static std::map<std::string, PNode*> moduleMap;
 static std::map<std::string, Node*> allSignals;
 void visitStmts(std::string prefix, graph* g, PNode* stmts);
 
-std::string tmp = std::string("tmp");
-std::string tmp2 = std::string("tmp2");
 
-std::string visitExpr(std::string& name, std::string prefix, Node* n, PNode* expr);
+expr_type visitExpr(std::string& name, std::string prefix, Node* n, PNode* expr);
 void visitType(Node* n, PNode* ptype);
 
 int p_stoi(const char* str);
@@ -165,42 +193,52 @@ void visitType(Node* n, PNode* ptype) {
   }
 }
 
-std::string visit1Expr1Int(std::string& name, std::string prefix, Node* n, PNode* expr) { // pad|shl|shr|head|tail
+expr_type visit1Expr1Int(std::string& name, std::string prefix, Node* n, PNode* expr) { // pad|shl|shr|head|tail
   Assert(expr1int1Map.find(expr->name) != expr1int1Map.end(), "Operation %s not found\n", expr->name.c_str());
   std::tuple<bool, bool, int (*)(int, int, bool)>info = expr1int1Map[expr->name];
-  std::string str = visitExpr(tmp, prefix, n, expr->getChild(0));
+  expr_type src = visitExpr(NEW_TMP, prefix, n, expr->getChild(0));;
   expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
   expr->width = std::get<2>(info)(expr->getChild(0)->width, p_stoi(expr->getExtra(0).c_str()), false);
-  return FUNC_NAME(expr->name) + "(" + name + ", " + str + ", " + (std::get<1>(info) ? std::to_string(expr->width) : cons2str(expr->getExtra(0))) + ")";
+  Assert(src.first, "Expr in 1Expr1Int must be var %s\n", src.second.c_str());
+  std::string cons = (std::get<1>(info) ? std::to_string(expr->width) : cons2str(expr->getExtra(0)));
+  insts_2expr(n, FUNC_NAME(expr->name), name, src.second, cons);
+  return std::make_pair(EXPR_VAR, name);
 }
 
-std::string visit1Expr2Int(std::string& name, std::string prefix, Node* n, PNode* expr){ // bits
-  std::string str = visitExpr(tmp, prefix, n, expr->getChild(0));
+expr_type visit1Expr2Int(std::string& name, std::string prefix, Node* n, PNode* expr){ // bits
+  expr_type src = visitExpr(NEW_TMP, prefix, n, expr->getChild(0));
   expr->sign = 0;
   expr->width = p_stoi(expr->getExtra(0).c_str()) - p_stoi(expr->getExtra(1).c_str()) + 1;
-  return FUNC_NAME(expr->name) + "(" + name + ", " + str + ", " + cons2str(expr->getExtra(0)) + ", " + cons2str(expr->getExtra(1)) + ")";
+  Assert(src.first, "Expr in 1Expr2Int must be var %s\n", src.second.c_str());
+  insts_3expr(n, FUNC_NAME(expr->name), name, src.second, cons2str(expr->getExtra(0)), cons2str(expr->getExtra(1)));
+  return std::make_pair(EXPR_VAR, name);
 }
 
-std::string visit2Expr(std::string& name, std::string prefix, Node* n, PNode* expr) { // add|sub|mul|div|mod|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat
+expr_type visit2Expr(std::string& name, std::string prefix, Node* n, PNode* expr) { // add|sub|mul|div|mod|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat
   Assert(expr->getChildNum() == 2, "Invalid childNum for expr %s\n", expr->name.c_str());
-  std::string left = visitExpr(tmp, prefix, n, expr->getChild(0));
-  std::string right = visitExpr(tmp2, prefix, n, expr->getChild(1));
+  expr_type left = visitExpr(NEW_TMP, prefix, n, expr->getChild(0));
+  expr_type right = visitExpr(NEW_TMP, prefix, n, expr->getChild(1));
+  // std::string left = visitExpr(NEW_TMP, prefix, n, expr->getChild(0));
+  // std::string right = visitExpr(NEW_TMP, prefix, n, expr->getChild(1));
   Assert(expr2Map.find(expr->name) != expr2Map.end(), "Operation %s not found\n", expr->name.c_str());
   std::tuple<bool, const char*, bool, int (*)(int, int, bool)>info = expr2Map[expr->name];
   expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
   expr->width = std::get<3>(info)(expr->getChild(0)->width, expr->getChild(1)->width, expr->getChild(0)->sign);
   if(std::get<2>(info) && (expr->getChild(1)->width > expr->getChild(0)->width))
-    return std::string(std::get<1>(info)) + "(" + name + ", " + right + ", " + left + ")";
+    insts_2expr(n, std::string(std::get<1>(info)), name, right.second, left.second);
   else
-    return std::string(std::get<1>(info)) + "(" + name + ", " + left + ", " + right + ")";
+    insts_2expr(n, std::string(std::get<1>(info)), name, left.second, right.second);
+  return std::make_pair(EXPR_VAR, name);
 }
 
-std::string visit1Expr(std::string& name, std::string prefix, Node* n, PNode* expr) { // asUInt|asSInt|asClock|cvt|neg|not|andr|orr|xorr
-  std::string ret = FUNC_NAME(expr->name) + "(" + name + ", " + visitExpr(tmp, prefix, n, expr->getChild(0)) + ")";
+expr_type visit1Expr(std::string& name, std::string prefix, Node* n, PNode* expr) { // asUInt|asSInt|asClock|cvt|neg|not|andr|orr|xorr
   std::tuple<uint8_t, int (*)(int, int, bool)>info = expr1Map[expr->name];
   expr->sign = std::get<0>(info);
   expr->width = std::get<1>(info)(expr->getChild(0)->width, 0, expr->getChild(0)->sign);
-  return ret;
+  expr_type src = visitExpr(tmp, prefix, n, expr->getChild(0));
+  Assert(src.first, "Expr in 1Expr must be var %s\n", src.second.c_str());
+  insts_1expr(n, FUNC_NAME(expr->name), name, src.second);
+  return std::make_pair(EXPR_VAR, name);
 }
 
 std::string visitReference(std::string prefix, PNode* expr) { // return ref name
@@ -223,13 +261,17 @@ std::string visitReference(std::string prefix, PNode* expr) { // return ref name
   Assert(expr->getChildNum() == 0, "TODO: expr %s with childNum %d\n", expr->name, expr->getChildNum());
 }
 
-std::string visitMux(std::string& name, std::string prefix, Node* n, PNode* mux) {
+expr_type visitMux(std::string& name, std::string prefix, Node* n, PNode* mux) {
   Assert(mux->getChildNum() == 3 && mux->getChild(0)->type == P_REF, "Invalid childNum or child0 for Mux\n");
 
-  visitExpr(tmp, prefix, n, mux->getChild(0));
-  std::string ret = std::string("mpz_set(") + name + ", (mpz_cmp_ui(" + visitReference(prefix, mux->getChild(0)) + ", 0)? " + visitExpr(name, prefix, n, mux->getChild(1)) + " : " + visitExpr(name, prefix, n, mux->getChild(2)) + "))";
+  visitExpr(NEW_TMP, prefix, n, mux->getChild(0));
+  expr_type expr1 = visitExpr(name, prefix, n, mux->getChild(1));
+  expr_type expr2 = visitExpr(name, prefix, n, mux->getChild(2));
+  std::string cond_true  = (expr1.first ? std::string("mpz_set(") : std::string("mpz_set_ui(")) + name + ", " + expr1.second + ")";
+  std::string cond_false = (expr2.first ? std::string("mpz_set(") : std::string("mpz_set_ui(")) + name + ", " + expr2.second + ")";
+  n->insts.push_back(std::string("mpz_cmp_ui(") + visitReference(prefix, mux->getChild(0)) + ", 0)? " + cond_true + " : " + cond_false);
   SET_TYPE(mux, mux->getChild(1));
-  return ret;
+  return std::make_pair(EXPR_VAR, name);
 }
 
 std::string cons2str(std::string s) {
@@ -248,14 +290,14 @@ std::string cons2str(std::string s) {
   return ret;
 }
 
-std::string visitExpr(std::string& name, std::string prefix, Node* n, PNode* expr) { // return op & update connect
+expr_type visitExpr(std::string& name, std::string prefix, Node* n, PNode* expr) { // return varName & update connect
   std::string ret;
   switch(expr->type) {
     case P_1EXPR1INT: return visit1Expr1Int(name, prefix, n, expr);
     case P_2EXPR: return visit2Expr(name, prefix, n, expr);
-    case P_REF: ret = visitReference(prefix, expr); addEdge(ret, n); SET_TYPE(expr, allSignals[ret]); return ret;
+    case P_REF: ret = visitReference(prefix, expr); addEdge(ret, n); SET_TYPE(expr, allSignals[ret]); return std::make_pair(EXPR_VAR, ret);
     case P_EXPR_MUX: return visitMux(name, prefix, n, expr);
-    case P_EXPR_INT_INIT: return cons2str(expr->getExtra(0).substr(1, expr->getExtra(0).length()-2));
+    case P_EXPR_INT_INIT: return std::make_pair(EXPR_CONSTANT, cons2str(expr->getExtra(0).substr(1, expr->getExtra(0).length()-2)));
     case P_1EXPR: return visit1Expr(name, prefix, n, expr);
     case P_1EXPR2INT: return visit1Expr2Int(name, prefix, n, expr);
     default: std::cout << expr->type << std::endl; TODO();
@@ -268,7 +310,8 @@ Node* visitNode(std::string prefix, PNode* node) { // generate new node and conn
   newSig->name = prefix + node->name;
   addSignal(newSig->name, newSig);
   Assert(node->getChildNum() >= 1, "Invalid childNum for node %s\n", node->name.c_str());
-  newSig->op = visitExpr(newSig->name, prefix, newSig, node->getChild(0));
+  expr_type right = visitExpr(newSig->name, prefix, newSig, node->getChild(0));
+  insts_set_expr_neq(newSig, right);
   SET_TYPE(newSig, node->getChild(0));
   return newSig;
 }
@@ -278,7 +321,8 @@ void visitConnect(std::string prefix, PNode* connect) {
   std::string strDst = visitReference(prefix, connect->getChild(0));
   Node* dst = str2Node(strDst);
   if(dst->type == NODE_REG_SRC) dst = dst->regNext;
-  dst->op = std::string("mpz_set(") + dst->name + "," + visitExpr(dst->name, prefix, dst, connect->getChild(1)) + ")";
+  expr_type right = visitExpr(dst->name, prefix, dst, connect->getChild(1));
+  insts_set_expr_neq(dst, right);
 }
 
 void visitRegDef(std::string prefix, graph* g, PNode* reg) {
@@ -300,6 +344,7 @@ void visitRegDef(std::string prefix, graph* g, PNode* reg) {
 void visitStmts(std::string prefix, graph* g, PNode* stmts) {
   for (int i = 0; i < stmts->getChildNum(); i++) {
     PNode* stmt = stmts->getChild(i);
+    clear_tmp;
     switch(stmt->type) {
       case P_INST : 
         Assert(stmt->getExtraNum() >= 1 && moduleMap.find(stmt->getExtra(0)) != moduleMap.end(), "Module %s is not defined!\n", stmt->name.c_str());

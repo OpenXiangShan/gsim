@@ -88,14 +88,14 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   sfile << "}\n";
 
   for(Node* node: g->sorted) {
-    if(node->op.length() == 0) continue;
+    if(node->insts.size() == 0) continue;
     // generate function
     sfile << "void S" << g->name << "::step" << node->id << "() {\n";
 
 
     sfile << "activeFlags[" << node->id << "] = false;\n";
     sfile << "mpz_set(oldVal, " << node->name << ");\n";
-    sfile << node->op << ";\n";
+    for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
     Node* activeNode = node->type == NODE_REG_DST ? node->regNext : node;
     if(activeNode->next.size() > 0){
       sfile << "if(" << "mpz_cmp(oldVal," << node->name << ") != 0){\n";
@@ -110,7 +110,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 
   sfile << "" <<"void S" << g->name << "::step() {\n";
   for(int i = 0; i < g->sorted.size(); i++) {
-    if(g->sorted[i]->op.length() == 0) continue;
+    if(g->sorted[i]->insts.size() == 0) continue;
     sfile << "if(activeFlags[" << i << "]) " << "step" << i << "();\n";
   }
   // for(Node* node: g->sorted) {

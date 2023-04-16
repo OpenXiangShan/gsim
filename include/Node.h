@@ -15,9 +15,8 @@ public:
   int width;
   int sign;
   std::vector<Node*> next;
-  std::string op;  // replace the variable names with new names
+  std::vector<std::string> insts;
   // std::vector<Node*> prev; // keep the order in sources file
-  // std::vector<std::string> op;
   int inEdge; // for topo sort
   int defined;
   int initVal;

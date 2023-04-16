@@ -6,7 +6,7 @@
 #define MIN_REG 10
 #define MAX_MID 40
 #define MIN_MID 10
-
+#if 0
 void randomGraph(graph* g) {
   g->name = "test";
   srand(time(NULL));
@@ -58,3 +58,4 @@ void randomGraph(graph* g) {
     ptr->inEdge = 2;
   }
 }
+#endif
