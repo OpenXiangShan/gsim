@@ -94,24 +94,24 @@ static int secondWidth(int a, int b, bool sign = 0){
 
 // 0: uint; 1: child sign
                               // sign  op    widthFunc
-std::map<std::string, std::tuple<bool, const char*, bool, int (*)(int, int, bool)>> expr2Map = {
-  {"add",   {1, "mpz_add",      COMMU,    maxWidthPlus1}},
-  {"sub",   {1, "mpz_sub",      NO_COMMU, maxWidthPlus1}},
-  {"mul",   {1, "mpz_mul",      COMMU,    sumWidth}},
-  {"div",   {1, "mpz_tdiv_q",   NO_COMMU, divWidth}},
-  {"rem",   {1, "mpz_tdiv_r",  NO_COMMU, minWidth}},
-  {"lt",    {0, "s_mpz_lt",  NO_COMMU, boolWidth}},
-  {"leq",   {0, "s_mpz_leq", NO_COMMU, boolWidth}},
-  {"gt",    {0, "s_mpz_gt",  NO_COMMU, boolWidth}},
-  {"geq",   {0, "s_mpz_geq", NO_COMMU, boolWidth}},
-  {"eq",    {0, "s_mpz_eq", COMMU, boolWidth}},
-  {"neq",   {0, "s_mpz_neq", COMMU, boolWidth}},
-  {"dshl",  {1, "s_mpz_dshl", NO_COMMU, dshlWidth}},
-  {"dshr",  {1, "s_mpz_dshr", NO_COMMU, firstWidth}},
-  {"and",   {0, "mpz_and",  COMMU, maxWidth}},
-  {"or",    {0, "mpz_ior",  COMMU, maxWidth}},
-  {"xor",   {0, "mpz_xor",  COMMU, maxWidth}},
-  {"cat",   {0, "s_cat", NO_COMMU, sumWidth}},
+std::map<std::string, std::tuple<bool, const char*, int (*)(int, int, bool)>> expr2Map = {
+  {"add",   {1, "mpz_add",    maxWidthPlus1}},
+  {"sub",   {1, "mpz_sub",    maxWidthPlus1}},
+  {"mul",   {1, "mpz_mul",    sumWidth}},
+  {"div",   {1, "mpz_tdiv_q", divWidth}},
+  {"rem",   {1, "mpz_tdiv_r", minWidth}},
+  {"lt",    {0, "s_mpz_lt",   boolWidth}},
+  {"leq",   {0, "s_mpz_leq",  boolWidth}},
+  {"gt",    {0, "s_mpz_gt",   boolWidth}},
+  {"geq",   {0, "s_mpz_geq",  boolWidth}},
+  {"eq",    {0, "s_mpz_eq",   boolWidth}},
+  {"neq",   {0, "s_mpz_neq",  boolWidth}},
+  {"dshl",  {1, "s_mpz_dshl", dshlWidth}},
+  {"dshr",  {1, "s_mpz_dshr", firstWidth}},
+  {"and",   {0, "mpz_and",    maxWidth}},
+  {"or",    {0, "mpz_ior",    maxWidth}},
+  {"xor",   {0, "mpz_xor",    maxWidth}},
+  {"cat",   {0, "s_cat",      sumWidth}},
 };
 
                                             // width num
@@ -222,13 +222,10 @@ expr_type visit2Expr(std::string& name, std::string prefix, Node* n, PNode* expr
   // std::string left = visitExpr(NEW_TMP, prefix, n, expr->getChild(0));
   // std::string right = visitExpr(NEW_TMP, prefix, n, expr->getChild(1));
   Assert(expr2Map.find(expr->name) != expr2Map.end(), "Operation %s not found\n", expr->name.c_str());
-  std::tuple<bool, const char*, bool, int (*)(int, int, bool)>info = expr2Map[expr->name];
+  std::tuple<bool, const char*, int (*)(int, int, bool)>info = expr2Map[expr->name];
   expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
-  expr->width = std::get<3>(info)(expr->getChild(0)->width, expr->getChild(1)->width, expr->getChild(0)->sign);
-  if(std::get<2>(info) && (expr->getChild(1)->width > expr->getChild(0)->width))
-    insts_2expr(n, std::string(std::get<1>(info)), name, right.second, left.second);
-  else
-    insts_2expr(n, std::string(std::get<1>(info)), name, left.second, right.second);
+  expr->width = std::get<2>(info)(expr->getChild(0)->width, expr->getChild(1)->width, expr->getChild(0)->sign);
+  insts_2expr(n, std::string(std::get<1>(info)), name, left.second, right.second);
   return std::make_pair(EXPR_VAR, name);
 }
 
