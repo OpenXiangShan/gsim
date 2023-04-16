@@ -111,6 +111,7 @@ std::map<std::string, std::tuple<bool, const char*, bool, int (*)(int, int, bool
   {"and",   {0, "mpz_and",  COMMU, maxWidth}},
   {"or",    {0, "mpz_ior",  COMMU, maxWidth}},
   {"xor",   {0, "mpz_xor",  COMMU, maxWidth}},
+  {"cat",   {0, "s_mpz_cat", NO_COMMU, sumWidth}},
 };
 
                                             // width num
@@ -236,9 +237,13 @@ expr_type visit1Expr(std::string& name, std::string prefix, Node* n, PNode* expr
   expr->sign = std::get<0>(info);
   expr->width = std::get<1>(info)(expr->getChild(0)->width, 0, expr->getChild(0)->sign);
   expr_type src = visitExpr(tmp, prefix, n, expr->getChild(0));
-  Assert(src.first, "Expr in 1Expr must be var %s\n", src.second.c_str());
-  insts_1expr(n, FUNC_NAME(expr->name), name, src.second);
-  return std::make_pair(EXPR_VAR, name);
+  // Assert(src.first, "Expr in 1Expr(%s) must be var %s\n", expr->name.c_str(), src.second.c_str());
+  if(src.first){
+    insts_1expr(n, FUNC_NAME(expr->name), name, src.second);
+    return std::make_pair(EXPR_VAR, name);
+  } else {
+    return std::make_pair(EXPR_CONSTANT, src.second.c_str());
+  }
 }
 
 std::string visitReference(std::string prefix, PNode* expr) { // return ref name
