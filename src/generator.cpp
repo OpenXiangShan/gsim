@@ -71,12 +71,12 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   INCLUDE(sfile, headerFile + ".h");
 
   // operations based on libgmp
-  for(int i = 0; i < LENGTH(cmpOP); i++) {
-    sfile << "void " << cmpOP[i][0] << "(mpz_t& dst, mpz_t& op1, mpz_t& op2) {\n";
-    sfile << "  mpz_set_ui(dst, mpz_cmp(op1, op2)" << cmpOP[i][1] << "0);\n}\n";
+  // for(int i = 0; i < LENGTH(cmpOP); i++) {
+    // sfile << "void " << cmpOP[i][0] << "(mpz_t& dst, mpz_t& op1, mpz_t& op2) {\n";
+    // sfile << "  mpz_set_ui(dst, mpz_cmp(op1, op2)" << cmpOP[i][1] << "0);\n}\n";
     // sfile << "void " << cmpOP[i][0] << "(mpz_t& dst, mpz_t& op1, unsigned long int op2) {\n";
     // sfile << "  mpz_set_ui(dst, mpz_cmp_ui(op1, op2)" << cmpOP[i][1] << "0);\n}\n";
-  }
+  // }
 
   for(Node* node: g->sorted) {
     if(node->insts.size() == 0) continue;
