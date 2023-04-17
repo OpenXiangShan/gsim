@@ -43,6 +43,8 @@ static inline void insts_set_expr_neq(Node* n, expr_type& src) {
   n->insts.push_back(func + "(" + dst + ", " + expr1 + ", " + expr2 + ")")
 #define insts_3expr(n, func, dst, expr1, expr2, expr3) \
   n->insts.push_back(func + "(" + dst + ", " + expr1 + ", " + expr2 + ", " + expr3 + ")")
+#define insts_4expr(n, func, dst, expr1, expr2, expr3, expr4) \
+  n->insts.push_back(func + "(" + dst + ", " + expr1 + ", " + expr2 + ", " + expr3 + ", " + expr4 + ")")
 
 static int maxWidth(int a, int b, bool sign = 0) {
   return MAX(a, b);
@@ -93,25 +95,25 @@ static int secondWidth(int a, int b, bool sign = 0){
 }
 
 // 0: uint; 1: child sign
-                              // sign  op    widthFunc
-std::map<std::string, std::tuple<bool, const char*, int (*)(int, int, bool)>> expr2Map = {
-  {"add",   {1, "mpz_add",    maxWidthPlus1}},
-  {"sub",   {1, "mpz_sub",    maxWidthPlus1}},
-  {"mul",   {1, "mpz_mul",    sumWidth}},
-  {"div",   {1, "mpz_tdiv_q", divWidth}},
-  {"rem",   {1, "mpz_tdiv_r", minWidth}},
-  {"lt",    {0, "s_mpz_lt",   boolWidth}},
-  {"leq",   {0, "s_mpz_leq",  boolWidth}},
-  {"gt",    {0, "s_mpz_gt",   boolWidth}},
-  {"geq",   {0, "s_mpz_geq",  boolWidth}},
-  {"eq",    {0, "s_mpz_eq",   boolWidth}},
-  {"neq",   {0, "s_mpz_neq",  boolWidth}},
-  {"dshl",  {1, "s_mpz_dshl", dshlWidth}},
-  {"dshr",  {1, "s_mpz_dshr", firstWidth}},
-  {"and",   {0, "mpz_and",    maxWidth}},
-  {"or",    {0, "mpz_ior",    maxWidth}},
-  {"xor",   {0, "mpz_xor",    maxWidth}},
-  {"cat",   {0, "s_cat",      sumWidth}},
+                              // sign   widthFunc
+std::map<std::string, std::tuple<bool, int (*)(int, int, bool), const char*, const char*, const char*, const char*>> expr2Map = {
+  {"add",   {1, maxWidthPlus1,  "mpz_add",    "s_mpz_add_ui_r",     "s_mpz_add_ui_l",     "s_mpz_add_ui2",   }},
+  {"sub",   {1, maxWidthPlus1,  "mpz_sub",    "s_mpz_sub_ui_r",     "s_mpz_sub_ui_l",     "s_mpz_sub_ui2",   }},
+  {"mul",   {1, sumWidth,       "mpz_mul",    "s_mpz_mul_ui_r",     "s_mpz_mul_ui_l",     "s_mpz_mul_ui2",   }},
+  {"div",   {1, divWidth,       "mpz_tdiv_q", "s_mpz_tdiv_q_ui_r",  "s_mpz_tdiv_q_ui_l",  "s_mpz_tdiv_q_ui2",}},
+  {"rem",   {1, minWidth,       "mpz_tdiv_r", "s_mpz_tdiv_r_ui_r",  "s_mpz_tdiv_r_ui_l",  "s_mpz_tdiv_r_ui2",}},
+  {"lt",    {0, boolWidth,      "s_mpz_lt",   "s_mpz_lt_ui_r",      "s_mpz_lt_ui_l",      "s_mpz_lt_ui2",    }},
+  {"leq",   {0, boolWidth,      "s_mpz_leq",  "s_mpz_leq_ui_r",     "s_mpz_leq_ui_l",     "s_mpz_leq_ui2",   }},
+  {"gt",    {0, boolWidth,      "s_mpz_gt",   "s_mpz_gt_ui_r",      "s_mpz_gt_ui_l",      "s_mpz_gt_ui2",    }},
+  {"geq",   {0, boolWidth,      "s_mpz_geq",  "s_mpz_geq_ui_r",     "s_mpz_geq_ui_l",     "s_mpz_geq_ui2",   }},
+  {"eq",    {0, boolWidth,      "s_mpz_eq",   "s_mpz_eq_ui_r",      "s_mpz_eq_ui_l",      "s_mpz_eq_ui2",    }},
+  {"neq",   {0, boolWidth,      "s_mpz_neq",  "s_mpz_neq_ui_r",     "s_mpz_neq_ui_l",     "s_mpz_neq_ui2",   }},
+  {"dshl",  {1, dshlWidth,      "s_mpz_dshl", "s_mpz_dshl_ui_r",    "s_mpz_dshl_ui_l",    "s_mpz_dshl_ui2",  }},
+  {"dshr",  {1, firstWidth,     "s_mpz_dshr", "s_mpz_dshr_ui_r",    "s_mpz_dshr_ui_l",    "s_mpz_dshr_ui2",  }},
+  {"and",   {0, maxWidth,       "mpz_and",    "s_mpz_and_ui_r",     "s_mpz_and_ui_l",     "s_mpz_and_ui2",   }},
+  {"or",    {0, maxWidth,       "mpz_ior",    "s_mpz_ior_ui_r",     "s_mpz_ior_ui_l",     "s_mpz_ior_ui2",   }},
+  {"xor",   {0, maxWidth,       "mpz_xor",    "s_mpz_xor_ui_r",     "s_mpz_xor_ui_l",     "s_mpz_xor_ui2",   }},
+  {"cat",   {0, sumWidth,       "s_cat",      "s_cat_ui_r",         "s_cat_ui_l",         "s_cat_ui2",       }},
 };
 
                                             // width num
@@ -222,10 +224,17 @@ expr_type visit2Expr(std::string& name, std::string prefix, Node* n, PNode* expr
   // std::string left = visitExpr(NEW_TMP, prefix, n, expr->getChild(0));
   // std::string right = visitExpr(NEW_TMP, prefix, n, expr->getChild(1));
   Assert(expr2Map.find(expr->name) != expr2Map.end(), "Operation %s not found\n", expr->name.c_str());
-  std::tuple<bool, const char*, int (*)(int, int, bool)>info = expr2Map[expr->name];
+  std::tuple<bool, int (*)(int, int, bool), const char*, const char*, const char*, const char*>info = expr2Map[expr->name];
   expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
-  expr->width = std::get<2>(info)(expr->getChild(0)->width, expr->getChild(1)->width, expr->getChild(0)->sign);
-  insts_2expr(n, std::string(std::get<1>(info)), name, left.second, right.second);
+  expr->width = std::get<1>(info)(expr->getChild(0)->width, expr->getChild(1)->width, expr->getChild(0)->sign);
+  if(left.first&& right.first)
+    insts_2expr(n, std::string(std::get<2>(info)), name, left.second, right.second);
+  else if(left.first && !right.first)
+    insts_3expr(n, std::string(std::get<3>(info)), name, left.second, right.second, std::to_string(expr->getChild(1)->width));
+  else if(!left.first && right.first)
+    insts_4expr(n, std::string(std::get<4>(info)), name, left.second, std::to_string(expr->getChild(0)->width), right.second, std::to_string(expr->getChild(1)->width));
+  else
+    insts_4expr(n, std::string(std::get<5>(info)), name, left.second, std::to_string(expr->getChild(0)->width), right.second, std::to_string(expr->getChild(1)->width));
   return std::make_pair(EXPR_VAR, name);
 }
 
