@@ -353,13 +353,15 @@ void visitRegDef(std::string prefix, graph* g, PNode* reg) {
 }
 
 void visitStmts(std::string prefix, graph* g, PNode* stmts) {
+  PNode* module;
   for (int i = 0; i < stmts->getChildNum(); i++) {
     PNode* stmt = stmts->getChild(i);
     clear_tmp;
     switch(stmt->type) {
       case P_INST : 
         Assert(stmt->getExtraNum() >= 1 && moduleMap.find(stmt->getExtra(0)) != moduleMap.end(), "Module %s is not defined!\n", stmt->name.c_str());
-        visitModule(prefix + stmt->name + "_", g, moduleMap[stmt->getExtra(0)]);
+        module = moduleMap[stmt->getExtra(0)];
+        if(module->type == P_MOD) visitModule(prefix + stmt->name + "_", g, module);
         break;
       case P_NODE :
         visitNode(prefix, stmt);
