@@ -52,6 +52,7 @@ public:
   std::vector<PNode*> siblings;
   void append(PNode* pnode);
   void append(int num, ...);
+  void concat(PList* plist);
 };
 
 PNode* newNode(int type, char* info, char* name, int num, ...);

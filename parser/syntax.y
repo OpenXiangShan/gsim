@@ -66,9 +66,9 @@ int p_stoi(const char* str);
 %token DataType Depth ReadLatency WriteLatency ReadUnderwrite Reader Writer Readwriter
 /* internal node */
 %type <intVal> width
-%type <plist> cir_mods mem_compulsory mem_optional fields
-%type <pnode> module ports statements port type statement when_else memory
-%type <pnode> mem_reader mem_writer mem_readwriter
+%type <plist> cir_mods mem_compulsory mem_optional fields params
+%type <pnode> module extmodule ports statements port type statement when_else memory param
+%type <plist> mem_reader mem_writer mem_readwriter
 %type <pnode> mem_datatype mem_depth mem_rlatency mem_wlatency mem_ruw
 %type <pnode> reference expr primop_2expr primop_1expr primop_1expr1int primop_1expr2int
 %type <pnode> field type_aggregate type_ground circuit
@@ -156,20 +156,20 @@ mem_wlatency: WriteLatency "=>" INT { $$ = newNode(P_WLATENCT, $3, 0); }
     ;
 mem_ruw: ReadUnderwrite "=>" Ruw { $$ = newNode(P_RUW, $3, 0); }
     ;
-mem_compulsory: mem_datatype mem_depth mem_rlatency mem_wlatency mem_ruw { $$ = new PList(); $$->append(5, $1, $2, $3, $4, $5); }
+mem_compulsory: mem_datatype mem_depth mem_rlatency mem_wlatency { $$ = new PList(); $$->append(4, $1, $2, $3, $4); }
     ;
-mem_reader: { $$ = NULL; }
-    | Reader "=>" ALLID    { $$ = newNode(P_READER, $3, 0);}
+mem_reader: { $$ = new PList(); }
+    | mem_reader Reader "=>" ALLID  { $$ = $1; $$->append(newNode(P_READER, $4, 0));}
     ;
-mem_writer: { $$ = NULL; }
-    | Writer "=>" ALLID    { $$ = newNode(P_WRITER, $3, 0);}
+mem_writer: { $$ = new PList(); }
+    | mem_writer Writer "=>" ALLID    { $$ = $1; $$->append(newNode(P_WRITER, $4, 0));}
     ;
-mem_readwriter: { $$ = NULL; }
-    | Readwriter "=>" ALLID    { $$ = newNode(P_READWRITER, $3, 0);}
+mem_readwriter: { $$ = new PList(); }
+    | mem_readwriter Readwriter "=>" ALLID  { $$ = $1; $$->append(newNode(P_READWRITER, $4, 0));}
     ;
-mem_optional: mem_reader mem_writer mem_readwriter { $$ = new PList(); $$->append(3, $1, $2, $3); }
+mem_optional: mem_reader mem_writer mem_readwriter { $$ = $1; $$->concat($2); $$->concat($3); }
     ;
-memory: Mem ALLID ':' info INDENT mem_compulsory mem_optional DEDENT { $$ = newNode(P_MEMORY, $4, $2, 0); $$->appendChildList($6); $$->appendChildList($7); }
+memory: Mem ALLID ':' info INDENT mem_compulsory mem_optional mem_ruw DEDENT { $$ = newNode(P_MEMORY, $4, $2, 0); $$->appendChild($8); $$->appendChildList($6); $$->appendChildList($7); }
     ;
 /* statements */
 references:
