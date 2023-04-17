@@ -67,8 +67,8 @@ int p_stoi(const char* str);
 /* internal node */
 %type <intVal> width
 %type <plist> cir_mods mem_compulsory mem_optional fields params
-%type <pnode> module extmodule ports statements port type statement when_else memory param
 %type <plist> mem_reader mem_writer mem_readwriter
+%type <pnode> module extmodule ports statements port type statement when_else memory param exprs
 %type <pnode> mem_datatype mem_depth mem_rlatency mem_wlatency mem_ruw
 %type <pnode> reference expr primop_2expr primop_1expr primop_1expr1int primop_1expr2int
 %type <pnode> field type_aggregate type_ground circuit
@@ -84,6 +84,8 @@ int p_stoi(const char* str);
 circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, $6, $3, $8); root = $$; }
 	;
 ALLID: Inst { $$ = "inst"; }
+    | Printf { $$ = "printf"; }
+    | Mem { $$ = "mem"; }
     | ID {$$ = $1; }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
@@ -127,8 +129,8 @@ primop_1expr1int: E1I1OP expr ',' INT ')' { $$ = newNode(P_1EXPR1INT, $1, 1, $2)
 primop_1expr2int: E1I2OP expr ',' INT ',' INT ')' { $$ = newNode(P_1EXPR2INT, $1, 1, $2); $$->appendExtraInfo($4); $$->appendExtraInfo($6); }
     ;
 /* expression definitions */
-exprs:
-    | exprs expr    { TODO(); }
+exprs:              { $$ = new PNode(P_EXPRS);}
+    | exprs expr    { $$ = $1; $$->appendChild($2); }
     ;
 expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S');}
     | IntType width '(' INT ')' { $$ = newNode(P_EXPR_INT_INIT, $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); $$->appendExtraInfo($4);}
@@ -192,8 +194,8 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $5, $2, 1, $4)
     | Attach '(' references ')' info { TODO(); }
     | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $4, NULL, 3, $2, $6, $8); } /* expected newline before statement */
     | Stop '(' expr ',' expr ',' INT ')' info   { TODO(); }
-    | Printf '(' expr ',' expr ',' String exprs ')' ':' ALLID info { TODO(); }
-    | Printf '(' expr ',' expr ',' String exprs ')' info    { TODO(); }
+    | Printf '(' expr ',' expr ',' String ',' exprs ')' ':' ALLID info { $$ = newNode(P_PRINTF, $13, $12, 3, $3, $5, $9); $$->appendExtraInfo($7); }
+    | Printf '(' expr ',' expr ',' String ',' exprs ')' info    { { $$ = newNode(P_PRINTF, $11, NULL, 3, $3, $5, $9); $$->appendExtraInfo($7); } }
     | Skip info { $$ = NULL; }
     ;
 /* module definitions */
@@ -205,16 +207,16 @@ ports:  { $$ = new PNode(P_PORTS); }
     ;
 module: Module ALLID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, $4, $2, 2, $6, $7); }
     ;
-ext_defname:
-    | Defname '=' ALLID            { TODO(); }
+ext_defname:                       {  }
+    | Defname '=' ALLID            {  }
     ;
-params: 
-    | params param              { TODO(); }
+params:                            { $$ = new PList(); }
+    | params param                 { $$ = $1; $$->append($2); }
     ;
 param: Parameter ALLID '=' String  { TODO(); }
     | Parameter ALLID '=' INT      { TODO(); }
     ;
-extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { TODO(); }
+extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$ = newNode(P_EXTMOD, $4, $2, 1, $6); $$->appendChildList($8);}
     ;
 intmodule: Intmodule ALLID ':' info INDENT ports Intrinsic '=' ALLID params DEDENT	{ TODO(); }
 		;
@@ -233,9 +235,9 @@ annotations:
 version: Firrtl Version INT '.' INT '.' INT { }
 		;
 cir_mods:                       { $$ = new PList(); }
-		| module cir_mods       { $$ = $2; $$->append($1); }
-		| extmodule cir_mods    { TODO(); }
-		| intmodule cir_mods    { TODO(); }
+		| cir_mods module       { $$ = $1; $$->append($2); }
+		| cir_mods extmodule    { $$ = $1; $$->append($2); }
+		| cir_mods intmodule    { TODO(); } // TODO
 		;
 
 %%
