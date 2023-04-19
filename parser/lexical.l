@@ -112,6 +112,7 @@ info        [0-9A-Za-z.{}:,/ ]+
 <normal>else                    { return token::Else; }
 <normal>stop                    { return token::Stop; }
 <normal>printf                  { return token::Printf; }
+<normal>assert                  { return token::Assert; }
 <normal>skip                    { return token::Skip; }
 <normal>input                   { return token::Input; }
 <normal>output                  { return token::Output; }

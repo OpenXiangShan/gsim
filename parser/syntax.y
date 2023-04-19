@@ -57,7 +57,7 @@ int p_stoi(const char* str);
 %token <typeRUW> Ruw
 %token <strVal> Info
 %token Flip Mux Validif Invalid Mem Wire Reg RegWith RegReset Inst Of Node Is Attach
-%token When Else Stop Printf Skip Input Output
+%token When Else Stop Printf Skip Input Output Assert
 %token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit
 %token Class Target Firrtl Version INDENT DEDENT
 %token RightArrow "=>"
@@ -83,10 +83,11 @@ int p_stoi(const char* str);
 /* remove version */
 circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, $6, $3, $8); root = $$; }
 	;
-ALLID: Inst { $$ = "inst"; }
+ALLID: ID {$$ = $1; }
+    | Inst { $$ = "inst"; }
     | Printf { $$ = "printf"; }
+    | Assert { $$ = "assert"; }
     | Mem { $$ = "mem"; }
-    | ID {$$ = $1; }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
@@ -196,7 +197,9 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $5, $2, 1, $4)
     | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $4, NULL, 3, $2, $6, $8); } /* expected newline before statement */
     | Stop '(' expr ',' expr ',' INT ')' info   { TODO(); }
     | Printf '(' expr ',' expr ',' String ',' exprs ')' ':' ALLID info { $$ = newNode(P_PRINTF, $13, $12, 3, $3, $5, $9); $$->appendExtraInfo($7); }
-    | Printf '(' expr ',' expr ',' String ',' exprs ')' info    { { $$ = newNode(P_PRINTF, $11, NULL, 3, $3, $5, $9); $$->appendExtraInfo($7); } }
+    | Printf '(' expr ',' expr ',' String ',' exprs ')' info    { $$ = newNode(P_PRINTF, $11, NULL, 3, $3, $5, $9); $$->appendExtraInfo($7); }
+    | Assert '(' expr ',' expr ',' expr ',' String ')' ':' ALLID info { $$ = newNode(P_ASSERT, $13, $12, 3, $3, $5, $7); $$->appendExtraInfo($9); }
+    | Assert '(' expr ',' expr ',' expr ',' String ')' info { $$ = newNode(P_ASSERT, $11, NULL, 3, $3, $5, $7); $$->appendExtraInfo($9); }
     | Skip info { $$ = NULL; }
     ;
 /* module definitions */
