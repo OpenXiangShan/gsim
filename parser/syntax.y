@@ -129,8 +129,9 @@ primop_1expr1int: E1I1OP expr ',' INT ')' { $$ = newNode(P_1EXPR1INT, $1, 1, $2)
 primop_1expr2int: E1I2OP expr ',' INT ',' INT ')' { $$ = newNode(P_1EXPR2INT, $1, 1, $2); $$->appendExtraInfo($4); $$->appendExtraInfo($6); }
     ;
 /* expression definitions */
-exprs:              { $$ = new PNode(P_EXPRS);}
-    | exprs expr    { $$ = $1; $$->appendChild($2); }
+exprs:                  { $$ = new PNode(P_EXPRS);}
+    | exprs ',' expr    { $$ = $1; $$->appendChild($3); }
+    | expr              { $$ = new PNode(P_EXPRS); $$->appendChild($1); }
     ;
 expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S');}
     | IntType width '(' INT ')' { $$ = newNode(P_EXPR_INT_INIT, $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); $$->appendExtraInfo($4);}
