@@ -5,7 +5,6 @@ LEXICAL_SRC = $(PARSER_DIR)/lexical.l
 SYNTAX_SRC = $(PARSER_DIR)/syntax.y
 PARSER_BUILD = $(PARSER_DIR)/build
 
-SRCS = $(shell find src $(PARSER_DIR) -name "*.cpp" -o -name "*.cc")
 INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 
 OBJ_DIR = obj
@@ -14,13 +13,16 @@ CXXFLAGS = -O2 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -lgmp
 CXX = g++
 TARGET = GraphEmu
 
-NAME = GCD
+NAME ?= GCD
 TEST_FILE = scala/build/$(NAME)
 FIRRTL_FILE = $(TEST_FILE).lo.fir
 
 EMU_DIR = emu
-EMU_SRC = $(EMU_DIR)/sim$(NAME).cpp
+EMU_SRC = $(EMU_DIR)/difftest.cpp
 EMU_TARGET = emu_test
+EMU_SRC_DIR = emu-src
+
+SRCS = $(shell find src $(PARSER_DIR) -name "*.cpp" -o -name "*.cc" )
 
 ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
@@ -39,11 +41,12 @@ compile: $(PARSER_BUILD)/syntax.cc
 	mkdir -p $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET)
 	$(BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
+	cp $(EMU_SRC_DIR)/* $(OBJ_DIR)
 
 clean:
 	rm -rf obj parser/build obj_dir
 
-emu: obj/top.cpp $(EMU_SRC)
+emu: obj/top.cpp $(EMU_SRC) compile
 	g++ $(EMU_SRC) obj/top.cpp -Iobj -o $(BUILD_DIR)/$(EMU_TARGET)
 	$(BUILD_DIR)/$(EMU_TARGET)
 
