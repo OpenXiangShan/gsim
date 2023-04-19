@@ -2,6 +2,16 @@
 #define FUNCTIONS_H
 #include <gmp.h>
 
+#define Assert(cond, ...) \
+  do { \
+    if (!(cond)) { \
+      fprintf(stderr, "\33[1;31m"); \
+      fprintf(stderr, __VA_ARGS__); \
+      fprintf(stderr, "\33[0m\n"); \
+      assert(cond); \
+    } \
+  } while (0)
+
 void s_tail(mpz_t& dst, mpz_t& src, unsigned long n);
 void s_cat(mpz_t& dst, mpz_t& src1, mpz_t& src2);
 void s_cat_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt);

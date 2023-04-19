@@ -1,7 +1,7 @@
 #ifndef NODE_H
 #define NODE_H
 #include "common.h"
-enum {NODE_REG_SRC, NODE_REG_DST, NODE_OTHERS};
+enum {NODE_REG_SRC, NODE_REG_DST, NODE_ACTIVE, NODE_OTHERS};
 enum {NO_OP, OP_ADD, OP_SUB, OP_MUL, OP_DIV};
 class Node {
 public:

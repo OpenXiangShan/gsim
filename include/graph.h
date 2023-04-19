@@ -9,6 +9,8 @@ public:
   std::vector<Node*>output;
   std::vector<Node*>sources;
   std::vector<Node*>sorted;
+  std::vector<Node*>active;
   std::string name;
+  int maxTmp = 0;
 };
 #endif

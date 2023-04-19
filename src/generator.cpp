@@ -17,6 +17,7 @@ void genHeader(graph* g, std::string headerFile) {
   INCLUDE_LIB(hfile, "iostream");
   INCLUDE_LIB(hfile, "vector");
   INCLUDE_LIB(hfile, "gmp.h");
+  INCLUDE_LIB(hfile, "assert.h");
   INCLUDE(hfile, "functions.h");
   hfile << "class S" << g->name << "{\n" << "public:\n";
 /*
@@ -45,7 +46,9 @@ void genHeader(graph* g, std::string headerFile) {
     hfile << "mpz_t " << node->name << ";\n";
   }
 // unique oldVal
-    hfile << "mpz_t oldVal;\n";
+  hfile << "mpz_t oldVal;\n";
+// tmp variable
+  for (int i = 0; i < g->maxTmp; i++) hfile << "mpz_t tmp" << i << ";\n";
 // set functions
   for (Node* node: g->input) {
     hfile << "void set_" << node->name << "(mpz_t val) {\n";
@@ -69,14 +72,6 @@ void genHeader(graph* g, std::string headerFile) {
 void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   std::ofstream sfile(std::string(OBJ_DIR) + "/" + srcFile + ".cpp");
   INCLUDE(sfile, headerFile + ".h");
-
-  // operations based on libgmp
-  // for(int i = 0; i < LENGTH(cmpOP); i++) {
-    // sfile << "void " << cmpOP[i][0] << "(mpz_t& dst, mpz_t& op1, mpz_t& op2) {\n";
-    // sfile << "  mpz_set_ui(dst, mpz_cmp(op1, op2)" << cmpOP[i][1] << "0);\n}\n";
-    // sfile << "void " << cmpOP[i][0] << "(mpz_t& dst, mpz_t& op1, unsigned long int op2) {\n";
-    // sfile << "  mpz_set_ui(dst, mpz_cmp_ui(op1, op2)" << cmpOP[i][1] << "0);\n}\n";
-  // }
 
   for(Node* node: g->sorted) {
     if(node->insts.size() == 0) continue;
@@ -104,13 +99,11 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
     if(g->sorted[i]->insts.size() == 0) continue;
     sfile << "if(activeFlags[" << i << "]) " << "step" << i << "();\n";
   }
-  // for(Node* node: g->sorted) {
-  //   if(node->op.length() == 0) continue;
-  //   // generate function
 
-  //   if(!node->defined) sfile << "int ";
-  //   sfile << node->name << " = " << node->op << ";\n";
-  // }
+  // active nodes
+  for(Node* n: g->active) {
+    for(int i = 0; i < n->insts.size(); i ++) sfile << n->insts[i] << ";\n";
+  }
 
   // update registers
   for(Node* node: g->sources) {
