@@ -370,8 +370,8 @@ void visitAssert(std::string prefix, graph* g, PNode* ass) {
   Node* n = new Node();
   n->name = prefix + ass->name;
   n->type = NODE_ACTIVE;
-  expr_type en = visitExpr(NEW_TMP, prefix, n, ass->getChild(1));
-  expr_type pred = visitExpr(NEW_TMP, prefix, n, ass->getChild(2));
+  expr_type pred = visitExpr(NEW_TMP, prefix, n, ass->getChild(1));
+  expr_type en = visitExpr(NEW_TMP, prefix, n, ass->getChild(2));
   std::string en_str = en.first ? (std::string("mpz_cmp_ui(") + en.second + ", 0)") : en.second;
   std::string pred_str = pred.first ? (std::string("mpz_cmp_ui(") + pred.second + ", 0)") : pred.second;
   n->insts.push_back(std::string("Assert(!") + en_str + " || " + pred_str + ", " + ass->getExtra(0) + ")");
