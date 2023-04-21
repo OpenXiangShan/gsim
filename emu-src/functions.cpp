@@ -44,9 +44,9 @@ void s_asUInt(mpz_t& dst, mpz_t& src) {
   mpz_limbs_finish(dst, mpz_size(src));
 }
 //s_bits
-void s_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t l, mp_bitcnt_t r) {
-  mp_bitcnt_t left_bits = mpz_sizeinbase(src, 2) - r;
-  mpz_tdiv_q_2exp(dst, src, r);
+void s_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t h, mp_bitcnt_t l) {
+  mp_bitcnt_t left_bits = h - l + 1;
+  mpz_tdiv_q_2exp(dst, src, l);
   int libms_num = (left_bits + 63) / 64;
   unsigned long int mask = ((unsigned long)1 << (left_bits % 64)) - 1;
   mp_limb_t* data = mpz_limbs_modify(dst, libms_num);
