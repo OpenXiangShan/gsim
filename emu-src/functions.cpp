@@ -45,6 +45,10 @@ void s_asUInt(mpz_t& dst, mpz_t& src) {
 }
 //s_bits
 void s_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t h, mp_bitcnt_t l) {
+  if(mpz_size(src) == 0) {
+    mpz_set(dst, src);
+    return;
+  }
   mp_bitcnt_t left_bits = h - l + 1;
   mpz_tdiv_q_2exp(dst, src, l);
   int libms_num = (left_bits + 63) / 64;
