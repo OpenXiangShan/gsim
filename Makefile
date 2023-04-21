@@ -18,7 +18,7 @@ TEST_FILE = scala/build/$(NAME)
 FIRRTL_FILE = $(TEST_FILE).lo.fir
 
 EMU_DIR = emu
-EMU_SRC = $(EMU_DIR)/difftest.cpp
+EMU_SRC = $(EMU_DIR)/emu.cpp $(shell find $(EMU_SRC_DIR) -name "*.cpp")
 EMU_TARGET = emu_test
 EMU_SRC_DIR = emu-src
 
@@ -34,20 +34,19 @@ VERI_CFLAGS = -O3 $(addprefix -I../, $(VERI_INC_DIR))
 VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\"
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
-VERI_CSRCS = $(shell find $(OBJ_DIR) -name "*.cpp") $(EMU_DIR)/difftest.cpp
+VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIR)/difftest.cpp
 
 compile: $(PARSER_BUILD)/syntax.cc
 	mkdir -p build
 	mkdir -p $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET)
 	$(BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
-	cp $(EMU_SRC_DIR)/* $(OBJ_DIR)
 
 clean:
 	rm -rf obj parser/build obj_dir
 
 emu: obj/top.cpp $(EMU_SRC) compile
-	g++ $(EMU_SRC) obj/top.cpp -Iobj -o $(BUILD_DIR)/$(EMU_TARGET)
+	g++ $(EMU_SRC) obj/top.cpp -DMOD_NAME=S$(NAME) -Wl,-lgmp -Iobj -I$(EMU_SRC_DIR) -o $(BUILD_DIR)/$(EMU_TARGET)
 	$(BUILD_DIR)/$(EMU_TARGET)
 
 $(PARSER_BUILD)/syntax.cc: $(LEXICAL_SRC) $(SYNTAX_SRC)
