@@ -22,6 +22,7 @@ std::string tmp;
 #define EXPR_CONSTANT 0
 #define EXPR_VAR 1
 #define expr_type std::pair<int, std::string>
+#define CONS(expr) (expr.first ? (std::string("mpz_get_ui(") + expr.second + ")") : expr.second)
 
 static inline void insts_set_neq(Node* node, std::string& srcStr) {
   if(node->name != srcStr)
@@ -361,7 +362,7 @@ void visitPrintf(std::string prefix, graph* g, PNode* print) {
   std::string cond_str = cond.first ? (std::string("mpz_cmp_ui(") + cond.second + ", 0)") : cond.second;
   std::string inst = std::string("if(") + cond_str + ") printf(" + print->getExtra(0);
   PNode* exprs = print->getChild(2);
-  for(int i = 0; i < exprs->getChildNum(); i++ ) inst += "," + visitExpr(NEW_TMP, prefix, n, exprs->getChild(i)).second;
+  for(int i = 0; i < exprs->getChildNum(); i++ ) inst += "," + CONS(visitExpr(NEW_TMP, prefix, n, exprs->getChild(i)));
   n->insts.push_back(inst + ")");
   g->active.push_back(n);
 }
