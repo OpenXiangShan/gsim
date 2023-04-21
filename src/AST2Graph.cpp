@@ -98,7 +98,7 @@ static int secondWidth(int a, int b, bool sign = 0){
 // 0: uint; 1: child sign
                               // sign   widthFunc
 std::map<std::string, std::tuple<bool, int (*)(int, int, bool), const char*, const char*, const char*, const char*>> expr2Map = {
-  {"add",   {1, maxWidthPlus1,  "mpz_add",    "s_mpz_add_ui_r",     "s_mpz_add_ui_l",     "s_mpz_add_ui2",   }},
+  {"add",   {1, maxWidthPlus1,  "s_mpz_add",    "s_mpz_add_ui_r",     "s_mpz_add_ui_l",     "s_mpz_add_ui2",   }},
   {"sub",   {1, maxWidthPlus1,  "mpz_sub",    "s_mpz_sub_ui_r",     "s_mpz_sub_ui_l",     "s_mpz_sub_ui2",   }},
   {"mul",   {1, sumWidth,       "mpz_mul",    "s_mpz_mul_ui_r",     "s_mpz_mul_ui_l",     "s_mpz_mul_ui2",   }},
   {"div",   {1, divWidth,       "mpz_tdiv_q", "s_mpz_tdiv_q_ui_r",  "s_mpz_tdiv_q_ui_l",  "s_mpz_tdiv_q_ui2",}},
@@ -111,9 +111,9 @@ std::map<std::string, std::tuple<bool, int (*)(int, int, bool), const char*, con
   {"neq",   {0, boolWidth,      "s_mpz_neq",  "s_mpz_neq_ui_r",     "s_mpz_neq_ui_l",     "s_mpz_neq_ui2",   }},
   {"dshl",  {1, dshlWidth,      "s_mpz_dshl", "s_mpz_dshl_ui_r",    "s_mpz_dshl_ui_l",    "s_mpz_dshl_ui2",  }},
   {"dshr",  {1, firstWidth,     "s_mpz_dshr", "s_mpz_dshr_ui_r",    "s_mpz_dshr_ui_l",    "s_mpz_dshr_ui2",  }},
-  {"and",   {0, maxWidth,       "mpz_and",    "s_mpz_and_ui_r",     "s_mpz_and_ui_l",     "s_mpz_and_ui2",   }},
-  {"or",    {0, maxWidth,       "mpz_ior",    "s_mpz_ior_ui_r",     "s_mpz_ior_ui_l",     "s_mpz_ior_ui2",   }},
-  {"xor",   {0, maxWidth,       "mpz_xor",    "s_mpz_xor_ui_r",     "s_mpz_xor_ui_l",     "s_mpz_xor_ui2",   }},
+  {"and",   {0, maxWidth,       "s_mpz_and",    "s_mpz_and_ui_r",     "s_mpz_and_ui_l",     "s_mpz_and_ui2",   }},
+  {"or",    {0, maxWidth,       "s_mpz_ior",    "s_mpz_ior_ui_r",     "s_mpz_ior_ui_l",     "s_mpz_ior_ui2",   }},
+  {"xor",   {0, maxWidth,       "s_mpz_xor",    "s_mpz_xor_ui_r",     "s_mpz_xor_ui_l",     "s_mpz_xor_ui2",   }},
   {"cat",   {0, sumWidth,       "s_cat",      "s_cat_ui_r",         "s_cat_ui_l",         "s_cat_ui2",       }},
 };
 
@@ -229,7 +229,7 @@ expr_type visit2Expr(std::string& name, std::string prefix, Node* n, PNode* expr
   expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
   expr->width = std::get<1>(info)(expr->getChild(0)->width, expr->getChild(1)->width, expr->getChild(0)->sign);
   if(left.first&& right.first)
-    insts_2expr(n, std::string(std::get<2>(info)), name, left.second, right.second);
+    insts_4expr(n, std::string(std::get<2>(info)), name, left.second, std::to_string(expr->getChild(0)->width), right.second, std::to_string(expr->getChild(1)->width));
   else if(left.first && !right.first)
     insts_3expr(n, std::string(std::get<3>(info)), name, left.second, right.second, std::to_string(expr->getChild(1)->width));
   else if(!left.first && right.first)
