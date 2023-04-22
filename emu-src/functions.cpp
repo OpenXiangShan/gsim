@@ -35,12 +35,12 @@ void s_cat_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned lon
   mpz_add_ui(dst, dst, val2);
 }
 //s_asSInt
-void s_asSInt(mpz_t& dst, mpz_t& src) {
+void s_asSInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set(dst, src);
   mpz_limbs_finish(dst, -mpz_size(src));
 }
 //s_asUInt
-void s_asUInt(mpz_t& dst, mpz_t& src) {
+void s_asUInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set(dst, src);
   mpz_limbs_finish(dst, mpz_size(src));
 }
@@ -226,6 +226,12 @@ void s_mpz_dshl_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigne
   mpz_set_ui(dst, val1 << val2);
 }
 //orr
-void s_orr(mpz_t& dst, mpz_t& src) {
+void s_orr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set_ui(dst, mpz_cmp_ui(src, 0) == 0 ? 0 : 1);
+}
+void s_andr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
+  mpz_set_ui(dst, 1);
+  mpz_mul_2exp(dst, dst, bitcnt);
+  mpz_sub_ui(dst, dst, 1);
+  mpz_set_ui(dst, mpz_cmp(dst, src) == 0);
 }

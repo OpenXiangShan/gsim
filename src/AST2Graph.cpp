@@ -246,7 +246,7 @@ expr_type visit1Expr(std::string& name, std::string prefix, Node* n, PNode* expr
   expr_type src = visitExpr(tmp, prefix, n, expr->getChild(0));
   // Assert(src.first, "Expr in 1Expr(%s) must be var %s\n", expr->name.c_str(), src.second.c_str());
   if(src.first){
-    insts_1expr(n, FUNC_NAME(expr->name), name, src.second);
+    insts_2expr(n, FUNC_NAME(expr->name), name, src.second, std::to_string(expr->getChild(0)->width));
     return std::make_pair(EXPR_VAR, name);
   } else {
     return std::make_pair(EXPR_CONSTANT, src.second.c_str());
