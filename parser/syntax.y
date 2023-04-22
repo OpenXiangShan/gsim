@@ -132,7 +132,6 @@ primop_1expr2int: E1I2OP expr ',' INT ',' INT ')' { $$ = newNode(P_1EXPR2INT, $1
 /* expression definitions */
 exprs:                  { $$ = new PNode(P_EXPRS);}
     | exprs ',' expr    { $$ = $1; $$->appendChild($3); }
-    | expr              { $$ = new PNode(P_EXPRS); $$->appendChild($1); }
     ;
 expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S');}
     | IntType width '(' INT ')' { $$ = newNode(P_EXPR_INT_INIT, $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); $$->appendExtraInfo($4);}
@@ -196,8 +195,8 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $5, $2, 1, $4)
     | Attach '(' references ')' info { TODO(); }
     | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $4, NULL, 3, $2, $6, $8); } /* expected newline before statement */
     | Stop '(' expr ',' expr ',' INT ')' info   { TODO(); }
-    | Printf '(' expr ',' expr ',' String ',' exprs ')' ':' ALLID info { $$ = newNode(P_PRINTF, $13, $12, 3, $3, $5, $9); $$->appendExtraInfo($7); }
-    | Printf '(' expr ',' expr ',' String ',' exprs ')' info    { $$ = newNode(P_PRINTF, $11, NULL, 3, $3, $5, $9); $$->appendExtraInfo($7); }
+    | Printf '(' expr ',' expr ',' String exprs ')' ':' ALLID info { $$ = newNode(P_PRINTF, $12, $11, 3, $3, $5, $8); $$->appendExtraInfo($7); }
+    | Printf '(' expr ',' expr ',' String exprs ')' info    { $$ = newNode(P_PRINTF, $10, NULL, 3, $3, $5, $8); $$->appendExtraInfo($7); }
     | Assert '(' expr ',' expr ',' expr ',' String ')' ':' ALLID info { $$ = newNode(P_ASSERT, $13, $12, 3, $3, $5, $7); $$->appendExtraInfo($9); }
     | Assert '(' expr ',' expr ',' expr ',' String ')' info { $$ = newNode(P_ASSERT, $11, NULL, 3, $3, $5, $7); $$->appendExtraInfo($9); }
     | Skip info { $$ = NULL; }
