@@ -1,14 +1,18 @@
 #include <gmp.h>
 #include <assert.h>
+#include <iostream>
 
 // s_tail: remain the last n bits
 void s_tail(mpz_t& dst, mpz_t& src, unsigned long n) {
   mpz_set(dst, src);
   if(mpz_size(dst) == 0) return;
   int libms_num = (n + 63) / 64;
-  unsigned long mask = ((unsigned long)1 << (n % 64)) - 1;
-  mp_limb_t* data = mpz_limbs_modify(dst, libms_num);
-  *data = *data & mask;
+  int trailing_bits = n % 64;
+  if(trailing_bits) {
+    unsigned long mask = ((unsigned long)1 << (n % 64)) - 1;
+    mp_limb_t* data = mpz_limbs_modify(dst, libms_num);
+    *data = *data & mask;
+  }
   mpz_limbs_finish(dst, libms_num);
 }
 //s_cat: concat src1 and src2
@@ -49,10 +53,13 @@ void s_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t h, mp_bitcnt_t l) {
   mp_bitcnt_t left_bits = h - l + 1;
   mpz_tdiv_q_2exp(dst, src, l);
   int libms_num = (left_bits + 63) / 64;
-  unsigned long int mask = ((unsigned long)1 << (left_bits % 64)) - 1;
-  mp_limb_t* data = mpz_limbs_modify(dst, libms_num);
-  *data = *data & mask;
-  mpz_limbs_finish(dst, libms_num);
+  int trailing_bits = left_bits % 64;
+  if(trailing_bits) {
+    unsigned long int mask = ((unsigned long)1 << trailing_bits) - 1;
+    mp_limb_t* data = mpz_limbs_modify(dst, libms_num);
+    *data = *data & mask;
+    mpz_limbs_finish(dst, libms_num);
+  }
 }
 //s_pat: sign/zero extends to n bits
 void s_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t n) {
