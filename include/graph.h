@@ -10,6 +10,7 @@ public:
   std::vector<Node*>sources;
   std::vector<Node*>sorted;
   std::vector<Node*>active;
+  std::vector<Node*>constant;
   std::string name;
   int maxTmp = 0;
 };

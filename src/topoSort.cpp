@@ -6,6 +6,7 @@ void topoSort(graph* g) {
   int idx = 0;
   std::vector<Node*> s(g->sources);
   s.insert(s.end(), g->input.begin(), g->input.end());
+  s.insert(s.end(), g->constant.begin(), g->constant.end());
   // for (Node* node : g->sources) {
   //   node->timestamp = time ++;
   // }

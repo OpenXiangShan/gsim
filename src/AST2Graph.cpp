@@ -339,13 +339,11 @@ void visitConnect(std::string prefix, PNode* connect) {
 }
 
 void visitRegDef(std::string prefix, graph* g, PNode* reg) {
-  Node* newReg = new Node();
+  Node* newReg = new Node(NODE_REG_SRC);
   newReg->name = prefix + reg->name;
-  newReg->type = NODE_REG_SRC;
   visitType(newReg, reg->getChild(0));
-  Node* nextReg = new Node();
+  Node* nextReg = new Node(NODE_REG_DST);
   nextReg->name = newReg->name + "_next";
-  nextReg->type = NODE_REG_DST;
   SET_TYPE(nextReg, newReg);
   newReg->regNext = nextReg;
   nextReg->regNext = newReg;
@@ -355,9 +353,8 @@ void visitRegDef(std::string prefix, graph* g, PNode* reg) {
 }
 
 void visitPrintf(std::string prefix, graph* g, PNode* print) {
-  Node* n = new Node();
+  Node* n = new Node(NODE_ACTIVE);
   n->name = prefix + print->name;
-  n->type = NODE_ACTIVE;
   expr_type cond = visitExpr(NEW_TMP, prefix, n, print->getChild(1));
   std::string cond_str = cond.first ? (std::string("mpz_cmp_ui(") + cond.second + ", 0)") : cond.second;
   std::string inst = std::string("if(") + cond_str + ") printf(" + print->getExtra(0);
@@ -368,9 +365,8 @@ void visitPrintf(std::string prefix, graph* g, PNode* print) {
 }
 
 void visitAssert(std::string prefix, graph* g, PNode* ass) {
-  Node* n = new Node();
+  Node* n = new Node(NODE_ACTIVE);
   n->name = prefix + ass->name;
-  n->type = NODE_ACTIVE;
   expr_type pred = visitExpr(NEW_TMP, prefix, n, ass->getChild(1));
   expr_type en = visitExpr(NEW_TMP, prefix, n, ass->getChild(2));
   std::string en_str = en.first ? (std::string("mpz_cmp_ui(") + en.second + ", 0)") : en.second;
@@ -420,8 +416,10 @@ void visitTopPorts(graph* g, PNode* ports) {
     io->name = port->name;
     if(port->type == P_INPUT) {
       g->input.push_back(io);
+      io->type = NODE_INP;
     } else if(port->type == P_OUTPUT) {
       g->output.push_back(io);
+      io->type = NODE_OUT;
     } else {
       Assert(0, "Invalid port %s with type %d\n", port->name.c_str(), port->type);
     }
@@ -446,5 +444,10 @@ graph* AST2Garph(PNode* root) {
   }
   Assert(topModule, "Top module can not be NULL\n");
   visitTopModule(g, topModule);
+  for(auto n: allSignals) {
+    if(n.second->type == NODE_OTHERS && n.second->inEdge == 0) {
+      g->constant.push_back(n.second);
+    }
+  }
   return g;
 }
