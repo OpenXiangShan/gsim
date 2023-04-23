@@ -75,7 +75,5 @@ void PList::append(int num, ...) {
 
 void PList::concat(PList* plist) {
   if(!plist) return;
-  for(int i = 0; i < plist->siblings.size(); i++) {
-    siblings.insert(siblings.end(), plist->siblings.begin(), plist->siblings.end());
-  }
+  siblings.insert(siblings.end(), plist->siblings.begin(), plist->siblings.end());
 }
