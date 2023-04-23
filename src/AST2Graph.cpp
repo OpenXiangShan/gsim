@@ -192,6 +192,12 @@ void visitModule(std::string prefix, graph* g, PNode* module) {
   MUX_DEBUG(std::cout << "leave " << module->name << std::endl);
 }
 
+void visitExtModule(std::string prefix, graph* g, PNode* module) {
+  MUX_DEBUG(std::cout << "visit " << module->name << std::endl);
+  visitPorts(prefix, g, module->getChild(0));
+  MUX_DEBUG(std::cout << "leave " << module->name << std::endl);
+}
+
 void visitType(Node* n, PNode* ptype) {
   switch(ptype->type) {
     case P_Clock: n->width = 1; break;
@@ -433,6 +439,7 @@ void visitStmts(std::string prefix, graph* g, PNode* stmts) {
         Assert(stmt->getExtraNum() >= 1 && moduleMap.find(stmt->getExtra(0)) != moduleMap.end(), "Module %s is not defined!\n", stmt->name.c_str());
         module = moduleMap[stmt->getExtra(0)];
         if(module->type == P_MOD) visitModule(prefix + stmt->name + "_", g, module);
+        else if(module->type == P_EXTMOD) visitExtModule(prefix + stmt->name + "_", g, module);
         break;
       case P_NODE :
         visitNode(prefix, stmt);
