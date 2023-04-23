@@ -172,7 +172,7 @@ mem_readwriter: { $$ = new PList(); }
     ;
 mem_optional: mem_reader mem_writer mem_readwriter { $$ = $1; $$->concat($2); $$->concat($3); }
     ;
-memory: Mem ALLID ':' info INDENT mem_compulsory mem_optional mem_ruw DEDENT { $$ = newNode(P_MEMORY, $4, $2, 0); $$->appendChild($8); $$->appendChildList($6); $$->appendChildList($7); }
+memory: Mem ALLID ':' info INDENT mem_compulsory mem_optional mem_ruw DEDENT { $$ = newNode(P_MEMORY, $4, $2, 0); $$->appendChildList($6); $$->appendChild($8); $$->appendChildList($7); }
     ;
 /* statements */
 references:

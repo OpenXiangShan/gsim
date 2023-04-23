@@ -11,6 +11,7 @@ public:
   std::vector<Node*>sorted;
   std::vector<Node*>active;
   std::vector<Node*>constant;
+  std::vector<Node*>memory;
   std::string name;
   int maxTmp = 0;
 };

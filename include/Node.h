@@ -1,7 +1,7 @@
 #ifndef NODE_H
 #define NODE_H
 #include "common.h"
-enum {NODE_REG_SRC, NODE_REG_DST, NODE_ACTIVE, NODE_INP, NODE_OUT, NODE_OTHERS};
+enum {NODE_REG_SRC, NODE_REG_DST, NODE_ACTIVE, NODE_INP, NODE_OUT, NODE_MEMORY, NODE_READER, NODE_WRITER, NODE_MEMBER, NODE_OTHERS};
 enum {NO_OP, OP_ADD, OP_SUB, OP_MUL, OP_DIV};
 class Node {
 public:
@@ -25,5 +25,7 @@ public:
   int defined;
   int initVal;
   Node* regNext;
+  std::vector<Node*>member;
+  int latency[2];
 };
 #endif

@@ -156,6 +156,9 @@ void addSignal(std::string s, Node* n) {
 }
 
 void addEdge(Node* src, Node* dst) {
+  if(dst->type == NODE_MEMBER) {
+    dst = dst->member[0];
+  }
   dst->inEdge ++;
   src->next.push_back(dst);
   // std::cout << src->name << " -> " << dst->name << std::endl;
@@ -260,17 +263,19 @@ std::string visitReference(std::string prefix, PNode* expr) { // return ref name
     // addEdge(ret, n);
     return ret;
   } else {
-    PNode* child = expr->getChild(0);
-    SET_TYPE(expr, expr->getChild(0));
-    switch(child->type) {
-      case P_REF_DOT: 
-        ret = prefix + expr->name + "_" + visitReference("", child);
-        // addEdge(ret, n);
-        return ret;
-      default: Assert(0, "TODO: invalid ref child type for %s\n", expr->name.c_str());
+    ret = prefix + expr->name;
+    for(int i = 0; i < expr->getChildNum(); i++) {
+      PNode* child = expr->getChild(i);
+      // SET_TYPE(expr, expr->getChild(i));
+      switch(child->type) {
+        case P_REF_DOT:
+          ret += "_" + visitReference("", child);
+          break;
+        default: Assert(0, "TODO: invalid ref child type(%d) for %s\n", child->type, expr->name.c_str());
+      }
     }
+    return ret;
   }
-  Assert(expr->getChildNum() == 0, "TODO: expr %s with childNum %d\n", expr->name, expr->getChildNum());
 }
 
 expr_type visitMux(std::string& name, std::string prefix, Node* n, PNode* mux) {
@@ -375,6 +380,49 @@ void visitAssert(std::string prefix, graph* g, PNode* ass) {
   g->active.push_back(n);
 }
 
+void visitMemory(std::string prefix, graph* g, PNode* memory) {
+  Assert(memory->getChildNum() >= 5 , "Invalid childNum(%d) ", memory->getChildNum());
+  Assert(memory->getChild(0)->type == P_DATATYPE, "Invalid child0 type(%d)\n", memory->getChild(0)->type);
+  Node* n = new Node(NODE_MEMORY);
+  n->name = prefix + memory->name;
+  g->memory.push_back(n);
+  visitType(n, memory->getChild(0)->getChild(0));
+  Assert(memory->getChild(1)->type == P_DEPTH, "Invalid child0 type(%d)\n", memory->getChild(0)->type);
+  Assert(n->width % 8 == 0, "invalid memory width %d\n", n);
+  int depth = p_stoi(memory->getChild(1)->name.c_str());
+  int readLatency = p_stoi(memory->getChild(2)->name.c_str());
+  int writeLatency = p_stoi(memory->getChild(3)->name.c_str());
+  n->latency[0] = readLatency;
+  n->latency[1] = writeLatency;
+  Assert(memory->getChild(4)->name == "undefined", "Invalid ruw %s\n", memory->getChild(4)->name.c_str());
+// readers
+  for(int i = 5; i < memory->getChildNum(); i++) {
+    PNode* rw = memory->getChild(i);
+    Node* rn = new Node();
+    rn->name = n->name + "_" + rw->name;
+    n->member.push_back(rn);
+    rn->regNext = n;
+    Node* rn_addr = new Node(NODE_MEMBER); rn->member.push_back(rn_addr); rn_addr->member.push_back(rn);
+    rn_addr->name = rn->name + "_addr";
+    Node* rn_en   = new Node(NODE_MEMBER); rn->member.push_back(rn_en);   rn_en->member.push_back(rn);
+    rn_en->name = rn->name + "_en";
+    Node* rn_clk  = new Node(NODE_MEMBER); rn->member.push_back(rn_clk);  rn_clk->member.push_back(rn);
+    rn_clk->name = rn->name + "_clk";
+    Node* rn_data = new Node(NODE_MEMBER); rn->member.push_back(rn_data); rn_data->member.push_back(rn);
+    rn_data->name = rn->name + "_data";
+    addSignal(rn_addr->name, rn_addr); addSignal(rn_en->name, rn_en); addSignal(rn_clk->name, rn_clk); addSignal(rn_data->name, rn_data);
+    if(rw->type == P_READER) {
+      rn->type = NODE_READER;
+    } else if(rw->type == P_WRITER) {
+      Node* rn_mask = new Node(NODE_MEMBER); rn->member.push_back(rn_data); rn_mask->member.push_back(rn);
+      rn_mask->name = rn->name + "_mask";
+      addSignal(rn_mask->name, rn_mask);
+    } else {
+      Assert(0, "Invalid rw type %d\n", rw->type);
+    }
+  }
+}
+
 void visitStmts(std::string prefix, graph* g, PNode* stmts) {
   PNode* module;
   for (int i = 0; i < stmts->getChildNum(); i++) {
@@ -400,6 +448,9 @@ void visitStmts(std::string prefix, graph* g, PNode* stmts) {
         break;
       case P_ASSERT:
         visitAssert(prefix, g, stmt);
+        break;
+      case P_MEMORY:
+        visitMemory(prefix, g, stmt);
         break;
       default: Assert(0, "Invalid stmt %s\n", stmt->name.c_str());
     }
