@@ -159,6 +159,7 @@ void addEdge(Node* src, Node* dst) {
   if(dst->type == NODE_MEMBER) {
     dst = dst->member[0];
   }
+  if(src->type == NODE_MEMBER) src = src->member[0];
   dst->inEdge ++;
   src->next.push_back(dst);
   // std::cout << src->name << " -> " << dst->name << std::endl;
@@ -420,7 +421,7 @@ void visitMemory(std::string prefix, graph* g, PNode* memory) {
     if(rw->type == P_READER) {
       rn->type = NODE_READER;
     } else if(rw->type == P_WRITER) {
-      Node* rn_mask = new Node(NODE_MEMBER); rn->member.push_back(rn_data); rn_mask->member.push_back(rn);
+      Node* rn_mask = new Node(NODE_MEMBER); rn->member.push_back(rn_mask); rn_mask->member.push_back(rn);
       rn_mask->name = rn->name + "_mask";
       addSignal(rn_mask->name, rn_mask);
     } else {

@@ -56,6 +56,9 @@ void genHeader(graph* g, std::string headerFile) {
 // memory
   for(Node* n : g->memory) {
     for(Node* rw : n->member) {
+      for(Node* type : rw->member) {
+        hfile << "mpz_t " << type->name << ";\n";
+      }
       if(rw->type == NODE_READER) {
         if(n->latency[0] != 0){
           hfile << "int " << waitIdx(rw->name) << ";\n";
