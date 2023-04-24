@@ -119,30 +119,38 @@ void s_mpz_mul_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned
 }
 //div
 void s_mpz_div(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) {
-  mpz_tdiv_q(dst, src1, src2);
+  if(mpz_cmp_ui(src2, 0) == 0) return;
+    mpz_tdiv_q(dst, src1, src2);
 }
 void s_mpz_div_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& src, mp_bitcnt_t bitcnt2) {
+  if(mpz_cmp_ui(src, 0) == 0) return;
   mpz_set_ui(dst, val);
   mpz_tdiv_q(dst, dst, src);
 }
 void s_mpz_div_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt) {
+  if(val == 0) return;
   mpz_tdiv_q_ui(dst, src, val);
 }
 void s_mpz_div_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long val2, mp_bitcnt_t bitcnt2) {
+  if(val2 == 0) return;
   mpz_set_ui(dst, val1 / val2);
 }
 //rem
 void s_mpz_rem(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) {
+  if(mpz_cmp_ui(src2, 0) == 0) return;
   mpz_tdiv_r(dst, src1, src2);
 }
 void s_mpz_rem_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& src, mp_bitcnt_t bitcnt2) {
+  if(mpz_cmp_ui(src, 0) == 0) return;
   mpz_set_ui(dst, val);
   mpz_tdiv_r(dst, dst, src);
 }
 void s_mpz_rem_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt) {
+  if(val == 0) return;
   mpz_tdiv_r_ui(dst, src, val);
 }
 void s_mpz_rem_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long val2, mp_bitcnt_t bitcnt2) {
+  if(val2 == 0) return;
   mpz_set_ui(dst, val1 % val2);
 }
 //lt
