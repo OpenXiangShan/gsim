@@ -8,9 +8,6 @@
 const char* cmpOP[][2] = {{"s_mpz_lt", "<"}, {"s_mpz_leq", "<="}, {"s_mpz_gt", ">"}, {"s_mpz_geq", ">="}, {"s_mpz_eq", "=="}, {"s_mpz_neq", "!="}};
 
 #define UI(x) (std::string("mpz_get_ui(") + x + ")")
-#define waitIdx(x) (x + "_waitIdx")
-#define timer(x) (x + "_timer")
-#define valid(x) (x + "_valid")
 void topoSort(graph* g);
 
 void genHeader(graph* g, std::string headerFile) {
@@ -55,21 +52,11 @@ void genHeader(graph* g, std::string headerFile) {
   for (int i = 0; i < g->maxTmp; i++) hfile << "mpz_t tmp" << i << ";\n";
 // memory
   for(Node* n : g->memory) {
+    hfile << (n->width == 8 ? "uint8_t " : (n->width == 16 ? "uint16_t " : (n->width == 32 ? "uint32_t " : "uint64_t ")));
+    hfile << n->name << "[" << n->val << "];\n";
     for(Node* rw : n->member) {
       for(Node* type : rw->member) {
         hfile << "mpz_t " << type->name << ";\n";
-      }
-      if(rw->type == NODE_READER) {
-        if(n->latency[0] != 0){
-          hfile << "int " << waitIdx(rw->name) << ";\n";
-          hfile << "unsigned long " << timer(rw->name) << "[" << n->latency[0] + 1 << "];\n";
-        }
-      } else if(rw->type == NODE_WRITER) {
-        if(n->latency[1] != 0){
-          hfile << "int " << waitIdx(rw->name) << ";\n";
-          hfile << "unsigned long " << timer(rw->name) << "[" << n->latency[1] + 1 << "][2];\n";
-          hfile << "bool " << timer(rw->name) << "[" << n->latency[1] + 1 << "];\n";
-        }
       }
     }
   }
@@ -117,37 +104,19 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
       sfile << "std::cout << \"" << node->id  << ": " << node->name << "(" << node->width << "): \" ;";
       sfile << "mpz_out_str(stdout, 16, oldVal); std::cout << \" -> \"; mpz_out_str(stdout, 16, " << node->name << "); std::cout << std::endl;\n";
     } else if(node->type == NODE_READER) {
+      for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
       int readlatency = node->regNext->latency[0];
       if(readlatency == 0) {
         sfile << "activeFlags[" << node->id << "] = false;\n";
         sfile << UI(node->member[3]->name) << " = " << node->regNext->name << "[" << UI(node->member[0]->name) << "]\n";
-      } else {
-        for(int i = 0; i < readlatency; i++)
-          sfile << timer(node->name) << "[" << i << "] = " << timer(node->name) << "[" << i + 1 << "];\n";
-        sfile << timer(node->name) << "[" << readlatency << "] = " << UI(node->member[0]->name) << ";\n";
-        sfile << "if(" << waitIdx(node->name) << " == 0) activeFlags[" << node->id << "] = false;\n";
-        sfile << "if(" << UI(node->member[1]->name) << ") " << waitIdx(node->name) << " = " << readlatency << ";\n";
-        sfile << "else " << waitIdx(node->name) << " = " << waitIdx(node->name) << " == 0 ? 0 : " << waitIdx(node->name) << " - 1;\n";
-        sfile << UI(node->member[3]->name) << " = " << node->regNext->name << "[" << timer(node->name) << "[0]]\n";
       }
     } else if(node->type == NODE_WRITER){
+      for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
       int writelatency = node->regNext->latency[1];
       if(writelatency == 0) {
         sfile << "activeFlags[" << node->id << "] = false;\n";
-        sfile << "if(" << UI(node->member[1]->name) << "&&" << UI(node->member[4]->name) << ") " << node->regNext->name << "[" << UI(node->member[0]->name) << "] = " << node->member[3] << ";\n";
-      } else {
-        for(int i = 0; i < writelatency; i++){
-          sfile << timer(node->name) << "[" << i << "][0] = " << timer(node->name) << "[" << i + 1 << "][0];\n";
-          sfile << timer(node->name) << "[" << i << "][1] = " << timer(node->name) << "[" << i + 1 << "][1];\n";
-          sfile << valid(node->name) << "[" << i << "] = " << valid(node->name) << "[" << i + 1 << "];\n";
-        }
-        sfile << timer(node->name) << "[" << writelatency << "][0] = " << UI(node->member[0]->name) << ";\n";
-        sfile << timer(node->name) << "[" << writelatency << "][1] = " << UI(node->member[3]->name) << ";\n";
-        sfile << valid(node->name) << "[" << writelatency << "] = " << UI(node->member[1]->name) << "&&" << UI(node->member[4]->name) <<  ";\n";
-        sfile << "if(" << waitIdx(node->name) << " == 0) activeFlags[" << node->id << "] = false;\n";
-        sfile << "if(" << UI(node->member[1]->name) << "&&" << UI(node->member[4]->name) << ") " << waitIdx(node->name) << " = " << writelatency << ";\n";
-        sfile << "else " << waitIdx(node->name) << " = " << waitIdx(node->name) << " == 0 ? 0 : " << node->name << "_waitIdx - 1;\n";
-        sfile << node->regNext->name << "[" << timer(node->name) << "[0][0]] = " << timer(node->name) << "[0][1]]";
+        sfile << "if(" << UI(node->member[1]->name) << "&&" << UI(node->member[4]->name) << ") " << \
+              node->regNext->name << "[" << UI(node->member[0]->name) << "] = " << UI(node->member[3]->name) << ";\n";
       }
     } else {
       Assert(0, "Invalid node %s with type %d\n", node->name.c_str(), node->type);
@@ -170,6 +139,29 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   // update registers
   for(Node* node: g->sources) {
     sfile << "mpz_set(" << node->name << ", " << node->name << "_next);\n";
+  }
+  // update memory rdata & wdata
+  for(Node* node: g->memory) {
+    for(Node* rw: node->member) {
+    std::cout << rw->name << " " << rw->type << " " << node->latency[0] << " " << node->latency[1] << "....\n";
+      if(rw->type == NODE_READER && node->latency[0] == 1) {
+        Node* data = rw->member[3];
+        Assert(data->type == NODE_L1_RDATA, "Invalid data type(%d) for reader(%s) with latency 1\n", data->type, rw->name.c_str());
+        sfile << "mpz_set(oldVal, " << data->name << ");\n";
+        sfile << "mpz_set_ui(" << data->name << ", " << node->name << "[" << rw->member[0]->name << "]);\n";
+        if(data->next.size() > 0) {
+          sfile << "if(" << "mpz_cmp(oldVal," << data->name << ") != 0){\n";
+          for(Node* next : data->next) {
+            sfile << "activeFlags[" << next->id << "] = true;\n";
+          }
+          sfile << "}\n";
+        }
+      } else if(rw->type == NODE_WRITER && node->latency[1] == 1) {
+        sfile << "if(" << UI(rw->member[1]->name) << " && " << UI(rw->member[4]->name) << ") " << \
+                node->name << "[" << UI(rw->member[0]->name) << "] = " << UI(rw->member[3]->name) << ";\n";
+      }
+    }
+
   }
   // sfile << "std::cout << \"------\\n\";\n";
   sfile << "}";

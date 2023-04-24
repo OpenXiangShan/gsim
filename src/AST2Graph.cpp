@@ -51,7 +51,7 @@ static inline void insts_set_expr_neq(Node* n, expr_type& src) {
   do {  \
     Node* rn_##str = new Node(NODE_MEMBER); \
     parent->member.push_back(rn_##str); \
-    rn_##str->member.push_back(parent); \
+    rn_##str->regNext = parent; \
     rn_##str->name = parent->name + "_" + #str; \
     addSignal(rn_##str->name, rn_##str); \
   } while(0)
@@ -166,9 +166,11 @@ void addSignal(std::string s, Node* n) {
 
 void addEdge(Node* src, Node* dst) {
   if(dst->type == NODE_MEMBER) {
-    dst = dst->member[0];
+    dst = dst->regNext;
   }
-  if(src->type == NODE_MEMBER) src = src->member[0];
+  if(src->type == NODE_MEMBER) {
+    src = src->regNext;
+  }
   dst->inEdge ++;
   src->next.push_back(dst);
   // std::cout << src->name << " -> " << dst->name << std::endl;
@@ -409,8 +411,10 @@ void visitMemory(std::string prefix, graph* g, PNode* memory) {
   int depth = p_stoi(memory->getChild(1)->name.c_str());
   int readLatency = p_stoi(memory->getChild(2)->name.c_str());
   int writeLatency = p_stoi(memory->getChild(3)->name.c_str());
+  Assert(readLatency <= 1 && writeLatency <= 1, "Invalid readLatency(%d) or writeLatency(%d)\n", readLatency, writeLatency);
   n->latency[0] = readLatency;
   n->latency[1] = writeLatency;
+  n->val = depth;
   Assert(memory->getChild(4)->name == "undefined", "Invalid ruw %s\n", memory->getChild(4)->name.c_str());
 // readers
   for(int i = 5; i < memory->getChildNum(); i++) {
@@ -425,7 +429,12 @@ void visitMemory(std::string prefix, graph* g, PNode* memory) {
     memory_member(data, rn);
     if(rw->type == P_READER) {
       rn->type = NODE_READER;
+      if(readLatency == 1) {
+        rn->member[3]->type = NODE_L1_RDATA;
+        g->memRdata1.push_back(rn->member[3]);
+      }
     } else if(rw->type == P_WRITER) {
+      rn->type = NODE_WRITER;
       memory_member(mask, rn);
     } else {
       Assert(0, "Invalid rw type %d\n", rw->type);

@@ -12,6 +12,7 @@ public:
   std::vector<Node*>active;
   std::vector<Node*>constant;
   std::vector<Node*>memory;
+  std::vector<Node*>memRdata1;
   std::string name;
   int maxTmp = 0;
 };
