@@ -47,6 +47,15 @@ static inline void insts_set_expr_neq(Node* n, expr_type& src) {
 #define insts_4expr(n, func, dst, expr1, expr2, expr3, expr4) \
   n->insts.push_back(func + "(" + dst + ", " + expr1 + ", " + expr2 + ", " + expr3 + ", " + expr4 + ")")
 
+#define memory_member(str, parent) \
+  do {  \
+    Node* rn_##str = new Node(NODE_MEMBER); \
+    parent->member.push_back(rn_##str); \
+    rn_##str->member.push_back(parent); \
+    rn_##str->name = parent->name + "_" + #str; \
+    addSignal(rn_##str->name, rn_##str); \
+  } while(0)
+
 static int maxWidth(int a, int b, bool sign = 0) {
   return MAX(a, b);
 }
@@ -409,21 +418,14 @@ void visitMemory(std::string prefix, graph* g, PNode* memory) {
     rn->name = n->name + "_" + rw->name;
     n->member.push_back(rn);
     rn->regNext = n;
-    Node* rn_addr = new Node(NODE_MEMBER); rn->member.push_back(rn_addr); rn_addr->member.push_back(rn);
-    rn_addr->name = rn->name + "_addr";
-    Node* rn_en   = new Node(NODE_MEMBER); rn->member.push_back(rn_en);   rn_en->member.push_back(rn);
-    rn_en->name = rn->name + "_en";
-    Node* rn_clk  = new Node(NODE_MEMBER); rn->member.push_back(rn_clk);  rn_clk->member.push_back(rn);
-    rn_clk->name = rn->name + "_clk";
-    Node* rn_data = new Node(NODE_MEMBER); rn->member.push_back(rn_data); rn_data->member.push_back(rn);
-    rn_data->name = rn->name + "_data";
-    addSignal(rn_addr->name, rn_addr); addSignal(rn_en->name, rn_en); addSignal(rn_clk->name, rn_clk); addSignal(rn_data->name, rn_data);
+    memory_member(addr, rn);
+    memory_member(en, rn);
+    memory_member(clk, rn);
+    memory_member(data, rn);
     if(rw->type == P_READER) {
       rn->type = NODE_READER;
     } else if(rw->type == P_WRITER) {
-      Node* rn_mask = new Node(NODE_MEMBER); rn->member.push_back(rn_mask); rn_mask->member.push_back(rn);
-      rn_mask->name = rn->name + "_mask";
-      addSignal(rn_mask->name, rn_mask);
+      memory_member(mask, rn);
     } else {
       Assert(0, "Invalid rw type %d\n", rw->type);
     }
