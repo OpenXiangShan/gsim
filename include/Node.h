@@ -8,14 +8,16 @@ public:
   Node() {
     defined = 0;
     type = NODE_OTHERS;
+    visited = 0;
   }
   Node(int _type) {
     defined = 0;
     type = _type;
+    visited = 0;
   }
   std::string name; // concat the module name in order (member in structure / temp variable)
   int id;   // unused
-  int type; // unused register ? mid
+  int type;
   int width;
   int sign;
   std::vector<Node*> next;
@@ -27,5 +29,6 @@ public:
   Node* regNext;
   std::vector<Node*>member;
   int latency[2];
+  int visited;
 };
 #endif

@@ -9,6 +9,7 @@ void generator(graph* g, std::string header, std::string src);
 void randomGraph(graph* g);
 void preorder_traversal(PNode* root);
 graph* AST2Garph(PNode* root);
+void loopDetector(graph* g);
 extern PNode* root;
 
 int main(int argc, char** argv) {
@@ -25,6 +26,7 @@ int main(int argc, char** argv) {
   MUX_DEBUG(std::cout << "after parser\n");
   MUX_DEBUG(preorder_traversal(root));
   graph* g = AST2Garph(root);
+  loopDetector(g);
   MUX_DEBUG(std::cout << "graph generated\n");
   generator(g, "top", "top");
   return 0;
