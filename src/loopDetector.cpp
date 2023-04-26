@@ -23,21 +23,21 @@ void loopDetector(graph* g) {
   }
   while(!s.empty()) {
     Node* top = s.top();
-    if(top->type == EXPANDED) {
-      top->type = VISITED;
+    if(top->visited == EXPANDED) {
+      top->visited = VISITED;
       s.pop();
-    } else if(top->type == NOT_VISIT) {
-      top->type = EXPANDED;
+    } else if(top->visited == NOT_VISIT) {
+      top->visited = EXPANDED;
       for(Node* n : top->next) {
-        if(n->type == EXPANDED) {
+        if(n->visited == EXPANDED) {
           std::cout << "detect Loop: \n";
           std::cout << n->name << std::endl;
           while(!s.empty()) {
             Node* info = s.top(); s.pop();
-            if(info->type == EXPANDED) std::cout << info->name  << std::endl;
+            if(info->visited == EXPANDED) std::cout << info->name  << std::endl;
             if(info == n) return;
           }
-        } else if (n->type == NOT_VISIT) {
+        } else if (n->visited == NOT_VISIT) {
           s.push(n);
         }
       }
