@@ -9,11 +9,13 @@ public:
     defined = 0;
     type = NODE_OTHERS;
     visited = 0;
+    inEdge = 0;
   }
   Node(int _type) {
     defined = 0;
     type = _type;
     visited = 0;
+    inEdge = 0;
   }
   std::string name; // concat the module name in order (member in structure / temp variable)
   int id;   // unused
