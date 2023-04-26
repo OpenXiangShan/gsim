@@ -88,38 +88,44 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   for(Node* node: g->sorted) {
     if(node->insts.size() == 0) continue;
     // generate function
+    Node* activeNode;
+    int latency;
     sfile << "void S" << g->name << "::step" << node->id << "() {\n";
-    if(node->type == NODE_REG_SRC || node->type == NODE_REG_DST || node->type == NODE_OTHERS) {
-      sfile << "activeFlags[" << node->id << "] = false;\n";
-      sfile << "mpz_set(oldVal, " << node->name << ");\n";
-      for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
-      Node* activeNode = node->type == NODE_REG_DST ? node->regNext : node;
-      if(activeNode->next.size() > 0){
-        sfile << "if(" << "mpz_cmp(oldVal," << node->name << ") != 0){\n";
-        for(Node* next: activeNode->next) {
-          sfile << "activeFlags[" << next->id << "] = true;\n";
+    switch(node->type) {
+      case NODE_REG_SRC: case NODE_REG_DST: case NODE_OTHERS: case NODE_OUT:
+        sfile << "activeFlags[" << node->id << "] = false;\n";
+        sfile << "mpz_set(oldVal, " << node->name << ");\n";
+        for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
+        activeNode = node->type == NODE_REG_DST ? node->regNext : node;
+        if(activeNode->next.size() > 0){
+          sfile << "if(" << "mpz_cmp(oldVal," << node->name << ") != 0){\n";
+          for(Node* next: activeNode->next) {
+            sfile << "activeFlags[" << next->id << "] = true;\n";
+          }
+          sfile << "}\n";
         }
-        sfile << "}\n";
-      }
-      sfile << "std::cout << \"" << node->id  << ": " << node->name << "(" << node->width << "): \" ;";
-      sfile << "mpz_out_str(stdout, 16, oldVal); std::cout << \" -> \"; mpz_out_str(stdout, 16, " << node->name << "); std::cout << std::endl;\n";
-    } else if(node->type == NODE_READER) {
-      for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
-      int readlatency = node->regNext->latency[0];
-      if(readlatency == 0) {
-        sfile << "activeFlags[" << node->id << "] = false;\n";
-        sfile << UI(node->member[3]->name) << " = " << node->regNext->name << "[" << UI(node->member[0]->name) << "]\n";
-      }
-    } else if(node->type == NODE_WRITER){
-      for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
-      int writelatency = node->regNext->latency[1];
-      if(writelatency == 0) {
-        sfile << "activeFlags[" << node->id << "] = false;\n";
-        sfile << "if(" << UI(node->member[1]->name) << "&&" << UI(node->member[4]->name) << ") " << \
-              node->regNext->name << "[" << UI(node->member[0]->name) << "] = " << UI(node->member[3]->name) << ";\n";
-      }
-    } else {
-      Assert(0, "Invalid node %s with type %d\n", node->name.c_str(), node->type);
+        // sfile << "std::cout << \"" << node->id  << ": " << node->name << "(" << node->width << "): \" ;";
+        // sfile << "mpz_out_str(stdout, 16, oldVal); std::cout << \" -> \"; mpz_out_str(stdout, 16, " << node->name << "); std::cout << std::endl;\n";
+        break;
+      case NODE_READER:
+        for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
+        latency = node->regNext->latency[0];
+        if(latency == 0) {
+          sfile << "activeFlags[" << node->id << "] = false;\n";
+          sfile << UI(node->member[3]->name) << " = " << node->regNext->name << "[" << UI(node->member[0]->name) << "]\n";
+        }
+        break;
+      case NODE_WRITER:
+        for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
+        latency = node->regNext->latency[1];
+        if(latency == 0) {
+          sfile << "activeFlags[" << node->id << "] = false;\n";
+          sfile << "if(" << UI(node->member[1]->name) << "&&" << UI(node->member[4]->name) << ") " << \
+                node->regNext->name << "[" << UI(node->member[0]->name) << "] = " << UI(node->member[3]->name) << ";\n";
+        }
+        break;
+      default:
+        Assert(0, "Invalid node %s with type %d\n", node->name.c_str(), node->type);
     }
     sfile << "}\n";
 
