@@ -11,7 +11,7 @@
 #define SIGN_SINT 1
 #define SIGN_CHILD 2
 #define SIGN_NEG_CHILD 3
-#define FUNC_NAME(s) (std::string("s_") + s)
+#define FUNC_NAME(s) (std::string("u_") + s)
 
 static int tmpIdx = 0;
 #define CUR_TMP (tmp = (std::string("tmp") + std::to_string(tmpIdx)))
@@ -107,23 +107,23 @@ static int secondWidth(int a, int b, bool sign = 0){
 // 0: uint; 1: child sign
                               // sign   widthFunc
 std::map<std::string, std::tuple<bool, int (*)(int, int, bool), const char*, const char*, const char*, const char*>> expr2Map = {
-  {"add",   {1, maxWidthPlus1,  "s_mpz_add",    "s_mpz_add_ui_r",     "s_mpz_add_ui_l",     "s_mpz_add_ui2",   }},
-  {"sub",   {1, maxWidthPlus1,  "s_mpz_sub",    "s_mpz_sub_ui_r",     "s_mpz_sub_ui_l",     "s_mpz_sub_ui2",   }},
-  {"mul",   {1, sumWidth,       "s_mpz_mul",    "s_mpz_mul_ui_r",     "s_mpz_mul_ui_l",     "s_mpz_mul_ui2",   }},
-  {"div",   {1, divWidth,       "s_mpz_div",    "s_mpz_div_ui_r",     "s_mpz_div_ui_l",     "s_mpz_div_ui2",}},
-  {"rem",   {1, minWidth,       "s_mpz_rem",    "s_mpz_rem_ui_r",     "s_mpz_rem_ui_l",     "s_mpz_rem_ui2",}},
-  {"lt",    {0, boolWidth,      "s_mpz_lt",     "s_mpz_lt_ui_r",      "s_mpz_lt_ui_l",      "s_mpz_lt_ui2",    }},
-  {"leq",   {0, boolWidth,      "s_mpz_leq",    "s_mpz_leq_ui_r",     "s_mpz_leq_ui_l",     "s_mpz_leq_ui2",   }},
-  {"gt",    {0, boolWidth,      "s_mpz_gt",     "s_mpz_gt_ui_r",      "s_mpz_gt_ui_l",      "s_mpz_gt_ui2",    }},
-  {"geq",   {0, boolWidth,      "s_mpz_geq",    "s_mpz_geq_ui_r",     "s_mpz_geq_ui_l",     "s_mpz_geq_ui2",   }},
-  {"eq",    {0, boolWidth,      "s_mpz_eq",     "s_mpz_eq_ui_r",      "s_mpz_eq_ui_l",      "s_mpz_eq_ui2",    }},
-  {"neq",   {0, boolWidth,      "s_mpz_neq",    "s_mpz_neq_ui_r",     "s_mpz_neq_ui_l",     "s_mpz_neq_ui2",   }},
-  {"dshl",  {1, dshlWidth,      "s_mpz_dshl",   "s_mpz_dshl_ui_r",    "s_mpz_dshl_ui_l",    "s_mpz_dshl_ui2",  }},
-  {"dshr",  {1, firstWidth,     "s_mpz_dshr",   "s_mpz_dshr_ui_r",    "s_mpz_dshr_ui_l",    "s_mpz_dshr_ui2",  }},
-  {"and",   {0, maxWidth,       "s_mpz_and",    "s_mpz_and_ui_r",     "s_mpz_and_ui_l",     "s_mpz_and_ui2",   }},
-  {"or",    {0, maxWidth,       "s_mpz_ior",    "s_mpz_ior_ui_r",     "s_mpz_ior_ui_l",     "s_mpz_ior_ui2",   }},
-  {"xor",   {0, maxWidth,       "s_mpz_xor",    "s_mpz_xor_ui_r",     "s_mpz_xor_ui_l",     "s_mpz_xor_ui2",   }},
-  {"cat",   {0, sumWidth,       "s_cat",        "s_cat_ui_r",         "s_cat_ui_l",         "s_cat_ui2",       }},
+  {"add",   {1, maxWidthPlus1,  "u_mpz_add",    "u_mpz_add_ui_r",     "u_mpz_add_ui_l",     "u_mpz_add_ui2",   }},
+  {"sub",   {1, maxWidthPlus1,  "u_mpz_sub",    "u_mpz_sub_ui_r",     "u_mpz_sub_ui_l",     "u_mpz_sub_ui2",   }},
+  {"mul",   {1, sumWidth,       "u_mpz_mul",    "u_mpz_mul_ui_r",     "u_mpz_mul_ui_l",     "u_mpz_mul_ui2",   }},
+  {"div",   {1, divWidth,       "u_mpz_div",    "u_mpz_div_ui_r",     "u_mpz_div_ui_l",     "u_mpz_div_ui2",}},
+  {"rem",   {1, minWidth,       "u_mpz_rem",    "u_mpz_rem_ui_r",     "u_mpz_rem_ui_l",     "u_mpz_rem_ui2",}},
+  {"lt",    {0, boolWidth,      "u_mpz_lt",     "u_mpz_lt_ui_r",      "u_mpz_lt_ui_l",      "u_mpz_lt_ui2",    }},
+  {"leq",   {0, boolWidth,      "u_mpz_leq",    "u_mpz_leq_ui_r",     "u_mpz_leq_ui_l",     "u_mpz_leq_ui2",   }},
+  {"gt",    {0, boolWidth,      "u_mpz_gt",     "u_mpz_gt_ui_r",      "u_mpz_gt_ui_l",      "u_mpz_gt_ui2",    }},
+  {"geq",   {0, boolWidth,      "u_mpz_geq",    "u_mpz_geq_ui_r",     "u_mpz_geq_ui_l",     "u_mpz_geq_ui2",   }},
+  {"eq",    {0, boolWidth,      "u_mpz_eq",     "u_mpz_eq_ui_r",      "u_mpz_eq_ui_l",      "u_mpz_eq_ui2",    }},
+  {"neq",   {0, boolWidth,      "u_mpz_neq",    "u_mpz_neq_ui_r",     "u_mpz_neq_ui_l",     "u_mpz_neq_ui2",   }},
+  {"dshl",  {1, dshlWidth,      "u_mpz_dshl",   "u_mpz_dshl_ui_r",    "u_mpz_dshl_ui_l",    "u_mpz_dshl_ui2",  }},
+  {"dshr",  {1, firstWidth,     "u_mpz_dshr",   "u_mpz_dshr_ui_r",    "u_mpz_dshr_ui_l",    "u_mpz_dshr_ui2",  }},
+  {"and",   {0, maxWidth,       "u_mpz_and",    "u_mpz_and_ui_r",     "u_mpz_and_ui_l",     "u_mpz_and_ui2",   }},
+  {"or",    {0, maxWidth,       "u_mpz_ior",    "u_mpz_ior_ui_r",     "u_mpz_ior_ui_l",     "u_mpz_ior_ui2",   }},
+  {"xor",   {0, maxWidth,       "u_mpz_xor",    "u_mpz_xor_ui_r",     "u_mpz_xor_ui_l",     "u_mpz_xor_ui2",   }},
+  {"cat",   {0, sumWidth,       "u_cat",        "u_cat_ui_r",         "u_cat_ui_l",         "u_cat_ui2",       }},
 };
 
                                             // width num

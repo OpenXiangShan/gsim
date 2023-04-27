@@ -5,8 +5,6 @@
 #define INCLUDE_LIB(f, s) f << "#include <" << s << ">\n";
 #define INCLUDE(f, s) f << "#include \"" << s << "\"\n";
 
-const char* cmpOP[][2] = {{"s_mpz_lt", "<"}, {"s_mpz_leq", "<="}, {"s_mpz_gt", ">"}, {"s_mpz_geq", ">="}, {"s_mpz_eq", "=="}, {"s_mpz_neq", "!="}};
-
 #define UI(x) (std::string("mpz_get_ui(") + x + ")")
 void topoSort(graph* g);
 
