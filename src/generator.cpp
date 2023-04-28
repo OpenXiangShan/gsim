@@ -142,6 +142,11 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 
   // update registers
   for(Node* node: g->sources) {
+    if(node->next.size()) {
+      sfile << "if(mpz_cmp(" << node->name << ", " << node->name << "_next)) {\n";
+      for(Node* next : node->next) sfile << "activeFlags[" << next->id << "] = true;\n";
+      sfile << "}\n";
+    }
     sfile << "mpz_set(" << node->name << ", " << node->name << "_next);\n";
   }
   // update memory rdata & wdata
