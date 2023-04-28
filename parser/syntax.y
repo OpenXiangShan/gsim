@@ -89,6 +89,7 @@ ALLID: ID {$$ = $1; }
     | Assert { $$ = "assert"; }
     | Mem { $$ = "mem"; }
     | Of { $$ = "of"; }
+    | Reg { $$ = "reg"; }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
