@@ -407,7 +407,8 @@ void visitMemory(std::string prefix, graph* g, PNode* memory) {
   g->memory.push_back(n);
   visitType(n, memory->getChild(0)->getChild(0));
   Assert(memory->getChild(1)->type == P_DEPTH, "Invalid child0 type(%d)\n", memory->getChild(0)->type);
-  Assert(n->width % 8 == 0, "invalid memory width %d\n", n);
+  if(n->width < 8) n->width = 8;
+  Assert(n->width % 8 == 0, "invalid memory width %d\n", n->width);
   int depth = p_stoi(memory->getChild(1)->name.c_str());
   int readLatency = p_stoi(memory->getChild(2)->name.c_str());
   int writeLatency = p_stoi(memory->getChild(3)->name.c_str());
