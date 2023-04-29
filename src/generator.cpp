@@ -62,6 +62,8 @@ void genHeader(graph* g, std::string headerFile) {
           hfile << "mpz_t " << member->name << ";\n";
         }
         break;
+      case NODE_L1_RDATA:
+        break;
       default:
         hfile << "mpz_t " << node->name << ";\n";
     }
@@ -105,7 +107,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
     Node* activeNode;
     int latency;
     switch(node->type) {
-      case NODE_REG_SRC: case NODE_REG_DST: case NODE_OTHERS: case NODE_OUT:
+      case NODE_REG_SRC: case NODE_REG_DST: case NODE_OTHERS: case NODE_OUT: case NODE_L1_RDATA:
         if(node->insts.size() == 0) continue;
         // sfile << "void S" << g->name << "::step" << node->id << "() {\n";
         STEP_START(sfile, g, node);
@@ -179,7 +181,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         Node* data = rw->member[3];
         Assert(data->type == NODE_L1_RDATA, "Invalid data type(%d) for reader(%s) with latency 1\n", data->type, rw->name.c_str());
         sfile << "mpz_set(oldVal, " << data->name << ");\n";
-        sfile << "mpz_set_ui(" << data->name << ", " << node->name << "[" << rw->member[0]->name << "]);\n";
+        sfile << "mpz_set_ui(" << data->name << ", " << node->name << "[" << UI(rw->member[0]->name) << "]);\n";
         if(data->next.size() > 0) {
           sfile << "if(" << "mpz_cmp(oldVal," << data->name << ") != 0){\n";
           for(Node* next : data->next) {
