@@ -7,6 +7,22 @@
 
 #define UI(x) (std::string("mpz_get_ui(") + x + ")")
 void topoSort(graph* g);
+#define STEP_START(file, g, node) file << "void S" << g->name << "::step" << node->id << "() {\n"
+#define SET_OLDVAL(file, node) file << "mpz_set(oldVal, " << node->name << ");\n"
+#define ACTIVATE(file, node, nextNodes) do { \
+    if(nextNodes.size() > 0){ \
+      file << "if(" << "mpz_cmp(oldVal," << node->name << ") != 0){\n"; \
+      for(Node* next: nextNodes) { \
+        file << "activeFlags[" << next->id << "] = true;\n"; \
+      } \
+      file << "}\n"; \
+    } \
+  } while(0)
+
+#define EMU_LOG(file, id, node) do{ \
+        file << "std::cout << \"" << id  << ": " << node->name << "(" << node->width << "): \" ;"; \
+        file << "mpz_out_str(stdout, 16, oldVal); std::cout << \" -> \"; mpz_out_str(stdout, 16, " << node->name << "); std::cout << std::endl;\n"; \
+      } while(0)
 
 void genHeader(graph* g, std::string headerFile) {
   std::ofstream hfile(std::string(OBJ_DIR) + "/" + headerFile + ".h");
@@ -19,22 +35,20 @@ void genHeader(graph* g, std::string headerFile) {
   INCLUDE_LIB(hfile, "assert.h");
   INCLUDE(hfile, "functions.h");
   hfile << "class S" << g->name << "{\n" << "public:\n";
-/*
-  // ports
-  for(Node* node: g->input) {
-    hfile << "int " << node->name << ";\n";
-  }
-  for(Node* node: g->output) {
-    hfile << "int " << node->name << ";\n";
-  }
-  // variables
-  for(Node* node: g->sources) {
-    hfile << "int " << node->name << ";\n";
-  }
-*/
+
 // constructor
   hfile << "S" << g->name << "() {" << std::endl;
-  for(Node* node: g->sorted) hfile << "mpz_init2(" << node->name << ", " << node->width << ");\n";
+  for(Node* node: g->sorted) {
+    switch(node->type) {
+      case NODE_READER: case NODE_WRITER:
+        for(Node* member : node->member) {
+          hfile << "mpz_init2(" << member->name << ", " << member->width << ");\n";
+        }
+        break;
+      default:
+        hfile << "mpz_init2(" << node->name << ", " << node->width << ");\n";
+    }
+  }
   hfile << "mpz_init(oldVal);\n";
   hfile << "}\n";
 
@@ -42,7 +56,15 @@ void genHeader(graph* g, std::string headerFile) {
   hfile << "std::vector<bool> activeFlags = " << "std::vector<bool>(" <<g->sorted.size() << ", true);\n";
 // all sigs
   for (Node* node: g->sorted) {
-    hfile << "mpz_t " << node->name << ";\n";
+    switch(node->type) {
+      case NODE_READER: case NODE_WRITER:
+        for(Node* member : node->member) {
+          hfile << "mpz_t " << member->name << ";\n";
+        }
+        break;
+      default:
+        hfile << "mpz_t " << node->name << ";\n";
+    }
   }
 // unique oldVal
   hfile << "mpz_t oldVal;\n";
@@ -52,11 +74,6 @@ void genHeader(graph* g, std::string headerFile) {
   for(Node* n : g->memory) {
     hfile << (n->width == 8 ? "uint8_t " : (n->width == 16 ? "uint16_t " : (n->width == 32 ? "uint32_t " : "uint64_t ")));
     hfile << n->name << "[" << n->val << "];\n";
-    for(Node* rw : n->member) {
-      for(Node* type : rw->member) {
-        hfile << "mpz_t " << type->name << ";\n";
-      }
-    }
   }
 
 // set functions
@@ -84,37 +101,41 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   INCLUDE(sfile, headerFile + ".h");
 
   for(Node* node: g->sorted) {
-    if(node->insts.size() == 0) continue;
     // generate function
     Node* activeNode;
     int latency;
-    sfile << "void S" << g->name << "::step" << node->id << "() {\n";
     switch(node->type) {
       case NODE_REG_SRC: case NODE_REG_DST: case NODE_OTHERS: case NODE_OUT:
+        if(node->insts.size() == 0) continue;
+        // sfile << "void S" << g->name << "::step" << node->id << "() {\n";
+        STEP_START(sfile, g, node);
         sfile << "activeFlags[" << node->id << "] = false;\n";
-        sfile << "mpz_set(oldVal, " << node->name << ");\n";
+        SET_OLDVAL(sfile, node);
+        // sfile << "mpz_set(oldVal, " << node->name << ");\n";
         for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
         activeNode = node->type == NODE_REG_DST ? node->regNext : node;
-        if(activeNode->next.size() > 0){
-          sfile << "if(" << "mpz_cmp(oldVal," << node->name << ") != 0){\n";
-          for(Node* next: activeNode->next) {
-            sfile << "activeFlags[" << next->id << "] = true;\n";
-          }
-          sfile << "}\n";
-        }
-        // sfile << "std::cout << \"" << node->id  << ": " << node->name << "(" << node->width << "): \" ;";
-        // sfile << "mpz_out_str(stdout, 16, oldVal); std::cout << \" -> \"; mpz_out_str(stdout, 16, " << node->name << "); std::cout << std::endl;\n";
+        ACTIVATE(sfile, activeNode, activeNode->next);
+        // EMU_LOG(sfile, node->id, node);
         break;
       case NODE_READER:
-        for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
+        STEP_START(sfile, g, node);
         latency = node->regNext->latency[0];
+        if(latency == 0) SET_OLDVAL(sfile, node->member[3]);
+        for(Node* member: node->member) {
+          for(int i = 0; i < member->insts.size(); i ++) sfile << member->insts[i] << ";\n";
+        }
         if(latency == 0) {
           sfile << "activeFlags[" << node->id << "] = false;\n";
-          sfile << UI(node->member[3]->name) << " = " << node->regNext->name << "[" << UI(node->member[0]->name) << "]\n";
+          sfile << "mpz_set_ui(" << node->member[3]->name << ", " << node->regNext->name << "[" << UI(node->member[0]->name) << "]);\n";
+          ACTIVATE(sfile, node->member[3], node->next);
+          // EMU_LOG(sfile, node->id, node->member[3]);
         }
         break;
       case NODE_WRITER:
-        for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
+        STEP_START(sfile, g, node);
+        for(Node* member: node->member) {
+          for(int i = 0; i < member->insts.size(); i ++) sfile << member->insts[i] << ";\n";
+        }
         latency = node->regNext->latency[1];
         if(latency == 0) {
           sfile << "activeFlags[" << node->id << "] = false;\n";
@@ -122,6 +143,8 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
                 node->regNext->name << "[" << UI(node->member[0]->name) << "] = " << UI(node->member[3]->name) << ";\n";
         }
         break;
+      case NODE_INP:
+        continue;
       default:
         Assert(0, "Invalid node %s with type %d\n", node->name.c_str(), node->type);
     }
@@ -131,7 +154,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 
   sfile << "" <<"void S" << g->name << "::step() {\n";
   for(int i = 0; i < g->sorted.size(); i++) {
-    if(g->sorted[i]->insts.size() == 0) continue;
+    if(g->sorted[i]->insts.size() == 0 && g->sorted[i]->type != NODE_READER && g->sorted[i]->type != NODE_WRITER) continue;
     sfile << "if(activeFlags[" << i << "]) " << "step" << i << "();\n";
   }
 
@@ -152,7 +175,6 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   // update memory rdata & wdata
   for(Node* node: g->memory) {
     for(Node* rw: node->member) {
-    std::cout << rw->name << " " << rw->type << " " << node->latency[0] << " " << node->latency[1] << "....\n";
       if(rw->type == NODE_READER && node->latency[0] == 1) {
         Node* data = rw->member[3];
         Assert(data->type == NODE_L1_RDATA, "Invalid data type(%d) for reader(%s) with latency 1\n", data->type, rw->name.c_str());
@@ -166,8 +188,12 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
           sfile << "}\n";
         }
       } else if(rw->type == NODE_WRITER && node->latency[1] == 1) {
-        sfile << "if(" << UI(rw->member[1]->name) << " && " << UI(rw->member[4]->name) << ") " << \
+        sfile << "if(" << UI(rw->member[1]->name) << " && " << UI(rw->member[4]->name) << ") {" << \
                 node->name << "[" << UI(rw->member[0]->name) << "] = " << UI(rw->member[3]->name) << ";\n";
+        for(Node* reader: rw->regNext->member) {
+          if(reader->type == NODE_READER) sfile << "activeFlags[" << reader->id << "] = true;\n";
+        }
+        sfile << "}\n";
       }
     }
 
