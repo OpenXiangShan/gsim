@@ -225,9 +225,11 @@ expr_type visit1Expr1Int(std::string& name, std::string prefix, Node* n, PNode* 
   expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
   int arg = p_stoi(expr->getExtra(0).c_str());
   expr->width = std::get<2>(info)(expr->getChild(0)->width, arg, false);
-  Assert(src.first, "Expr in 1Expr1Int must be var %s\n", src.second.c_str());
   std::string cons = (std::get<1>(info) ? std::to_string(expr->getChild(0)->width - arg) : cons2str(expr->getExtra(0)));
-  insts_2expr(n, FUNC_NAME(expr->name), name, src.second, cons);
+  if(src.first)
+    insts_2expr(n, FUNC_NAME(expr->name), name, src.second, cons);
+  else
+    insts_2expr(n, FUNC_NAME(expr->name) + "_ui", name, src.second, cons);
   return std::make_pair(EXPR_VAR, name);
 }
 
