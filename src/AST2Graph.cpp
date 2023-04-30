@@ -52,7 +52,7 @@ static inline void insts_set_expr_neq(Node* n, expr_type& src) {
     Node* rn_##str = new Node(NODE_MEMBER); \
     parent->member.push_back(rn_##str); \
     rn_##str->regNext = parent; \
-    rn_##str->name = parent->name + "_" + #str; \
+    rn_##str->name = parent->name + "$" + #str; \
     addSignal(rn_##str->name, rn_##str); \
   } while(0)
 
@@ -288,7 +288,7 @@ std::string visitReference(std::string prefix, PNode* expr) { // return ref name
       // SET_TYPE(expr, expr->getChild(i));
       switch(child->type) {
         case P_REF_DOT:
-          ret += "_" + visitReference("", child);
+          ret += "$" + visitReference("", child);
           break;
         default: Assert(0, "TODO: invalid ref child type(%d) for %s\n", child->type, expr->name.c_str());
       }
@@ -367,7 +367,7 @@ void visitRegDef(std::string prefix, graph* g, PNode* reg) {
   newReg->name = prefix + reg->name;
   visitType(newReg, reg->getChild(0));
   Node* nextReg = new Node(NODE_REG_DST);
-  nextReg->name = newReg->name + "_next";
+  nextReg->name = newReg->name + "$next";
   SET_TYPE(nextReg, newReg);
   newReg->regNext = nextReg;
   nextReg->regNext = newReg;
@@ -421,7 +421,7 @@ void visitMemory(std::string prefix, graph* g, PNode* memory) {
   for(int i = 5; i < memory->getChildNum(); i++) {
     PNode* rw = memory->getChild(i);
     Node* rn = new Node();
-    rn->name = n->name + "_" + rw->name;
+    rn->name = n->name + "$" + rw->name;
     n->member.push_back(rn);
     rn->regNext = n;
     memory_member(addr, rn);
@@ -452,8 +452,8 @@ void visitStmts(std::string prefix, graph* g, PNode* stmts) {
       case P_INST : 
         Assert(stmt->getExtraNum() >= 1 && moduleMap.find(stmt->getExtra(0)) != moduleMap.end(), "Module %s is not defined!\n", stmt->name.c_str());
         module = moduleMap[stmt->getExtra(0)];
-        if(module->type == P_MOD) visitModule(prefix + stmt->name + "_", g, module);
-        else if(module->type == P_EXTMOD) visitExtModule(prefix + stmt->name + "_", g, module);
+        if(module->type == P_MOD) visitModule(prefix + stmt->name + "$", g, module);
+        else if(module->type == P_EXTMOD) visitExtModule(prefix + stmt->name + "$", g, module);
         break;
       case P_NODE :
         visitNode(prefix, stmt);
