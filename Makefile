@@ -28,7 +28,7 @@ ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
 endif
 
-VERI_INC_DIR = $(OBJ_DIR) $(EMU_DIR)/include include
+VERI_INC_DIR = $(OBJ_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME)
 VERI_CFLAGS = -O3 $(addprefix -I../, $(VERI_INC_DIR))
 VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\"
