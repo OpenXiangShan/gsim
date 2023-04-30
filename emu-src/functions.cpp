@@ -96,8 +96,15 @@ void u_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t n) {
 void u_shl(mpz_t& dst, mpz_t& src, unsigned long n) {
   mpz_mul_2exp(dst, src, n);
 }
+void u_shl_ui(mpz_t& dst, unsigned long src, unsigned long n) {
+  mpz_set_ui(dst, src);
+  mpz_mul_2exp(dst, dst, n);
+}
 void u_shr(mpz_t& dst, mpz_t& src, unsigned long n) {
   mpz_tdiv_q_2exp(dst, src, n);
+}
+void u_shr_ui(mpz_t& dst, unsigned long src, unsigned long n) {
+  mpz_set_ui(dst, src >> n);
 }
 //add
 void u_mpz_add(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) {

@@ -15,7 +15,9 @@
 void u_tail(mpz_t& dst, mpz_t& src, unsigned long n);
 void u_head(mpz_t& dst, mpz_t& src, unsigned long n);
 void u_shl(mpz_t& dst, mpz_t& src, unsigned long n);
+void u_shl_ui(mpz_t& dst, unsigned long src, unsigned long n);
 void u_shr(mpz_t& dst, mpz_t& src, unsigned long n);
+void u_shr_ui(mpz_t& dst, unsigned long src, unsigned long n);
 void u_cat(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2);
 void u_cat_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt);
 void u_cat_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& src, mp_bitcnt_t bitcnt2);
