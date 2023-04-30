@@ -265,9 +265,9 @@ expr_type visit2Expr(std::string& name, std::string prefix, Node* n, PNode* expr
 
 expr_type visit1Expr(std::string& name, std::string prefix, Node* n, PNode* expr) { // asUInt|asSInt|asClock|cvt|neg|not|andr|orr|xorr
   std::tuple<uint8_t, int (*)(int, int, bool)>info = expr1Map[expr->name];
+  expr_type src = visitExpr(tmp, prefix, n, expr->getChild(0));
   expr->sign = std::get<0>(info);
   expr->width = std::get<1>(info)(expr->getChild(0)->width, 0, expr->getChild(0)->sign);
-  expr_type src = visitExpr(tmp, prefix, n, expr->getChild(0));
   // Assert(src.first, "Expr in 1Expr(%s) must be var %s\n", expr->name.c_str(), src.second.c_str());
   if(src.first){
     insts_2expr(n, FUNC_NAME(expr->name), name, src.second, std::to_string(expr->getChild(0)->width));
