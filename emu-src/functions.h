@@ -12,21 +12,22 @@
     } \
   } while (0)
 
-void u_tail(mpz_t& dst, mpz_t& src, unsigned long n);
-void u_head(mpz_t& dst, mpz_t& src, unsigned long n);
-void u_shl(mpz_t& dst, mpz_t& src, unsigned long n);
+void u_tail(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n);
+void u_head(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n);
+void u_shl(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n);
 void u_shl_ui(mpz_t& dst, unsigned long src, unsigned long n);
-void u_shr(mpz_t& dst, mpz_t& src, unsigned long n);
+void u_shr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n);
+void s_shr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n);
 void u_shr_ui(mpz_t& dst, unsigned long src, unsigned long n);
 void u_cat(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2);
 void u_cat_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt);
 void u_cat_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& src, mp_bitcnt_t bitcnt2);
 void u_cat_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long val2, mp_bitcnt_t bitcnt2);
-void u_asSInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
+void s_asSInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_asUInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_asClock(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t l, mp_bitcnt_t r);
-void u_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t n);
+void u_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n);
 //arithmetic
 void u_mpz_add(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2);
 void u_mpz_add_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& src, mp_bitcnt_t bitcnt2);
@@ -88,6 +89,7 @@ void u_mpz_xor_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& s
 void u_mpz_xor_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long val2, mp_bitcnt_t bitcnt2);
 //shift
 void u_mpz_dshl(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2);
+void s_mpz_dshr(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2);
 void u_mpz_dshl_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt);
 void u_mpz_dshl_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& src, mp_bitcnt_t bitcnt2);
 void u_mpz_dshl_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long val2, mp_bitcnt_t bitcnt2);

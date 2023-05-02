@@ -19,11 +19,14 @@ void topoSort(graph* g);
     } \
   } while(0)
 
+#if 0
 #define EMU_LOG(file, id, node) do{ \
         file << "std::cout << \"" << id  << ": " << node->name << "(" << node->width << "): \" ;"; \
         file << "mpz_out_str(stdout, 16, oldVal); std::cout << \" -> \"; mpz_out_str(stdout, 16, " << node->name << "); std::cout << std::endl;\n"; \
       } while(0)
-
+#else
+#define EMU_LOG(...) 
+#endif
 void genHeader(graph* g, std::string headerFile) {
   std::ofstream hfile(std::string(OBJ_DIR) + "/" + headerFile + ".h");
 
@@ -117,7 +120,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
         activeNode = node->type == NODE_REG_DST ? node->regNext : node;
         ACTIVATE(sfile, activeNode, activeNode->next);
-        // EMU_LOG(sfile, node->id, node);
+        EMU_LOG(sfile, node->id, node);
         break;
       case NODE_READER:
         STEP_START(sfile, g, node);
@@ -130,7 +133,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
           sfile << "activeFlags[" << node->id << "] = false;\n";
           sfile << "mpz_set_ui(" << node->member[3]->name << ", " << node->regNext->name << "[" << UI(node->member[0]->name) << "]);\n";
           ACTIVATE(sfile, node->member[3], node->next);
-          // EMU_LOG(sfile, node->id, node->member[3]);
+          EMU_LOG(sfile, node->id, node->member[3]);
         }
         break;
       case NODE_WRITER:

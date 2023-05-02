@@ -3,7 +3,7 @@
 #include <iostream>
 
 // u_tail: remain the last n bits
-void u_tail(mpz_t& dst, mpz_t& src, unsigned long n) {
+void u_tail(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
   mpz_set(dst, src);
   if(mpz_size(dst) == 0) return;
   int libms_num = (n + 63) / 64;
@@ -16,7 +16,7 @@ void u_tail(mpz_t& dst, mpz_t& src, unsigned long n) {
   mpz_limbs_finish(dst, libms_num);
 }
 // u_head: remove the last n bits
-void u_head(mpz_t& dst, mpz_t& src, unsigned long n) {
+void u_head(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
   mpz_tdiv_q_2exp(dst, src, n);
 }
 // u_cat: concat src1 and src2
@@ -38,8 +38,8 @@ void u_cat_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned lon
   mpz_mul_2exp(dst, dst, bitcnt2);
   mpz_add_ui(dst, dst, val2);
 }
-// u_asSInt
-void u_asSInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) { // TODO: test & fix
+// s_asSInt
+void s_asSInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   if(mpz_tstbit(src, bitcnt - 1)) {
     mpz_set_ui(dst, 1);
     mpz_mul_2exp(dst, dst, bitcnt);
@@ -51,11 +51,12 @@ void u_asSInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) { // TODO: test & fix
 }
 // u_asUInt
 void u_asUInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
-  mpz_set(dst, src);
-  // mpz_limbs_finish(dst, mpz_size(src));
   if(mpz_cmp_ui(src, 0) < 0) {
-    mpz_setbit(dst, bitcnt-1);
-    mpz_neg(dst, dst);
+    mpz_set_ui(dst, 1);
+    mpz_mul_2exp(dst, dst, bitcnt);
+    mpz_add(dst, dst, src);
+  } else {
+    mpz_set(dst, src);
   }
 }
 // u_asClock
@@ -80,8 +81,7 @@ void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t h, mp_bitcnt_t l) {
   }
 }
 // u_pat: sign/zero extends to n bits
-void u_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t n) {
-  mp_bitcnt_t bitcnt = mpz_sizeinbase(src, 2);
+void u_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n) {
   if(bitcnt >= n || (mpz_cmp_ui(src, 0) >= 0)) {
     mpz_set(dst, src);
     return;
@@ -93,15 +93,22 @@ void u_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t n) {
   mpz_ior(dst, dst, src);
 }
 //shl
-void u_shl(mpz_t& dst, mpz_t& src, unsigned long n) {
+void u_shl(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
   mpz_mul_2exp(dst, src, n);
 }
 void u_shl_ui(mpz_t& dst, unsigned long src, unsigned long n) {
   mpz_set_ui(dst, src);
   mpz_mul_2exp(dst, dst, n);
 }
-void u_shr(mpz_t& dst, mpz_t& src, unsigned long n) {
+void u_shr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
   mpz_tdiv_q_2exp(dst, src, n);
+}
+void s_shr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
+  if(mpz_cmp_ui(src, 0) < 0) {
+    mpz_fdiv_q_2exp(dst, dst, n);
+  } else {
+    mpz_tdiv_q_2exp(dst, src, n);
+  }
 }
 void u_shr_ui(mpz_t& dst, unsigned long src, unsigned long n) {
   mpz_set_ui(dst, src >> n);
@@ -330,12 +337,19 @@ void u_mpz_dshl_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigne
 void u_mpz_dshr(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) {
   mpz_tdiv_q_2exp(dst, src1, mpz_get_ui(src2));
 }
+void s_mpz_dshr(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) {
+  int n = mpz_get_ui(src2);
+  if(mpz_cmp_ui(src1, 0) < 0) {
+    mpz_fdiv_q_2exp(dst, src1, n);
+  } else {
+    mpz_tdiv_q_2exp(dst, src1, n);
+  }
+}
 void u_mpz_dshr_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt) {
   mpz_tdiv_q_2exp(dst, src, val);
 }
 void u_mpz_dshr_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& src, mp_bitcnt_t bitcnt2) {
-  mpz_set_ui(dst, val);
-  mpz_tdiv_q_2exp(dst, dst, mpz_get_ui(src));
+  mpz_set_ui(dst, val >> mpz_get_ui(src));
 }
 void u_mpz_dshr_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long val2, mp_bitcnt_t bitcnt2) {
   mpz_set_ui(dst, val1 >> val2);

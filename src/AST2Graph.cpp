@@ -11,7 +11,7 @@
 #define SIGN_SINT 1
 #define SIGN_CHILD 2
 #define SIGN_NEG_CHILD 3
-#define FUNC_NAME(s) (std::string("u_") + s)
+#define FUNC_NAME(sign, s) ((sign ? std::string("s_") : std::string("u_")) + s)
 
 static int tmpIdx = 0;
 #define CUR_TMP (tmp = (std::string("tmp") + std::to_string(tmpIdx)))
@@ -107,23 +107,23 @@ static int secondWidth(int a, int b, bool sign = 0){
 // 0: uint; 1: child sign
                               // sign   widthFunc
 std::map<std::string, std::tuple<bool, int (*)(int, int, bool), const char*, const char*, const char*, const char*>> expr2Map = {
-  {"add",   {1, maxWidthPlus1,  "u_mpz_add",    "u_mpz_add_ui_r",     "u_mpz_add_ui_l",     "u_mpz_add_ui2",   }},
-  {"sub",   {1, maxWidthPlus1,  "u_mpz_sub",    "u_mpz_sub_ui_r",     "u_mpz_sub_ui_l",     "u_mpz_sub_ui2",   }},
-  {"mul",   {1, sumWidth,       "u_mpz_mul",    "u_mpz_mul_ui_r",     "u_mpz_mul_ui_l",     "u_mpz_mul_ui2",   }},
-  {"div",   {1, divWidth,       "u_mpz_div",    "u_mpz_div_ui_r",     "u_mpz_div_ui_l",     "u_mpz_div_ui2",}},
-  {"rem",   {1, minWidth,       "u_mpz_rem",    "u_mpz_rem_ui_r",     "u_mpz_rem_ui_l",     "u_mpz_rem_ui2",}},
-  {"lt",    {0, boolWidth,      "u_mpz_lt",     "u_mpz_lt_ui_r",      "u_mpz_lt_ui_l",      "u_mpz_lt_ui2",    }},
-  {"leq",   {0, boolWidth,      "u_mpz_leq",    "u_mpz_leq_ui_r",     "u_mpz_leq_ui_l",     "u_mpz_leq_ui2",   }},
-  {"gt",    {0, boolWidth,      "u_mpz_gt",     "u_mpz_gt_ui_r",      "u_mpz_gt_ui_l",      "u_mpz_gt_ui2",    }},
-  {"geq",   {0, boolWidth,      "u_mpz_geq",    "u_mpz_geq_ui_r",     "u_mpz_geq_ui_l",     "u_mpz_geq_ui2",   }},
-  {"eq",    {0, boolWidth,      "u_mpz_eq",     "u_mpz_eq_ui_r",      "u_mpz_eq_ui_l",      "u_mpz_eq_ui2",    }},
-  {"neq",   {0, boolWidth,      "u_mpz_neq",    "u_mpz_neq_ui_r",     "u_mpz_neq_ui_l",     "u_mpz_neq_ui2",   }},
-  {"dshl",  {1, dshlWidth,      "u_mpz_dshl",   "u_mpz_dshl_ui_r",    "u_mpz_dshl_ui_l",    "u_mpz_dshl_ui2",  }},
-  {"dshr",  {1, firstWidth,     "u_mpz_dshr",   "u_mpz_dshr_ui_r",    "u_mpz_dshr_ui_l",    "u_mpz_dshr_ui2",  }},
-  {"and",   {0, maxWidth,       "u_mpz_and",    "u_mpz_and_ui_r",     "u_mpz_and_ui_l",     "u_mpz_and_ui2",   }},
-  {"or",    {0, maxWidth,       "u_mpz_ior",    "u_mpz_ior_ui_r",     "u_mpz_ior_ui_l",     "u_mpz_ior_ui2",   }},
-  {"xor",   {0, maxWidth,       "u_mpz_xor",    "u_mpz_xor_ui_r",     "u_mpz_xor_ui_l",     "u_mpz_xor_ui2",   }},
-  {"cat",   {0, sumWidth,       "u_cat",        "u_cat_ui_r",         "u_cat_ui_l",         "u_cat_ui2",       }},
+  {"add",   {1, maxWidthPlus1,  "mpz_add",    "mpz_add_ui_r",     "mpz_add_ui_l",     "mpz_add_ui2",   }},
+  {"sub",   {1, maxWidthPlus1,  "mpz_sub",    "mpz_sub_ui_r",     "mpz_sub_ui_l",     "mpz_sub_ui2",   }},
+  {"mul",   {1, sumWidth,       "mpz_mul",    "mpz_mul_ui_r",     "mpz_mul_ui_l",     "mpz_mul_ui2",   }},
+  {"div",   {1, divWidth,       "mpz_div",    "mpz_div_ui_r",     "mpz_div_ui_l",     "mpz_div_ui2",}},
+  {"rem",   {1, minWidth,       "mpz_rem",    "mpz_rem_ui_r",     "mpz_rem_ui_l",     "mpz_rem_ui2",}},
+  {"lt",    {0, boolWidth,      "mpz_lt",     "mpz_lt_ui_r",      "mpz_lt_ui_l",      "mpz_lt_ui2",    }},
+  {"leq",   {0, boolWidth,      "mpz_leq",    "mpz_leq_ui_r",     "mpz_leq_ui_l",     "mpz_leq_ui2",   }},
+  {"gt",    {0, boolWidth,      "mpz_gt",     "mpz_gt_ui_r",      "mpz_gt_ui_l",      "mpz_gt_ui2",    }},
+  {"geq",   {0, boolWidth,      "mpz_geq",    "mpz_geq_ui_r",     "mpz_geq_ui_l",     "mpz_geq_ui2",   }},
+  {"eq",    {0, boolWidth,      "mpz_eq",     "mpz_eq_ui_r",      "mpz_eq_ui_l",      "mpz_eq_ui2",    }},
+  {"neq",   {0, boolWidth,      "mpz_neq",    "mpz_neq_ui_r",     "mpz_neq_ui_l",     "mpz_neq_ui2",   }},
+  {"dshl",  {1, dshlWidth,      "mpz_dshl",   "mpz_dshl_ui_r",    "mpz_dshl_ui_l",    "mpz_dshl_ui2",  }},
+  {"dshr",  {1, firstWidth,     "mpz_dshr",   "mpz_dshr_ui_r",    "mpz_dshr_ui_l",    "mpz_dshr_ui2",  }},
+  {"and",   {0, maxWidth,       "mpz_and",    "mpz_and_ui_r",     "mpz_and_ui_l",     "mpz_and_ui2",   }},
+  {"or",    {0, maxWidth,       "mpz_ior",    "mpz_ior_ui_r",     "mpz_ior_ui_l",     "mpz_ior_ui2",   }},
+  {"xor",   {0, maxWidth,       "mpz_xor",    "mpz_xor_ui_r",     "mpz_xor_ui_l",     "mpz_xor_ui2",   }},
+  {"cat",   {0, sumWidth,       "cat",        "cat_ui_r",         "cat_ui_l",         "cat_ui2",       }},
 };
 
                                             // width num
@@ -227,9 +227,9 @@ expr_type visit1Expr1Int(std::string& name, std::string prefix, Node* n, PNode* 
   expr->width = std::get<2>(info)(expr->getChild(0)->width, arg, false);
   std::string cons = (std::get<1>(info) ? std::to_string(expr->getChild(0)->width - arg) : cons2str(expr->getExtra(0)));
   if(src.first)
-    insts_2expr(n, FUNC_NAME(expr->name), name, src.second, cons);
+    insts_3expr(n, FUNC_NAME(expr->sign, expr->name), name, src.second, std::to_string(expr->width), cons);
   else
-    insts_2expr(n, FUNC_NAME(expr->name) + "_ui", name, src.second, cons);
+    insts_2expr(n, FUNC_NAME(expr->sign, expr->name) + "_ui", name, src.second, cons);
   return std::make_pair(EXPR_VAR, name);
 }
 
@@ -238,7 +238,7 @@ expr_type visit1Expr2Int(std::string& name, std::string prefix, Node* n, PNode* 
   expr->sign = 0;
   expr->width = p_stoi(expr->getExtra(0).c_str()) - p_stoi(expr->getExtra(1).c_str()) + 1;
   Assert(src.first, "Expr in 1Expr2Int must be var %s\n", src.second.c_str());
-  insts_3expr(n, FUNC_NAME(expr->name), name, src.second, cons2str(expr->getExtra(0)), cons2str(expr->getExtra(1)));
+  insts_3expr(n, FUNC_NAME(expr->sign, expr->name), name, src.second, cons2str(expr->getExtra(0)), cons2str(expr->getExtra(1)));
   return std::make_pair(EXPR_VAR, name);
 }
 
@@ -253,13 +253,13 @@ expr_type visit2Expr(std::string& name, std::string prefix, Node* n, PNode* expr
   expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
   expr->width = std::get<1>(info)(expr->getChild(0)->width, expr->getChild(1)->width, expr->getChild(0)->sign);
   if(left.first&& right.first)
-    insts_4expr(n, std::string(std::get<2>(info)), name, left.second, std::to_string(expr->getChild(0)->width), right.second, std::to_string(expr->getChild(1)->width));
+    insts_4expr(n, FUNC_NAME(expr->sign, std::string(std::get<2>(info))), name, left.second, std::to_string(expr->getChild(0)->width), right.second, std::to_string(expr->getChild(1)->width));
   else if(left.first && !right.first)
-    insts_3expr(n, std::string(std::get<3>(info)), name, left.second, right.second, std::to_string(expr->getChild(1)->width));
+    insts_3expr(n, FUNC_NAME(expr->sign, std::string(std::get<3>(info))), name, left.second, right.second, std::to_string(expr->getChild(1)->width));
   else if(!left.first && right.first)
-    insts_4expr(n, std::string(std::get<4>(info)), name, left.second, std::to_string(expr->getChild(0)->width), right.second, std::to_string(expr->getChild(1)->width));
+    insts_4expr(n, FUNC_NAME(expr->sign, std::string(std::get<4>(info))), name, left.second, std::to_string(expr->getChild(0)->width), right.second, std::to_string(expr->getChild(1)->width));
   else
-    insts_4expr(n, std::string(std::get<5>(info)), name, left.second, std::to_string(expr->getChild(0)->width), right.second, std::to_string(expr->getChild(1)->width));
+    insts_4expr(n, FUNC_NAME(expr->sign, std::string(std::get<5>(info))), name, left.second, std::to_string(expr->getChild(0)->width), right.second, std::to_string(expr->getChild(1)->width));
   return std::make_pair(EXPR_VAR, name);
 }
 
@@ -270,7 +270,7 @@ expr_type visit1Expr(std::string& name, std::string prefix, Node* n, PNode* expr
   expr->width = std::get<1>(info)(expr->getChild(0)->width, 0, expr->getChild(0)->sign);
   // Assert(src.first, "Expr in 1Expr(%s) must be var %s\n", expr->name.c_str(), src.second.c_str());
   if(src.first){
-    insts_2expr(n, FUNC_NAME(expr->name), name, src.second, std::to_string(expr->getChild(0)->width));
+    insts_2expr(n, FUNC_NAME(expr->sign, expr->name), name, src.second, std::to_string(expr->getChild(0)->width));
     return std::make_pair(EXPR_VAR, name);
   } else {
     return std::make_pair(EXPR_CONSTANT, src.second.c_str());
