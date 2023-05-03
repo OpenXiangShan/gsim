@@ -12,11 +12,14 @@
       assert(cond); \
     } \
   } while (0)
-#endif
 
 #define TODO() Assert(0, "Implement ME!")
 #ifdef DEBUG
   #define MUX_DEBUG(...) __VA_ARGS__
 #else
   #define MUX_DEBUG(...)
+#endif
+
+#define DIFFTEST_PER_SIG
+
 #endif

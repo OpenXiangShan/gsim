@@ -27,8 +27,12 @@ void topoSort(graph* g);
 #else
 #define EMU_LOG(...) 
 #endif
+
 void genHeader(graph* g, std::string headerFile) {
   std::ofstream hfile(std::string(OBJ_DIR) + "/" + headerFile + ".h");
+#ifdef DIFFTEST_PER_SIG
+  std::ofstream sigFile(std::string(OBJ_DIR) + "/" + "allSig.h");
+#endif
 
   hfile << "#ifndef " << headerFile << "_H\n";
   hfile << "#define " << headerFile << "\n";
@@ -69,6 +73,14 @@ void genHeader(graph* g, std::string headerFile) {
         break;
       default:
         hfile << "mpz_t " << node->name << ";\n";
+#ifdef DIFFTEST_PER_SIG
+        std::string name = "top__DOT__" +node->name;
+        int pos;
+        while((pos = name.find("$")) != std::string::npos) {
+          name.replace(pos, 1, "__DOT__");
+        }
+        sigFile << node->name << " " << name << std::endl;
+#endif
     }
   }
 // unique oldVal
