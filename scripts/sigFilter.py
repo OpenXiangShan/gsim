@@ -19,7 +19,7 @@ class SigFilter():
         self.dstfp.writelines( \
         "if(display || mpz_cmp_ui(mod->" + line[0] + ", ref->rootp->" + line[1] + ") != 0){\n" + \
         "  ret = true;\n" + \
-        "  std::cout << \"" + line[0] + ": \"; mpz_out_str(stdout, 16, mod->" + line[0] + "); std::cout <<\"  \" << std::hex << ref->rootp->" + line[1] + "<< std::endl;\n" + \
+        "  std::cout << \"" + line[0] + ": \"; mpz_out_str(stdout, 16, mod->" + line[0] + "); std::cout <<\"  \" << std::hex << +ref->rootp->" + line[1] + "<< std::endl;\n" + \
         "} \n")
     self.dstfp.writelines("return ret;\n")
     self.srcfp.close()
