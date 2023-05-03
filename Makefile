@@ -55,7 +55,8 @@ $(PARSER_BUILD)/syntax.cc: $(LEXICAL_SRC) $(SYNTAX_SRC)
 	bison -v -d $(SYNTAX_SRC) -o $(PARSER_BUILD)/syntax.cc
 
 difftest: compile
-	verilator $(VERI_VFLAGS) -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
+	verilator $(VERI_VFLAGS) -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
+	python3 scripts/sigFilter.py
 	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
 	./obj_dir/V$(NAME)
 
