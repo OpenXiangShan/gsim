@@ -52,6 +52,10 @@ void genHeader(graph* g, std::string headerFile) {
           hfile << "mpz_init2(" << member->name << ", " << member->width << ");\n";
         }
         break;
+      case NODE_REG_SRC:
+#ifdef DIFFTEST_PER_SIG
+        hfile << "mpz_init2(" << node->name << "$prev" << ", " << node->width << ");\n";
+#endif
       default:
         hfile << "mpz_init2(" << node->name << ", " << node->width << ");\n";
     }
@@ -71,15 +75,25 @@ void genHeader(graph* g, std::string headerFile) {
         break;
       case NODE_L1_RDATA:
         break;
+      case NODE_REG_SRC:
+#ifdef DIFFTEST_PER_SIG
+        hfile << "mpz_t " << node->name << "$prev;\n";
+#endif
       default:
         hfile << "mpz_t " << node->name << ";\n";
 #ifdef DIFFTEST_PER_SIG
         std::string name = "top__DOT__" +node->name;
         int pos;
         while((pos = name.find("$")) != std::string::npos) {
-          name.replace(pos, 1, "__DOT__");
+          if(name.substr(pos + 1, 2) == "io") {
+            name.replace(pos, 1, "_");
+          }
+          else name.replace(pos, 1, "__DOT__");
         }
-        sigFile << node->name << " " << name << std::endl;
+        if(node->type == NODE_REG_SRC)
+          sigFile << node->name + "$prev" << " " << name << std::endl;
+        else
+          sigFile << node->name << " " << name << std::endl;
 #endif
     }
   }
@@ -187,6 +201,9 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
       for(Node* next : node->next) sfile << "activeFlags[" << next->id << "] = true;\n";
       sfile << "}\n";
     }
+#ifdef DIFFTEST_PER_SIG
+    sfile << "mpz_set(" << node->name << "$prev, " << node->name << ");\n";
+#endif
     sfile << "mpz_set(" << node->name << ", " << node->name << "$next);\n";
   }
   // update memory rdata & wdata
