@@ -376,6 +376,9 @@ void u_not(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
 void u_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set(dst, src);
 }
+void s_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
+  mpz_set(dst, src);
+}
 void u_neg(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set_ui(dst, 0);
   mpz_sub(dst, dst, src);

@@ -102,6 +102,7 @@ void u_orr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_andr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_not(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
+void s_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_neg(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_shl(mpz_t& dst, mpz_t& src, unsigned long n);
 void u_shr(mpz_t& dst, mpz_t& src, unsigned long n);
