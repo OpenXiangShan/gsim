@@ -310,6 +310,7 @@ expr_type visitMux(std::string& name, std::string prefix, Node* n, PNode* mux) {
   std::string cond_true  = (expr1.first ? std::string("mpz_set(") : std::string("mpz_set_ui(")) + name + ", " + expr1.second + ")";
   std::string cond_false = (expr2.first ? std::string("mpz_set(") : std::string("mpz_set_ui(")) + name + ", " + expr2.second + ")";
   std::string cond_str = cond.first ? (std::string("mpz_cmp_ui(") + cond.second + ", 0) ") : cond.second;
+  mux->getChild(1)->width = mux->getChild(2)->width = MAX(mux->getChild(1)->width, mux->getChild(2)->width);
   n->insts.push_back(cond_str + "?" + cond_true + " : " + cond_false);
   SET_TYPE(mux, mux->getChild(1));
   return std::make_pair(EXPR_VAR, name);
