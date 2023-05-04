@@ -2,18 +2,25 @@
 #include <assert.h>
 #include <iostream>
 
+static mpz_t t1;
+
 // u_tail: remain the last n bits
 void u_tail(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
-  mpz_set(dst, src);
-  if(mpz_size(dst) == 0) return;
-  int libms_num = (n + 63) / 64;
-  int trailing_bits = n % 64;
-  if(trailing_bits) {
-    unsigned long mask = ((unsigned long)1 << (n % 64)) - 1;
-    mp_limb_t* data = mpz_limbs_modify(dst, libms_num);
-    *data = *data & mask;
+  if(mpz_size(dst) == 0) {
+    mpz_set(dst, src);
+    return;
   }
-  mpz_limbs_finish(dst, libms_num);
+  mpz_set_ui(dst, 1);
+  mpz_mul_2exp(dst, dst, n);
+  mpz_sub_ui(dst, dst, 1);
+  if(mpz_sgn(src)) {
+    mpz_set_ui(t1, 1);
+    mpz_mul_2exp(t1, t1, bitcnt);
+    mpz_add(t1, t1, src);
+    mpz_and(dst, dst, t1);
+  } else {
+    mpz_and(dst, dst, src);
+  }
 }
 // u_head: remove the last n bits
 void u_head(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
@@ -382,4 +389,8 @@ void s_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
 void u_neg(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set_ui(dst, 0);
   mpz_sub(dst, dst, src);
+}
+
+void init_functions() {
+  mpz_init(t1);
 }

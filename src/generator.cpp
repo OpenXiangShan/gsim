@@ -45,6 +45,7 @@ void genHeader(graph* g, std::string headerFile) {
 
 // constructor
   hfile << "S" << g->name << "() {" << std::endl;
+  hfile << "void init_functions();\n";
   for(Node* node: g->sorted) {
     switch(node->type) {
       case NODE_READER: case NODE_WRITER:
