@@ -13,7 +13,7 @@ CXXFLAGS = -O2 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -lgmp
 CXX = g++
 TARGET = GraphEmu
 
-NAME ?= GCD
+NAME ?= top
 TEST_FILE = scala/build/$(NAME)
 FIRRTL_FILE = $(TEST_FILE).lo.fir
 
@@ -35,6 +35,8 @@ VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Sy
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
 VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIR)/difftest.cpp
+
+mainargs = bin/dummy-riscv32e-nemu.bin
 
 compile: $(PARSER_BUILD)/syntax.cc
 	mkdir -p build
@@ -58,6 +60,6 @@ difftest: compile
 	verilator $(VERI_VFLAGS) -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
 	python3 scripts/sigFilter.py
 	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
-	./obj_dir/V$(NAME)
+	./obj_dir/V$(NAME) $(mainargs)
 
 .PHONY: compile clean emu difftest
