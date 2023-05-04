@@ -47,14 +47,17 @@ static inline void insts_set_expr_neq(Node* n, expr_type& src) {
 #define insts_4expr(n, func, dst, expr1, expr2, expr3, expr4) \
   n->insts.push_back(func + "(" + dst + ", " + expr1 + ", " + expr2 + ", " + expr3 + ", " + expr4 + ")")
 
-#define memory_member(str, parent) \
+#define memory_member(str, parent, w) \
   do {  \
     Node* rn_##str = new Node(NODE_MEMBER); \
     parent->member.push_back(rn_##str); \
     rn_##str->regNext = parent; \
     rn_##str->name = parent->name + "$" + #str; \
+    rn_##str->width = w; \
     addSignal(rn_##str->name, rn_##str); \
   } while(0)
+
+int log2 (int x){return 31 - __builtin_clz(x);}
 
 static int maxWidth(int a, int b, bool sign = 0) {
   return MAX(a, b);
@@ -246,8 +249,6 @@ expr_type visit2Expr(std::string& name, std::string prefix, Node* n, PNode* expr
   Assert(expr->getChildNum() == 2, "Invalid childNum for expr %s\n", expr->name.c_str());
   expr_type left = visitExpr(NEW_TMP, prefix, n, expr->getChild(0));
   expr_type right = visitExpr(NEW_TMP, prefix, n, expr->getChild(1));
-  // std::string left = visitExpr(NEW_TMP, prefix, n, expr->getChild(0));
-  // std::string right = visitExpr(NEW_TMP, prefix, n, expr->getChild(1));
   Assert(expr2Map.find(expr->name) != expr2Map.end(), "Operation %s not found\n", expr->name.c_str());
   std::tuple<bool, bool, int (*)(int, int, bool), const char*, const char*, const char*, const char*>info = expr2Map[expr->name];
   expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
@@ -335,7 +336,7 @@ expr_type visitExpr(std::string& name, std::string prefix, Node* n, PNode* expr)
   switch(expr->type) {
     case P_1EXPR1INT: return visit1Expr1Int(name, prefix, n, expr);
     case P_2EXPR: return visit2Expr(name, prefix, n, expr);
-    case P_REF: ret = visitReference(prefix, expr); if(n->type != NODE_ACTIVE) addEdge(ret, n); SET_TYPE(expr, allSignals[ret]); return std::make_pair(EXPR_VAR, ret);
+    case P_REF: ret = visitReference(prefix, expr); if(n->type != NODE_ACTIVE) addEdge(ret, n); SET_TYPE(expr, allSignals[ret]); SET_TYPE(n, expr); return std::make_pair(EXPR_VAR, ret);
     case P_EXPR_MUX: return visitMux(name, prefix, n, expr);
     case P_EXPR_INT_INIT: return std::make_pair(EXPR_CONSTANT, cons2str(expr->getExtra(0).substr(1, expr->getExtra(0).length()-2)));
     case P_1EXPR: return visit1Expr(name, prefix, n, expr);
@@ -410,6 +411,7 @@ void visitMemory(std::string prefix, graph* g, PNode* memory) {
   g->memory.push_back(n);
   visitType(n, memory->getChild(0)->getChild(0));
   Assert(memory->getChild(1)->type == P_DEPTH, "Invalid child0 type(%d)\n", memory->getChild(0)->type);
+  int width = n->width;
   if(n->width < 8) n->width = 8;
   Assert(n->width % 8 == 0, "invalid memory width %d\n", n->width);
   int depth = p_stoi(memory->getChild(1)->name.c_str());
@@ -427,10 +429,10 @@ void visitMemory(std::string prefix, graph* g, PNode* memory) {
     rn->name = n->name + "$" + rw->name;
     n->member.push_back(rn);
     rn->regNext = n;
-    memory_member(addr, rn);
-    memory_member(en, rn);
-    memory_member(clk, rn);
-    memory_member(data, rn);
+    memory_member(addr, rn, log2(depth));
+    memory_member(en, rn, 1);
+    memory_member(clk, rn, 1);
+    memory_member(data, rn, width);
     if(rw->type == P_READER) {
       rn->type = NODE_READER;
       if(readLatency == 1) {
@@ -439,7 +441,7 @@ void visitMemory(std::string prefix, graph* g, PNode* memory) {
       }
     } else if(rw->type == P_WRITER) {
       rn->type = NODE_WRITER;
-      memory_member(mask, rn);
+      memory_member(mask, rn, 1);
     } else {
       Assert(0, "Invalid rw type %d\n", rw->type);
     }

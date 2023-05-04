@@ -20,8 +20,8 @@ public:
   std::string name; // concat the module name in order (member in structure / temp variable)
   int id;   // unused
   int type;
-  int width;
-  int sign;
+  int width = 0;
+  int sign = 0;
   std::vector<Node*> next;
   std::vector<std::string> insts;
   // std::vector<Node*> prev; // keep the order in sources file
