@@ -75,16 +75,26 @@ int main(int argc, char** argv) {
     return 0;
   }
   std::cout << "start testing.....\n";
-  for(int i = 1; i <= 10; i++) {
+  bool dut_end = false;
+  int cycles = 0;
+  while(!dut_end) {
     ref_cycle(1);
     mod->step();
-
+    cycles ++;
     bool isDiff = checkSignals(false);
+    dut_end = mpz_cmp_ui(mod->rv32e$fetch$prevFinish, 1) == 0 && mpz_cmp_ui(mod->rv32e$writeback$prevInst, 0x00100073) == 0;
     if(isDiff) {
       std::cout << "all Sigs:\n -----------------\n";
       checkSignals(true);
-      std::cout << "Failed after " << i << " cycles\n";
+      std::cout << "Failed after " << cycles << " cycles\n";
       return 0;
+    }
+    if(dut_end) {
+      if(mpz_sgn(mod->rv32e$regs$regs_0) == 0){
+          printf("\33[1;32mCPU HIT GOOD TRAP\033[0m\n");
+      }else{
+          printf("\33[1;31mCPU HIT BAD TRAP\033[0m\n");
+      }
     }
   }
 }
