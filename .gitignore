@@ -2,7 +2,8 @@ build/
 obj/
 .vscode/
 out/
-log
+*log
 obj_dir
 tests
 tmp*
+bin/
