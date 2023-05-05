@@ -47,7 +47,7 @@ void u_cat_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned lon
 }
 // s_asSInt
 void s_asSInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
-  if(mpz_tstbit(src, bitcnt - 1)) {
+  if(mpz_sgn(src) > 0 && mpz_tstbit(src, bitcnt - 1)) {
     mpz_set_ui(dst, 1);
     mpz_mul_2exp(dst, dst, bitcnt);
     mpz_sub(dst, dst, src);
