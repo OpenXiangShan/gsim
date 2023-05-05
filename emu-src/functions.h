@@ -27,7 +27,7 @@ void s_asSInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void s_asSInt_ui(mpz_t& dst, unsigned long src, mp_bitcnt_t bitcnt);
 void u_asUInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_asClock(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
-void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t l, mp_bitcnt_t r);
+void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t l, mp_bitcnt_t r);
 void u_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n);
 //arithmetic
 void u_mpz_add(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2);

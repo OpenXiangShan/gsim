@@ -79,13 +79,20 @@ void u_asClock(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set(dst, src);
 }
 // u_bits
-void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t h, mp_bitcnt_t l) {
+void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t h, mp_bitcnt_t l) {
   if(mpz_size(src) == 0) {
     mpz_set(dst, src);
     return;
   }
+  if(mpz_sgn(src) < 0) {
+    mpz_set_ui(dst, 1);
+    mpz_mul_2exp(dst, dst, bitcnt);
+    mpz_add(dst, dst, src);
+    mpz_tdiv_q_2exp(dst, dst, l);
+  } else {
+    mpz_tdiv_q_2exp(dst, src, l);
+  }
   mp_bitcnt_t left_bits = h - l + 1;
-  mpz_tdiv_q_2exp(dst, src, l);
   int libms_num = (left_bits + 63) / 64;
   int trailing_bits = left_bits % 64;
   if(trailing_bits) {

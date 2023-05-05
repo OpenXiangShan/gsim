@@ -241,7 +241,7 @@ expr_type visit1Expr2Int(std::string& name, std::string prefix, Node* n, PNode* 
   expr->sign = 0;
   expr->width = p_stoi(expr->getExtra(0).c_str()) - p_stoi(expr->getExtra(1).c_str()) + 1;
   Assert(src.first, "Expr in 1Expr2Int must be var %s\n", src.second.c_str());
-  insts_3expr(n, FUNC_NAME(expr->sign, expr->name), name, src.second, cons2str(expr->getExtra(0)), cons2str(expr->getExtra(1)));
+  insts_4expr(n, FUNC_NAME(expr->sign, expr->name), name, src.second, std::to_string(expr->getChild(0)->width), cons2str(expr->getExtra(0)), cons2str(expr->getExtra(1)));
   return std::make_pair(EXPR_VAR, name);
 }
 
