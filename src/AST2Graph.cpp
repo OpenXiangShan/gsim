@@ -275,7 +275,8 @@ expr_type visit1Expr(std::string& name, std::string prefix, Node* n, PNode* expr
     insts_2expr(n, FUNC_NAME(expr->sign, expr->name), name, src.second, std::to_string(expr->getChild(0)->width));
     return std::make_pair(EXPR_VAR, name);
   } else {
-    return std::make_pair(EXPR_CONSTANT, src.second.c_str());
+    insts_2expr(n, FUNC_NAME(expr->sign, expr->name) + "_ui", name, src.second, std::to_string(expr->getChild(0)->width));
+    return std::make_pair(EXPR_VAR, name);
   }
 }
 

@@ -56,6 +56,14 @@ void s_asSInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
     mpz_set(dst, src);
   }
 }
+void s_asSInt_ui(mpz_t& dst, unsigned long src, mp_bitcnt_t bitcnt) {
+  if(src & (1 << (bitcnt - 1))) {
+    mpz_set_ui(dst, (1 << bitcnt) - src);
+    mpz_neg(dst, dst);
+  } else {
+    mpz_set_ui(dst, src);
+  }
+}
 // u_asUInt
 void u_asUInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   if(mpz_cmp_ui(src, 0) < 0) {
@@ -379,6 +387,10 @@ void u_not(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_mul_2exp(dst, dst, bitcnt);
   mpz_sub_ui(dst, dst, 1);
   mpz_xor(dst, dst, src);
+}
+void u_not_ui(mpz_t& dst, unsigned long src, mp_bitcnt_t bitcnt) {
+  unsigned long mask = ((unsigned long)1 << bitcnt) - 1;
+  mpz_set_ui(dst, (~src) & mask);
 }
 void u_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set(dst, src);
