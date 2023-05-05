@@ -64,11 +64,11 @@ bool checkSignals(bool display) {
 int main(int argc, char** argv) {
   mod = new MOD_NAME();
   ref = new REF_NAME();
-  ref_reset();
-  mod_reset();
   load_program(argv[1]);
   memcpy(&ref->rootp->top__DOT__mem__DOT__ram, program, program_sz);
   memcpy(&mod->mem$ram, program, program_sz);
+  ref_reset();
+  mod_reset();
   mod->step();
   if(checkSignals(false)) {
     std::cout << "Diff after reset!\n";
