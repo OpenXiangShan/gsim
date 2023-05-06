@@ -101,6 +101,7 @@ void u_mpz_dshr_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigne
 //bits
 void u_orr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_andr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
+void u_xorr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_not(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_not_ui(mpz_t& dst, unsigned long src, mp_bitcnt_t bitcnt);
 void u_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);

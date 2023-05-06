@@ -38,7 +38,7 @@ void u_cat_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt) {
 void u_cat_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& src, mp_bitcnt_t bitcnt2) {
   mpz_set_ui(dst, val);
   mpz_mul_2exp(dst, dst, bitcnt2);
-  mpz_add_ui(dst, dst, val);
+  mpz_add(dst, dst, src);
 }
 void u_cat_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long val2, mp_bitcnt_t bitcnt2) {
   mpz_set_ui(dst, val1);

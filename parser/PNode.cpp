@@ -3,7 +3,7 @@
 
 void PNode::appendChild(PNode* p) {
   if(p) child.push_back(p);
-  }
+}
 void PNode::appendExtraInfo(char* info) {
   extraInfo.push_back(std::string(info));
 }

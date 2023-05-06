@@ -91,9 +91,9 @@ int main(int argc, char** argv) {
     }
     if(dut_end) {
       if(mpz_sgn(mod->rv32e$regs$regs_0) == 0){
-          printf("\33[1;32mCPU HIT GOOD TRAP\033[0m\n");
+          printf("\33[1;32mCPU HIT GOOD TRAP after %d cycles\033[0m\n", cycles);
       }else{
-          printf("\33[1;31mCPU HIT BAD TRAP\033[0m\n");
+          printf("\33[1;31mCPU HIT BAD TRAP after %d cycles\033[0m\n", cycles);
       }
     }
   }

@@ -21,7 +21,7 @@ void topoSort(graph* g);
 
 #if 0
 #define EMU_LOG(file, id, node) do{ \
-        file << "std::cout << \"" << id  << ": " << node->name << "(" << node->width << "): \" ;"; \
+        file << "std::cout << \"" << id  << ": " << node->name << "(" << node->width << ", " << node->sign << "): \" ;"; \
         file << "mpz_out_str(stdout, 16, oldVal); std::cout << \" -> \"; mpz_out_str(stdout, 16, " << node->name << "); std::cout << std::endl;\n"; \
       } while(0)
 #else
