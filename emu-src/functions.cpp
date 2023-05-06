@@ -6,14 +6,14 @@ static mpz_t t1;
 
 // u_tail: remain the last n bits
 void u_tail(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
-  if(mpz_size(dst) == 0) {
+  if(mpz_sgn(src) == 0) {
     mpz_set(dst, src);
     return;
   }
   mpz_set_ui(dst, 1);
   mpz_mul_2exp(dst, dst, n);
   mpz_sub_ui(dst, dst, 1);
-  if(mpz_sgn(src)) {
+  if(mpz_sgn(src) < 0) {
     mpz_set_ui(t1, 1);
     mpz_mul_2exp(t1, t1, bitcnt);
     mpz_add(t1, t1, src);
@@ -151,7 +151,10 @@ void u_mpz_add_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned
 }
 //sub
 void u_mpz_sub(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) {
-  // mpz_sub(dst, src1, src2);
+  if(mpz_sgn(src2) == 0) {
+    mpz_set(dst, src1);
+    return;
+  }
   mpz_set_ui(dst, 1);
   mpz_mul_2exp(dst, dst, bitcnt2);
   mpz_sub(dst, dst, src2);
