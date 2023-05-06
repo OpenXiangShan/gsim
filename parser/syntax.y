@@ -193,7 +193,7 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $5, $2, 1, $4)
     | Node ALLID '=' expr info { $$ = newNode(P_NODE, $5, $2, 1, $4); }
     | reference "<=" expr info  { $$ = newNode(P_CONNECT, $4, NULL, 2, $1, $3); }
     | reference "<-" expr info  { TODO(); }
-    | reference Is Invalid info { TODO(); }
+    | reference Is Invalid info { $$ = NULL; }
     | Attach '(' references ')' info { TODO(); }
     | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $4, NULL, 3, $2, $6, $8); } /* expected newline before statement */
     | Stop '(' expr ',' expr ',' INT ')' info   { TODO(); }
