@@ -34,7 +34,7 @@ int         \"b-?{digit_bin}+\"|\"o-?{digit_oct}+\"|\"h-?{digit_hex}+\"|-?{digit
 letter      [A-Za-z]
 id          (_|{letter})(_|{letter}|{digit_dec})*
 string      \"((\\\")|[!|0-9A-Za-z %\\,:=_^.\t()-{}$])*\"
-info        [0-9A-Za-z.{}:,/ ]+
+info        [0-9A-Za-z.{}:,/ _]+
 /* Fileinfo communicates Chisel source file and line/column info */
 
 /* %x initial */
