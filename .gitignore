@@ -6,4 +6,4 @@ out/
 obj_dir
 tests
 tmp*
-bin/
+*bin/
