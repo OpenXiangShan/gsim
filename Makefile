@@ -24,7 +24,7 @@ EMU_SRC_DIR = emu-src
 
 SRCS = $(shell find src $(PARSER_DIR) -name "*.cpp" -o -name "*.cc" )
 
-DIFF ?= 0
+MODE ?= 0
 
 ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
@@ -38,8 +38,12 @@ VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
 VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIR)/difftest.cpp
 
-ifeq ($(DIFF),1)
-	VERI_CFLAGS += -DDIFFTEST
+ifeq ($(MODE),0)
+	VERI_CFLAGS += -DGSIM
+else ifeq ($(MODE), 1)
+	VERI_CFLAGS += -DVERILATOR
+else
+	VERI_CFLAGS += -DGSIM -DVERILATOR
 endif
 
 mainargs = bin/microbench-riscv32e-nemu-test.bin

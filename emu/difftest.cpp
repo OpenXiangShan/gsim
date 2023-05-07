@@ -33,7 +33,7 @@ void load_program(char* filename){
   return;
 }
 
-#ifdef DIFFTEST
+#ifdef VERILATOR
 void ref_cycle(int n) {
   while(n --){
     ref->clock = 0;
@@ -50,7 +50,7 @@ void ref_reset(){
     ref->reset = 0;
 }
 #endif
-
+#ifdef GSIM
 void mod_reset() {
   mpz_t val;
   mpz_init(val);
@@ -60,23 +60,27 @@ void mod_reset() {
   mpz_set_ui(val, 0);
   mod->set_reset(val);
 }
-
+#endif
+#if defined(VERILATOR) && defined(GSIM)
 bool checkSignals(bool display) {
   #include "../obj/checkSig.h"
 }
+#endif
 
 int main(int argc, char** argv) {
-  mod = new MOD_NAME();
-  ref = new REF_NAME();
   load_program(argv[1]);
+#ifdef GSIM
+  mod = new MOD_NAME();
   memcpy(&mod->mem$ram, program, program_sz);
-#ifdef DIFFTEST
+  mod_reset();
+  mod->step();
+#endif
+#ifdef VERILATOR
+  ref = new REF_NAME();
   memcpy(&ref->rootp->top__DOT__mem__DOT__ram, program, program_sz);
   ref_reset();
 #endif
-  mod_reset();
-  mod->step();
-#ifdef DIFFTEST
+#if defined(VERILATOR) && defined(GSIM)
   if(checkSignals(false)) {
     std::cout << "Diff after reset!\n";
     return 0;
@@ -87,11 +91,22 @@ int main(int argc, char** argv) {
   int cycles = 0;
   clock_t start = clock();
   while(!dut_end) {
-    mod->step();
-    cycles ++;
-    dut_end = mpz_cmp_ui(mod->rv32e$fetch$prevFinish, 1) == 0 && mpz_cmp_ui(mod->rv32e$writeback$prevInst, 0x00100073) == 0;
-#ifdef DIFFTEST
+#ifdef VERILATOR
     ref_cycle(1);
+#endif
+    cycles ++;
+#if defined(GSIM)
+    mod->step();
+    dut_end = mpz_cmp_ui(mod->rv32e$fetch$prevFinish, 1) == 0 && mpz_cmp_ui(mod->rv32e$writeback$prevInst, 0x00100073) == 0;
+#elif defined(VERILATOR)
+    static int cnt = 0;
+    if(cycles % 10000 == 0 && cnt < 3) {
+      cnt ++;
+      clock_t dur = clock() - start;
+      printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+    }
+#endif
+#if defined(VERILATOR) && defined(GSIM)
     bool isDiff = checkSignals(false);
     if(isDiff) {
       std::cout << "all Sigs:\n -----------------\n";
@@ -102,7 +117,11 @@ int main(int argc, char** argv) {
 #endif
     if(dut_end) {
       clock_t dur = clock() - start;
+#if defined(GSIM)
       if(mpz_sgn(mod->rv32e$regs$regs_0) == 0){
+#else
+      if(ref->rootp->top__DOT__rv32e__DOT__regs__DOT__regs_0 == 0) {
+#endif
           printf("\33[1;32mCPU HIT GOOD TRAP after %d cycles (%d ms, %d per sec)\033[0m\n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
       }else{
           printf("\33[1;31mCPU HIT BAD TRAP after %d cycles\033[0m\n", cycles);
