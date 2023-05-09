@@ -24,12 +24,25 @@ std::string tmp;
 #define expr_type std::pair<int, std::string>
 #define CONS(expr) (expr.first ? (std::string("mpz_get_ui(") + expr.second + ")") : expr.second)
 
+expr_type visitExpr(std::string& name, std::string prefix, Node* n, PNode* expr);
+void visitType(Node* n, PNode* ptype);
+
+int p_stoi(const char* str);
+std::string cons2str(std::string s);
+std::pair<int, std::string> strBase(std::string s);
+
 static inline void insts_set_neq(Node* node, std::string& srcStr) {
   if(node->name != srcStr)
       node->insts.push_back(std::string("mpz_set(") + node->name + ", " + srcStr + ")");
 }
 static inline void insts_set_neq_ui(Node* node, std::string& srcStr) {
-  node->insts.push_back(std::string("mpz_set_ui(") + node->name + ", " + srcStr + ")");
+  int base;
+  std::string cons;
+  std::tie(base, cons) = strBase(srcStr);
+  if(base < 0)
+    node->insts.push_back(std::string("mpz_set_ui(") + node->name + ", " + cons + ")");
+  else
+    node->insts.push_back(std::string("mpz_set_str(") + node->name + ", \"" + cons + "\", " + std::to_string(base) + ")");
 }
 static inline void insts_set_expr_neq(Node* n, expr_type& src) {
   if(src.first) {
@@ -155,13 +168,6 @@ static std::map<std::string, PNode*> moduleMap;
 static std::map<std::string, Node*> allSignals;
 void visitStmts(std::string prefix, graph* g, PNode* stmts);
 
-
-expr_type visitExpr(std::string& name, std::string prefix, Node* n, PNode* expr);
-void visitType(Node* n, PNode* ptype);
-
-int p_stoi(const char* str);
-std::string cons2str(std::string s);
-
 void addSignal(std::string s, Node* n) {
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
   allSignals[s] = n;
@@ -255,13 +261,13 @@ expr_type visit2Expr(std::string& name, std::string prefix, Node* n, PNode* expr
   bool funcSign = std::get<1>(info) ? expr->sign : 0;
   expr->width = std::get<2>(info)(expr->getChild(0)->width, expr->getChild(1)->width, expr->getChild(0)->sign);
   if(left.first&& right.first)
-    insts_4expr(n, FUNC_NAME(funcSign, std::string(std::get<3>(info))), name, left.second, std::to_string(expr->getChild(0)->width), right.second, std::to_string(expr->getChild(1)->width));
+    insts_4expr(n, FUNC_NAME(funcSign, std::string(std::get<3>(info))), name, cons2str(left.second), std::to_string(expr->getChild(0)->width), cons2str(right.second), std::to_string(expr->getChild(1)->width));
   else if(left.first && !right.first)
-    insts_3expr(n, FUNC_NAME(funcSign, std::string(std::get<4>(info))), name, left.second, right.second, std::to_string(expr->getChild(1)->width));
+    insts_3expr(n, FUNC_NAME(funcSign, std::string(std::get<4>(info))), name, cons2str(left.second), cons2str(right.second), std::to_string(expr->getChild(1)->width));
   else if(!left.first && right.first)
-    insts_4expr(n, FUNC_NAME(funcSign, std::string(std::get<5>(info))), name, left.second, std::to_string(expr->getChild(0)->width), right.second, std::to_string(expr->getChild(1)->width));
+    insts_4expr(n, FUNC_NAME(funcSign, std::string(std::get<5>(info))), name, cons2str(left.second), std::to_string(expr->getChild(0)->width), cons2str(right.second), std::to_string(expr->getChild(1)->width));
   else
-    insts_4expr(n, FUNC_NAME(funcSign, std::string(std::get<6>(info))), name, left.second, std::to_string(expr->getChild(0)->width), right.second, std::to_string(expr->getChild(1)->width));
+    insts_4expr(n, FUNC_NAME(funcSign, std::string(std::get<6>(info))), name, cons2str(left.second), std::to_string(expr->getChild(0)->width), cons2str(right.second), std::to_string(expr->getChild(1)->width));
   return std::make_pair(EXPR_VAR, name);
 }
 
@@ -308,11 +314,24 @@ expr_type visitMux(std::string& name, std::string prefix, Node* n, PNode* mux) {
   expr_type cond = visitExpr(NEW_TMP, prefix, n, mux->getChild(0));
   expr_type expr1 = visitExpr(name, prefix, n, mux->getChild(1));
   expr_type expr2 = visitExpr(name, prefix, n, mux->getChild(2));
-  std::string cond_true  = (expr1.first ? std::string("mpz_set(") : std::string("mpz_set_ui(")) + name + ", " + expr1.second + ")";
-  std::string cond_false = (expr2.first ? std::string("mpz_set(") : std::string("mpz_set_ui(")) + name + ", " + expr2.second + ")";
+  int base1, base2; std::string cons1, cons2;
+  std::string cond_true, cond_false;
+  if(expr1.first) {
+    cond_true = std::string("mpz_set(") + name + ", " + expr1.second + ")";
+  } else {
+    std::tie(base1, cons1) = strBase(expr1.second);
+    cond_true = base1 < 0 ? std::string("mpz_set_ui(") + name + ", " + cons1 + ")" : std::string("(void)mpz_set_str(") + name + ", \"" + cons1 + "\", " + std::to_string(base1) + ")";
+  }
+  if(expr2.first) {
+    cond_false = std::string("mpz_set(") + name + ", " + expr2.second + ")";
+  } else {
+    std::tie(base2, cons2) = strBase(expr2.second);
+    cond_false = base2 < 0 ? std::string("mpz_set_ui(") + name + ", " + cons2 + ")" : std::string("(void)mpz_set_str(") + name + ", \"" + cons2 + "\", " + std::to_string(base2) + ")";
+  }
+
   std::string cond_str = cond.first ? (std::string("mpz_cmp_ui(") + cond.second + ", 0) ") : cond.second;
   mux->getChild(1)->width = mux->getChild(2)->width = MAX(mux->getChild(1)->width, mux->getChild(2)->width);
-  n->insts.push_back(cond_str + "?" + cond_true + " : " + cond_false);
+  n->insts.push_back(cond_str + "? " + cond_true + " : " + cond_false);
   SET_TYPE(mux, mux->getChild(1));
   return std::make_pair(EXPR_VAR, name);
 }
@@ -333,6 +352,33 @@ std::string cons2str(std::string s) {
   return ret;
 }
 
+std::pair<int, std::string> strBase(std::string s) {
+  if (s.length() <= 1) return std::make_pair(10, s);
+  std::string ret;
+  int idx = 1;
+  int base = -1;
+  if (s[1] == '-') {
+    ret += "-";
+    idx = 2;
+  }
+  if (s[0] == 'b') {
+    if(s.length() - idx <= 64) ret += "0b";
+    else base = 2;
+  } else if(s[0] == 'o') {
+    if(s.substr(idx) <= "1777777777777777777777") ret += "0";
+    else base = 8;
+  } else if(s[0] == 'h') {
+    if(s.length() - idx <= 16 ) ret += "0x";
+    else base = 16;
+  } else {
+    int decIdx = s[0] == '-';
+    if(s.substr(decIdx) > "18446744073709551615") base = 10;
+    idx = 0;
+  }
+  ret += s.substr(idx);
+  return std::make_pair(base, ret);
+}
+
 expr_type visitExpr(std::string& name, std::string prefix, Node* n, PNode* expr) { // return varName & update connect
   std::string ret;
   switch(expr->type) {
@@ -340,7 +386,7 @@ expr_type visitExpr(std::string& name, std::string prefix, Node* n, PNode* expr)
     case P_2EXPR: return visit2Expr(name, prefix, n, expr);
     case P_REF: ret = visitReference(prefix, expr); if(n->type != NODE_ACTIVE) addEdge(ret, n); SET_TYPE(expr, allSignals[ret]); SET_TYPE(n, expr); return std::make_pair(EXPR_VAR, ret);
     case P_EXPR_MUX: return visitMux(name, prefix, n, expr);
-    case P_EXPR_INT_INIT: return std::make_pair(EXPR_CONSTANT, cons2str(expr->getExtra(0).substr(1, expr->getExtra(0).length()-2)));
+    case P_EXPR_INT_INIT: return std::make_pair(EXPR_CONSTANT, expr->getExtra(0).substr(1, expr->getExtra(0).length()-2));
     case P_1EXPR: return visit1Expr(name, prefix, n, expr);
     case P_1EXPR2INT: return visit1Expr2Int(name, prefix, n, expr);
     default: std::cout << expr->type << std::endl; TODO();
@@ -386,7 +432,7 @@ void visitPrintf(std::string prefix, graph* g, PNode* print) {
   Node* n = new Node(NODE_ACTIVE);
   n->name = prefix + print->name;
   expr_type cond = visitExpr(NEW_TMP, prefix, n, print->getChild(1));
-  std::string cond_str = cond.first ? (std::string("mpz_cmp_ui(") + cond.second + ", 0)") : cond.second;
+  std::string cond_str = cond.first ? (std::string("mpz_cmp_ui(") + cons2str(cond.second) + ", 0)") : cons2str(cond.second);
   std::string inst = std::string("if(") + cond_str + ") printf(" + print->getExtra(0);
   PNode* exprs = print->getChild(2);
   for(int i = 0; i < exprs->getChildNum(); i++ ) inst += "," + CONS(visitExpr(NEW_TMP, prefix, n, exprs->getChild(i)));
@@ -399,8 +445,8 @@ void visitAssert(std::string prefix, graph* g, PNode* ass) {
   n->name = prefix + ass->name;
   expr_type pred = visitExpr(NEW_TMP, prefix, n, ass->getChild(1));
   expr_type en = visitExpr(NEW_TMP, prefix, n, ass->getChild(2));
-  std::string en_str = en.first ? (std::string("mpz_cmp_ui(") + en.second + ", 0)") : en.second;
-  std::string pred_str = pred.first ? (std::string("mpz_cmp_ui(") + pred.second + ", 0)") : pred.second;
+  std::string en_str = en.first ? (std::string("mpz_cmp_ui(") + cons2str(en.second) + ", 0)") : en.second;
+  std::string pred_str = pred.first ? (std::string("mpz_cmp_ui(") + cons2str(pred.second) + ", 0)") : pred.second;
   n->insts.push_back(std::string("Assert(!") + en_str + " || " + pred_str + ", " + ass->getExtra(0) + ")");
   g->active.push_back(n);
 }
