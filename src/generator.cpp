@@ -20,13 +20,19 @@ void topoSort(graph* g);
     } \
   } while(0)
 
-#if 0
+#if 1
 #define EMU_LOG(file, id, node) do{ \
         file << "std::cout << \"" << id  << ": " << node->name << "(" << node->width << ", " << node->sign << "): \" ;"; \
         file << "mpz_out_str(stdout, 16, oldVal); std::cout << \" -> \"; mpz_out_str(stdout, 16, " << node->name << "); std::cout << std::endl;\n"; \
       } while(0)
+#define WRITE_LOG(file, name, idx, val) do{ \
+        file << "std::cout << \"" << name << "[\";"; \
+        file << "mpz_out_str(stdout, 10, " << idx << ");"; \
+        file << "std::cout << \"] = \"; mpz_out_str(stdout, 16, " << val << "); std::cout << std::endl;\n"; \
+        } while(0)
 #else
 #define EMU_LOG(...) 
+#define WRITE_LOG(...) 
 #endif
 
 void genHeader(graph* g, std::string headerFile) {
@@ -257,6 +263,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         for(Node* reader: rw->regNext->member) {
           if(reader->type == NODE_READER) sfile << "activeFlags[" << reader->id << "] = true;\n";
         }
+        WRITE_LOG(sfile, node->name, rw->member[0]->name, rw->member[3]->name);
         sfile << "}\n";
       }
     }
