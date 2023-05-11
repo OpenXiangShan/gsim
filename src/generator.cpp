@@ -4,6 +4,7 @@
 
 #define INCLUDE_LIB(f, s) f << "#include <" << s << ">\n";
 #define INCLUDE(f, s) f << "#include \"" << s << "\"\n";
+#define T_NUM 1
 
 #define UI(x) (std::string("mpz_get_ui(") + x + ")")
 void topoSort(graph* g);
@@ -46,6 +47,9 @@ void genHeader(graph* g, std::string headerFile) {
 // constructor
   hfile << "S" << g->name << "() {" << std::endl;
   hfile << "void init_functions();\n";
+  for(int i = 0; i < T_NUM; i++) {
+    hfile << "mpz_init(t" << i << ");\n";
+  }
   for(Node* node: g->sorted) {
     switch(node->type) {
       case NODE_READER: case NODE_WRITER:
@@ -101,10 +105,15 @@ void genHeader(graph* g, std::string headerFile) {
 // unique oldVal
   hfile << "mpz_t oldVal;\n";
 // tmp variable
+  for (int i = 0; i < T_NUM; i++) hfile << "mpz_t t" << i << ";\n";
   for (int i = 0; i < g->maxTmp; i++) hfile << "mpz_t tmp" << i << ";\n";
 // memory
   for(Node* n : g->memory) {
-    hfile << (n->width == 8 ? "uint8_t " : (n->width == 16 ? "uint16_t " : (n->width == 32 ? "uint32_t " : "uint64_t ")));
+    hfile <<  (n->width == 8 ? "uint8_t " : 
+              (n->width == 16 ? "uint16_t " : 
+              (n->width == 32 ? "uint32_t " : 
+              (n->width == 64 ? "uint64_t " : "struct{uint64_t hi; uint64_t lo;}"))));
+    Assert(n->width <= 128, "Data type of memory %s is larger than 128\n", n->name.c_str());
     hfile << n->name << "[" << n->val << "];\n";
   }
 
@@ -158,7 +167,13 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         }
         if(latency == 0) {
           sfile << "activeFlags[" << node->id << "] = false;\n";
-          sfile << "mpz_set_ui(" << node->member[3]->name << ", " << node->regNext->name << "[" << UI(node->member[0]->name) << "]);\n";
+          if(node->regNext->width == 128) {
+            sfile << "mpz_set_ui(" << node->member[3]->name << ", " << node->regNext->name << "[" << UI(node->member[0]->name) << "].hi);\n";
+            sfile << "mpz_mul_2exp(" << node->member[3]->name << ", " << node->member[3]->name << ", " << 64 << ");\n";
+            sfile << "mpz_add_ui(" << node->member[3]->name << ", " << node->member[3]->name << ", " << node->regNext->name << "[" << UI(node->member[0]->name) << "].lo);\n";
+          } else {
+            sfile << "mpz_set_ui(" << node->member[3]->name << ", " << node->regNext->name << "[" << UI(node->member[0]->name) << "]);\n";
+          }
           ACTIVATE(sfile, node->member[3], node->next);
           EMU_LOG(sfile, node->id, node->member[3]);
         }
@@ -171,8 +186,16 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         latency = node->regNext->latency[1];
         if(latency == 0) {
           sfile << "activeFlags[" << node->id << "] = false;\n";
-          sfile << "if(" << UI(node->member[1]->name) << "&&" << UI(node->member[4]->name) << ") " << \
-                node->regNext->name << "[" << UI(node->member[0]->name) << "] = " << UI(node->member[3]->name) << ";\n";
+          sfile << "if(" << UI(node->member[1]->name) << "&&" << UI(node->member[4]->name) << ") {\n";
+          if(node->regNext->width == 128) {
+            sfile << "mpz_div_2exp(t0, " << node->member[3]->name << ", 64);\n";
+            sfile << node->regNext->name << "[" << UI(node->member[0]->name) << "].hi = " << UI("t1") << ";\n";
+            sfile << node->regNext->name << "[" << UI(node->member[0]->name) << "].lo = " << UI(node->member[3]->name) << ";\n";
+          } else {
+            sfile << node->regNext->name << "[" << UI(node->member[0]->name) << "] = " << UI(node->member[3]->name) << ";\n";
+          }
+          WRITE_LOG(sfile, node->regNext->name, node->member[0]->name, node->member[4]->name);
+          sfile << "}\n";
         }
         break;
       case NODE_INP:
@@ -223,8 +246,14 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
           sfile << "}\n";
         }
       } else if(rw->type == NODE_WRITER && node->latency[1] == 1) {
-        sfile << "if(" << UI(rw->member[1]->name) << " && " << UI(rw->member[4]->name) << ") {" << \
-                node->name << "[" << UI(rw->member[0]->name) << "] = " << UI(rw->member[3]->name) << ";\n";
+        sfile << "if(" << UI(rw->member[1]->name) << " && " << UI(rw->member[4]->name) << ") {\n";
+        if(node->width == 128) {
+          sfile << "mpz_div_2exp(t0, " << rw->member[3]->name << ", 64);\n";
+          sfile << node->name << "[" << UI(rw->member[0]->name) << "].hi = " << UI("t0") << ";\n";
+          sfile << node->name << "[" << UI(rw->member[0]->name) << "].lo = " << UI(rw->member[3]->name) << ";\n";
+        } else {
+          sfile << node->name << "[" << UI(rw->member[0]->name) << "] = " << UI(rw->member[3]->name) << ";\n";
+        }
         for(Node* reader: rw->regNext->member) {
           if(reader->type == NODE_READER) sfile << "activeFlags[" << reader->id << "] = true;\n";
         }
