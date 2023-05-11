@@ -40,4 +40,4 @@ class SigFilter():
 
 if __name__ == "__main__":
   sigFilter = SigFilter()
-  sigFilter.filter("obj/allSig.h", "obj_dir/Vtop___024root.h", "obj/checkSig.h")
+  sigFilter.filter("obj/allSig.h", "obj_dir/Vnewtop___024root.h", "obj/checkSig.h")

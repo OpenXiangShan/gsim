@@ -13,7 +13,7 @@ CXXFLAGS = -O2 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -lgmp
 CXX = g++
 TARGET = GraphEmu
 
-NAME ?= top
+NAME ?= newtop
 TEST_FILE = scala/build/$(NAME)
 FIRRTL_FILE = $(TEST_FILE).lo.fir
 
@@ -24,7 +24,7 @@ EMU_SRC_DIR = emu-src
 
 SRCS = $(shell find src $(PARSER_DIR) -name "*.cpp" -o -name "*.cc" )
 
-MODE ?= 0
+MODE ?= 2
 
 ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
@@ -36,7 +36,8 @@ VERI_CFLAGS = -O3 $(addprefix -I../, $(VERI_INC_DIR))
 VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\"
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
-VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIR)/difftest.cpp
+VERI_VSRCS += $(addprefix scala/build/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v)
+VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIR)/difftest-ysyx3.cpp
 
 ifeq ($(MODE),0)
 	VERI_CFLAGS += -DGSIM
@@ -46,7 +47,7 @@ else
 	VERI_CFLAGS += -DGSIM -DVERILATOR
 endif
 
-mainargs = bin/microbench-riscv32e-nemu-test.bin
+mainargs = ysyx3-bin/rtthread.bin
 
 compile: $(PARSER_BUILD)/syntax.cc
 	mkdir -p build
@@ -66,7 +67,7 @@ $(PARSER_BUILD)/syntax.cc: $(LEXICAL_SRC) $(SYNTAX_SRC)
 	flex -o $(PARSER_BUILD)/lexical.cc $(LEXICAL_SRC)
 	bison -v -d $(SYNTAX_SRC) -o $(PARSER_BUILD)/syntax.cc
 
-difftest: compile
+difftest:
 	verilator $(VERI_VFLAGS) -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
 	python3 scripts/sigFilter.py
 	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
