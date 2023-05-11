@@ -99,11 +99,14 @@ void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t h, mp_bitcnt
     unsigned long int mask = ((unsigned long)1 << trailing_bits) - 1;
     mp_limb_t* data = mpz_limbs_modify(dst, libms_num);
     *data = *data & mask;
-    mpz_limbs_finish(dst, libms_num);
   }
+  mpz_limbs_finish(dst, libms_num);
 }
 // u_pat: sign/zero extends to n bits
 void u_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n) {
+  mpz_set(dst, src);
+}
+void s_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n) {
   if(bitcnt >= n || (mpz_cmp_ui(src, 0) >= 0)) {
     mpz_set(dst, src);
     return;
