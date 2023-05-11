@@ -80,7 +80,7 @@ void u_asClock(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
 }
 // u_bits
 void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t h, mp_bitcnt_t l) {
-  if(mpz_size(src) == 0) {
+  if(mpz_size(src) <= (h - l + 1) / 64) {
     mpz_set(dst, src);
     return;
   }
