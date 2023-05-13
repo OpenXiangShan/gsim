@@ -80,10 +80,7 @@ void u_asClock(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
 }
 // u_bits
 void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t h, mp_bitcnt_t l) {
-  if(mpz_size(src) <= (h - l + 1) / 64) {
-    mpz_set(dst, src);
-    return;
-  }
+
   if(mpz_sgn(src) < 0) {
     mpz_set_ui(dst, 1);
     mpz_mul_2exp(dst, dst, bitcnt);
@@ -92,15 +89,10 @@ void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t h, mp_bitcnt
   } else {
     mpz_tdiv_q_2exp(dst, src, l);
   }
-  mp_bitcnt_t left_bits = h - l + 1;
-  int libms_num = (left_bits + 63) / 64;
-  int trailing_bits = left_bits % 64;
-  if(trailing_bits) {
-    unsigned long int mask = ((unsigned long)1 << trailing_bits) - 1;
-    mp_limb_t* data = mpz_limbs_modify(dst, libms_num);
-    *data = *data & mask;
-  }
-  mpz_limbs_finish(dst, libms_num);
+  mpz_set_ui(t1, 1);
+  mpz_mul_2exp(t1, t1, h - l + 1);
+  mpz_sub_ui(t1, t1, 1);
+  mpz_and(dst, dst, t1);
 }
 // u_pat: sign/zero extends to n bits
 void u_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n) {

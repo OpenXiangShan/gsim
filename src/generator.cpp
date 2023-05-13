@@ -146,13 +146,21 @@ void genHeader(graph* g, std::string headerFile) {
 void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   std::ofstream sfile(std::string(OBJ_DIR) + "/" + srcFile + ".cpp");
   INCLUDE(sfile, headerFile + ".h");
-
+  sfile << "long cycles = 0;\n";
   for(Node* node: g->sorted) {
     // generate function
     Node* activeNode;
     int latency;
     switch(node->type) {
-      case NODE_REG_SRC: case NODE_REG_DST: case NODE_OTHERS: case NODE_OUT: case NODE_L1_RDATA:
+      case NODE_REG_SRC: case NODE_REG_DST:
+        if(node->insts.size() == 0) continue;
+        STEP_START(sfile, g, node);
+        sfile << "activeFlags[" << node->id << "] = false;\n";
+        for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
+        Assert(node->type == NODE_REG_DST, "invalid Node %s\n", node->name.c_str());
+        EMU_LOG(sfile, node->id, node->regNext->name, node);
+        break;
+      case NODE_OTHERS: case NODE_OUT: case NODE_L1_RDATA:
         if(node->insts.size() == 0) continue;
         // sfile << "void S" << g->name << "::step" << node->id << "() {\n";
         STEP_START(sfile, g, node);
@@ -162,7 +170,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
         activeNode = node->type == NODE_REG_DST ? node->regNext : node;
         ACTIVATE(sfile, activeNode, activeNode->next);
-        EMU_LOG(sfile, node->id, node);
+        EMU_LOG(sfile, node->id, "oldVal", node);
         break;
       case NODE_READER:
         STEP_START(sfile, g, node);
@@ -181,7 +189,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
             sfile << "mpz_set_ui(" << node->member[3]->name << ", " << node->regNext->name << "[" << UI(node->member[0]->name) << "]);\n";
           }
           ACTIVATE(sfile, node->member[3], node->next);
-          EMU_LOG(sfile, node->id, node->member[3]);
+          EMU_LOG(sfile, node->id, "oldVal", node->member[3]);
         }
         break;
       case NODE_WRITER:

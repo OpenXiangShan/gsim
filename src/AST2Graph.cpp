@@ -174,7 +174,7 @@ void addSignal(std::string s, Node* n) {
 }
 
 void addEdge(Node* src, Node* dst) {
-  if(dst->type == NODE_MEMBER) {
+  if(dst->type == NODE_MEMBER || dst->type == NODE_REG_SRC) {
     dst = dst->regNext;
   }
   if(src->type == NODE_MEMBER) {
