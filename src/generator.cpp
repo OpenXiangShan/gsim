@@ -20,15 +20,17 @@ void topoSort(graph* g);
     } \
   } while(0)
 
-#if 1
-#define EMU_LOG(file, id, node) do{ \
+#if 0
+#define EMU_LOG(file, id, oldName, node) do{ \
+        file << "if(cycles > 0xd000) {\n"; \
         file << "std::cout << \"" << id  << ": " << node->name << "(" << node->width << ", " << node->sign << "): \" ;"; \
-        file << "mpz_out_str(stdout, 16, oldVal); std::cout << \" -> \"; mpz_out_str(stdout, 16, " << node->name << "); std::cout << std::endl;\n"; \
+        file << "mpz_out_str(stdout, 16," << oldName << "); std::cout << \" -> \"; mpz_out_str(stdout, 16, " << node->name << "); std::cout << std::endl;\n}\n"; \
       } while(0)
 #define WRITE_LOG(file, name, idx, val) do{ \
+        file << "if(cycles > 0xd000) {\n"; \
         file << "std::cout << \"" << name << "[\";"; \
         file << "mpz_out_str(stdout, 10, " << idx << ");"; \
-        file << "std::cout << \"] = \"; mpz_out_str(stdout, 16, " << val << "); std::cout << std::endl;\n"; \
+        file << "std::cout << \"] = \"; mpz_out_str(stdout, 16, " << val << "); std::cout << std::endl;\n}\n"; \
         } while(0)
 #else
 #define EMU_LOG(...) 
@@ -102,9 +104,9 @@ void genHeader(graph* g, std::string headerFile) {
           else name.replace(pos, 1, "__DOT__");
         }
         if(node->type == NODE_REG_SRC)
-          sigFile << node->name + "$prev" << " " << name << std::endl;
+          sigFile << node->sign << " " << node->width << " " << node->name + "$prev" << " " << name << std::endl;
         else
-          sigFile << node->name << " " << name << std::endl;
+          sigFile << node->sign << " " << node->width << " " << node->name << " " << name << std::endl;
 #endif
     }
   }
@@ -278,7 +280,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 
   }
   // sfile << "std::cout << \"------\\n\";\n";
-  sfile << "}";
+  sfile << "cycles ++;\n}\n";
 }
 
 void generator(graph* g, std::string header, std::string src) {
