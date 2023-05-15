@@ -497,6 +497,13 @@ void visitMemory(std::string prefix, graph* g, PNode* memory) {
   }
 }
 
+void visitWireDef(std::string prefix, graph* g, PNode* wire) {
+  Node* newWire = new Node();
+  newWire->name = prefix + wire->name;
+  visitType(newWire, wire->getChild(0));
+  addSignal(newWire->name, newWire);
+}
+
 void visitStmts(std::string prefix, graph* g, PNode* stmts) {
   PNode* module;
   for (int i = 0; i < stmts->getChildNum(); i++) {
@@ -527,7 +534,10 @@ void visitStmts(std::string prefix, graph* g, PNode* stmts) {
       case P_MEMORY:
         visitMemory(prefix, g, stmt);
         break;
-      default: Assert(0, "Invalid stmt %s\n", stmt->name.c_str());
+      case P_WIRE_DEF:
+        visitWireDef(prefix, g, stmt);
+        break;
+      default: Assert(0, "Invalid stmt %s(%d)\n", stmt->name.c_str(), stmt->type);
     }
     g->maxTmp = MAX(g->maxTmp, tmpIdx);
   }
