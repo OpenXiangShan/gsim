@@ -156,6 +156,7 @@ std::map<std::string, std::tuple<uint8_t, int (*)(int, int, bool)>> expr1Map = {
   {"asUInt",  {SIGN_UINT, firstWidth}},
   {"asSInt",  {SIGN_SINT, firstWidth}},
   {"asClock", {SIGN_UINT, boolWidth}},
+  {"asAsyncReset", {SIGN_UINT, boolWidth}},
   {"cvt",     {SIGN_SINT, cvtWidth}},
   {"neg",     {SIGN_SINT, maxWidthPlus1}},  // a + 1 (second is zero)
   {"not",     {SIGN_UINT, firstWidth}},
