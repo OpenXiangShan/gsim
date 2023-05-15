@@ -33,7 +33,7 @@ int         \"b-?{digit_bin}+\"|\"o-?{digit_oct}+\"|\"h-?{digit_hex}+\"|-?{digit
 /* Identifiers define legal FIRRTL or Verilog names */
 letter      [A-Za-z]
 id          (_|{letter})(_|{letter}|{digit_dec})*
-string      \"((\\\")|[!|0-9A-Za-z %\\,:=_^.\t()-{}$])*\"
+string      \"((\\\")|[!|0-9A-Za-z %\\,:=_^.&~\t()-{}$'])*\"
 info        [0-9A-Za-z.{}:,/ _]+
 /* Fileinfo communicates Chisel source file and line/column info */
 

@@ -91,6 +91,7 @@ ALLID: ID {$$ = $1; }
     | Of { $$ = "of"; }
     | Reg { $$ = "reg"; }
     | Output { $$ = "output"; }
+    | Invalid { $$ = "invalid"; }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
