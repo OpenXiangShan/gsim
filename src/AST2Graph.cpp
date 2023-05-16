@@ -72,6 +72,8 @@ static inline void insts_set_expr_neq(Node* n, expr_type& src) {
 
 int log2 (int x){return 31 - __builtin_clz(x);}
 
+int p2(int x) { return 1 << (32 - __builtin_clz (x - 1)); }
+
 static int maxWidth(int a, int b, bool sign = 0) {
   return MAX(a, b);
 }
@@ -462,7 +464,10 @@ void visitMemory(std::string prefix, graph* g, PNode* memory) {
   Assert(memory->getChild(1)->type == P_DEPTH, "Invalid child0 type(%d)\n", memory->getChild(0)->type);
   int width = n->width;
   if(n->width < 8) n->width = 8;
-  Assert(n->width % 8 == 0, "invalid memory width %d\n", n->width);
+  else {
+    n->width = p2(n->width);
+  }
+  Assert(n->width % 8 == 0, "invalid memory width %d for %s\n", n->width, n->name.c_str());
   int depth = p_stoi(memory->getChild(1)->name.c_str());
   int readLatency = p_stoi(memory->getChild(2)->name.c_str());
   int writeLatency = p_stoi(memory->getChild(3)->name.c_str());
