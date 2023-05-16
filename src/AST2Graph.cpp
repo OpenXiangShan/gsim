@@ -486,16 +486,27 @@ void visitMemory(std::string prefix, graph* g, PNode* memory) {
     memory_member(addr, rn, log2(depth));
     memory_member(en, rn, 1);
     memory_member(clk, rn, 1);
-    memory_member(data, rn, width);
     if(rw->type == P_READER) {
       rn->type = NODE_READER;
+      memory_member(data, rn, width);
       if(readLatency == 1) {
         rn->member[3]->type = NODE_L1_RDATA;
         g->memRdata1.push_back(rn->member[3]);
       }
     } else if(rw->type == P_WRITER) {
       rn->type = NODE_WRITER;
+      memory_member(data, rn, width);
       memory_member(mask, rn, 1);
+    } else if(rw->type == P_READWRITER) {
+      rn->type = NODE_READWRITER;
+      memory_member(rdata, rn, width);
+      memory_member(wdata, rn, width);
+      memory_member(wmask, rn, 1);
+      memory_member(wmode, rn, 1);
+      if(readLatency == 1) {
+        rn->member[3]->type = NODE_L1_RDATA;
+        g->memRdata1.push_back(rn->member[3]);
+      }
     } else {
       Assert(0, "Invalid rw type %d\n", rw->type);
     }
