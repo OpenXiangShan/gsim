@@ -79,7 +79,7 @@ static int maxWidth(int a, int b, bool sign = 0) {
 }
 
 static int minWidth(int a, int b, bool sign = 0) {
-  return MAX(a, b);
+  return MIN(a, b);
 }
 
 static int maxWidthPlus1(int a, int b, bool sign = 0) {
