@@ -302,14 +302,14 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
       } else if(rw->type == NODE_READWRITER) {
         if(node->latency[0] == 1) {
           Node* data = rw->member[3];
-          sfile << "if(!" << node->member[6]->name << "){\n";
+          sfile << "if(!" << rw->member[6]->name << "){\n";
           SET_OLDVAL(sfile, data);
           MEM_READ(sfile, node->width, node->name, rw->member[0]->name, rw->member[3]->name);
           ACTIVATE(sfile, data, data->next);
           sfile << "}\n";
         }
         if(node->latency[1] == 1) {
-          sfile << "if(" << node->member[6]->name << "){\n";
+          sfile << "if(" << rw->member[6]->name << "){\n";
           sfile << "if(" << UI(rw->member[1]->name) << " && " << UI(rw->member[5]->name) << ") {\n";
           MEM_WRITE(sfile, node->width, node->name, rw->member[0]->name, rw->member[4]->name);
           for(Node* reader: rw->regNext->member) {
