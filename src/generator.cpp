@@ -7,7 +7,7 @@
 #define T_NUM 1
 
 #define UI(x) (std::string("mpz_get_ui(") + x + ")")
-void topoSort(graph* g);
+
 #define STEP_START(file, g, node) file << "void S" << g->name << "::step" << node->id << "() {\n"
 #define SET_OLDVAL(file, node) file << "mpz_set(oldVal, " << node->name << ");\n"
 #define ACTIVATE(file, node, nextNodes) do { \
@@ -97,7 +97,7 @@ void genHeader(graph* g, std::string headerFile) {
   hfile << "}\n";
 
 // active flags
-  hfile << "std::vector<bool> activeFlags = " << "std::vector<bool>(" <<g->sorted.size() << ", true);\n";
+  hfile << "std::vector<bool> activeFlags = " << "std::vector<bool>(" << g->sorted.back()->id << ", true);\n";
 // all sigs
   for (Node* node: g->sorted) {
     switch(node->type) {
@@ -155,7 +155,7 @@ void genHeader(graph* g, std::string headerFile) {
   }
 // step functions
   for (int i = 0; i < g->sorted.size(); i++) {
-    hfile << "void step" << i << "();\n";
+    hfile << "void step" << g->sorted[i]->id << "();\n";
   }
 
 // functions
@@ -261,7 +261,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   sfile << "" <<"void S" << g->name << "::step() {\n";
   for(int i = 0; i < g->sorted.size(); i++) {
     if(g->sorted[i]->insts.size() == 0 && g->sorted[i]->type != NODE_READER && g->sorted[i]->type != NODE_WRITER) continue;
-    sfile << "if(activeFlags[" << i << "]) " << "step" << i << "();\n";
+    sfile << "if(activeFlags[" << g->sorted[i]->id << "]) " << "step" << g->sorted[i]->id << "();\n";
   }
 
   // active nodes
@@ -328,7 +328,6 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 }
 
 void generator(graph* g, std::string header, std::string src) {
-  topoSort(g);
   genHeader(g, header);
   genSrc(g, header, src);
 }

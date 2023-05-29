@@ -185,6 +185,7 @@ void addEdge(Node* src, Node* dst) {
   }
   dst->inEdge ++;
   src->next.push_back(dst);
+  dst->prev.push_back(src);
   // std::cout << src->name << " -> " << dst->name << std::endl;
 }
 
@@ -293,13 +294,11 @@ std::string visitReference(std::string prefix, PNode* expr) { // return ref name
   std::string ret;
   if(expr->getChildNum() == 0) {
     ret = prefix + expr->name;
-    // addEdge(ret, n);
     return ret;
   } else {
     ret = prefix + expr->name;
     for(int i = 0; i < expr->getChildNum(); i++) {
       PNode* child = expr->getChild(i);
-      // SET_TYPE(expr, expr->getChild(i));
       switch(child->type) {
         case P_REF_DOT:
           ret += "$" + visitReference("", child);
@@ -387,7 +386,7 @@ expr_type visitExpr(std::string& name, std::string prefix, Node* n, PNode* expr)
   switch(expr->type) {
     case P_1EXPR1INT: return visit1Expr1Int(name, prefix, n, expr);
     case P_2EXPR: return visit2Expr(name, prefix, n, expr);
-    case P_REF: ret = visitReference(prefix, expr); if(n->type != NODE_ACTIVE) addEdge(ret, n); SET_TYPE(expr, allSignals[ret]); SET_TYPE(n, expr); return std::make_pair(EXPR_VAR, ret);
+    case P_REF: ret = visitReference(prefix, expr); addEdge(ret, n); SET_TYPE(expr, allSignals[ret]); SET_TYPE(n, expr); return std::make_pair(EXPR_VAR, ret);
     case P_EXPR_MUX: return visitMux(name, prefix, n, expr);
     case P_EXPR_INT_INIT: return std::make_pair(EXPR_CONSTANT, expr->getExtra(0).substr(1, expr->getExtra(0).length()-2));
     case P_1EXPR: return visit1Expr(name, prefix, n, expr);
