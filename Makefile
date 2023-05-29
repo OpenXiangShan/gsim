@@ -9,11 +9,12 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 
 OBJ_DIR = obj
 
-CXXFLAGS = -O2 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -lgmp
+CXXFLAGS = -ggdb -O2 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -lgmp
 CXX = g++
 TARGET = GraphEmu
 
 NAME ?= newtop
+# NAME ?= freechips.rocketchip.system.DefaultConfig
 TEST_FILE = scala/build/$(NAME)
 FIRRTL_FILE = $(TEST_FILE).lo.fir
 
@@ -30,24 +31,30 @@ ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
 endif
 
+ifeq ($(MODE),0)
+	MODE_FLAGS += -DGSIM
+	target = $(BUILD_DIR)/S$(NAME)
+else ifeq ($(MODE), 1)
+	MODE_FLAGS += -DVERILATOR
+	target = ./obj_dir/V$(NAME)
+else
+	MODE_FLAGS += -DGSIM -DVERILATOR
+	target = ./obj_dir/V$(NAME)
+endif
+
 VERI_INC_DIR = $(OBJ_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME)
-VERI_CFLAGS = -O3 $(addprefix -I../, $(VERI_INC_DIR))
+VERI_CFLAGS = -O3 $(addprefix -I../, $(VERI_INC_DIR)) $(MODE_FLAGS)
 VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\"
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
 VERI_VSRCS += $(addprefix scala/build/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v)
 VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIR)/difftest-ysyx3.cpp
 
-ifeq ($(MODE),0)
-	VERI_CFLAGS += -DGSIM
-else ifeq ($(MODE), 1)
-	VERI_CFLAGS += -DVERILATOR
-else
-	VERI_CFLAGS += -DGSIM -DVERILATOR
-endif
+GSIM_CFLAGS = -O3 $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME)
 
-mainargs = ysyx3-bin/rtthread.bin
+mainargs = ysyx3-bin/bbl-hello.bin
+# mainargs = ysyx3-bin/rtthread.bin
 
 compile: $(PARSER_BUILD)/syntax.cc
 	mkdir -p build
@@ -67,10 +74,21 @@ $(PARSER_BUILD)/syntax.cc: $(LEXICAL_SRC) $(SYNTAX_SRC)
 	flex -o $(PARSER_BUILD)/lexical.cc $(LEXICAL_SRC)
 	bison -v -d $(SYNTAX_SRC) -o $(PARSER_BUILD)/syntax.cc
 
-difftest:
-	verilator $(VERI_VFLAGS) -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
+$(BUILD_DIR)/S$(NAME): $(VERI_CSRCS)
+	$(CXX) $^ $(GSIM_CFLAGS) -lgmp -o $@
+
+./obj_dir/V$(NAME): $(VERI_CSRCS)
+	verilator $(VERI_VFLAGS) -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $^
 	python3 scripts/sigFilter.py
 	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
-	./obj_dir/V$(NAME) $(mainargs)
+
+./obj_dir/V$(NAME): $(VERI_CSRCS)
+	verilator $(VERI_VFLAGS) -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $^
+	python3 scripts/sigFilter.py
+	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
+
+difftest: $(target)
+	$(target) $(mainargs)
+
 
 .PHONY: compile clean emu difftest
