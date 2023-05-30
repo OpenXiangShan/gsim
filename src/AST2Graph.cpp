@@ -111,7 +111,7 @@ static int boolWidth(int a, int b, bool sign = 0) {
 }
 
 static int dshlWidth(int a, int b, bool sign = 0) {
-  return a + 1 << b -1;
+  return a + (1 << b) -1;
 }
 
 static int firstWidth(int a, int b, bool sign = 0){
