@@ -91,5 +91,7 @@ $(BUILD_DIR)/S$(NAME): $(VERI_CSRCS)
 difftest: $(target)
 	$(target) $(mainargs)
 
+count:
+	find emu parser src include emu-src scripts -name "*.cpp" -o -name "*.h" -o -name "*.y" -o -name "*.l" -o -name "*.py" |xargs wc
 
-.PHONY: compile clean emu difftest
+.PHONY: compile clean emu difftest count
