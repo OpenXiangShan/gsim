@@ -39,6 +39,7 @@ else ifeq ($(MODE), 1)
 	target = ./obj_dir/V$(NAME)
 else
 	MODE_FLAGS += -DGSIM -DVERILATOR
+	CXXFLAGS += -DDIFFTEST_PER_SIG
 	target = ./obj_dir/V$(NAME)
 endif
 

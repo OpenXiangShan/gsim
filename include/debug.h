@@ -20,6 +20,4 @@
   #define MUX_DEBUG(...)
 #endif
 
-#define DIFFTEST_PER_SIG
-
 #endif
