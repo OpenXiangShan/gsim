@@ -205,6 +205,7 @@ void constantPropagation(graph* g) {
       computeConstant(N(i));
       Assert(val.size() == 1, "Invalid val size %d for %s\n", val.size(), N(i)->name.c_str());
       char* str = mpz_get_str(NULL, 16, val[0]->a);
+      N(i)->status = CONSTANT_NODE;
       N(i)->consVal = str;
       // std::cout << "set " << N(i)->name << " = " << N(i)->consVal << std::endl;
       free(str);
