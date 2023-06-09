@@ -9,7 +9,7 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 
 OBJ_DIR = obj
 
-CXXFLAGS = -ggdb -O2 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -lgmp
+CXXFLAGS = -ggdb -O2 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR))
 CXX = g++
 TARGET = GraphEmu
 
@@ -25,7 +25,7 @@ EMU_SRC_DIR = emu-src
 
 SRCS = $(shell find src $(PARSER_DIR) -name "*.cpp" -o -name "*.cc" )
 
-MODE ?= 2
+MODE ?= 0
 
 ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
@@ -59,7 +59,7 @@ mainargs = ysyx3-bin/bbl-hello.bin
 compile: $(PARSER_BUILD)/syntax.cc
 	mkdir -p build
 	mkdir -p $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET)
+	$(CXX) $(CXXFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET) -lgmp
 	$(BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
 
 clean:

@@ -128,7 +128,7 @@ int main(int argc, char** argv) {
     if(isDiff) {
       std::cout << "all Sigs:\n -----------------\n";
       checkSignals(true);
-      std::cout << "Failed after " << cycles << " cycles\nALL diffs:\n";
+      std::cout << "Failed after " << cycles << " cycles\nALL diffs: mode -- ref\n";
       checkSignals(false);
       return 0;
     }

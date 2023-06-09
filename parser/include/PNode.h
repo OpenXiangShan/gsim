@@ -3,6 +3,7 @@
 #include "common.h"
 
 class PList;
+class Node;
 
 enum {P_INVALID, P_CIRCUIT, P_CIR_MODS, P_MOD, P_EXTMOD, P_INTMOD, P_PORTS, P_INPUT, P_OUTPUT, \
       P_WIRE_DEF, P_REG_DEF, P_INST, P_NODE, P_CONNECT, P_PAR_CONNECT, P_WHEN, P_ELSE, \
@@ -11,6 +12,8 @@ enum {P_INVALID, P_CIRCUIT, P_CIR_MODS, P_MOD, P_EXTMOD, P_INTMOD, P_PORTS, P_IN
       P_2EXPR, P_1EXPR, P_1EXPR1INT, P_1EXPR2INT, P_FIELD, P_FLIP_FIELD, P_AG_TYPE, P_AG_FIELDS, \
       P_Clock, P_INT_TYPE, P_EXPR_INT_NOINIT, P_EXPR_INT_INIT, P_EXPR_MUX, P_STATEMENTS, \
       P_PRINTF, P_EXPRS, P_ASSERT};
+
+enum {VALID_PNODE, CONSTANT_PNODE};
 
 class PNode {
 public:
@@ -30,6 +33,9 @@ public:
   int type;
   int width;
   bool sign;
+
+  int status;
+  std::string consVal;
 
   void appendChild(PNode* p);
   void appendExtraInfo(char* info);

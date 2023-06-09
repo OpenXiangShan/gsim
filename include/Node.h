@@ -3,8 +3,10 @@
 #include "common.h"
 enum {NODE_REG_SRC, NODE_REG_DST, NODE_ACTIVE, NODE_INP, NODE_OUT, \
     NODE_MEMORY, NODE_READER, NODE_WRITER, NODE_READWRITER, NODE_MEMBER, NODE_L1_RDATA, NODE_OTHERS};
-enum {NO_OP, OP_ADD, OP_SUB, OP_MUL, OP_DIV};
-enum {VALID_NODE, DEAD_NODE};
+enum {VALID_NODE, DEAD_NODE, CONSTANT_NODE};
+
+class PNode;
+
 class Node {
 public:
   Node() {
@@ -17,20 +19,27 @@ public:
     visited = 0;
     inEdge = 0;
   }
+  // update in AST2Graph
   std::string name; // concat the module name in order (member in structure / temp variable)
   int id;
   int type;
   int width = 0;
   int sign = 0;
+  int val;
+  int status = VALID_NODE;
+  int visited;
   std::vector<Node*> next;
   std::vector<Node*> prev;
-  std::vector<std::string> insts;
+  std::vector<Node*> operands;
+  std::vector<PNode*> ops;
   int inEdge; // for topo sort
-  int val;
-  Node* regNext;
   std::vector<Node*>member;
   int latency[2];
-  int visited;
-  int status = 0;
+  Node* regNext;
+  // update in constantNode
+  std::string consVal;
+  // update in instsGenerator
+  std::vector<std::string> insts;
 };
+
 #endif

@@ -29,7 +29,8 @@ digit_oct   [0-7]
 digit_dec   [0-9]
 digit_hex   [0-9A-Fa-f]
 /* Integer */
-int         \"b-?{digit_bin}+\"|\"o-?{digit_oct}+\"|\"h-?{digit_hex}+\"|-?{digit_dec}+
+int         \"b-?{digit_bin}+\"|\"o-?{digit_oct}+\"|\"h-?{digit_hex}+\"
+int_dec     -?{digit_dec}+
 /* Identifiers define legal FIRRTL or Verilog names */
 letter      [A-Za-z]
 id          (_|{letter})(_|{letter}|{digit_dec})*
@@ -89,7 +90,8 @@ info        [0-9A-Za-z.{}:,/ _]+
 <normal>validif                 { return token::Validif; }
 <normal>old|new|undefined       { yylval->typeRUW = strdup(yytext); return token::Ruw; }
 <normal>mem                     { return token::Mem; }
-<normal>{int}                   { yylval->strVal = strdup(yytext); return token::INT; }
+<normal>{int}                   { yylval->strVal = strndup(yytext+1, strlen(yytext)-2); return token::INT; }
+<normal>{int_dec}                   { yylval->strVal = strdup(yytext); return token::INT; }
 <normal>data-type               { return token::DataType; }
 <normal>depth                   { return token::Depth; }
 <normal>read-latency            { return token::ReadLatency; }

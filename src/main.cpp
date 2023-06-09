@@ -12,12 +12,11 @@ graph* AST2Garph(PNode* root);
 void loopDetector(graph* g);
 void topoSort(graph* g);
 void removeDeadNodes(graph* g);
+void constantPropagation(graph* g);
+void instsGenerator(graph* g);
 extern PNode* root;
 
 int main(int argc, char** argv) {
-  // graph g;
-  // randomGraph(&g);
-  // generator(&g, "top", "top");
   if(argc <= 1) {
     std::cout << "Usage: \n";
   }
@@ -32,6 +31,11 @@ int main(int argc, char** argv) {
   MUX_DEBUG(std::cout << "graph generated\n");
   topoSort(g);
   removeDeadNodes(g);
+  constantPropagation(g);
+  instsGenerator(g);
+  for(Node* n: g->constant) {
+    if(n->status != DEAD_NODE && n->status != CONSTANT_NODE) std::cout << n->type << " " << n->status << " " << n->name << std::endl;
+  }
   generator(g, "top", "top");
   return 0;
 }

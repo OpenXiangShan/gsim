@@ -26,7 +26,7 @@ void removeDeadNodes(graph* g) { // after topo sort
     if(N(i)->status != DEAD_NODE)
       N(idx ++) = N(i);
   }
-  std::cout << "find " << deadNum << " deadNodes( " << g->sorted.size() << " )";
+  std::cout << "find " << deadNum << " deadNodes( " << g->sorted.size() << " )\n";
 
   g->sorted.erase(g->sorted.begin() + idx, g->sorted.end());
 }

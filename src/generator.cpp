@@ -14,7 +14,9 @@
     if(nextNodes.size() > 0){ \
       file << "if(" << "mpz_cmp(oldVal," << node->name << ") != 0){\n"; \
       for(Node* next: nextNodes) { \
-        file << "activeFlags[" << next->id << "] = true;\n"; \
+        if(next->status == VALID_NODE && next->type != NODE_ACTIVE) { \
+          file << "activeFlags[" << next->id << "] = true;\n"; \
+        } \
       } \
       file << "}\n"; \
     } \
@@ -42,19 +44,25 @@
 
 #if 0
 #define EMU_LOG(file, id, oldName, node) do{ \
-        file << "if(cycles > 0xd000) {\n"; \
+        file << "if(cycles >= 0) {\n"; \
         file << "std::cout << \"" << id  << ": " << node->name << "(" << node->width << ", " << node->sign << "): \" ;"; \
         file << "mpz_out_str(stdout, 16," << oldName << "); std::cout << \" -> \"; mpz_out_str(stdout, 16, " << node->name << "); std::cout << std::endl;\n}\n"; \
       } while(0)
 #define WRITE_LOG(file, name, idx, val) do{ \
-        file << "if(cycles > 0xd000) {\n"; \
+        file << "if(cycles >= 0) {\n"; \
         file << "std::cout << \"" << name << "[\";"; \
         file << "mpz_out_str(stdout, 10, " << idx << ");"; \
         file << "std::cout << \"] = \"; mpz_out_str(stdout, 16, " << val << "); std::cout << std::endl;\n}\n"; \
         } while(0)
+#define EMU_LOG2(file, id, node) do{ \
+        file << "if(cycles >= 0) {\n"; \
+        file << "std::cout << \"" << id  << ": " << node->name << "(" << node->width << ", " << node->sign << "): \" ;"; \
+        file << "mpz_out_str(stdout, 16, " << node->name << "); std::cout << std::endl;\n}\n"; \
+      } while(0)
 #else
 #define EMU_LOG(...) 
 #define WRITE_LOG(...) 
+#define EMU_LOG2(...) 
 #endif
 
 void genHeader(graph* g, std::string headerFile) {
@@ -86,10 +94,12 @@ void genHeader(graph* g, std::string headerFile) {
         }
         break;
       case NODE_REG_SRC:
+        if(node->status == CONSTANT_NODE) continue;
 #ifdef DIFFTEST_PER_SIG
         hfile << "mpz_init2(" << node->name << "$prev" << ", " << node->width << ");\n";
 #endif
       default:
+        if(node->status == CONSTANT_NODE) continue;
         hfile << "mpz_init2(" << node->name << ", " << node->width << ");\n";
     }
   }
@@ -113,6 +123,10 @@ void genHeader(graph* g, std::string headerFile) {
         hfile << "mpz_t " << node->name << "$prev;\n";
 #endif
       default:
+        if(node->status == CONSTANT_NODE) {
+          std::cout <<"remove constant " << node->name << " " <<node->consVal << std::endl;
+          continue;
+        }
         hfile << "mpz_t " << node->name << ";\n";
 #ifdef DIFFTEST_PER_SIG
         std::string name = "newtop__DOT__" +node->name;
@@ -134,7 +148,7 @@ void genHeader(graph* g, std::string headerFile) {
   hfile << "mpz_t oldVal;\n";
 // tmp variable
   for (int i = 0; i < T_NUM; i++) hfile << "mpz_t t" << i << ";\n";
-  for (int i = 0; i < g->maxTmp; i++) hfile << "mpz_t tmp" << i << ";\n";
+  for (int i = 1; i <= g->maxTmp; i++) hfile << "mpz_t __tmp__" << i << ";\n";
 // memory
   for(Node* n : g->memory) {
     hfile <<  (n->width == 8 ? "uint8_t " : 
@@ -148,7 +162,7 @@ void genHeader(graph* g, std::string headerFile) {
 // set functions
   for (Node* node: g->input) {
     hfile << "void set_" << node->name << "(mpz_t val) {\n";
-    hfile <<"mpz_set(" << node->name << ", val);\n";
+    hfile << "mpz_set(" << node->name << ", val);\n";
     for (Node* next: node->next)
       hfile << "activeFlags[" << next->id << "] = true;\n";
     hfile << "}\n";
@@ -182,7 +196,9 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         Assert(node->type == NODE_REG_DST, "invalid Node %s\n", node->name.c_str());
         EMU_LOG(sfile, node->id, node->regNext->name, node);
         break;
-      case NODE_OTHERS: case NODE_OUT: case NODE_L1_RDATA:
+      case NODE_OTHERS:
+        if(node->status == CONSTANT_NODE) continue;
+      case NODE_OUT: case NODE_L1_RDATA:
         if(node->insts.size() == 0) continue;
         // sfile << "void S" << g->name << "::step" << node->id << "() {\n";
         STEP_START(sfile, g, node);
@@ -206,6 +222,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
           MEM_READ(sfile, node->regNext->width, node->regNext->name, node->member[0]->name, node->member[3]->name);
           ACTIVATE(sfile, node->member[3], node->next);
           EMU_LOG(sfile, node->id, "oldVal", node->member[3]);
+          EMU_LOG2(sfile, node->id, node->member[0]);
         }
         break;
       case NODE_WRITER:
@@ -271,9 +288,14 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 
   // update registers
   for(Node* node: g->sources) {
+    if(node->regNext->status == CONSTANT_NODE) continue;
     if(node->next.size()) {
       sfile << "if(mpz_cmp(" << node->name << ", " << node->name << "$next)) {\n";
-      for(Node* next : node->next) sfile << "activeFlags[" << next->id << "] = true;\n";
+      for(Node* next : node->next) {
+        if(next->status == VALID_NODE && next->type != NODE_ACTIVE) {
+          sfile << "activeFlags[" << next->id << "] = true;\n";
+        }
+      }
       sfile << "}\n";
     }
 #ifdef DIFFTEST_PER_SIG
