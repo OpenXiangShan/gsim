@@ -199,7 +199,14 @@ void constantPropagation(graph* g) {
     topValid = false;
     if(isConstant) { // compute constant
       if(N(i)->ops.size() == 0) {
-        N(i)->consVal = "0";
+        if(N(i)->operands.size() != 0) {
+          Assert(N(i)->operands.size() == 1, "Invalid operand size %d\n", N(i)->operands.size());
+          N(i)->consVal = N(i)->operands[0]->consVal;
+        } else {
+          N(i)->consVal = "0";
+        }
+        N(i)->status = CONSTANT_NODE;
+        std::cout << "set " << N(i)->name << " = " << N(i)->consVal << std::endl;
         continue;
       }
       computeConstant(N(i));
