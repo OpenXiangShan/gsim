@@ -163,7 +163,15 @@ void computeNode(Node* node) {
   if(node->ops.size() == 0 && node->operands.size() == 0) return;
   if(node->ops.size() == 0) {
     Assert(node->operands.size() == 1, "Invalid operands size(%d) for %s\n", node->operands.size(), node->name.c_str());
-    node->insts.push_back("mpz_set(" + node->name + ", " + node->operands[0]->name + ")");
+    if(node->operands[0]->status == CONSTANT_NODE) {
+      if(node->operands[0]->consVal.length() <= 16) {
+        node->insts.push_back("mpz_set_ui(" + node->name + ", " + node->operands[0]->consVal + ")");
+      } else {
+        node->insts.push_back("mpz_set_str(" + node->name + ", \"" + node->operands[0]->consVal + "\", 16)");
+      }
+    } else {
+      node->insts.push_back("mpz_set(" + node->name + ", " + node->operands[0]->name + ")");
+    }
     return;
   }
   int prevIdx = node->operands.size() - 1;
