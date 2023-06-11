@@ -91,6 +91,12 @@ void genHeader(graph* g, std::string headerFile) {
       case NODE_READER: case NODE_WRITER:
         for(Node* member : node->member) {
           hfile << "mpz_init2(" << member->name << ", " << member->width << ");\n";
+          if(member->status == CONSTANT_NODE) {
+            if(member->consVal.length() <= 16)
+              hfile << "mpz_set_ui(" << member->name << ", 0x" << member->consVal << ");\n";
+            else
+              hfile << "mpz_set_str(" << member->name << ", 16, \"" << member->consVal << "\");\n";
+          }
         }
         break;
       case NODE_REG_SRC:
@@ -238,6 +244,10 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
           WRITE_LOG(sfile, node->regNext->name, node->member[0]->name, node->member[3]->name);
           sfile << "}\n";
         }
+        EMU_LOG2(sfile, node->id, node->member[0]);
+        EMU_LOG2(sfile, node->id, node->member[1]);
+        EMU_LOG2(sfile, node->id, node->member[3]);
+        EMU_LOG2(sfile, node->id, node->member[4]);
         break;
       case NODE_READWRITER:
         STEP_START(sfile, g, node);

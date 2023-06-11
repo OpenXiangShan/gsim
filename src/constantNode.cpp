@@ -9,7 +9,7 @@
 #include <stack>
 
 #define N(i) g->sorted[i]
-#define POTENTIAL_TYPE(n) ((n->type == NODE_REG_DST) || (n->type == NODE_ACTIVE) || (n->type == NODE_OUT) || (n->type == NODE_OTHERS))
+#define POTENTIAL_TYPE(n) ((n->type == NODE_REG_DST) || (n->type == NODE_ACTIVE) || (n->type == NODE_OUT) || (n->type == NODE_OTHERS) || (n->type) == NODE_MEMBER)
 
 #define EXPR1INT_FUNC_TYPE void (*) (mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n)
 #define EXPR1_FUNC_TYPE void (*) (mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt)
@@ -185,39 +185,65 @@ void computeConstant(Node* node) {
 
 }
 
+void checkAndComputeConstant(Node* node) {
+  bool isConstant = true;
+  for(Node* operand: node->operands) {
+    if(!POTENTIAL_TYPE(operand) || operand->status != CONSTANT_NODE) {
+      isConstant = false;
+      return;
+    }
+  }
+  if(isConstant) { // compute constant
+    if(node->ops.size() == 0) {
+      if(node->operands.size() != 0) {
+        Assert(node->operands.size() == 1, "Invalid operand size %d\n", node->operands.size());
+        node->consVal = node->operands[0]->consVal;
+      } else {
+        node->consVal = "0";
+      }
+      node->status = CONSTANT_NODE;
+      std::cout << "set " << node->name << " = " << node->consVal << std::endl;
+      return;
+    }
+    topValid = false;
+    computeConstant(node);
+    Assert(val.size() == 1, "Invalid val size %d for %s\n", val.size(), node->name.c_str());
+    char* str = mpz_get_str(NULL, 16, val[0]->a);
+    node->status = CONSTANT_NODE;
+    node->consVal = str;
+    std::cout << "set " << node->name << " = " << node->consVal << std::endl;
+    free(str);
+    deleteAndPop();
+  }
+}
+
 // compute constant val
 void constantPropagation(graph* g) {
   for(int i = 0; i < g->sorted.size(); i++) {
-    if(!POTENTIAL_TYPE(N(i))) continue;
-    bool isConstant = true;
-    for(Node* operands: N(i)->operands) {
-      if(!POTENTIAL_TYPE(operands) || operands->status != CONSTANT_NODE) {
-        isConstant = false;
+    switch(N(i)->type) {
+      case NODE_READER:
+        checkAndComputeConstant(N(i)->member[0]); // addr
+        checkAndComputeConstant(N(i)->member[1]); // en
         break;
-      }
+      case NODE_WRITER:
+        checkAndComputeConstant(N(i)->member[0]); // addr
+        checkAndComputeConstant(N(i)->member[1]); // en
+        checkAndComputeConstant(N(i)->member[3]); // data
+        checkAndComputeConstant(N(i)->member[4]); // mask
+        break;
+      case NODE_READWRITER:
+        checkAndComputeConstant(N(i)->member[0]); // addr
+        checkAndComputeConstant(N(i)->member[1]); // en
+        checkAndComputeConstant(N(i)->member[4]); // wdata
+        checkAndComputeConstant(N(i)->member[5]); // wmask
+        checkAndComputeConstant(N(i)->member[6]); // wmode
+        break;
+      case NODE_OTHERS: case NODE_OUT: case NODE_ACTIVE: case NODE_REG_DST:
+        checkAndComputeConstant(N(i));
+        break;
+      default:
+        break;
     }
-    topValid = false;
-    if(isConstant) { // compute constant
-      if(N(i)->ops.size() == 0) {
-        if(N(i)->operands.size() != 0) {
-          Assert(N(i)->operands.size() == 1, "Invalid operand size %d\n", N(i)->operands.size());
-          N(i)->consVal = N(i)->operands[0]->consVal;
-        } else {
-          N(i)->consVal = "0";
-        }
-        N(i)->status = CONSTANT_NODE;
-        std::cout << "set " << N(i)->name << " = " << N(i)->consVal << std::endl;
-        continue;
-      }
-      computeConstant(N(i));
-      Assert(val.size() == 1, "Invalid val size %d for %s\n", val.size(), N(i)->name.c_str());
-      char* str = mpz_get_str(NULL, 16, val[0]->a);
-      N(i)->status = CONSTANT_NODE;
-      N(i)->consVal = str;
-      // std::cout << "set " << N(i)->name << " = " << N(i)->consVal << std::endl;
-      free(str);
-      deleteAndPop();
-    }
-  }  
+  }
 }
 
