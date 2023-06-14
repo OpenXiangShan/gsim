@@ -219,7 +219,6 @@ void visit1Expr2Int(std::string prefix, Node* n, PNode* expr){ // bits
   visitExpr(prefix, n, expr->getChild(0));
   expr->sign = 0;
   expr->width = p_stoi(expr->getExtra(0).c_str()) - p_stoi(expr->getExtra(1).c_str()) + 1;
-  SET_TYPE(n, expr);
   if(expr->getChild(0)->status == CONSTANT_PNODE) {
     expr->status = CONSTANT_PNODE;
   }
@@ -312,7 +311,6 @@ void visitExpr(std::string prefix, Node* n, PNode* expr) { // return varName & u
       ret = visitReference(prefix, expr);
       addEdge(ret, n);
       SET_TYPE(expr, allSignals[ret]);
-      SET_TYPE(n, expr);
       if(allSignals[ret]->status == CONSTANT_NODE) {
         expr->status = CONSTANT_NODE;
       }
