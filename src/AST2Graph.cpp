@@ -174,6 +174,7 @@ void visitPorts(std::string prefix, graph* g, PNode* ports) { // treat as node
     Assert(port->getChildNum() == 1, "Invalid port %s\n", port->name.c_str());
     Node* io = new Node();
     visitType(io, port->getChild(0));
+    SET_TYPE(port, io);
     io->name = prefix + port->name;
     addSignal(io->name, io);
   }
@@ -218,6 +219,7 @@ void visit1Expr2Int(std::string prefix, Node* n, PNode* expr){ // bits
   visitExpr(prefix, n, expr->getChild(0));
   expr->sign = 0;
   expr->width = p_stoi(expr->getExtra(0).c_str()) - p_stoi(expr->getExtra(1).c_str()) + 1;
+  SET_TYPE(n, expr);
   if(expr->getChild(0)->status == CONSTANT_PNODE) {
     expr->status = CONSTANT_PNODE;
   }
@@ -329,10 +331,11 @@ void visitExpr(std::string prefix, Node* n, PNode* expr) { // return varName & u
 void visitNode(std::string prefix, PNode* node) { // generate new node and connect
   Node* newSig = new Node();
   newSig->name = prefix + node->name;
-  addSignal(newSig->name, newSig);
   Assert(node->getChildNum() >= 1, "Invalid childNum for node %s\n", node->name.c_str());
   visitExpr(prefix, newSig, node->getChild(0));
   SET_TYPE(newSig, node->getChild(0));
+  addSignal(newSig->name, newSig);
+  SET_TYPE(node, newSig);
 }
 
 void visitConnect(std::string prefix, PNode* connect) {
@@ -341,6 +344,7 @@ void visitConnect(std::string prefix, PNode* connect) {
   Node* dst = str2Node(strDst);
   if(dst->type == NODE_REG_SRC) dst = dst->regNext;
   visitExpr(prefix, dst, connect->getChild(1));
+  SET_TYPE(connect->getChild(0), connect->getChild(1));
   if(connect->getChild(1)->status == CONSTANT_NODE) {
     connect->status = CONSTANT_NODE;
   }
