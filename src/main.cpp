@@ -25,8 +25,8 @@ int main(int argc, char** argv) {
   Parser::Syntax syntax{&lexical};
   syntax.parse();
   MUX_DEBUG(std::cout << "after parser\n");
-  MUX_DEBUG(preorder_traversal(root));
   graph* g = AST2Garph(root);
+  MUX_DEBUG(preorder_traversal(root));
   loopDetector(g);
   MUX_DEBUG(std::cout << "graph generated\n");
   topoSort(g);
@@ -34,7 +34,8 @@ int main(int argc, char** argv) {
   constantPropagation(g);
   instsGenerator(g);
   for(Node* n: g->constant) {
-    if(n->status != DEAD_NODE && n->status != CONSTANT_NODE) std::cout << n->type << " " << n->status << " " << n->name << std::endl;
+    if(n->status != DEAD_NODE && n->status != CONSTANT_NODE)
+      std::cout << "check: " << n->type << " " << n->status << " " << n->name << std::endl;
   }
   generator(g, "top", "top");
   return 0;

@@ -3,6 +3,7 @@
 #include <iostream>
 
 static mpz_t t1;
+static mpz_t t2;
 
 // u_tail: remain the last n bits
 void u_tail(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
@@ -21,6 +22,10 @@ void u_tail(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
   } else {
     mpz_and(dst, dst, src);
   }
+}
+unsigned long ui_tail(mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
+  u_tail(t2, src, bitcnt, n);
+  return mpz_get_ui(t2);
 }
 // u_head: remove the last n bits
 void u_head(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
@@ -94,9 +99,29 @@ void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t h, mp_bitcnt
   mpz_sub_ui(t1, t1, 1);
   mpz_and(dst, dst, t1);
 }
+
+unsigned long u_bits_basic(mpz_t& src, mp_bitcnt_t bitcnt, int h, int l) {
+  if(mpz_sgn(src) < 0) {
+    mpz_set_ui(t1, 1);
+    mpz_mul_2exp(t1, t1, bitcnt);
+    mpz_add(t1, t1, src);
+    mpz_tdiv_q_2exp(t1, t1, l);
+  } else {
+    mpz_tdiv_q_2exp(t1, src, l);
+  }
+  mpz_set_ui(t2, 1);
+  mpz_mul_2exp(t2, t2, h - l + 1);
+  mpz_sub_ui(t2, t2, 1);
+  mpz_and(t1, t1, t2);
+  return mpz_get_ui(t1);
+}
+
 // u_pat: sign/zero extends to n bits
 void u_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n) {
   mpz_set(dst, src);
+}
+void u_pad_ui(mpz_t& dst, unsigned long src, mp_bitcnt_t n) {
+  mpz_set_ui(dst, src);
 }
 void s_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n) {
   if(bitcnt >= n || (mpz_cmp_ui(src, 0) >= 0)) {
@@ -140,6 +165,12 @@ void u_add_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& src, 
 void u_add_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt) {
   mpz_add_ui(dst, src, val);
 }
+void u_add_si_r(mpz_t& dst, mpz_t& src, long val, mp_bitcnt_t bitcnt) {
+  if(val > 0)
+    mpz_add_ui(dst, src, val);
+  else
+    mpz_sub_ui(dst, src, -val);
+}
 void u_add_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long val2, mp_bitcnt_t bitcnt2) {
   mpz_set_ui(dst, val1);
   mpz_add_ui(dst, dst, val2);
@@ -173,8 +204,14 @@ void u_mul(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_
 void u_mul_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& src, mp_bitcnt_t bitcnt2) {
   mpz_mul_ui(dst, src, val);
 }
+void u_mul_si_l(mpz_t& dst, long val, mp_bitcnt_t bitcnt1, mpz_t& src, mp_bitcnt_t bitcnt2) {
+  mpz_mul_si(dst, src, val);
+}
 void u_mul_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt) {
   mpz_mul_ui(dst, src, val);
+}
+void u_mul_si_r(mpz_t& dst, mpz_t& src, long val, mp_bitcnt_t bitcnt) {
+  mpz_mul_si(dst, src, val);
 }
 void u_mul_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long val2, mp_bitcnt_t bitcnt2) {
   mpz_set_ui(dst, val1);
@@ -258,6 +295,9 @@ void u_gt_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long
 //geq
 void u_geq(mpz_t& dst, mpz_t& op1, mp_bitcnt_t bitcnt1, mpz_t& op2, mp_bitcnt_t bitcnt2) {
   mpz_set_ui(dst, mpz_cmp(op1, op2)>=0);
+}
+bool ui_geq(mpz_t& op1, mp_bitcnt_t bitcnt1, mpz_t& op2, mp_bitcnt_t bitcnt2) {
+  return mpz_cmp(op1, op2)>=0;
 }
 void u_geq_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt) {
   mpz_set_ui(dst, mpz_cmp_ui(src, val)>=0);
@@ -403,6 +443,9 @@ void u_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
 void s_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set(dst, src);
 }
+void s_cvt_ui(mpz_t&dst, unsigned long src, mp_bitcnt_t bitcnt) {
+  mpz_set_ui(dst, src);
+}
 void u_neg(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set_ui(dst, 0);
   mpz_sub(dst, dst, src);
@@ -410,4 +453,5 @@ void u_neg(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
 
 void init_functions() {
   mpz_init(t1);
+  mpz_init(t2);
 }

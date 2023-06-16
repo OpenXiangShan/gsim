@@ -51,3 +51,16 @@ std::pair<int, std::string> strBaseAll(std::string s) {
   ret += s.substr(idx);
   return std::make_pair(base, ret);
 }
+
+std::string to_hex_string(unsigned long x) {
+  if (x == 0) {
+    return "0";
+  }
+  std::string ret;
+  while(x != 0) {
+    int rem = x % 16;
+    ret = (char)(rem < 10 ? (rem + '0') : (rem - 10 + 'a')) + ret;
+    x /= 16;
+  }
+  return ret;
+}
