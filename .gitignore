@@ -8,3 +8,5 @@ tests
 tmp*
 *bin/
 !ready-to-run/bin/
+.cache/clangd/index
+compile_commands.json
