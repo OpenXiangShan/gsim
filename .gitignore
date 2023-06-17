@@ -7,3 +7,4 @@ obj_dir
 tests
 tmp*
 *bin/
+!ready-to-run/bin/

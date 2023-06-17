@@ -15,7 +15,7 @@ TARGET = GraphEmu
 
 NAME ?= newtop
 # NAME ?= freechips.rocketchip.system.DefaultConfig
-TEST_FILE = scala/build/$(NAME)
+TEST_FILE = ready-to-run/$(NAME)
 FIRRTL_FILE = $(TEST_FILE).lo.fir
 
 EMU_DIR = emu
@@ -54,7 +54,7 @@ VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIR)/di
 
 GSIM_CFLAGS = -O3 $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME)
 
-mainargs = ysyx3-bin/bbl-hello.bin
+mainargs = ready-to-run/bin/bbl-hello.bin
 # mainargs = ysyx3-bin/rtthread.bin
 
 compile: $(PARSER_BUILD)/syntax.cc
