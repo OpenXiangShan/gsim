@@ -69,13 +69,9 @@ void ref_reset(){
 #endif
 #ifdef GSIM
 void mod_reset() {
-  mpz_t val;
-  mpz_init(val);
-  mpz_set_ui(val, 1);
-  mod->set_reset(val);
+  mod->set_reset(1);
   mod->step();
-  mpz_set_ui(val, 0);
-  mod->set_reset(val);
+  mod->set_reset(0);
 }
 #endif
 #if defined(VERILATOR) && defined(GSIM)
@@ -121,7 +117,7 @@ int main(int argc, char** argv) {
 #endif
 #if defined(GSIM)
     mod->step();
-    dut_end = mpz_cmp_ui(mod->cpu$writeback$valid_r, 1) == 0 && mpz_cmp_ui(mod->cpu$writeback$inst_r, 0x6b) == 0;
+    dut_end = (mod->cpu$writeback$valid_r == 1) && (mod->cpu$writeback$inst_r == 0x6b);
 #endif
 #if defined(VERILATOR) && defined(GSIM)
     bool isDiff = checkSignals(false);
@@ -136,7 +132,7 @@ int main(int argc, char** argv) {
     if(dut_end) {
       clock_t dur = clock() - start;
 #if defined(GSIM)
-      if(mpz_sgn(mod->cpu$regs$regs_0) == 0){
+      if(mod->cpu$regs$regs_0 == 0){
 #else
       if(ref->rootp->newtop__DOT__cpu__DOT__regs__DOT__regs_0 == 0) {
 #endif
