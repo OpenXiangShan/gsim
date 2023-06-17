@@ -8,6 +8,7 @@
 #include <fstream>
 #include <stdlib.h>
 #include <cstring>
+#include <cstdint>
 #include <string.h>
 
 #include "debug.h"
