@@ -40,9 +40,9 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
             self.dstfp.writelines("mpz_mul_2exp(tmp1, tmp1, 32);\n")
             self.dstfp.writelines("mpz_add_ui(tmp1, tmp1, ref->rootp->" + line[3] + "[" + str(i-1) + "U]);\n")
           refName = "tmp1"
-        if sign :
-          self.dstfp.writelines("u_asUInt(tmp2, " + "mod->" + line[2] + ", " + line[1] +");\n")
-        modName = "tmp2" if sign else "mod->" + line[2]
+          if sign :
+            self.dstfp.writelines("u_asUInt(tmp2, " + "mod->" + line[2] + ", " + line[1] +");\n")
+        modName = "tmp2" if sign and ref_width > 64 else "mod->" + line[2]
         if refName == "tmp1" :
           self.dstfp.writelines( \
           "if(display || mpz_cmp(" + modName + ", " + refName + ") != 0){\n" + \
@@ -53,11 +53,9 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
           )
         else :
           self.dstfp.writelines( \
-          "if(display || mpz_cmp_ui(" + modName + ", " + refName + ") != 0){\n" + \
+          "if(display || ((" + modName + " & " + hex((1 << ref_width) - 1) + ") != " + refName + ") != 0){\n" + \
           "  ret = true;\n" + \
-          "  std::cout << \"" + line[2] + ": \";\n" + \
-          "  mpz_out_str(stdout, 16, mod->" + line[2] + ");\n" \
-          "  std::cout <<\"  \" << std::hex << +" + refName + "<< std::endl;\n" + \
+          "  std::cout << std::hex <<\"" + line[2] + ": \" << +" + modName + " << \"  \" << +" + refName + "<< std::endl;\n" + \
           "} \n")
     self.dstfp.writelines("return ret;\n")
     self.srcfp.close()
