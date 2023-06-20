@@ -83,11 +83,6 @@ $(BUILD_DIR)/S$(NAME): $(VERI_CSRCS)
 	python3 scripts/sigFilter.py
 	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
 
-./obj_dir/V$(NAME): $(VERI_CSRCS)
-	verilator $(VERI_VFLAGS) -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $^
-	python3 scripts/sigFilter.py
-	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
-
 difftest: $(target)
 	$(target) $(mainargs)
 
