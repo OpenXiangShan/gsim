@@ -1,13 +1,15 @@
-BUILD_DIR = ./build
+BUILD_DIR = build
 
-PARSER_DIR = ./parser
+PARSER_DIR = parser
 LEXICAL_SRC = $(PARSER_DIR)/lexical.l
 SYNTAX_SRC = $(PARSER_DIR)/syntax.y
 PARSER_BUILD = $(PARSER_DIR)/build
+$(shell mkdir -p $(PARSER_BUILD))
 
 INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 
 OBJ_DIR = obj
+$(shell mkdir -p $(OBJ_DIR))
 
 CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR))
 CXX = g++
@@ -23,7 +25,10 @@ EMU_SRC = $(EMU_DIR)/emu.cpp $(shell find $(EMU_SRC_DIR) -name "*.cpp")
 EMU_TARGET = emu_test
 EMU_SRC_DIR = emu-src
 
-SRCS = $(shell find src $(PARSER_DIR) -name "*.cpp" -o -name "*.cc" )
+SRC_PATH := src $(PARSER_DIR)
+
+SRCS := $(foreach x, $(SRC_PATH), $(wildcard $(addprefix $(x)/*,.c*)))
+OBJS := $(addprefix $(BUILD_DIR)/, $(addsuffix .o, $(basename $(SRCS))))
 
 MODE ?= 0
 
@@ -57,23 +62,42 @@ GSIM_CFLAGS = -O3 $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(N
 mainargs = ready-to-run/bin/bbl-hello.bin
 # mainargs = ysyx3-bin/rtthread.bin
 
-compile: $(PARSER_BUILD)/syntax.cc
+$(BUILD_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@) && echo + CXX $<
+	@$(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
+
+$(BUILD_DIR)/%.o: %.cxx
+	@mkdir -p $(dir $@) && echo + CXX $<
+	@$(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
+
+$(TARGET): makedir $(PARSER_BUILD)/syntax.o $(PARSER_BUILD)/lexical.o $(OBJS)
+	$(CXX) $(CXXFLAGS) $(OBJS) $(PARSER_BUILD)/syntax.o $(PARSER_BUILD)/lexical.o -o $(BUILD_DIR)/$(TARGET) -lgmp
+
+makedir:
 	mkdir -p build
-	mkdir -p $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET) -lgmp
+
+compile: $(TARGET)
 	$(BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
 
 clean:
-	rm -rf obj parser/build obj_dir
+	rm -rf obj parser/build obj_dir build
 
 emu: obj/top.cpp $(EMU_SRC) compile
 	g++ $(EMU_SRC) obj/top.cpp -DMOD_NAME=S$(NAME) -Wl,-lgmp -Iobj -I$(EMU_SRC_DIR) -o $(BUILD_DIR)/$(EMU_TARGET)
 	$(BUILD_DIR)/$(EMU_TARGET)
 
-$(PARSER_BUILD)/syntax.cc: $(LEXICAL_SRC) $(SYNTAX_SRC)
-	mkdir -p $(PARSER_BUILD)
-	flex -o $(PARSER_BUILD)/lexical.cc $(LEXICAL_SRC)
-	bison -v -d $(SYNTAX_SRC) -o $(PARSER_BUILD)/syntax.cc
+# flex & bison
+$(PARSER_BUILD)/syntax.cc:  $(SYNTAX_SRC)
+	bison -v -d $< -o $@
+
+$(PARSER_BUILD)/lexical.cc: $(LEXICAL_SRC)
+	flex -o $@ $<
+
+$(PARSER_BUILD)/syntax.o: $(PARSER_BUILD)/syntax.cc
+	@$(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
+
+$(PARSER_BUILD)/lexical.o: $(PARSER_BUILD)/lexical.cc
+	@$(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
 
 $(BUILD_DIR)/S$(NAME): $(VERI_CSRCS)
 	$(CXX) $^ $(GSIM_CFLAGS) -lgmp -o $@
@@ -89,4 +113,4 @@ difftest: $(target)
 count:
 	find emu parser src include emu-src scripts -name "*.cpp" -o -name "*.h" -o -name "*.y" -o -name "*.l" -o -name "*.py" |xargs wc
 
-.PHONY: compile clean emu difftest count
+.PHONY: compile clean emu difftest count makedir
