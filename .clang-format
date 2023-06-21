@@ -1,0 +1,21 @@
+Language:        Cpp
+BasedOnStyle: Google
+# ---
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignTrailingComments: false # Should be off, causes many dummy problems!!
+AllowShortBlocksOnASingleLine: Never
+ColumnLimit: 100
+IndentCaseLabels: true
+IndentWidth:     2
+IndentWrappedFunctionNames: true
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: None
+DerivePointerAlignment: false
+ReflowComments:  true # Should be true, otherwise clang-format doesn't touch comments
+SortIncludes: Never
+SpaceBeforeAssignmentOperators: true
+Standard:        c++20
+TabWidth:        2
+UseTab:          Never # Available options are Never, Always, ForIndentation
+AllowShortEnumsOnASingleLine: true
