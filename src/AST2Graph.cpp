@@ -386,8 +386,8 @@ void visitMux(std::string prefix, Node* n, PNode* mux) {
   visitExpr(prefix, n, mux->getChild(1));
   n->ops.push_back(NULL);
   visitExpr(prefix, n, mux->getChild(2));
-  if (mux->getChild(0)->status = CONSTANT_NODE && mux->getChild(1)->status == CONSTANT_NODE &&
-                                 mux->getChild(2)->status == CONSTANT_NODE) {
+  if (mux->getChild(0)->status == CONSTANT_NODE && mux->getChild(1)->status == CONSTANT_NODE &&
+      mux->getChild(2)->status == CONSTANT_NODE) {
     mux->status = CONSTANT_NODE;
   }
   mux->getChild(1)->width = mux->getChild(2)->width =
