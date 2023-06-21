@@ -112,6 +112,8 @@ void genHeader(graph* g, std::string headerFile) {
   INCLUDE_LIB(hfile, "assert.h");
   INCLUDE_LIB(hfile, "cstdint");
   INCLUDE(hfile, "functions.h");
+
+  hfile << "#define likely(x) __builtin_expect(!!(x), 1)\n#define unlikely(x) __builtin_expect(!!(x), 0)\n";
   hfile << "class S" << g->name << "{\n" << "public:\n";
 
 // constructor
@@ -351,7 +353,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   sfile << "" <<"void S" << g->name << "::step() {\n";
   for(int i = 0; i < g->sorted.size(); i++) {
     if(g->sorted[i]->insts.size() == 0 && g->sorted[i]->type != NODE_READER && g->sorted[i]->type != NODE_WRITER) continue;
-    sfile << "if(activeFlags[" << g->sorted[i]->id << "]) " << "step" << g->sorted[i]->id << "();\n";
+    sfile << "if(unlikely(activeFlags[" << g->sorted[i]->id << "])) " << "step" << g->sorted[i]->id << "();\n";
   }
 
   // active nodes
