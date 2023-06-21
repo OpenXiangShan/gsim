@@ -113,4 +113,8 @@ difftest: $(target)
 count:
 	find emu parser src include emu-src scripts -name "*.cpp" -o -name "*.h" -o -name "*.y" -o -name "*.l" -o -name "*.py" |xargs wc
 
-.PHONY: compile clean emu difftest count makedir
+gendoc:
+	doxygen
+	python3 -m http.server 8080 --directory doc/html
+
+.PHONY: compile clean emu difftest count makedir gendoc
