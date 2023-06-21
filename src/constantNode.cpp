@@ -17,6 +17,9 @@
 int p_stoi(const char* str);
 std::pair<int, std::string> strBaseAll(std::string s);
 
+static int constantNode = 0;
+static int totalNode = 0;
+
 class mpz_wrap {
 public:
   mpz_wrap() {
@@ -194,6 +197,7 @@ void checkAndComputeConstant(Node* node) {
     }
   }
   if(isConstant) { // compute constant
+    constantNode ++;
     if(node->ops.size() == 0) {
       if(node->operands.size() != 0) {
         Assert(node->operands.size() == 1, "Invalid operand size %d\n", node->operands.size());
@@ -202,7 +206,7 @@ void checkAndComputeConstant(Node* node) {
         node->consVal = "0";
       }
       node->status = CONSTANT_NODE;
-      std::cout << "set " << node->name << " = " << node->consVal << std::endl;
+      // std::cout << "set " << node->name << " = " << node->consVal << std::endl;
       return;
     }
     topValid = false;
@@ -211,7 +215,7 @@ void checkAndComputeConstant(Node* node) {
     char* str = mpz_get_str(NULL, 16, val[0]->a);
     node->status = CONSTANT_NODE;
     node->consVal = str;
-    std::cout << "set " << node->name << " = " << node->consVal << std::endl;
+    // std::cout << "set " << node->name << " = " << node->consVal << std::endl;
     free(str);
     deleteAndPop();
   }
@@ -220,6 +224,7 @@ void checkAndComputeConstant(Node* node) {
 // compute constant val
 void constantPropagation(graph* g) {
   for(int i = 0; i < g->sorted.size(); i++) {
+    totalNode ++;
     switch(N(i)->type) {
       case NODE_READER:
         checkAndComputeConstant(N(i)->member[0]); // addr
@@ -245,5 +250,6 @@ void constantPropagation(graph* g) {
         break;
     }
   }
+  std::cout << "find " << constantNode << " constant nodes (" << totalNode << ")\n";
 }
 
