@@ -11,7 +11,10 @@
 #define nameUI(node) (node->width > 64? UI(node->name) : node->name)
 #define nodeEqualsZero(node) (node->width > 64 ? "mpz_sgn(" + node->name + ")" : node->name)
 
-#define STEP_START(file, g, node) file << "void S" << g->name << "::step" << node->id << "() {\n"
+#define STEP_START(file, g, node) do { \
+  nodeNum ++; \
+  file << "void S" << g->name << "::step" << node->id << "() {\n"; \
+} while(0)
 #define SET_OLDVAL(file, node) file << (node->width > 64 ? "mpz_set(oldVal, " + node->name + ")" : \
                                                           "oldValBasic = " + node->name) << ";\n"
 #define ACTIVATE(file, node, nextNodes) do { \
@@ -92,6 +95,8 @@
 #define WRITE_LOG(...) 
 #define EMU_LOG2(...) 
 #endif
+
+static int nodeNum = 0;
 
 void genHeader(graph* g, std::string headerFile) {
   std::ofstream hfile(std::string(OBJ_DIR) + "/" + headerFile + ".h");
@@ -178,7 +183,7 @@ void genHeader(graph* g, std::string headerFile) {
 #endif
       default:
         if(node->status == CONSTANT_NODE) {
-          std::cout <<"remove constant " << node->name << " " <<node->consVal << std::endl;
+          // std::cout <<"remove constant " << node->name << " " <<node->consVal << std::endl;
           continue;
         }
         if(node->width > 64)
@@ -429,4 +434,5 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 void generator(graph* g, std::string header, std::string src) {
   genHeader(g, header);
   genSrc(g, header, src);
+  std::cout << "nodeNum " << nodeNum << " " << g->sorted.size() << std::endl;
 }
