@@ -330,7 +330,7 @@ void insts_assert(Node* node, int opIdx, int& prevIdx) {
 void computeNode(Node* node) {
   if (node->ops.size() == 0 && node->operands.size() == 0) return;
   if (node->ops.size() == 0) {
-    Assert(node->operands.size() == 1, "Invalid operands size(%d) for %s\n", node->operands.size(),
+    Assert(node->operands.size() == 1, "Invalid operands size(%ld) for %s\n", node->operands.size(),
            node->name.c_str());
     if (node->operands[0]->status != CONSTANT_NODE) {
       if (node->width > 64) {
@@ -377,7 +377,7 @@ void computeNode(Node* node) {
         Assert(0, "Invalid op(%s) with type %d\n", node->ops[i]->name.c_str(), node->ops[i]->type);
     }
   }
-  Assert(valName.size() == 1, "Invalid valname size %d for node %s\n", valName.size(),
+  Assert(valName.size() == 1, "Invalid valname size %ld for node %s\n", valName.size(),
          node->name.c_str());
   valName.pop_back();
   topValid = false;
