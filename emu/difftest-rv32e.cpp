@@ -11,10 +11,9 @@ REF_NAME* ref;
 uint8_t program[MAX_PROGRAM_SIZE];
 int program_sz = 0;
 
-void load_program(char* filename){
-
+void load_program(char* filename) {
   memset(&program, 0, sizeof(program));
-  if(!filename){
+  if (!filename) {
     printf("No input program\n");
     return;
   }
@@ -35,19 +34,19 @@ void load_program(char* filename){
 
 #ifdef VERILATOR
 void ref_cycle(int n) {
-  while(n --){
+  while (n--) {
     ref->clock = 0;
     ref->eval();
     ref->clock = 1;
     ref->eval();
   }
 }
-void ref_reset(){
-    ref->reset = 1;
-    for(int i = 0; i < 10; i++){
-        ref_cycle(1);
-    }
-    ref->reset = 0;
+void ref_reset() {
+  ref->reset = 1;
+  for (int i = 0; i < 10; i++) {
+    ref_cycle(1);
+  }
+  ref->reset = 0;
 }
 #endif
 #ifdef GSIM
@@ -63,7 +62,7 @@ void mod_reset() {
 #endif
 #if defined(VERILATOR) && defined(GSIM)
 bool checkSignals(bool display) {
-  #include "../obj/checkSig.h"
+#include "../obj/checkSig.h"
 }
 #endif
 
@@ -81,7 +80,7 @@ int main(int argc, char** argv) {
   ref_reset();
 #endif
 #if defined(VERILATOR) && defined(GSIM)
-  if(checkSignals(false)) {
+  if (checkSignals(false)) {
     std::cout << "Diff after reset!\n";
     return 0;
   }
@@ -90,41 +89,44 @@ int main(int argc, char** argv) {
   bool dut_end = false;
   int cycles = 0;
   clock_t start = clock();
-  while(!dut_end) {
+  while (!dut_end) {
 #ifdef VERILATOR
     ref_cycle(1);
 #endif
-    cycles ++;
+    cycles++;
 #if defined(GSIM)
     mod->step();
-    dut_end = mpz_cmp_ui(mod->rv32e$fetch$prevFinish, 1) == 0 && mpz_cmp_ui(mod->rv32e$writeback$prevInst, 0x00100073) == 0;
+    dut_end = mpz_cmp_ui(mod->rv32e$fetch$prevFinish, 1) == 0 &&
+              mpz_cmp_ui(mod->rv32e$writeback$prevInst, 0x00100073) == 0;
 #elif defined(VERILATOR)
     static int cnt = 0;
-    if(cycles % 10000 == 0 && cnt < 3) {
-      cnt ++;
+    if (cycles % 10000 == 0 && cnt < 3) {
+      cnt++;
       clock_t dur = clock() - start;
-      printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+      printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC,
+             cycles * CLOCKS_PER_SEC / dur);
     }
 #endif
 #if defined(VERILATOR) && defined(GSIM)
     bool isDiff = checkSignals(false);
-    if(isDiff) {
+    if (isDiff) {
       std::cout << "all Sigs:\n -----------------\n";
       checkSignals(true);
       std::cout << "Failed after " << cycles << " cycles\n";
       return 0;
     }
 #endif
-    if(dut_end) {
+    if (dut_end) {
       clock_t dur = clock() - start;
 #if defined(GSIM)
-      if(mpz_sgn(mod->rv32e$regs$regs_0) == 0){
+      if (mpz_sgn(mod->rv32e$regs$regs_0) == 0) {
 #else
-      if(ref->rootp->top__DOT__rv32e__DOT__regs__DOT__regs_0 == 0) {
+      if (ref->rootp->top__DOT__rv32e__DOT__regs__DOT__regs_0 == 0) {
 #endif
-          printf("\33[1;32mCPU HIT GOOD TRAP after %d cycles (%d ms, %d per sec)\033[0m\n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
-      }else{
-          printf("\33[1;31mCPU HIT BAD TRAP after %d cycles\033[0m\n", cycles);
+        printf("\33[1;32mCPU HIT GOOD TRAP after %d cycles (%d ms, %d per sec)\033[0m\n", cycles,
+               dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+      } else {
+        printf("\33[1;31mCPU HIT BAD TRAP after %d cycles\033[0m\n", cycles);
       }
     }
   }
