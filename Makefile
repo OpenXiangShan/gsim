@@ -28,6 +28,7 @@ EMU_SRC_DIR = emu-src
 SRC_PATH := src $(PARSER_DIR)
 
 SRCS := $(foreach x, $(SRC_PATH), $(wildcard $(addprefix $(x)/*,.c*)))
+HEADERS := $(foreach x, $(INCLUDE_DIR), $(wildcard $(addprefix $(x)/*,.h)))
 OBJS := $(addprefix $(BUILD_DIR)/, $(addsuffix .o, $(basename $(SRCS))))
 
 MODE ?= 0
@@ -116,5 +117,8 @@ count:
 gendoc:
 	doxygen
 	python3 -m http.server 8080 --directory doc/html
+
+format:
+	@clang-format -i --style=file $(SRCS) $(HEADERS)
 
 .PHONY: compile clean emu difftest count makedir gendoc
