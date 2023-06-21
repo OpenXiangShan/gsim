@@ -33,6 +33,8 @@ SRCS := $(foreach x, $(SRC_PATH), $(wildcard $(x)/*.c*))
 OBJS := $(addprefix $(GSIM_BUILD_DIR)/, $(addsuffix .o, $(basename $(SRCS))))
 PARSER_SRCS := $(addprefix $(PARSER_BUILD)/, $(addsuffix .cc, $(basename $(LEXICAL_SRC) $(SYNTAX_SRC))))
 PARSER_OBJS := $(PARSER_SRCS:.cc=.o)
+HEADERS := $(foreach x, $(INCLUDE_DIR), $(wildcard $(addprefix $(x)/*,.h)))
+
 MODE ?= 0
 
 ifeq ($(DEBUG),1)
@@ -120,5 +122,8 @@ count:
 gendoc:
 	doxygen
 	python3 -m http.server 8080 --directory doc/html
+
+format:
+	@clang-format -i --style=file $(SRCS) $(HEADERS)
 
 .PHONY: compile clean emu difftest count makedir gendoc
