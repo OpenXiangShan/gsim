@@ -307,7 +307,7 @@ void insts_assert(Node* node, int opIdx, int& prevIdx) {
 void computeNode(Node* node, bool nodeEnd) {
   if(node->ops.size() == 0 && node->operands.size() == 0) return;
   if(node->ops.size() == 0) {
-    Assert(node->operands.size() == 1, "Invalid operands size(%d) for %s\n", node->operands.size(), node->name.c_str());
+    Assert(node->operands.size() == 1, "Invalid operands size(%ld) for %s\n", node->operands.size(), node->name.c_str());
     int prevIdx = 0;
     setPrev(node, prevIdx);
     if(valName.back().first > 0) {

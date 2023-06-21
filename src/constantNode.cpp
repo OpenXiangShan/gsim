@@ -200,7 +200,8 @@ void checkAndComputeConstant(Node* node) {
     constantNode ++;
     if(node->ops.size() == 0) {
       if(node->operands.size() != 0) {
-        Assert(node->operands.size() == 1, "Invalid operand size %d\n", node->operands.size());
+        Assert(node->operands.size() == 1, "Invalid operand size %ld\n", node->operands.size());
+
         node->consVal = node->operands[0]->consVal;
       } else {
         node->consVal = "0";
@@ -211,7 +212,7 @@ void checkAndComputeConstant(Node* node) {
     }
     topValid = false;
     computeConstant(node);
-    Assert(val.size() == 1, "Invalid val size %d for %s\n", val.size(), node->name.c_str());
+    Assert(val.size() == 1, "Invalid val size %ld for %s\n", val.size(), node->name.c_str());
     char* str = mpz_get_str(NULL, 16, val[0]->a);
     node->status = CONSTANT_NODE;
     node->consVal = str;
