@@ -61,9 +61,9 @@ static std::map<std::string, std::string> opMap = {
 
 static void setPrev(Node* node, int& prevIdx) {
   if (node->operands[prevIdx]->status == CONSTANT_NODE) {
-    valName.push_back(std::pair(-node->operands[prevIdx]->width, node->operands[prevIdx]->consVal));
+    valName.push_back(std::pair<int, std::string>(-node->operands[prevIdx]->width, node->operands[prevIdx]->consVal));
   } else {
-    valName.push_back(std::pair(node->operands[prevIdx]->width, node->operands[prevIdx]->name));
+    valName.push_back(std::pair<int, std::string>(node->operands[prevIdx]->width, node->operands[prevIdx]->name));
   }
   topValid = true;
   prevIdx--;
@@ -105,7 +105,7 @@ void insts_1expr1int(Node* node, int opIdx, int& prevIdx) {
     if (opIdx == 0) node->insts.push_back(node->name + " = " + dstName);
   }
   valName.pop_back();
-  valName.push_back(std::pair(op->width, dstName));
+  valName.push_back(std::pair<int, std::string>(op->width, dstName));
 }
 
 void insts_1expr2int(Node* node, int opIdx, int& prevIdx) {
@@ -132,7 +132,7 @@ void insts_1expr2int(Node* node, int opIdx, int& prevIdx) {
                     cons2str(op->getExtra(1)));
   }
   valName.pop_back();
-  valName.push_back(std::pair(op->width, dstName));
+  valName.push_back(std::pair<int, std::string>(op->width, dstName));
 }
 
 void insts_2expr(Node* node, int opIdx, int& prevIdx) {
@@ -209,7 +209,7 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx) {
   }
   valName.pop_back();
   valName.pop_back();
-  valName.push_back(std::pair(op->width, dstName));
+  valName.push_back(std::pair<int, std::string>(op->width, dstName));
 }
 
 void insts_1expr(Node* node, int opIdx, int& prevIdx) {
@@ -238,7 +238,7 @@ void insts_1expr(Node* node, int opIdx, int& prevIdx) {
     TODO();
   }
   valName.pop_back();
-  valName.push_back(std::pair(op->width, dstName));
+  valName.push_back(std::pair<int, std::string>(op->width, dstName));
 }
 
 void insts_mux(Node* node, int opIdx, int& prevIdx) {
@@ -277,7 +277,7 @@ void insts_mux(Node* node, int opIdx, int& prevIdx) {
     dstName = value;
   }
   valName.pop_back();
-  valName.push_back(std::pair(node->ops[opIdx]->width, dstName));
+  valName.push_back(std::pair<int, std::string>(node->ops[opIdx]->width, dstName));
 }
 
 void insts_intInit(Node* node, int opIdx) {
@@ -286,7 +286,7 @@ void insts_intInit(Node* node, int opIdx) {
   std::tie(base, cons) = strBaseAll(node->ops[opIdx]->getExtra(0));
   mpz_set_str(val, cons.c_str(), base);
   char* str = mpz_get_str(NULL, 16, val);
-  valName.push_back(std::pair(-node->ops[opIdx]->width, str));
+  valName.push_back(std::pair<int, std::string>(-node->ops[opIdx]->width, str));
   topValid = true;
   free(str);
 }
@@ -305,7 +305,7 @@ void insts_printf(Node* node, int opIdx, int& prevIdx) {
     valName.pop_back();
   }
   node->insts.push_back(inst + ")");
-  valName.push_back(std::pair(0, ""));
+  valName.push_back(std::pair<int, std::string>(0, ""));
 }
 
 void insts_assert(Node* node, int opIdx, int& prevIdx) {
@@ -324,7 +324,7 @@ void insts_assert(Node* node, int opIdx, int& prevIdx) {
   valName.pop_back();
   std::string inst = "Assert(!" + en + " || " + pred + ", " + node->ops[opIdx]->getExtra(0) + ")";
   node->insts.push_back(inst);
-  valName.push_back(std::pair(0, ""));
+  valName.push_back(std::pair<int, std::string>(0, ""));
 }
 
 void computeNode(Node* node) {
