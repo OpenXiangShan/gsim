@@ -145,13 +145,11 @@ void genHeader(graph* g, std::string headerFile) {
         }
         break;
       case NODE_REG_SRC:
-        if(node->status == CONSTANT_NODE) continue;
 #ifdef DIFFTEST_PER_SIG
         if(node->width > 64)
           hfile << "mpz_init2(" << node->name << "$prev" << ", " << node->width << ");\n";
 #endif
       default:
-        if(node->status == CONSTANT_NODE) continue;
         if(node->width > 64)
           hfile << "mpz_init2(" << node->name << ", " << node->width << ");\n";
     }
@@ -184,10 +182,6 @@ void genHeader(graph* g, std::string headerFile) {
           hfile << nodeType(node) << " " << node->name << "$prev" << " : " << node->width << ";\n";
 #endif
       default:
-        if(node->status == CONSTANT_NODE) {
-          // std::cout <<"remove constant " << node->name << " " <<node->consVal << std::endl;
-          continue;
-        }
         if(node->width > 64)
           mpz_vals += "mpz_t " + node->name + ";\n";
         else
@@ -268,7 +262,6 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         EMU_LOG(sfile, node->id, node->regNext->name, node);
         break;
       case NODE_OTHERS:
-        if(node->status == CONSTANT_NODE) continue;
       case NODE_OUT: case NODE_L1_RDATA:
         if(node->insts.size() == 0) continue;
         // sfile << "void S" << g->name << "::step" << node->id << "() {\n";

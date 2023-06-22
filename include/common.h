@@ -10,6 +10,7 @@
 #include <cstring>
 #include <cstdint>
 #include <string.h>
+#include <algorithm>
 
 #include "debug.h"
 
