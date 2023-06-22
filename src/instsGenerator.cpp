@@ -61,9 +61,11 @@ static std::map<std::string, std::string> opMap = {
 
 static void setPrev(Node* node, int& prevIdx) {
   if (node->operands[prevIdx]->status == CONSTANT_NODE) {
-    valName.push_back(std::pair<int, std::string>(-node->operands[prevIdx]->width, node->operands[prevIdx]->consVal));
+    valName.push_back(std::pair<int, std::string>(-node->operands[prevIdx]->width,
+                                                  node->operands[prevIdx]->consVal));
   } else {
-    valName.push_back(std::pair<int, std::string>(node->operands[prevIdx]->width, node->operands[prevIdx]->name));
+    valName.push_back(
+        std::pair<int, std::string>(node->operands[prevIdx]->width, node->operands[prevIdx]->name));
   }
   topValid = true;
   prevIdx--;

@@ -233,6 +233,7 @@ void checkAndComputeConstant(Node* node) {
 // compute constant val
 void constantPropagation(graph* g) {
   for (size_t i = 0; i < g->sorted.size(); i++) {
+    if (N(i)->status != VALID_NODE) continue;
     totalNode++;
     switch (N(i)->type) {
       case NODE_READER: {
@@ -270,5 +271,19 @@ void constantPropagation(graph* g) {
         break;
     }
   }
+  for (int i = 0; i < g->sorted.size(); i++) {
+    if (N(i)->status == VALID_NODE) {
+      N(i)->prev.erase(std::remove_if(N(i)->prev.begin(), N(i)->prev.end(),
+                                      [](const Node* n) { return n->status != VALID_NODE; }),
+                       N(i)->prev.end());
+      N(i)->next.erase(std::remove_if(N(i)->next.begin(), N(i)->next.end(),
+                                      [](const Node* n) { return n->status != VALID_NODE; }),
+                       N(i)->next.end());
+    }
+  }
+  g->sorted.erase(std::remove_if(g->sorted.begin(), g->sorted.end(),
+                                 [](const Node* n) { return n->status != VALID_NODE; }),
+                  g->sorted.end());
+
   std::cout << "find " << constantNode << " constant nodes (" << totalNode << ")\n";
 }

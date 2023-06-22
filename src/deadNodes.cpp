@@ -38,12 +38,5 @@ void removeDeadNodes(graph* g) {  // after topo sort
     }
   }
 
-  int idx = 0;
-  for (size_t i = 0; i < g->sorted.size(); i++) {
-    if (N(i)->status != DEAD_NODE) N(idx++) = N(i);
-  }
-
   std::cout << "find " << deadNum << " deadNodes( " << g->sorted.size() << " )\n";
-
-  g->sorted.erase(g->sorted.begin() + idx, g->sorted.end());
 }
