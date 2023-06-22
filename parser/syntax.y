@@ -84,14 +84,14 @@ int p_stoi(const char* str);
 circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, $6, $3, $8); root = $$; }
 	;
 ALLID: ID {$$ = $1; }
-    | Inst { $$ = "inst"; }
-    | Printf { $$ = "printf"; }
-    | Assert { $$ = "assert"; }
-    | Mem { $$ = "mem"; }
-    | Of { $$ = "of"; }
-    | Reg { $$ = "reg"; }
-    | Output { $$ = "output"; }
-    | Invalid { $$ = "invalid"; }
+    | Inst { $$ = strdup("inst"); }
+    | Printf { $$ = strdup("printf"); }
+    | Assert { $$ = strdup("assert"); }
+    | Mem { $$ = strdup("mem"); }
+    | Of { $$ = strdup("of"); }
+    | Reg { $$ = strdup("reg"); }
+    | Output { $$ = strdup("output"); }
+    | Invalid { $$ = strdup("invalid"); }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}

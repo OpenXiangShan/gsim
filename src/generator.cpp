@@ -54,12 +54,12 @@
 #define DISP_CLUS_INSTS(file, node) do { \
   for(int clusIdx = node->clusNodes.size() - 1; clusIdx >= 0; clusIdx --) { \
     Node* clusMember = node->clusNodes[clusIdx]; \
-    for(int i = 0; i < clusMember->insts.size(); i ++) file << clusMember->insts[i] << ";\n"; \
+    for(size_t i = 0; i < clusMember->insts.size(); i ++) file << clusMember->insts[i] << ";\n"; \
   } \
 } while(0)
 
 #define DISP_INSTS(file, node) do { \
-  for(int i = 0; i < node->insts.size(); i ++) file << node->insts[i] << ";\n"; \
+  for(size_t i = 0; i < node->insts.size(); i ++) file << node->insts[i] << ";\n"; \
 } while(0)
 
 #if 0
@@ -237,8 +237,8 @@ void genHeader(graph* g, std::string headerFile) {
       hfile << "activeFlags[" << next->id << "] = true;\n";
     hfile << "}\n";
   }
-// step functions
-  for (int i = 0; i < g->sorted.size(); i++) {
+  // step functions
+  for (size_t i = 0; i < g->sorted.size(); i++) {
     hfile << "void step" << g->sorted[i]->id << "();\n";
   }
 
@@ -355,14 +355,14 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   }
 
   sfile << "" <<"void S" << g->name << "::step() {\n";
-  for(int i = 0; i < g->sorted.size(); i++) {
+  for(size_t i = 0; i < g->sorted.size(); i++) {
     if(g->sorted[i]->insts.size() == 0 && g->sorted[i]->type != NODE_READER && g->sorted[i]->type != NODE_WRITER) continue;
     sfile << "if(unlikely(activeFlags[" << g->sorted[i]->id << "])) " << "step" << g->sorted[i]->id << "();\n";
   }
 
   // active nodes
   for(Node* n: g->active) {
-    for(int i = 0; i < n->insts.size(); i ++) sfile << n->insts[i] << ";\n";
+    for(size_t i = 0; i < n->insts.size(); i ++) sfile << n->insts[i] << ";\n";
   }
 
   // update registers

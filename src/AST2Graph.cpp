@@ -233,7 +233,6 @@ void visit2Expr(std::string prefix, Node* n, PNode* expr) { // add|sub|mul|div|m
   Assert(expr2Map.find(expr->name) != expr2Map.end(), "Operation %s not found\n", expr->name.c_str());
   std::tuple<bool, bool, int (*)(int, int, bool)>info = expr2Map[expr->name];
   expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
-  bool funcSign = std::get<1>(info) ? expr->sign : 0;
   expr->width = std::get<2>(info)(expr->getChild(0)->width, expr->getChild(1)->width, expr->getChild(0)->sign);
   if(expr->getChild(0)->status == CONSTANT_PNODE && expr->getChild(1)->status == CONSTANT_PNODE) {
     expr->status = CONSTANT_PNODE;
