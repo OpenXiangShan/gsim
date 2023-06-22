@@ -272,7 +272,7 @@ void genHeader(graph* g, std::string headerFile) {
     hfile << "}\n";
   }
   // step functions
-  for (int i = 0; i < g->sorted.size(); i++) {
+  for (size_t i = 0; i < g->sorted.size(); i++) {
     hfile << "void step" << g->sorted[i]->id << "();\n";
   }
 
@@ -297,7 +297,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         if (node->insts.size() == 0) continue;
         STEP_START(sfile, g, node);
         sfile << "activeFlags[" << node->id << "] = false;\n";
-        for (int i = 0; i < node->insts.size(); i++) sfile << node->insts[i] << ";\n";
+        for (size_t i = 0; i < node->insts.size(); i++) sfile << node->insts[i] << ";\n";
         Assert(node->type == NODE_REG_DST, "invalid Node %s\n", node->name.c_str());
         EMU_LOG(sfile, node->id, node->regNext->name, node);
         break;
@@ -312,7 +312,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         sfile << "activeFlags[" << node->id << "] = false;\n";
         SET_OLDVAL(sfile, node);
         // sfile << "mpz_set(oldVal, " << node->name << ");\n";
-        for (int i = 0; i < node->insts.size(); i++) sfile << node->insts[i] << ";\n";
+        for (size_t i = 0; i < node->insts.size(); i++) sfile << node->insts[i] << ";\n";
         activeNode = node->type == NODE_REG_DST ? node->regNext : node;
         ACTIVATE(sfile, activeNode, activeNode->next);
         EMU_LOG(sfile, node->id, OLDNAME(node->width), node);
@@ -322,7 +322,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         latency = node->regNext->latency[0];
         if (latency == 0) SET_OLDVAL(sfile, node->member[3]);
         for (Node* member : node->member) {
-          for (int i = 0; i < member->insts.size(); i++) sfile << member->insts[i] << ";\n";
+          for (size_t i = 0; i < member->insts.size(); i++) sfile << member->insts[i] << ";\n";
         }
         if (latency == 0) {
           sfile << "activeFlags[" << node->id << "] = false;\n";
@@ -336,7 +336,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
       case NODE_WRITER:
         STEP_START(sfile, g, node);
         for (Node* member : node->member) {
-          for (int i = 0; i < member->insts.size(); i++) sfile << member->insts[i] << ";\n";
+          for (size_t i = 0; i < member->insts.size(); i++) sfile << member->insts[i] << ";\n";
         }
         latency = node->regNext->latency[1];
         if (latency == 0) {
@@ -361,7 +361,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
           SET_OLDVAL(sfile, node->member[3]);
         }
         for (Node* member : node->member) {
-          for (int i = 0; i < member->insts.size(); i++) sfile << member->insts[i] << ";\n";
+          for (size_t i = 0; i < member->insts.size(); i++) sfile << member->insts[i] << ";\n";
         }
         // write mode
         sfile << "if(" << node->member[6]->name << "){\n";
@@ -395,7 +395,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 
   sfile << ""
         << "void S" << g->name << "::step() {\n";
-  for (int i = 0; i < g->sorted.size(); i++) {
+  for (size_t i = 0; i < g->sorted.size(); i++) {
     if (g->sorted[i]->insts.size() == 0 && g->sorted[i]->type != NODE_READER &&
         g->sorted[i]->type != NODE_WRITER)
       continue;
@@ -405,7 +405,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 
   // active nodes
   for (Node* n : g->active) {
-    for (int i = 0; i < n->insts.size(); i++) sfile << n->insts[i] << ";\n";
+    for (size_t i = 0; i < n->insts.size(); i++) sfile << n->insts[i] << ";\n";
   }
 
   // update registers

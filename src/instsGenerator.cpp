@@ -111,7 +111,7 @@ void insts_1expr1int(Node* node, int opIdx, int& prevIdx) {
 void insts_1expr2int(Node* node, int opIdx, int& prevIdx) {
   PNode* op = node->ops[opIdx];
   if (!topValid) setPrev(node, prevIdx);
-  unsigned long n = p_stoi(op->getExtra(0).c_str());
+  // unsigned long n = p_stoi(op->getExtra(0).c_str());
   std::string dstName;
   if (op->width <= 64) {
     if (ABS(valName.back().first) <= 64) {
@@ -386,7 +386,7 @@ void computeNode(Node* node) {
 void instsGenerator(graph* g) {
   mpz_init(val);
 
-  for (int i = 0; i < g->sorted.size(); i++) {
+  for (size_t i = 0; i < g->sorted.size(); i++) {
     if (g->sorted[i]->status == CONSTANT_NODE) {
       continue;
     }

@@ -336,7 +336,7 @@ void visit2Expr(std::string prefix, Node* n,
          expr->name.c_str());
   std::tuple<bool, bool, int (*)(int, int, bool)> info = expr2Map[expr->name];
   expr->sign = std::get<0>(info) ? expr->getChild(0)->sign : 0;
-  bool funcSign = std::get<1>(info) ? expr->sign : 0;
+  // bool funcSign = std::get<1>(info) ? expr->sign : 0;
   expr->width = std::get<2>(info)(expr->getChild(0)->width, expr->getChild(1)->width,
                                   expr->getChild(0)->sign);
   if (expr->getChild(0)->status == CONSTANT_PNODE && expr->getChild(1)->status == CONSTANT_PNODE) {

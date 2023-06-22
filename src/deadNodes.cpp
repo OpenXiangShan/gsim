@@ -18,7 +18,7 @@ enum { DEAD = 1, VALID };
 #define N(i) g->sorted[i]
 
 void removeDeadNodes(graph* g) {  // after topo sort
-  std::vector<int> info(g->sorted.size(), 0);
+  std::vector<size_t> info(g->sorted.size(), 0);
 
   int deadNum = 0;
 
@@ -39,7 +39,7 @@ void removeDeadNodes(graph* g) {  // after topo sort
   }
 
   int idx = 0;
-  for (int i = 0; i < g->sorted.size(); i++) {
+  for (size_t i = 0; i < g->sorted.size(); i++) {
     if (N(i)->status != DEAD_NODE) N(idx++) = N(i);
   }
 

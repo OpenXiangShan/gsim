@@ -232,7 +232,7 @@ void checkAndComputeConstant(Node* node) {
 
 // compute constant val
 void constantPropagation(graph* g) {
-  for (int i = 0; i < g->sorted.size(); i++) {
+  for (size_t i = 0; i < g->sorted.size(); i++) {
     totalNode++;
     switch (N(i)->type) {
       case NODE_READER: {
