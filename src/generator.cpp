@@ -4,7 +4,6 @@
 
 #define INCLUDE_LIB(f, s) f << "#include <" << s << ">\n";
 #define INCLUDE(f, s) f << "#include \"" << s << "\"\n";
-#define T_NUM 1
 #define OLDNAME(width) (width > 64? "oldVal" : "oldValBasic")
 
 #define UI(x) (std::string("mpz_get_ui(") + x + ")")
@@ -119,7 +118,7 @@ void genHeader(graph* g, std::string headerFile) {
 // constructor
   hfile << "S" << g->name << "() {" << std::endl;
   hfile << "void init_functions();\n";
-  for(int i = 0; i < T_NUM; i++) {
+  for(int i = 0; i < g->maxTmp; i++) {
     hfile << "mpz_init(t" << i << ");\n";
   }
   for(Node* node: g->sorted) {
@@ -207,7 +206,7 @@ void genHeader(graph* g, std::string headerFile) {
   hfile << "mpz_t oldVal;\n";
   hfile << "uint64_t oldValBasic;\n";
 // tmp variable
-  for (int i = 0; i < T_NUM; i++) hfile << "mpz_t t" << i << ";\n";
+  for (int i = 0; i < g->maxTmp; i++) hfile << "mpz_t t" << i << ";\n";
   for (int i = 1; i <= g->maxTmp; i++) hfile << "mpz_t __tmp__" << i << ";\n";
 // memory
   for(Node* n : g->memory) {
