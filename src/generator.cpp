@@ -90,7 +90,7 @@
   do {                                                    \
     file << "if(cycles >= 0x13acf00) {\n";                \
     file << "std::cout << \"" << name << "[\";";          \
-    file << "std::cout << " << idx << ";";                \
+    file << "std::cout << +" << idx << ";";               \
     file << "std::cout << \"] = \"; ";                    \
     if (width > 64) {                                     \
       file << "mpz_out_str(stdout, 16, " << val << ");";  \
