@@ -271,7 +271,7 @@ void constantPropagation(graph* g) {
         break;
     }
   }
-  for (int i = 0; i < g->sorted.size(); i++) {
+  for (size_t i = 0; i < g->sorted.size(); i++) {
     if (N(i)->status == VALID_NODE) {
       N(i)->prev.erase(std::remove_if(N(i)->prev.begin(), N(i)->prev.end(),
                                       [](const Node* n) { return n->status != VALID_NODE; }),

@@ -11,9 +11,6 @@
 #include "Node.h"
 #include "graph.h"
 
-#define EXPR_CONSTANT 0
-#define EXPR_VAR 1
-
 #define add_insts_1expr(n, func, dst, expr1) \
   n->insts.push_back(func + "(" + dst + ", " + expr1 + ")")
 
@@ -40,11 +37,13 @@
 #define valEqualsZero(width, str) (width > 64 ? "mpz_sgn(" + str + ")" : str)
 #define valName2Str(entry) (entry.first > 0 ? entry.second : "0x" + entry.second)
 #define MPZ_SET(sign) std::string(sign ? "mpz_set_si" : "mpz_set_ui")
+#define VAR_NAME(node) (node->name)
 
 int p_stoi(const char* str);
 std::string cons2str(std::string s);
 std::pair<int, std::string> strBaseAll(std::string s);
 std::string to_hex_string(unsigned long x);
+void computeNode(Node* node, bool nodeEnd);
 
 static std::vector<std::pair<int, std::string>>
     valName;  // width(pos for val & neg for cons) & name
@@ -56,13 +55,18 @@ static std::map<std::string, std::string> opMap = {
     {"add", "+"},       {"sub", "-"},   {"mul", "*"},   {"div", "/"},   {"rem", "%"},
     {"lt", "<"},        {"leq", "<="},  {"gt", ">"},    {"geq", ">="},  {"eq", "=="},
     {"neq", "!="},      {"dshl", "<<"}, {"dshr", ">>"}, {"and", "&"},   {"or", "|"},
-    {"xor", "^"},       {"shl", "<<"},  {"shr", ">>"},  {"asUInt", ""}, {"asSInt", ""},
-    {"asClock", "0!="}, {"neg", "-"},   {"not", "~"},   {"cvt", ""},    {"orr", "0 != "}};
+    {"xor", "^"},       {"shl", "<<"},  {"shr", ">>"},
+    {"asClock", "0!="}, {"neg", "-"},   /*{"not", "~"},*/   {"cvt", ""},    {"orr", "0 != "}};
 
 static void setPrev(Node* node, int& prevIdx) {
   if (node->operands[prevIdx]->status == CONSTANT_NODE) {
     valName.push_back(std::pair<int, std::string>(-node->operands[prevIdx]->width,
                                                   node->operands[prevIdx]->consVal));
+  } else if (node->operands[prevIdx]->id != node->operands[prevIdx]->clusId) {
+    size_t size = valName.size();
+    computeNode(node->operands[prevIdx], false);
+    Assert(valName.size() == size + 1, "Invalid size for %s (%ld -> %ld)\n", node->name.c_str(),
+           size, valName.size());
   } else {
     valName.push_back(
         std::pair<int, std::string>(node->operands[prevIdx]->width, node->operands[prevIdx]->name));
@@ -71,28 +75,37 @@ static void setPrev(Node* node, int& prevIdx) {
   prevIdx--;
 }
 
-void insts_1expr1int(Node* node, int opIdx, int& prevIdx) {
+void insts_1expr1int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   PNode* op = node->ops[opIdx];
   if (!topValid) setPrev(node, prevIdx);
   unsigned long n = p_stoi(op->getExtra(0).c_str());
   if (op->name == "head" || op->name == "tail") n = op->getChild(0)->width - n;
   std::string dstName;
+  int valWidth = ABS(valName.back().first);
   bool result_mpz = op->width > 64;
-  bool operand_mpz = ABS(valName.back().first) > 64;
+  bool operand_mpz = valWidth > 64;
   if (result_mpz) {
-    dstName = opIdx == 0 ? node->name : NEW_TMP;
-    if (valName.back().first > 64)
+    dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
+    if (valWidth > 64)
       add_insts_3expr(node, FUNC_NAME(op->sign, op->name), dstName, valName.back().second,
                       std::to_string(op->getChild(0)->width), std::to_string(n));
     else
       add_insts_2expr(node, FUNC_NAME(op->sign, op->name) + "_ui", dstName,
-                      (valName.back().first ? "" : "0x") + valName.back().second,
-                      std::to_string(n));
+                      valName2Str(valName.back()), std::to_string(n));
   } else if (!result_mpz && !operand_mpz) {
     if (opMap.find(op->name) != opMap.end()) {
       dstName = "(" + valName2Str(valName.back()) + opMap[op->name] + std::to_string(n) + ")";
     } else if (op->name == "pad") {
-      dstName = valName2Str(valName.back());
+      if (!op->sign)
+        dstName = valName2Str(valName.back());
+      else {
+        node->insts.push_back(widthUType(valWidth) + " " + op->getChild(0)->name + " = " +
+                              valName2Str(valName.back()));
+        // TODO: count variable num & previous assignment is not needed when num=1
+        dstName = "(-((" + nodeType(op) + ")(" + op->getChild(0)->name + " >> " +
+                  std::to_string(valWidth - 1) + ") << " + std::to_string(valWidth) + ") | " +
+                  op->getChild(0)->name + ")";
+      }
     } else if (op->name == "tail") {
       unsigned long mask = n == 64 ? MAX_U64 : (((unsigned long)1 << n) - 1);
       dstName = "(" + valName2Str(valName.back()) + " & 0x" + to_hex_string(mask) + ")";
@@ -100,17 +113,17 @@ void insts_1expr1int(Node* node, int opIdx, int& prevIdx) {
       dstName = FUNC_BASIC(op->sign, op->name) + "(" + valName2Str(valName.back()) + ", " +
                 std::to_string(n) + ")";
     }
-    if (opIdx == 0) node->insts.push_back(node->name + " = " + dstName);
+    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName);
   } else if (!result_mpz && operand_mpz) {
     dstName = FUNC_I(op->sign, op->name) + "(" + valName2Str(valName.back()) + ", " +
               std::to_string(ABS(valName.back().first)) + ", " + std::to_string(n) + ")";
-    if (opIdx == 0) node->insts.push_back(node->name + " = " + dstName);
+    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName);
   }
   valName.pop_back();
   valName.push_back(std::pair<int, std::string>(op->width, dstName));
 }
 
-void insts_1expr2int(Node* node, int opIdx, int& prevIdx) {
+void insts_1expr2int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   PNode* op = node->ops[opIdx];
   if (!topValid) setPrev(node, prevIdx);
   // unsigned long n = p_stoi(op->getExtra(0).c_str());
@@ -126,9 +139,9 @@ void insts_1expr2int(Node* node, int opIdx, int& prevIdx) {
                 std::to_string(ABS(valName.back().first)) + ", " + cons2str(op->getExtra(0)) +
                 ", " + cons2str(op->getExtra(1)) + ")";
     }
-    if (opIdx == 0) node->insts.push_back(node->name + " = " + dstName);
+    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName);
   } else {
-    dstName = opIdx == 0 ? node->name : NEW_TMP;
+    dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
     add_insts_4expr(node, FUNC_NAME(op->sign, op->name), dstName, valName.back().second,
                     std::to_string(op->getChild(0)->width), cons2str(op->getExtra(0)),
                     cons2str(op->getExtra(1)));
@@ -137,7 +150,7 @@ void insts_1expr2int(Node* node, int opIdx, int& prevIdx) {
   valName.push_back(std::pair<int, std::string>(op->width, dstName));
 }
 
-void insts_2expr(Node* node, int opIdx, int& prevIdx) {
+void insts_2expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   PNode* op = node->ops[opIdx];
   if (!topValid) setPrev(node, prevIdx);
   int funcSign = op->sign;
@@ -151,7 +164,7 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx) {
   bool right_mpz = (ABS(valName[valName.size() - 2].first) > 64);
   bool operand_mpz = left_mpz && right_mpz;
   if (result_mpz && operand_mpz) {
-    dstName = opIdx == 0 ? node->name : NEW_TMP;
+    dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
     // TODO: replace getChild with back.first
     if (valName.back().first > 0 && valName[valName.size() - 2].first > 0) {
       add_insts_4expr(node, FUNC_NAME(funcSign, op->name), dstName, valName.back().second,
@@ -174,8 +187,14 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx) {
     }
   } else if (!result_mpz && !operand_mpz) {
     if (opMap.find(op->name) != opMap.end()) {
-      dstName = "(" + valName2Str(valName.back()) + opMap[op->name] +
-                valName2Str(valName[valName.size() - 2]) + ")";
+      if (op->getChild(0)->sign) {
+        std::string typeStr = "(" + widthSType(op->getChild(0)->width) + ")";
+        dstName = "(" + typeStr + valName2Str(valName.back()) + opMap[op->name] + typeStr +
+                  valName2Str(valName[valName.size() - 2]) + ")";
+      } else {
+        dstName = "(" + valName2Str(valName.back()) + opMap[op->name] +
+                  valName2Str(valName[valName.size() - 2]) + ")";
+      }
     } else if (op->name == "cat") {
       dstName = "((uint64_t)" + valName2Str(valName.back()) + " << " +
                 std::to_string(ABS(valName[valName.size() - 2].first)) + " | " +
@@ -184,9 +203,9 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx) {
       dstName = FUNC_BASIC(op->sign, op->name) + "(" + valName2Str(valName.back()) + ", " +
                 valName2Str(valName[valName.size() - 2]) + ")";
     }
-    if (opIdx == 0) node->insts.push_back(node->name + " = " + dstName);
+    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName);
   } else if (result_mpz && !operand_mpz) {
-    dstName = opIdx == 0 ? node->name : NEW_TMP;
+    dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
     if (left_mpz) {
       add_insts_3expr(node, FUNC_SUI_R(funcSign, op->getChild(1)->sign, op->name), dstName,
                       valName2Str(valName.back()), valName2Str(valName[valName.size() - 2]),
@@ -207,14 +226,14 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx) {
     dstName = FUNC_I(op->sign, op->name) + "(" + valName.back().second + ", " +
               std::to_string(op->getChild(0)->width) + ", " + valName[valName.size() - 2].second +
               ", " + std::to_string(op->getChild(1)->width) + ")";
-    if (opIdx == 0) node->insts.push_back(node->name + " = " + dstName);
+    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName);
   }
   valName.pop_back();
   valName.pop_back();
   valName.push_back(std::pair<int, std::string>(op->width, dstName));
 }
 
-void insts_1expr(Node* node, int opIdx, int& prevIdx) {
+void insts_1expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   PNode* op = node->ops[opIdx];
   if (!topValid) setPrev(node, prevIdx);
 
@@ -222,7 +241,7 @@ void insts_1expr(Node* node, int opIdx, int& prevIdx) {
   bool result_mpz = op->width > 64;
   bool operand_mpz = ABS(valName.back().first) > 64;
   if (result_mpz) {
-    dstName = opIdx == 0 ? node->name : NEW_TMP;
+    dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
     if (valName.back().first > 64)
       add_insts_2expr(node, FUNC_NAME(op->sign, op->name), dstName, valName.back().second,
                       std::to_string(op->getChild(0)->width));
@@ -232,9 +251,16 @@ void insts_1expr(Node* node, int opIdx, int& prevIdx) {
   } else if (!result_mpz && !operand_mpz) {
     if (opMap.find(op->name) != opMap.end())
       dstName = "(" + opMap[op->name] + valName2Str(valName.back()) + ")";
-    else
+    else if (op->name == "not") {
+      unsigned long mask = op->width == 64 ? MAX_U64 : (((unsigned long)1 << op->width) - 1);
+      dstName = "(" + valName2Str(valName.back()) + " ^ 0x" + to_hex_string(mask) + ")";
+    } else if (op->name == "asSInt") {
+      dstName = "(" + widthSType(op->width) + ")" + valName2Str(valName.back());
+    } else if (op->name == "asUInt") {
+      dstName = "(" + widthUType(op->width) + ")" + valName2Str(valName.back());
+    } else
       dstName = FUNC_BASIC(op->sign, op->name) + "(" + valName2Str(valName.back()) + ")";
-    if (opIdx == 0) node->insts.push_back(node->name + " = " + dstName);
+    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName);
   } else {
     std::cout << op->name << " " << op->getChild(0)->name << std::endl;
     TODO();
@@ -243,7 +269,7 @@ void insts_1expr(Node* node, int opIdx, int& prevIdx) {
   valName.push_back(std::pair<int, std::string>(op->width, dstName));
 }
 
-void insts_mux(Node* node, int opIdx, int& prevIdx) {
+void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   if (!topValid) setPrev(node, prevIdx);
   std::string cond = valName.back().first > 0
                          ? valEqualsZero(valName.back().first, valName.back().second)
@@ -251,7 +277,7 @@ void insts_mux(Node* node, int opIdx, int& prevIdx) {
   valName.pop_back();
   std::string dstName;
   if (node[opIdx].width > 64) {
-    dstName = opIdx == 0 ? node->name : NEW_TMP;
+    dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
     std::string cond_true, cond_false;
     if (valName.back().first > 0) {
       cond_true = "mpz_set(" + dstName + ", " + valName2Str(valName.back()) + ")";
@@ -272,10 +298,10 @@ void insts_mux(Node* node, int opIdx, int& prevIdx) {
     }
     node->insts.push_back(cond + "? " + cond_true + " : " + cond_false);
   } else {
-    std::string value = "(" + cond + "? " + valName2Str(valName.back()) + " : ";
+    std::string value = "(" + cond + "? " + valName2Str(valName.back()) + " : \n";
     valName.pop_back();
     value += valName2Str(valName.back()) + ")";
-    if (opIdx == 0) node->insts.push_back(node->name + " = " + value);
+    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + value);
     dstName = value;
   }
   valName.pop_back();
@@ -329,17 +355,25 @@ void insts_assert(Node* node, int opIdx, int& prevIdx) {
   valName.push_back(std::pair<int, std::string>(0, ""));
 }
 
-void computeNode(Node* node) {
+void computeNode(Node* node, bool nodeEnd) {
   if (node->ops.size() == 0 && node->operands.size() == 0) return;
   if (node->ops.size() == 0) {
     Assert(node->operands.size() == 1, "Invalid operands size(%ld) for %s\n", node->operands.size(),
            node->name.c_str());
-    if (node->operands[0]->status != CONSTANT_NODE) {
-      if (node->width > 64) {
-        node->insts.push_back("mpz_set(" + node->name + ", " + node->operands[0]->name + ")");
-      } else {
-        node->insts.push_back(node->name + " = " + node->operands[0]->name);
+    int prevIdx = 0;
+    setPrev(node, prevIdx);
+    if (valName.back().first > 0) {
+      if (nodeEnd && node->width > 64) {
+        node->insts.push_back("mpz_set(" + node->name + ", " + valName.back().second + ")");
+      } else if (nodeEnd) {
+        node->insts.push_back(VAR_NAME(node) + " = " + valName.back().second);
       }
+    } else {
+      Assert(0, "invalid constant\n");
+    }
+    if (nodeEnd) {
+      valName.pop_back();
+      topValid = false;
     }
     return;
   }
@@ -352,19 +386,19 @@ void computeNode(Node* node) {
     }
     switch (node->ops[i]->type) {
       case P_1EXPR1INT:
-        insts_1expr1int(node, i, prevIdx);
+        insts_1expr1int(node, i, prevIdx, nodeEnd);
         break;
       case P_1EXPR2INT:
-        insts_1expr2int(node, i, prevIdx);
+        insts_1expr2int(node, i, prevIdx, nodeEnd);
         break;
       case P_2EXPR:
-        insts_2expr(node, i, prevIdx);
+        insts_2expr(node, i, prevIdx, nodeEnd);
         break;
       case P_1EXPR:
-        insts_1expr(node, i, prevIdx);
+        insts_1expr(node, i, prevIdx, nodeEnd);
         break;
       case P_EXPR_MUX:
-        insts_mux(node, i, prevIdx);
+        insts_mux(node, i, prevIdx, nodeEnd);
         break;
       case P_EXPR_INT_INIT:
         insts_intInit(node, i);
@@ -379,10 +413,11 @@ void computeNode(Node* node) {
         Assert(0, "Invalid op(%s) with type %d\n", node->ops[i]->name.c_str(), node->ops[i]->type);
     }
   }
-  Assert(valName.size() == 1, "Invalid valname size %ld for node %s\n", valName.size(),
-         node->name.c_str());
-  valName.pop_back();
-  topValid = false;
+
+  if (nodeEnd) {
+    valName.pop_back();
+    topValid = false;
+  }
 }
 
 void instsGenerator(graph* g) {
@@ -397,13 +432,13 @@ void instsGenerator(graph* g) {
       case NODE_READER:
       case NODE_WRITER: {
         for (Node* node : g->sorted[i]->member) {
-          computeNode(node);
+          computeNode(node, true);
         }
         break;
       }
 
       default:
-        computeNode(g->sorted[i]);
+        computeNode(g->sorted[i], true);
     }
 
     g->maxTmp = MAX(tmpIdx, g->maxTmp);
@@ -411,7 +446,7 @@ void instsGenerator(graph* g) {
   }
 
   for (Node* node : g->active) {
-    computeNode(node);
+    computeNode(node, true);
     g->maxTmp = MAX(tmpIdx, g->maxTmp);
     tmpIdx = 0;
   }

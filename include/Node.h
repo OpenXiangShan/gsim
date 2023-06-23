@@ -55,6 +55,7 @@ class Node {
    */
   std::string name;
   int id;
+  int clusId;
   int type;
   int width = 0;
   int sign = 0;
@@ -65,6 +66,7 @@ class Node {
   std::vector<Node*> prev;
   std::vector<Node*> operands;
   std::vector<PNode*> ops;
+  std::vector<Node*> clusNodes;
   int inEdge;  // for topo sort
   std::vector<Node*> member;
   int latency[2];
@@ -73,6 +75,10 @@ class Node {
   std::string consVal;
   // update in instsGenerator
   std::vector<std::string> insts;
+  void set_id(int _id) {
+    id = _id;
+    clusId = id;
+  }
 };
 
 #endif
