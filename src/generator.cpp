@@ -21,7 +21,7 @@
       file << "if(" << (node->width > 64 ? "mpz_cmp(oldVal, " + node->name + ") != 0" : "oldValBasic != " + node->name) << "){\n"; \
       for(Node* next: nextNodes) { \
         if(next->status == VALID_NODE && next->type != NODE_ACTIVE) { \
-          file << "activeFlags[" << next->id << "] = true;\n"; \
+          file << "activeFlags[" << (next->id == next->clusId ? next->id : next->clusNodes[0]->id) << "] = true;\n"; \
         } \
       } \
       file << "}\n"; \
@@ -51,10 +51,16 @@
   } \
 } while(0)
 
-#define nodeType(node) (std::string(node->sign ? "" : "u") + \
-                        (node->width < 8 ? "int8_t" : ( \
-                        (node->width < 16 ? "int16_t" : ( \
-                        (node->width < 32 ? "int32_t" : "int64_t"))))))
+#define DISP_CLUS_INSTS(file, node) do { \
+  for(int clusIdx = node->clusNodes.size() - 1; clusIdx >= 0; clusIdx --) { \
+    Node* clusMember = node->clusNodes[clusIdx]; \
+    for(int i = 0; i < clusMember->insts.size(); i ++) file << clusMember->insts[i] << ";\n"; \
+  } \
+} while(0)
+
+#define DISP_INSTS(file, node) do { \
+  for(int i = 0; i < node->insts.size(); i ++) file << node->insts[i] << ";\n"; \
+} while(0)
 
 #if 0
 #define EMU_LOG(file, id, oldName, node) do{ \
@@ -168,7 +174,7 @@ void genHeader(graph* g, std::string headerFile) {
           if(member->width > 64)
             mpz_vals += "mpz_t " + member->name + ";\n";
           else
-            hfile << nodeType(member) << " " << member->name << " : " << member->width << ";\n";
+            hfile << nodeType(member) << " " << member->name << ";\n";
         }
         break;
       case NODE_L1_RDATA:
@@ -178,13 +184,13 @@ void genHeader(graph* g, std::string headerFile) {
         if(node->width > 64)
           mpz_vals += "mpz_t " + node->name + "$prev;\n";
         else
-          hfile << nodeType(node) << " " << node->name << "$prev" << " : " << node->width << ";\n";
+          hfile << nodeType(node) << " " << node->name << "$prev" << ";\n";
 #endif
       default:
         if(node->width > 64)
           mpz_vals += "mpz_t " + node->name + ";\n";
         else
-          hfile << nodeType(node) << " " << node->name << " : " << node->width << ";\n";
+          hfile << nodeType(node) << " " << node->name << ";\n";
 #ifdef DIFFTEST_PER_SIG
         std::string name = "newtop__DOT__" +node->name;
         int pos;
@@ -256,19 +262,19 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         if(node->insts.size() == 0) continue;
         STEP_START(sfile, g, node);
         sfile << "activeFlags[" << node->id << "] = false;\n";
-        for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
+        DISP_CLUS_INSTS(sfile, node);
+        DISP_INSTS(sfile, node);
         Assert(node->type == NODE_REG_DST, "invalid Node %s\n", node->name.c_str());
         EMU_LOG(sfile, node->id, node->regNext->name, node);
         break;
       case NODE_OTHERS:
       case NODE_OUT: case NODE_L1_RDATA:
         if(node->insts.size() == 0) continue;
-        // sfile << "void S" << g->name << "::step" << node->id << "() {\n";
         STEP_START(sfile, g, node);
         sfile << "activeFlags[" << node->id << "] = false;\n";
         SET_OLDVAL(sfile, node);
-        // sfile << "mpz_set(oldVal, " << node->name << ");\n";
-        for(int i = 0; i < node->insts.size(); i ++) sfile << node->insts[i] << ";\n";
+        DISP_CLUS_INSTS(sfile, node);
+        DISP_INSTS(sfile, node);
         activeNode = node->type == NODE_REG_DST ? node->regNext : node;
         ACTIVATE(sfile, activeNode, activeNode->next);
         EMU_LOG(sfile, node->id, OLDNAME(node->width), node);
@@ -277,8 +283,10 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         STEP_START(sfile, g, node);
         latency = node->regNext->latency[0];
         if(latency == 0) SET_OLDVAL(sfile, node->member[3]);
+        DISP_CLUS_INSTS(sfile, node);
         for(Node* member: node->member) {
-          for(int i = 0; i < member->insts.size(); i ++) sfile << member->insts[i] << ";\n";
+          DISP_CLUS_INSTS(sfile, member);
+          DISP_INSTS(sfile, member);
         }
         if(latency == 0) {
           sfile << "activeFlags[" << node->id << "] = false;\n";
@@ -290,8 +298,10 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         break;
       case NODE_WRITER:
         STEP_START(sfile, g, node);
+        DISP_CLUS_INSTS(sfile, node);
         for(Node* member: node->member) {
-          for(int i = 0; i < member->insts.size(); i ++) sfile << member->insts[i] << ";\n";
+          DISP_CLUS_INSTS(sfile, member);
+          DISP_INSTS(sfile, member);
         }
         latency = node->regNext->latency[1];
         if(latency == 0) {
@@ -312,8 +322,10 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
           sfile << "if(" << node->member[6]->name << ") ";
           SET_OLDVAL(sfile, node->member[3]);
         }
+        DISP_CLUS_INSTS(sfile, node);
         for(Node* member: node->member) {
-          for(int i = 0; i < member->insts.size(); i ++) sfile << member->insts[i] << ";\n";
+          DISP_CLUS_INSTS(sfile, member);
+          DISP_INSTS(sfile, member);
         }
         // write mode
         sfile << "if(" << node->member[6]->name << "){\n";
@@ -363,7 +375,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         sfile << "if(" << node->name << " != " << node->name << "$next) {\n";
       for(Node* next : node->next) {
         if(next->status == VALID_NODE && next->type != NODE_ACTIVE) {
-          sfile << "activeFlags[" << next->id << "] = true;\n";
+          sfile << "activeFlags[" << (next->id == next->clusId ? next->id : next->clusNodes[0]->id) << "] = true;\n";
         }
       }
       sfile << "}\n";

@@ -11,7 +11,7 @@ void topoSort(graph* g) {
 
   while(!s.empty()) {
     Node* top = s.back();
-    top->id = idx ++;
+    top->set_id(idx ++);
     g->sorted.push_back(top);
     s.pop_back();
     for(Node* next : top->next) {
@@ -21,7 +21,7 @@ void topoSort(graph* g) {
     }
   }
   for(Node* node: g->sources) {
-    node->regNext->id = idx ++;
+    node->regNext->set_id(idx ++);
     g->sorted.push_back(node->regNext);
   }
   

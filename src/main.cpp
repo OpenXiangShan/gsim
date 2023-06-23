@@ -14,6 +14,7 @@ void topoSort(graph* g);
 void removeDeadNodes(graph* g);
 void constantPropagation(graph* g);
 void instsGenerator(graph* g);
+void mergeNodes(graph* g);
 extern PNode* root;
 
 int main(int argc, char** argv) {
@@ -32,6 +33,7 @@ int main(int argc, char** argv) {
   topoSort(g);
   removeDeadNodes(g);
   constantPropagation(g);
+  mergeNodes(g);
   instsGenerator(g);
   for(Node* n: g->constant) {
     if(n->status != DEAD_NODE && n->status != CONSTANT_NODE)
