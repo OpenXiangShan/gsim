@@ -1,3 +1,8 @@
+/**
+ * @file randomGraph.cpp
+ * @brief generate randomGraph
+ */
+
 #include "common.h"
 #include "Node.h"
 #include "graph.h"
@@ -6,6 +11,7 @@
 #define MIN_REG 10
 #define MAX_MID 40
 #define MIN_MID 10
+
 #if 0
 void randomGraph(graph* g) {
   g->name = "test";

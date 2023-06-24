@@ -1,7 +1,13 @@
-#include "common.h"
+/**
+ * @file loopDetector.cpp
+ * @brief 检测图是否有环
+ */
+
 #include <stack>
 #include <graph.h>
 #include <Node.h>
+
+#include "common.h"
 
 #define NOT_VISIT 0
 #define EXPANDED 1
@@ -24,30 +30,40 @@ void loopDetector(graph* g) {
     s.push(g->input[i]);
     g->input[i]->visited = NOT_VISIT;
   }
-  while(!s.empty()) {
+
+  while (!s.empty()) {
     Node* top = s.top();
-    if(top->visited == EXPANDED) {
+
+    if (top->visited == EXPANDED) {
       top->visited = VISITED;
+
       s.pop();
-    } else if(top->visited == NOT_VISIT) {
+    } else if (top->visited == NOT_VISIT) {
       top->visited = EXPANDED;
-      for(Node* n : top->next) {
-        if(n->visited == EXPANDED) {
+
+      for (Node* n : top->next) {
+        if (n->visited == EXPANDED) {
           std::cout << "detect Loop: \n";
           std::cout << n->name << std::endl;
-          while(!s.empty()) {
-            Node* info = s.top(); s.pop();
-            if(info->visited == EXPANDED) std::cout << info->name  << std::endl;
-            if(info == n) return;
+
+          while (!s.empty()) {
+            Node* info = s.top();
+            s.pop();
+
+            if (info->visited == EXPANDED) {
+              std::cout << info->name << std::endl;
+            }
+
+            if (info == n) return;
           }
         } else if (n->visited == NOT_VISIT) {
           s.push(n);
         }
       }
-
     } else {
       s.pop();
     }
   }
+
   std::cout << "NO Loop!\n";
 }

@@ -126,4 +126,4 @@ gendoc:
 format:
 	@clang-format -i --style=file $(SRCS) $(HEADERS)
 
-.PHONY: compile clean emu difftest count makedir gendoc
+.PHONY: compile clean emu difftest count makedir gendoc format

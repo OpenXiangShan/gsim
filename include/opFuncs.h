@@ -1,6 +1,13 @@
+/**
+ * @file opFuncs.h
+ * @brief operation functions
+ */
+
 #ifndef OPFUNCS_H
 #define OPFUNCS_H
+
 #include <gmp.h>
+
 void invalidExpr1Int1(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n);
 void u_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n);
 void s_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n);
