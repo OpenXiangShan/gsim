@@ -1,13 +1,17 @@
-BUILD_DIR = ./build
+BUILD_DIR = build
+GSIM_BUILD_DIR = $(BUILD_DIR)/gsim
+EMU_BUILD_DIR = $(BUILD_DIR)/emu
 
-PARSER_DIR = ./parser
-LEXICAL_SRC = $(PARSER_DIR)/lexical.l
-SYNTAX_SRC = $(PARSER_DIR)/syntax.y
+PARSER_DIR = parser
+LEXICAL_SRC = lexical.l
+SYNTAX_SRC = syntax.y
 PARSER_BUILD = $(PARSER_DIR)/build
+$(shell mkdir -p $(PARSER_BUILD))
 
 INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 
 OBJ_DIR = obj
+$(shell mkdir -p $(OBJ_DIR))
 
 CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR))
 CXX = g++
@@ -23,17 +27,22 @@ EMU_SRC = $(EMU_DIR)/emu.cpp $(shell find $(EMU_SRC_DIR) -name "*.cpp")
 EMU_TARGET = emu_test
 EMU_SRC_DIR = emu-src
 
-SRCS = $(shell find src $(PARSER_DIR) -name "*.cpp" -o -name "*.cc" )
+SRC_PATH := src $(PARSER_DIR)
 
+SRCS := $(foreach x, $(SRC_PATH), $(wildcard $(x)/*.c*))
+OBJS := $(addprefix $(GSIM_BUILD_DIR)/, $(addsuffix .o, $(basename $(SRCS))))
+PARSER_SRCS := $(addprefix $(PARSER_BUILD)/, $(addsuffix .cc, $(basename $(LEXICAL_SRC) $(SYNTAX_SRC))))
+PARSER_OBJS := $(PARSER_SRCS:.cc=.o)
 MODE ?= 0
 
 ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
 endif
 
+
 ifeq ($(MODE),0)
 	MODE_FLAGS += -DGSIM
-	target = $(BUILD_DIR)/S$(NAME)
+	target = $(EMU_BUILD_DIR)/S$(NAME)
 else ifeq ($(MODE), 1)
 	MODE_FLAGS += -DVERILATOR
 	target = ./obj_dir/V$(NAME)
@@ -51,31 +60,50 @@ VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
 VERI_VSRCS += $(addprefix scala/build/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v)
 VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIR)/difftest-ysyx3.cpp
+VERI_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(VERI_CSRCS:.cpp=.o))
 
 GSIM_CFLAGS = -O3 $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME)
 
 mainargs = ready-to-run/bin/bbl-hello.bin
 # mainargs = ysyx3-bin/rtthread.bin
 
-compile: $(PARSER_BUILD)/syntax.cc
+$(GSIM_BUILD_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@) && echo + CXX $<
+	@$(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
+
+$(EMU_BUILD_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@) && echo + CXX $<
+	$(CXX) $^ $(GSIM_CFLAGS) -c -o $@
+
+$(TARGET): makedir $(PARSER_OBJS) $(OBJS)
+	$(CXX) $(CXXFLAGS) $(OBJS) $(PARSER_OBJS) -o $(GSIM_BUILD_DIR)/$(TARGET) -lgmp
+
+makedir:
 	mkdir -p build
-	mkdir -p $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET) -lgmp
-	$(BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
+	mkdir -p build/gsim build/emu
+
+compile: $(TARGET)
+	$(GSIM_BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
 
 clean:
-	rm -rf obj parser/build obj_dir
+	rm -rf obj parser/build obj_dir build
 
 emu: obj/top.cpp $(EMU_SRC) compile
-	g++ $(EMU_SRC) obj/top.cpp -DMOD_NAME=S$(NAME) -Wl,-lgmp -Iobj -I$(EMU_SRC_DIR) -o $(BUILD_DIR)/$(EMU_TARGET)
-	$(BUILD_DIR)/$(EMU_TARGET)
+	g++ $(EMU_SRC) obj/top.cpp -DMOD_NAME=S$(NAME) -Wl,-lgmp -Iobj -I$(EMU_SRC_DIR) -o $(GSIM_BUILD_DIR)/$(EMU_TARGET)
+	$(GSIM_BUILD_DIR)/$(EMU_TARGET)
 
-$(PARSER_BUILD)/syntax.cc: $(LEXICAL_SRC) $(SYNTAX_SRC)
-	mkdir -p $(PARSER_BUILD)
-	flex -o $(PARSER_BUILD)/lexical.cc $(LEXICAL_SRC)
-	bison -v -d $(SYNTAX_SRC) -o $(PARSER_BUILD)/syntax.cc
+# flex & bison
+$(PARSER_BUILD)/syntax.cc:  $(PARSER_DIR)/$(SYNTAX_SRC)
+	bison -v -d $< -o $@
 
-$(BUILD_DIR)/S$(NAME): $(VERI_CSRCS)
+$(PARSER_BUILD)/lexical.cc: $(PARSER_DIR)/$(LEXICAL_SRC)
+	flex -o $@ $<
+
+$(PARSER_BUILD)/%.o: $(PARSER_BUILD)/%.cc $(PARSER_SRCS)
+	@echo + CXX $<
+	@$(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
+
+$(EMU_BUILD_DIR)/S$(NAME): $(VERI_OBJS)
 	$(CXX) $^ $(GSIM_CFLAGS) -lgmp -o $@
 
 ./obj_dir/V$(NAME): $(VERI_CSRCS)
@@ -89,4 +117,4 @@ difftest: $(target)
 count:
 	find emu parser src include emu-src scripts -name "*.cpp" -o -name "*.h" -o -name "*.y" -o -name "*.l" -o -name "*.py" |xargs wc
 
-.PHONY: compile clean emu difftest count
+.PHONY: compile clean emu difftest count makedir
