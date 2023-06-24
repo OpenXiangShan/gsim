@@ -13,7 +13,7 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 OBJ_DIR = obj
 $(shell mkdir -p $(OBJ_DIR))
 
-CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR))
+CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror
 CXX = g++
 TARGET = GraphEmu
 

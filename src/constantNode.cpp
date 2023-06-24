@@ -200,7 +200,8 @@ void checkAndComputeConstant(Node* node) {
     constantNode ++;
     if(node->ops.size() == 0) {
       if(node->operands.size() != 0) {
-        Assert(node->operands.size() == 1, "Invalid operand size %d\n", node->operands.size());
+        Assert(node->operands.size() == 1, "Invalid operand size %ld\n", node->operands.size());
+
         node->consVal = node->operands[0]->consVal;
       } else {
         node->consVal = "0";
@@ -211,7 +212,7 @@ void checkAndComputeConstant(Node* node) {
     }
     topValid = false;
     computeConstant(node);
-    Assert(val.size() == 1, "Invalid val size %d for %s\n", val.size(), node->name.c_str());
+    Assert(val.size() == 1, "Invalid val size %ld for %s\n", val.size(), node->name.c_str());
     char* str = mpz_get_str(NULL, 16, val[0]->a);
     node->status = CONSTANT_NODE;
     node->consVal = str;
@@ -223,7 +224,7 @@ void checkAndComputeConstant(Node* node) {
 
 // compute constant val
 void constantPropagation(graph* g) {
-  for(int i = 0; i < g->sorted.size(); i++) {
+  for(size_t i = 0; i < g->sorted.size(); i++) {
     if(N(i)->status != VALID_NODE) continue;
     totalNode ++;
     switch(N(i)->type) {
@@ -251,7 +252,7 @@ void constantPropagation(graph* g) {
         break;
     }
   }
-  for(int i = 0; i < g->sorted.size(); i++) {
+  for(size_t i = 0; i < g->sorted.size(); i++) {
     if(N(i)->status == VALID_NODE) {
       N(i)->prev.erase(std::remove_if(N(i)->prev.begin(), N(i)->prev.end(),
         [](const Node* n) { return n->status != VALID_NODE; }), N(i)->prev.end());

@@ -9,15 +9,18 @@
 
 void loopDetector(graph* g) {
   std::stack<Node*> s;
-  for(int i = 0; i < g->constant.size(); i++) {
+
+  for (size_t i = 0; i < g->constant.size(); i++) {
     s.push(g->constant[i]);
     g->constant[i]->visited = NOT_VISIT;
   }
-  for(int i = 0; i < g->sources.size(); i++) {
+
+  for (size_t i = 0; i < g->sources.size(); i++) {
     s.push(g->sources[i]);
     g->sources[i]->visited = NOT_VISIT;
   }
-  for(int i = 0; i < g->input.size(); i++) {
+
+  for (size_t i = 0; i < g->input.size(); i++) {
     s.push(g->input[i]);
     g->input[i]->visited = NOT_VISIT;
   }

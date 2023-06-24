@@ -122,7 +122,6 @@ void insts_1expr1int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
 void insts_1expr2int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   PNode* op = node->ops[opIdx];
   if(!topValid) setPrev(node, prevIdx);
-  unsigned long n = p_stoi(op->getExtra(0).c_str());
   std::string dstName;
   if(op->width <= 64) {
     if(ABS(valName.back().first) <= 64) {
@@ -307,7 +306,7 @@ void insts_assert(Node* node, int opIdx, int& prevIdx) {
 void computeNode(Node* node, bool nodeEnd) {
   if(node->ops.size() == 0 && node->operands.size() == 0) return;
   if(node->ops.size() == 0) {
-    Assert(node->operands.size() == 1, "Invalid operands size(%d) for %s\n", node->operands.size(), node->name.c_str());
+    Assert(node->operands.size() == 1, "Invalid operands size(%ld) for %s\n", node->operands.size(), node->name.c_str());
     int prevIdx = 0;
     setPrev(node, prevIdx);
     if(valName.back().first > 0) {
@@ -370,7 +369,7 @@ void computeNode(Node* node, bool nodeEnd) {
 
 void instsGenerator(graph* g) {
   mpz_init(val);
-  for(int i = 0; i < g->sorted.size(); i++) {
+  for(size_t i = 0; i < g->sorted.size(); i++) {
     if(g->sorted[i]->status == CONSTANT_NODE) continue;
     switch(g->sorted[i]->type) {
       case NODE_READER: case NODE_WRITER:
