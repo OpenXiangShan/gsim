@@ -52,11 +52,14 @@ static int tmpIdx = 0;
 static mpz_t val;
 
 static std::map<std::string, std::string> opMap = {
-    {"add", "+"},       {"sub", "-"},   {"mul", "*"},   {"div", "/"},   {"rem", "%"},
-    {"lt", "<"},        {"leq", "<="},  {"gt", ">"},    {"geq", ">="},  {"eq", "=="},
-    {"neq", "!="},      {"dshl", "<<"}, {"dshr", ">>"}, {"and", "&"},   {"or", "|"},
-    {"xor", "^"},       {"shl", "<<"},  {"shr", ">>"},
-    {"asClock", "0!="}, {"neg", "-"},   /*{"not", "~"},*/   {"cvt", ""},    {"orr", "0 != "}};
+    {"add", "+"},       {"sub", "-"},  {"mul", "*"},
+    {"div", "/"},       {"rem", "%"},  {"lt", "<"},
+    {"leq", "<="},      {"gt", ">"},   {"geq", ">="},
+    {"eq", "=="},       {"neq", "!="}, {"dshl", "<<"},
+    {"dshr", ">>"},     {"and", "&"},  {"or", "|"},
+    {"xor", "^"},       {"shl", "<<"}, {"shr", ">>"},
+    {"asClock", "0!="}, {"neg", "-"},  /*{"not", "~"},*/ {"cvt", ""},
+    {"orr", "0 != "}};
 
 static void setPrev(Node* node, int& prevIdx) {
   if (node->operands[prevIdx]->status == CONSTANT_NODE) {

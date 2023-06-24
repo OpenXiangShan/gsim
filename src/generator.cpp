@@ -24,20 +24,21 @@
   file << (node->width > 64 ? "mpz_set(oldVal, " + node->name + ")" \
                             : "oldValBasic = " + node->name)        \
        << ";\n"
-#define ACTIVATE(file, node, nextNodes)                                      \
-  do {                                                                       \
-    if (nextNodes.size() > 0) {                                              \
-      file << "if("                                                          \
-           << (node->width > 64 ? "mpz_cmp(oldVal, " + node->name + ") != 0" \
-                                : "oldValBasic != " + node->name)            \
-           << "){\n";                                                        \
-      for (Node * next : nextNodes) {                                        \
-        if (next->status == VALID_NODE && next->type != NODE_ACTIVE) {       \
-          file << "activeFlags[" << (next->id == next->clusId ? next->id : next->clusNodes[0]->id) << "] = true;\n";               \
-        }                                                                    \
-      }                                                                      \
-      file << "}\n";                                                         \
-    }                                                                        \
+#define ACTIVATE(file, node, nextNodes)                                                            \
+  do {                                                                                             \
+    if (nextNodes.size() > 0) {                                                                    \
+      file << "if("                                                                                \
+           << (node->width > 64 ? "mpz_cmp(oldVal, " + node->name + ") != 0"                       \
+                                : "oldValBasic != " + node->name)                                  \
+           << "){\n";                                                                              \
+      for (Node * next : nextNodes) {                                                              \
+        if (next->status == VALID_NODE && next->type != NODE_ACTIVE) {                             \
+          file << "activeFlags[" << (next->id == next->clusId ? next->id : next->clusNodes[0]->id) \
+               << "] = true;\n";                                                                   \
+        }                                                                                          \
+      }                                                                                            \
+      file << "}\n";                                                                               \
+    }                                                                                              \
   } while (0)
 
 #define MEM_WRITE(file, w, mem, idx, val)                                     \
@@ -68,7 +69,7 @@
 
 #define DISP_CLUS_INSTS(file, node)                                                                \
   do {                                                                                             \
-    for (int clusIdx = node->clusNodes.size() - 1; clusIdx >= 0; clusIdx--) {                   \
+    for (int clusIdx = node->clusNodes.size() - 1; clusIdx >= 0; clusIdx--) {                      \
       Node* clusMember = node->clusNodes[clusIdx];                                                 \
       for (size_t i = 0; i < clusMember->insts.size(); i++) file << clusMember->insts[i] << ";\n"; \
     }                                                                                              \
@@ -213,7 +214,8 @@ void genHeader(graph* g, std::string headerFile) {
         if (node->width > 64)
           mpz_vals += "mpz_t " + node->name + "$prev;\n";
         else
-          hfile << nodeType(node) << " " << node->name << "$prev" << ";\n";
+          hfile << nodeType(node) << " " << node->name << "$prev"
+                << ";\n";
 #endif
       default:
         if (node->width > 64)
