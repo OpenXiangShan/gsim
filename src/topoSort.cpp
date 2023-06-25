@@ -25,14 +25,11 @@ void topoSort(graph* g) {
     s.pop_back();
 
     for (Node* next : top->next) {
-      Assert(next->inEdge > 0, "Invalid inEdge %d for node(%s, %d)\n", next->inEdge,
-             next->name.c_str(), next->id);
+      Assert(next->inEdge > 0, "Invalid inEdge %d for node(%s, %d)\n", next->inEdge, next->name.c_str(), next->id);
 
       next->inEdge--;
 
-      if (!next->inEdge && (next->type != NODE_REG_DST && next->type != NODE_ACTIVE)) {
-        s.push_back(next);
-      }
+      if (!next->inEdge && (next->type != NODE_REG_DST && next->type != NODE_ACTIVE)) { s.push_back(next); }
     }
   }
 

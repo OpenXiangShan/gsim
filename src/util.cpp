@@ -8,13 +8,11 @@
 #include <iostream>
 
 std::pair<int, std::string> strBase(std::string s) {
-  if (s.length() <= 1) {
-    return std::make_pair(10, s);
-  }
+  if (s.length() <= 1) { return std::make_pair(10, s); }
 
   std::string ret;
 
-  int idx = 1;
+  int idx  = 1;
   int base = -1;
 
   if (s[1] == '-') {
@@ -49,13 +47,11 @@ std::pair<int, std::string> strBase(std::string s) {
 }
 
 std::pair<int, std::string> strBaseAll(std::string s) {
-  if (s.length() <= 1) {
-    return std::make_pair(10, s);
-  }
+  if (s.length() <= 1) { return std::make_pair(10, s); }
 
   std::string ret;
 
-  int idx = 1;
+  int idx  = 1;
   int base = -1;
 
   if (s[1] == '-') {
@@ -71,7 +67,7 @@ std::pair<int, std::string> strBaseAll(std::string s) {
     base = 16;
   } else {
     base = 10;
-    idx = 0;
+    idx  = 0;
   }
 
   ret += s.substr(idx);
@@ -80,15 +76,13 @@ std::pair<int, std::string> strBaseAll(std::string s) {
 }
 
 std::string to_hex_string(unsigned long x) {
-  if (x == 0) {
-    return "0";
-  }
+  if (x == 0) { return "0"; }
 
   std::string ret;
 
   while (x != 0) {
     int rem = x % 16;
-    ret = (char)(rem < 10 ? (rem + '0') : (rem - 10 + 'a')) + ret;
+    ret     = (char)(rem < 10 ? (rem + '0') : (rem - 10 + 'a')) + ret;
     x /= 16;
   }
 

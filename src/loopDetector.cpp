@@ -49,11 +49,7 @@ void loopDetector(graph* g) {
           while (!s.empty()) {
             Node* info = s.top();
             s.pop();
-
-            if (info->visited == EXPANDED) {
-              std::cout << info->name << std::endl;
-            }
-
+            if (info->visited == EXPANDED) { std::cout << info->name << std::endl; }
             if (info == n) return;
           }
         } else if (n->visited == NOT_VISIT) {

@@ -8,7 +8,7 @@
 
 void mergeToNext(Node* node) {
   Node* nextNode = node->next[0];
-  node->clusId = nextNode->clusId;
+  node->clusId   = nextNode->clusId;
 
   Assert(nextNode->clusId == nextNode->id || nextNode->clusNodes.size() == 1, "Merge error!");
 
@@ -31,14 +31,12 @@ void mergeNodes(graph* g) {
         break;
       }
 
-      default:
-        break;
+      default: break;
     }
   }
 
   std::cout << "merge " << num << " nodes (" << g->sorted.size() << ")\n";
 
-  g->sorted.erase(std::remove_if(g->sorted.begin(), g->sorted.end(),
-                                 [](const Node* n) { return n->clusId != n->id; }),
+  g->sorted.erase(std::remove_if(g->sorted.begin(), g->sorted.end(), [](const Node* n) { return n->clusId != n->id; }),
                   g->sorted.end());
 }

@@ -32,9 +32,7 @@ extern PNode* root;
  * @return exit state.
  */
 int main(int argc, char** argv) {
-  if (argc <= 1) {
-    std::cout << "Usage: \n";
-  }
+  if (argc <= 1) { std::cout << "Usage: \n"; }
 
   std::ifstream infile(argv[1]);
 

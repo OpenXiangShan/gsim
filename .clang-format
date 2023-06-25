@@ -1,11 +1,12 @@
 Language:        Cpp
 BasedOnStyle: Google
 # ---
-AlignConsecutiveAssignments: None
-AlignConsecutiveDeclarations: None
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
 AlignTrailingComments: false # Should be off, causes many dummy problems!!
-AllowShortBlocksOnASingleLine: Never
-ColumnLimit: 100
+AllowShortBlocksOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+ColumnLimit: 120
 IndentCaseLabels: true
 IndentWidth:     2
 IndentWrappedFunctionNames: true
@@ -19,3 +20,5 @@ Standard:        c++20
 TabWidth:        2
 UseTab:          Never # Available options are Never, Always, ForIndentation
 AllowShortEnumsOnASingleLine: true
+BreakBeforeTernaryOperators: true
+AlignOperands: true

@@ -33,9 +33,9 @@ class Node {
    * @brief Default constructor.
    */
   Node() {
-    type = NODE_OTHERS;
+    type    = NODE_OTHERS;
     visited = 0;
-    inEdge = 0;
+    inEdge  = 0;
   }
 
   /**
@@ -44,9 +44,9 @@ class Node {
    * @param _type The type of the node.
    */
   Node(int _type) {
-    type = _type;
+    type    = _type;
     visited = 0;
-    inEdge = 0;
+    inEdge  = 0;
   }
 
   // update in AST2Graph
@@ -59,7 +59,7 @@ class Node {
   int clusId;
   int type;
   int width = 0;
-  int sign = 0;
+  int sign  = 0;
   int val;
   int status = VALID_NODE;
   int visited;
@@ -77,7 +77,7 @@ class Node {
   // update in instsGenerator
   std::vector<std::string> insts;
   void set_id(int _id) {
-    id = _id;
+    id     = _id;
     clusId = id;
   }
 };

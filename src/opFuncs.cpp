@@ -28,13 +28,9 @@ void s_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n) {
   mpz_ior(dst, t1, src);
 }
 
-void u_shl(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
-  mpz_mul_2exp(dst, src, n);
-}
+void u_shl(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) { mpz_mul_2exp(dst, src, n); }
 
-void u_shr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
-  mpz_tdiv_q_2exp(dst, src, n);
-}
+void u_shr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) { mpz_tdiv_q_2exp(dst, src, n); }
 void s_shr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
   if (mpz_cmp_ui(src, 0) < 0) {
     mpz_fdiv_q_2exp(dst, dst, n);
@@ -43,9 +39,7 @@ void s_shr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
   }
 }
 // u_head: remove the last n bits
-void u_head(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
-  mpz_tdiv_q_2exp(dst, src, n);
-}
+void u_head(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) { mpz_tdiv_q_2exp(dst, src, n); }
 // u_tail: remain the last n bits
 void u_tail(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
   if (mpz_sgn(src) == 0) {
@@ -65,9 +59,7 @@ void u_tail(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
   }
 }
 // expr1
-void invalidExpr1(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
-  Assert(0, "Invalid Expr1 function\n");
-}
+void invalidExpr1(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) { Assert(0, "Invalid Expr1 function\n"); }
 void u_asUInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   if (mpz_cmp_ui(src, 0) < 0) {
     mpz_set_ui(t1, 1);
@@ -103,9 +95,7 @@ void u_not(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_sub_ui(t1, t1, 1);
   mpz_xor(dst, t1, src);
 }
-void u_orr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
-  mpz_set_ui(dst, mpz_cmp_ui(src, 0) == 0 ? 0 : 1);
-}
+void u_orr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) { mpz_set_ui(dst, mpz_cmp_ui(src, 0) == 0 ? 0 : 1); }
 void u_andr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set_ui(t1, 1);
   mpz_mul_2exp(t1, t1, bitcnt);
@@ -176,15 +166,9 @@ void s_dshr(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt
     mpz_tdiv_q_2exp(dst, src1, n);
   }
 }
-void u_and(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) {
-  mpz_and(dst, src1, src2);
-}
-void u_ior(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) {
-  mpz_ior(dst, src1, src2);
-}
-void u_xor(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) {
-  mpz_xor(dst, src1, src2);
-}
+void u_and(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) { mpz_and(dst, src1, src2); }
+void u_ior(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) { mpz_ior(dst, src1, src2); }
+void u_xor(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) { mpz_xor(dst, src1, src2); }
 void u_cat(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) {
   Assert(mpz_sgn(src1) >= 0 && mpz_sgn(src2) >= 0, "src1 / src2 < 0\n");
   mpz_mul_2exp(t1, src1, bitcnt2);

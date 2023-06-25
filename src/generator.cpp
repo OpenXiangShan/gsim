@@ -20,25 +20,21 @@
     nodeNum++;                                                       \
     file << "void S" << g->name << "::step" << node->id << "() {\n"; \
   } while (0)
-#define SET_OLDVAL(file, node)                                      \
-  file << (node->width > 64 ? "mpz_set(oldVal, " + node->name + ")" \
-                            : "oldValBasic = " + node->name)        \
-       << ";\n"
-#define ACTIVATE(file, node, nextNodes)                                                            \
-  do {                                                                                             \
-    if (nextNodes.size() > 0) {                                                                    \
-      file << "if("                                                                                \
-           << (node->width > 64 ? "mpz_cmp(oldVal, " + node->name + ") != 0"                       \
-                                : "oldValBasic != " + node->name)                                  \
-           << "){\n";                                                                              \
-      for (Node * next : nextNodes) {                                                              \
-        if (next->status == VALID_NODE && next->type != NODE_ACTIVE) {                             \
-          file << "activeFlags[" << (next->id == next->clusId ? next->id : next->clusNodes[0]->id) \
-               << "] = true;\n";                                                                   \
-        }                                                                                          \
-      }                                                                                            \
-      file << "}\n";                                                                               \
-    }                                                                                              \
+#define SET_OLDVAL(file, node) \
+  file << (node->width > 64 ? "mpz_set(oldVal, " + node->name + ")" : "oldValBasic = " + node->name) << ";\n"
+#define ACTIVATE(file, node, nextNodes)                                                                              \
+  do {                                                                                                               \
+    if (nextNodes.size() > 0) {                                                                                      \
+      file << "if("                                                                                                  \
+           << (node->width > 64 ? "mpz_cmp(oldVal, " + node->name + ") != 0" : "oldValBasic != " + node->name)       \
+           << "){\n";                                                                                                \
+      for (Node * next : nextNodes) {                                                                                \
+        if (next->status == VALID_NODE && next->type != NODE_ACTIVE) {                                               \
+          file << "activeFlags[" << (next->id == next->clusId ? next->id : next->clusNodes[0]->id) << "] = true;\n"; \
+        }                                                                                                            \
+      }                                                                                                              \
+      file << "}\n";                                                                                                 \
+    }                                                                                                                \
   } while (0)
 
 #define MEM_WRITE(file, w, mem, idx, val)                                     \
@@ -52,19 +48,18 @@
     }                                                                         \
   } while (0)
 
-#define MEM_READ(file, w, mem, addr, dst)                                                     \
-  do {                                                                                        \
-    if (w == 128) {                                                                           \
-      file << "mpz_set_ui(" << dst->name << ", " << mem << "[" << nameUI(addr) << "].hi);\n"; \
-      file << "mpz_mul_2exp(" << dst->name << ", " << dst->name << ", " << 64 << ");\n";      \
-      file << "mpz_add_ui(" << dst->name << ", " << dst->name << ", " << mem << "["           \
-           << nameUI(addr) << "].lo);\n";                                                     \
-    } else {                                                                                  \
-      if (dst->width > 64)                                                                    \
-        file << "mpz_set_ui(" << dst->name << ", " << mem << "[" << nameUI(addr) << "]);\n";  \
-      else                                                                                    \
-        file << dst->name << " = " << mem << "[" << nameUI(addr) << "];\n";                   \
-    }                                                                                         \
+#define MEM_READ(file, w, mem, addr, dst)                                                                          \
+  do {                                                                                                             \
+    if (w == 128) {                                                                                                \
+      file << "mpz_set_ui(" << dst->name << ", " << mem << "[" << nameUI(addr) << "].hi);\n";                      \
+      file << "mpz_mul_2exp(" << dst->name << ", " << dst->name << ", " << 64 << ");\n";                           \
+      file << "mpz_add_ui(" << dst->name << ", " << dst->name << ", " << mem << "[" << nameUI(addr) << "].lo);\n"; \
+    } else {                                                                                                       \
+      if (dst->width > 64)                                                                                         \
+        file << "mpz_set_ui(" << dst->name << ", " << mem << "[" << nameUI(addr) << "]);\n";                       \
+      else                                                                                                         \
+        file << dst->name << " = " << mem << "[" << nameUI(addr) << "];\n";                                        \
+    }                                                                                                              \
   } while (0)
 
 #define DISP_CLUS_INSTS(file, node)                                                                \
@@ -81,18 +76,18 @@
   } while (0)
 
 #if 0
-#define EMU_LOG(file, id, oldName, node)                                                    \
-  do {                                                                                      \
-    file << "if(cycles >= 0x13acf00) {\n";                                                  \
-    file << "std::cout << std::hex << \"" << id << ": " << node->name << "(" << node->width \
-         << ", " << node->sign << "): \" ";                                                 \
-    if (node->width > 64) {                                                                 \
-      file << ";mpz_out_str(stdout, 16," << oldName                                         \
-           << "); std::cout << \" -> \"; mpz_out_str(stdout, 16, " << node->name << ");";   \
-    } else {                                                                                \
-      file << " << +" << oldName << " << \" -> \" << +" << node->name << ";";               \
-    }                                                                                       \
-    file << "std::cout << std::endl;\n}\n";                                                 \
+#define EMU_LOG(file, id, oldName, node)                                                                          \
+  do {                                                                                                            \
+    file << "if(cycles >= 0x13acf00) {\n";                                                                        \
+    file << "std::cout << std::hex << \"" << id << ": " << node->name << "(" << node->width << ", " << node->sign \
+         << "): \" ";                                                                                             \
+    if (node->width > 64) {                                                                                       \
+      file << ";mpz_out_str(stdout, 16," << oldName << "); std::cout << \" -> \"; mpz_out_str(stdout, 16, "       \
+           << node->name << ");";                                                                                 \
+    } else {                                                                                                      \
+      file << " << +" << oldName << " << \" -> \" << +" << node->name << ";";                                     \
+    }                                                                                                             \
+    file << "std::cout << std::endl;\n}\n";                                                                       \
   } while (0)
 #define WRITE_LOG(file, name, idx, val, width)            \
   do {                                                    \
@@ -107,17 +102,16 @@
     }                                                     \
     file << "std::cout << std::endl;\n}\n";               \
   } while (0)
-#define EMU_LOG2(file, id, node)                                                        \
-  do {                                                                                  \
-    file << "if(cycles >= 0x13acf00) {\n";                                              \
-    file << "std::cout << \"" << id << ": " << node->name << "(" << node->width << ", " \
-         << node->sign << "): \" ;";                                                    \
-    if (node->width > 64) {                                                             \
-      file << "mpz_out_str(stdout, 16, " << node->name << "); ";                        \
-    } else {                                                                            \
-      file << "std::cout << std::hex << +" << node->name << ";";                        \
-    }                                                                                   \
-    file << "std::cout << std::endl;\n}\n";                                             \
+#define EMU_LOG2(file, id, node)                                                                                    \
+  do {                                                                                                              \
+    file << "if(cycles >= 0x13acf00) {\n";                                                                          \
+    file << "std::cout << \"" << id << ": " << node->name << "(" << node->width << ", " << node->sign << "): \" ;"; \
+    if (node->width > 64) {                                                                                         \
+      file << "mpz_out_str(stdout, 16, " << node->name << "); ";                                                    \
+    } else {                                                                                                        \
+      file << "std::cout << std::hex << +" << node->name << ";";                                                    \
+    }                                                                                                               \
+    file << "std::cout << std::endl;\n}\n";                                                                         \
   } while (0)
 #else
 #define EMU_LOG(...)
@@ -150,16 +144,13 @@ void genHeader(graph* g, std::string headerFile) {
   // constructor
   hfile << "S" << g->name << "() {" << std::endl;
   hfile << "void init_functions();\n";
-  for (int i = 0; i < g->maxTmp; i++) {
-    hfile << "mpz_init(t" << i << ");\n";
-  }
+  for (int i = 0; i < g->maxTmp; i++) { hfile << "mpz_init(t" << i << ");\n"; }
   for (Node* node : g->sorted) {
     switch (node->type) {
       case NODE_READER:
       case NODE_WRITER:
         for (Node* member : node->member) {
-          if (member->width > 64)
-            hfile << "mpz_init2(" << member->name << ", " << member->width << ");\n";
+          if (member->width > 64) hfile << "mpz_init2(" << member->name << ", " << member->width << ");\n";
           if (member->status == CONSTANT_NODE) {
             if (member->width > 64) {
               hfile << member->name << " = 0x" << member->consVal << ";\n";
@@ -170,8 +161,7 @@ void genHeader(graph* g, std::string headerFile) {
                 if (member->consVal.length() <= 16)
                   hfile << "mpz_set_ui(" << member->name << ", 0x" << member->consVal << ");\n";
                 else
-                  hfile << "mpz_set_str(" << member->name << ", 16, \"" << member->consVal
-                        << "\");\n";
+                  hfile << "mpz_set_str(" << member->name << ", 16, \"" << member->consVal << "\");\n";
               }
             }
           }
@@ -207,8 +197,7 @@ void genHeader(graph* g, std::string headerFile) {
             hfile << nodeType(member) << " " << member->name << ";\n";
         }
         break;
-      case NODE_L1_RDATA:
-        break;
+      case NODE_L1_RDATA: break;
       case NODE_REG_SRC:
 #ifdef DIFFTEST_PER_SIG
         if (node->width > 64)
@@ -235,8 +224,7 @@ void genHeader(graph* g, std::string headerFile) {
           sigFile << node->sign << " " << node->width << " " << node->name + "$prev"
                   << " " << name << std::endl;
         else
-          sigFile << node->sign << " " << node->width << " " << node->name << " " << name
-                  << std::endl;
+          sigFile << node->sign << " " << node->width << " " << node->name << " " << name << std::endl;
 #endif
     }
   }
@@ -253,10 +241,8 @@ void genHeader(graph* g, std::string headerFile) {
                   ? "uint8_t "
                   : (n->width == 16
                          ? "uint16_t "
-                         : (n->width == 32
-                                ? "uint32_t "
-                                : (n->width == 64 ? "uint64_t "
-                                                  : "struct{uint64_t hi; uint64_t lo;}"))));
+                         : (n->width == 32 ? "uint32_t "
+                                           : (n->width == 64 ? "uint64_t " : "struct{uint64_t hi; uint64_t lo;}"))));
     Assert(n->width <= 128, "Data type of memory %s is larger than 128\n", n->name.c_str());
     hfile << n->name << "[" << n->val << "];\n";
   }
@@ -274,9 +260,7 @@ void genHeader(graph* g, std::string headerFile) {
     hfile << "}\n";
   }
   // step functions
-  for (size_t i = 0; i < g->sorted.size(); i++) {
-    hfile << "void step" << g->sorted[i]->id << "();\n";
-  }
+  for (size_t i = 0; i < g->sorted.size(); i++) { hfile << "void step" << g->sorted[i]->id << "();\n"; }
 
   // functions
   hfile << "void step();\n";
@@ -328,8 +312,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         }
         if (latency == 0) {
           sfile << "activeFlags[" << node->id << "] = false;\n";
-          MEM_READ(sfile, node->regNext->width, node->regNext->name, node->member[0],
-                   node->member[3]);
+          MEM_READ(sfile, node->regNext->width, node->regNext->name, node->member[0], node->member[3]);
           ACTIVATE(sfile, node->member[3], node->next);
           EMU_LOG(sfile, node->id, OLDNAME(node->regNext->width), node->member[3]);
           EMU_LOG2(sfile, node->id, node->member[0]);
@@ -345,12 +328,9 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         latency = node->regNext->latency[1];
         if (latency == 0) {
           sfile << "activeFlags[" << node->id << "] = false;\n";
-          sfile << "if(" << nodeEqualsZero(node->member[1]) << "&&"
-                << nodeEqualsZero(node->member[4]) << ") {\n";
-          MEM_WRITE(sfile, node->regNext->width, node->regNext->name, node->member[0],
-                    node->member[3]);
-          WRITE_LOG(sfile, node->regNext->name, node->member[0]->name, node->member[3]->name,
-                    node->width);
+          sfile << "if(" << nodeEqualsZero(node->member[1]) << "&&" << nodeEqualsZero(node->member[4]) << ") {\n";
+          MEM_WRITE(sfile, node->regNext->width, node->regNext->name, node->member[0], node->member[3]);
+          WRITE_LOG(sfile, node->regNext->name, node->member[0]->name, node->member[3]->name, node->width);
           sfile << "}\n";
         }
         EMU_LOG2(sfile, node->id, node->member[0]);
@@ -373,28 +353,22 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         sfile << "if(" << node->member[6]->name << "){\n";
         if (node->regNext->latency[1] == 0) {
           sfile << "activeFlags[" << node->id << "] = false;\n";
-          sfile << "if(" << nodeEqualsZero(node->member[1]) << "&&"
-                << nodeEqualsZero(node->member[5]) << ") {\n";
-          MEM_WRITE(sfile, node->regNext->width, node->regNext->name, node->member[0],
-                    node->member[4]);
-          WRITE_LOG(sfile, node->regNext->name, node->member[0]->name, node->member[4]->name,
-                    node->width);
+          sfile << "if(" << nodeEqualsZero(node->member[1]) << "&&" << nodeEqualsZero(node->member[5]) << ") {\n";
+          MEM_WRITE(sfile, node->regNext->width, node->regNext->name, node->member[0], node->member[4]);
+          WRITE_LOG(sfile, node->regNext->name, node->member[0]->name, node->member[4]->name, node->width);
           sfile << "}\n";
         }
         // read mode
         sfile << "} else {\n";
         if (node->regNext->latency[0] == 0) {
           sfile << "activeFlags[" << node->id << "] = false;\n";
-          MEM_READ(sfile, node->regNext->width, node->regNext->name, node->member[0],
-                   node->member[3]);
+          MEM_READ(sfile, node->regNext->width, node->regNext->name, node->member[0], node->member[3]);
           ACTIVATE(sfile, node->member[3], node->next);
           EMU_LOG(sfile, node->id, OLDNAME(node->width), node->member[3]);
         }
         break;
-      case NODE_INP:
-        continue;
-      default:
-        Assert(0, "Invalid node %s with type %d\n", node->name.c_str(), node->type);
+      case NODE_INP: continue;
+      default: Assert(0, "Invalid node %s with type %d\n", node->name.c_str(), node->type);
     }
     sfile << "}\n";
   }
@@ -402,8 +376,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   sfile << ""
         << "void S" << g->name << "::step() {\n";
   for (size_t i = 0; i < g->sorted.size(); i++) {
-    if (g->sorted[i]->insts.size() == 0 && g->sorted[i]->type != NODE_READER &&
-        g->sorted[i]->type != NODE_WRITER)
+    if (g->sorted[i]->insts.size() == 0 && g->sorted[i]->type != NODE_READER && g->sorted[i]->type != NODE_WRITER)
       continue;
     sfile << "if(unlikely(activeFlags[" << g->sorted[i]->id << "])) "
           << "step" << g->sorted[i]->id << "();\n";
@@ -424,8 +397,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         sfile << "if(" << node->name << " != " << node->name << "$next) {\n";
       for (Node* next : node->next) {
         if (next->status == VALID_NODE && next->type != NODE_ACTIVE) {
-          sfile << "activeFlags[" << (next->id == next->clusId ? next->id : next->clusNodes[0]->id)
-                << "] = true;\n";
+          sfile << "activeFlags[" << (next->id == next->clusId ? next->id : next->clusNodes[0]->id) << "] = true;\n";
         }
       }
       sfile << "}\n";
@@ -446,14 +418,13 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
     for (Node* rw : node->member) {
       if (rw->type == NODE_READER && node->latency[0] == 1) {
         Node* data = rw->member[3];
-        Assert(data->type == NODE_L1_RDATA, "Invalid data type(%d) for reader(%s) with latency 1\n",
-               data->type, rw->name.c_str());
+        Assert(data->type == NODE_L1_RDATA, "Invalid data type(%d) for reader(%s) with latency 1\n", data->type,
+               rw->name.c_str());
         SET_OLDVAL(sfile, data);
         MEM_READ(sfile, node->width, node->name, rw->member[0], data);
         ACTIVATE(sfile, data, data->next);
       } else if (rw->type == NODE_WRITER && node->latency[1] == 1) {
-        sfile << "if(" << nodeEqualsZero(rw->member[1]) << " && " << nodeEqualsZero(rw->member[4])
-              << ") {\n";
+        sfile << "if(" << nodeEqualsZero(rw->member[1]) << " && " << nodeEqualsZero(rw->member[4]) << ") {\n";
         MEM_WRITE(sfile, node->width, node->name, rw->member[0], rw->member[3]);
         for (Node* reader : rw->regNext->member) {
           if (reader->type == NODE_READER || reader->type == NODE_READWRITER)
@@ -472,8 +443,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         }
         if (node->latency[1] == 1) {
           sfile << "if(" << rw->member[6]->name << "){\n";
-          sfile << "if(" << nodeEqualsZero(rw->member[1]) << " && " << nodeEqualsZero(rw->member[5])
-                << ") {\n";
+          sfile << "if(" << nodeEqualsZero(rw->member[1]) << " && " << nodeEqualsZero(rw->member[5]) << ") {\n";
           MEM_WRITE(sfile, node->width, node->name, rw->member[0], rw->member[4]);
           for (Node* reader : rw->regNext->member) {
             if (reader->type == NODE_READER || reader->type == NODE_READWRITER)
