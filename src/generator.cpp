@@ -213,7 +213,7 @@ void genHeader(graph* g, std::string headerFile) {
           hfile << nodeType(node) << " " << node->name << ";\n";
 #ifdef DIFFTEST_PER_SIG
         std::string name = "newtop__DOT__" + node->name;
-        int pos;
+        size_t pos;
         while ((pos = name.find("$")) != std::string::npos) {
           if (name.substr(pos + 1, 2) == "io") {
             name.replace(pos, 1, "_");
