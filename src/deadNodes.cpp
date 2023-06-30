@@ -22,7 +22,7 @@ void removeDeadNodes(graph* g) {  // after topo sort
   int deadNum = 0;
 
   for (int i = g->sorted.size() - 1; i >= 0; i--) {
-    bool isDeadNode = N(i)->type == NODE_OTHERS && (N(i)->next.size() == 0 || N(i)->next.size() == info[i]);
+    bool isDeadNode = N(i)->type == NODE_OTHERS && (N(i)->next.size() == 0 || N(i)->next.size() == info[N(i)->id]);
 
     if (isDeadNode == true) {  // deadNode
       for (Node* n : N(i)->prev) info[n->id]++;
