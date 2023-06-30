@@ -144,7 +144,8 @@ void genHeader(graph* g, std::string headerFile) {
   // constructor
   hfile << "S" << g->name << "() {" << std::endl;
   hfile << "void init_functions();\n";
-  for (int i = 0; i < g->maxTmp; i++) { hfile << "mpz_init(t" << i << ");\n"; }
+  for (int i = 1; i <= g->maxTmp; i++) hfile << "mpz_init(__tmp__" << i << ");\n";
+  hfile << "mpz_init(t0);\n";
   for (Node* node : g->sorted) {
     switch (node->type) {
       case NODE_READER:
@@ -233,7 +234,7 @@ void genHeader(graph* g, std::string headerFile) {
   hfile << "mpz_t oldVal;\n";
   hfile << "uint64_t oldValBasic;\n";
   // tmp variable
-  for (int i = 0; i < g->maxTmp; i++) hfile << "mpz_t t" << i << ";\n";
+  hfile << "mpz_t t0;\n";
   for (int i = 1; i <= g->maxTmp; i++) hfile << "mpz_t __tmp__" << i << ";\n";
   // memory
   for (Node* n : g->memory) {
