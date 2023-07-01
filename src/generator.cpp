@@ -143,7 +143,7 @@ void genHeader(graph* g, std::string headerFile) {
 
   // constructor
   hfile << "S" << g->name << "() {" << std::endl;
-  hfile << "void init_functions();\n";
+  hfile << "init_functions();\n";
   for (int i = 1; i <= g->maxTmp; i++) hfile << "mpz_init(__tmp__" << i << ");\n";
   hfile << "mpz_init(t0);\n";
   for (Node* node : g->sorted) {
