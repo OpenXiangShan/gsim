@@ -21,7 +21,7 @@
     file << "void S" << g->name << "::step" << node->id << "() {\n"; \
   } while (0)
 #define SET_OLDVAL(file, node) \
-  file << (node->width > 64 ? "mpz_set(oldVal, " + node->name + ")" : "oldValBasic = " + node->name) << ";\n"
+  file << (node->width > 64 ? "mpz_set(oldVal, " + node->name + ")" : nodeType(node) + " oldValBasic = " + node->name) << ";\n"
 
 void activete(std::ofstream& file, Node* node, std::vector<Node*>& nextNodes) {
   if (nextNodes.size() > 0) {
@@ -183,7 +183,6 @@ void genHeader(graph* g, std::string headerFile) {
     }
   }
   hfile << "mpz_init(oldVal);\n";
-  hfile << "oldValBasic = 0;\n";
   hfile << "}\n";
 
   // active flags
@@ -236,7 +235,6 @@ void genHeader(graph* g, std::string headerFile) {
   hfile << mpz_vals;
   // unique oldVal
   hfile << "mpz_t oldVal;\n";
-  hfile << "uint64_t oldValBasic;\n";
   // tmp variable
   hfile << "mpz_t t0;\n";
   for (int i = 1; i <= g->maxTmp; i++) hfile << "mpz_t __tmp__" << i << ";\n";
