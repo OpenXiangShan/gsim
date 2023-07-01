@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <string.h>
 #include <algorithm>
+#include <set>
 
 #include "debug.h"
 
