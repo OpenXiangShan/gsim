@@ -170,9 +170,8 @@ void genHeader(graph* g, std::string headerFile) {
         break;
       case NODE_REG_SRC:
 #ifdef DIFFTEST_PER_SIG
-        if (node->width > 64)
-          hfile << "mpz_init2(" << node->name << "$prev"
-                << ", " << node->width << ");\n";
+        if (node->width > 64) hfile << "mpz_init2(" << node->name << "$prev" << ", " << node->width << ");\n";
+        if (!node->regSplit) break;
 #endif
       default:
         if (node->width > 64) hfile << "mpz_init2(" << node->name << ", " << node->width << ");\n";
@@ -204,9 +203,9 @@ void genHeader(graph* g, std::string headerFile) {
         if (node->width > 64)
           mpz_vals += "mpz_t " + node->name + "$prev;\n";
         else
-          hfile << nodeType(node) << " " << node->name << "$prev"
-                << ";\n";
+          hfile << nodeType(node) << " " << node->name << "$prev" << ";\n";
 #endif
+        if (!node->regSplit) break;
       default:
         if (node->width > 64)
           mpz_vals += "mpz_t " + node->name + ";\n";
@@ -221,10 +220,10 @@ void genHeader(graph* g, std::string headerFile) {
           } else
             name.replace(pos, 1, "__DOT__");
         }
-        if (node->type == NODE_REG_SRC)
-          sigFile << node->sign << " " << node->width << " " << node->name + "$prev"
+        if (node->type == NODE_REG_DST)
+          sigFile << node->sign << " " << node->width << " " << node->regNext->name + "$prev"
                   << " " << name << std::endl;
-        else
+        else if (node->type != NODE_REG_SRC)
           sigFile << node->sign << " " << node->width << " " << node->name << " " << name << std::endl;
 #endif
     }
@@ -238,12 +237,10 @@ void genHeader(graph* g, std::string headerFile) {
   for (int i = 1; i <= g->maxTmp; i++) hfile << "mpz_t __tmp__" << i << ";\n";
   // memory
   for (Node* n : g->memory) {
-    hfile << (n->width == 8
-                  ? "uint8_t "
-                  : (n->width == 16
-                         ? "uint16_t "
-                         : (n->width == 32 ? "uint32_t "
-                                           : (n->width == 64 ? "uint64_t " : "struct{uint64_t hi; uint64_t lo;}"))));
+    hfile << (n->width == 8 ? "uint8_t " :
+             (n->width == 16 ? "uint16_t " :
+             (n->width == 32 ? "uint32_t " :
+             (n->width == 64 ? "uint64_t " : "struct{uint64_t hi; uint64_t lo;}"))));
     Assert(n->width <= 128, "Data type of memory %s is larger than 128\n", n->name.c_str());
     hfile << n->name << "[" << n->val << "];\n";
   }
@@ -284,10 +281,16 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         if (node->insts.size() == 0) continue;
         STEP_START(sfile, g, node);
         sfile << "activeFlags[" << node->id << "] = false;\n";
+        if (!node->regNext->regSplit) SET_OLDVAL(sfile, node->regNext);
         DISP_CLUS_INSTS(sfile, node);
         DISP_INSTS(sfile, node);
         Assert(node->type == NODE_REG_DST, "invalid Node %s\n", node->name.c_str());
-        EMU_LOG(sfile, node->id, node->regNext->name, node);
+        if (!node->regNext->regSplit) {
+          ACTIVATE(sfile, node, node->regNext->next);
+          EMU_LOG(sfile, node->id, OLDNAME(node->width), node);
+        } else {
+          EMU_LOG(sfile, node->id, node->regNext->name, node);
+        }
         break;
       case NODE_OTHERS:
       case NODE_OUT:
@@ -374,8 +377,18 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
     sfile << "}\n";
   }
 
-  sfile << ""
-        << "void S" << g->name << "::step() {\n";
+  sfile << "" << "void S" << g->name << "::step() {\n";
+
+#ifdef DIFFTEST_PER_SIG
+  for (Node* node: g->sources) {
+    if (node->regNext->insts.size() == 0) continue;
+    if (node->width > 64)
+      sfile << "mpz_set(" << node->name << "$prev, " << node->name << ");\n";
+    else
+      sfile << node->name << "$prev = " << node->name << ";\n";
+  }
+#endif
+
   for (size_t i = 0; i < g->sorted.size(); i++) {
     if (g->sorted[i]->insts.size() == 0 && g->sorted[i]->type != NODE_READER && g->sorted[i]->type != NODE_WRITER)
       continue;
@@ -390,7 +403,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 
   // update registers
   for (Node* node : g->sources) {
-    if (node->regNext->status == CONSTANT_NODE) continue;
+    if (node->regNext->status == CONSTANT_NODE || !node->regSplit) continue;
     if (node->next.size()) {
       if (node->width > 64)
         sfile << "if(mpz_cmp(" << node->name << ", " << node->name << "$next)) {\n";
@@ -403,12 +416,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
       }
       sfile << "}\n";
     }
-#ifdef DIFFTEST_PER_SIG
-    if (node->width > 64)
-      sfile << "mpz_set(" << node->name << "$prev, " << node->name << ");\n";
-    else
-      sfile << node->name << "$prev = " << node->name << ";\n";
-#endif
+
     if (node->width > 64)
       sfile << "mpz_set(" << node->name << ", " << node->name << "$next);\n";
     else

@@ -9,10 +9,6 @@
 
 #include "common.h"
 
-#define NOT_VISIT 0
-#define EXPANDED 1
-#define VISITED 2
-
 void loopDetector(graph* g) {
   std::stack<Node*> s;
 

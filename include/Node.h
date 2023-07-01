@@ -63,6 +63,8 @@ class Node {
   int val;
   int status = VALID_NODE;
   int visited;
+  int scratch;
+  bool regSplit = false;
   std::vector<Node*> next;
   std::vector<Node*> prev;
   std::vector<Node*> operands;

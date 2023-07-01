@@ -40,4 +40,10 @@
             ((width <= 16 ? "int16_t" : \
             ((width <= 32 ? "int32_t" : "int64_t")))))
 
+#define MAP(c, f) c(f)
+
+#define NOT_VISIT 0
+#define EXPANDED 1
+#define VISITED 2
+
 #endif
