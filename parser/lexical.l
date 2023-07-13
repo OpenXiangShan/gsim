@@ -21,7 +21,7 @@
   }
 %}
 
-%option c++ noyywrap noyylineno nodefault
+%option c++ noyywrap yylineno nodefault
 
 /* Integer literal definitions */
 digit_bin   0|1

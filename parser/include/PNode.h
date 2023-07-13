@@ -93,14 +93,14 @@ class PNode {
    *
    * @param _type The type of the node.
    */
-  PNode(int _type) { type = _type; }
+  PNode(int _type, int _lineno = -1) { type = _type; lineno = _lineno; }
 
   /**
    * @brief Constructor with a string parameter.
    *
    * @param str The string value of the node.
    */
-  PNode(char* str) { name = std::string(str); }
+  PNode(char* str, int _lineno = -1) { name = std::string(str); lineno = _lineno; }
 
   /**
    * @brief A vector of child nodes.
@@ -111,6 +111,7 @@ class PNode {
   std::vector<std::string> extraInfo;
   int type;
   int width;
+  int lineno;
   bool sign;
 
   /**
@@ -155,8 +156,8 @@ class PList {
   void concat(PList* plist);
 };
 
-PNode* newNode(int type, char* info, char* name, int num, ...);
-PNode* newNode(int type, char* name, int num, ...);
-PNode* newNode(int type, char* info, char* name, PList* plist);
+PNode* newNode(int type, int lineno, char* info, char* name, int num, ...);
+PNode* newNode(int type, int lineno, char* name, int num, ...);
+PNode* newNode(int type, int lineno, char* info, char* name, PList* plist);
 
 #endif
