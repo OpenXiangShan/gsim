@@ -309,6 +309,9 @@ void u_geq_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned lon
   mpz_set_ui(dst, val1 >= val2);
 }
 //eq
+bool ui_eq(mpz_t& op1, mp_bitcnt_t bitcnt1, mpz_t& op2, mp_bitcnt_t bitcnt2) {
+  return mpz_cmp(op1, op2)==0;
+}
 void u_eq(mpz_t& dst, mpz_t& op1, mp_bitcnt_t bitcnt1, mpz_t& op2, mp_bitcnt_t bitcnt2) {
   mpz_set_ui(dst, mpz_cmp(op1, op2)==0);
 }
@@ -322,6 +325,9 @@ void u_eq_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long
   mpz_set_ui(dst, val1 == val2);
 }
 //neq
+bool ui_neq(mpz_t& op1, mp_bitcnt_t bitcnt1, mpz_t& op2, mp_bitcnt_t bitcnt2) {
+  return mpz_cmp(op1, op2)!=0;
+}
 void u_neq(mpz_t& dst, mpz_t& op1, mp_bitcnt_t bitcnt1, mpz_t& op2, mp_bitcnt_t bitcnt2) {
   mpz_set_ui(dst, mpz_cmp(op1, op2)!=0);
 }
