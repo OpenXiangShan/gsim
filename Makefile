@@ -3,9 +3,10 @@ GSIM_BUILD_DIR = $(BUILD_DIR)/gsim
 EMU_BUILD_DIR = $(BUILD_DIR)/emu
 
 PARSER_DIR = parser
-LEXICAL_SRC = lexical.l
-SYNTAX_SRC = syntax.y
+LEXICAL_NAME = lexical
+SYNTAX_NAME = syntax
 PARSER_BUILD = $(PARSER_DIR)/build
+FIRRTL_VERSION = 
 $(shell mkdir -p $(PARSER_BUILD))
 
 INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
@@ -13,14 +14,18 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 OBJ_DIR = obj
 $(shell mkdir -p $(OBJ_DIR))
 
-CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror
+# NAME ?= newtop
+# NAME ?= freechips.rocketchip.system.DefaultConfig
+NAME ?= Exp8AllTest
+
+TEST_FILE = ready-to-run/$(NAME)
+
+CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror \
+	-DDST_NAME=\"$(NAME)\"
 CXX = g++
 TARGET = GraphEmu
 
-NAME ?= newtop
-# NAME ?= freechips.rocketchip.system.DefaultConfig
-TEST_FILE = ready-to-run/$(NAME)
-FIRRTL_FILE = $(TEST_FILE).lo.fir
+FIRRTL_FILE = $(TEST_FILE).hi.fir
 
 EMU_DIR = emu
 EMU_SRC = $(EMU_DIR)/emu.cpp $(shell find $(EMU_SRC_DIR) -name "*.cpp")
@@ -31,7 +36,7 @@ SRC_PATH := src $(PARSER_DIR)
 
 SRCS := $(foreach x, $(SRC_PATH), $(wildcard $(x)/*.c*))
 OBJS := $(addprefix $(GSIM_BUILD_DIR)/, $(addsuffix .o, $(basename $(SRCS))))
-PARSER_SRCS := $(addprefix $(PARSER_BUILD)/, $(addsuffix .cc, $(basename $(LEXICAL_SRC) $(SYNTAX_SRC))))
+PARSER_SRCS := $(addprefix $(PARSER_BUILD)/, $(addsuffix $(FIRRTL_VERSION).cc, $(LEXICAL_NAME) $(SYNTAX_NAME)))
 PARSER_OBJS := $(PARSER_SRCS:.cc=.o)
 HEADERS := $(foreach x, $(INCLUDE_DIR), $(wildcard $(addprefix $(x)/*,.h)))
 
@@ -95,10 +100,10 @@ emu: obj/top.cpp $(EMU_SRC) compile
 	$(GSIM_BUILD_DIR)/$(EMU_TARGET)
 
 # flex & bison
-$(PARSER_BUILD)/syntax.cc:  $(PARSER_DIR)/$(SYNTAX_SRC)
+$(PARSER_BUILD)/%.cc:  $(PARSER_DIR)/%.y
 	bison -v -d $< -o $@
 
-$(PARSER_BUILD)/lexical.cc: $(PARSER_DIR)/$(LEXICAL_SRC)
+$(PARSER_BUILD)/%.cc: $(PARSER_DIR)/%.l
 	flex -o $@ $<
 
 $(PARSER_BUILD)/%.o: $(PARSER_BUILD)/%.cc $(PARSER_SRCS)
