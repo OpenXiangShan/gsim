@@ -150,8 +150,8 @@ expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, synlineno(), $
     ;
 reference: ALLID  { $$ = newNode(P_REF, synlineno(), $1, 0); }
     | reference '.' ALLID  { $$ = $1; $1->appendChild(newNode(P_REF_DOT, synlineno(), $3, 0)); }
-    | reference '[' INT ']' { $$ = $1; $1->appendChild(newNode(P_REF_IDX, synlineno(), $3, 0)); }
-    | reference '[' expr ']' { $$ = $1; $1->appendChild($3); }
+    | reference '[' INT ']' { $$ = $1; $1->appendChild(newNode(P_REF_IDX_INT, synlineno(), $3, 0)); }
+    | reference '[' expr ']' { $$ = $1; $1->appendChild(newNode(P_REF_IDX_EXPR, synlineno(), NULL, 1, $3)); }
     ;
 /* Memory */
 mem_datatype: DataType "=>" type { $$ = newNode(P_DATATYPE, synlineno(), NULL, 1, $3); }
@@ -189,16 +189,16 @@ statements: { $$ = new PNode(P_STATEMENTS, synlineno()); }
 when_else:  %prec LOWER_THAN_ELSE { $$ = new PNode(P_STATEMENTS, synlineno()); }
     | Else ':' INDENT statements DEDENT { $$ = $4; }
     ;
-statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, synlineno(), $5, $2, 1, $4); }
-    | Reg ALLID ':' type ',' expr RegWith INDENT RegReset '(' expr ',' expr ')' info DEDENT { $$ = newNode(P_REG_DEF, synlineno(), $15, $2, 4, $4, $6, $11, $13); }
+statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5, $2, 1, $4); }
+    | Reg ALLID ':' type ',' expr RegWith INDENT RegReset '(' expr ',' expr ')' info DEDENT { $$ = newNode(P_REG_DEF, $4->lineno, $15, $2, 4, $4, $6, $11, $13); }
     | memory    { $$ = $1;}
     | Inst ALLID Of ALLID info    { $$ = newNode(P_INST, synlineno(), $5, $2, 0); $$->appendExtraInfo($4); }
     | Node ALLID '=' expr info { $$ = newNode(P_NODE, synlineno(), $5, $2, 1, $4); }
-    | reference "<=" expr info  { $$ = newNode(P_CONNECT, synlineno(), $4, NULL, 2, $1, $3); }
+    | reference "<=" expr info  { $$ = newNode(P_CONNECT, $1->lineno, $4, NULL, 2, $1, $3); }
     | reference "<-" expr info  { TODO(); }
     | reference Is Invalid info { $$ = NULL; }
     | Attach '(' references ')' info { TODO(); }
-    | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, synlineno(), $4, NULL, 3, $2, $6, $8); } /* expected newline before statement */
+    | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $2->lineno, $4, NULL, 3, $2, $6, $8); } /* expected newline before statement */
     | Stop '(' expr ',' expr ',' INT ')' info   { TODO(); }
     | Printf '(' expr ',' expr ',' String exprs ')' ':' ALLID info { $$ = newNode(P_PRINTF, synlineno(), $12, $11, 3, $3, $5, $8); $$->appendExtraInfo($7); }
     | Printf '(' expr ',' expr ',' String exprs ')' info    { $$ = newNode(P_PRINTF, synlineno(), $10, NULL, 3, $3, $5, $8); $$->appendExtraInfo($7); }

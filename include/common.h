@@ -20,6 +20,9 @@
 
 #include "debug.h"
 
+#include "Node.h"
+#include "PNode.h"
+
 #define LENGTH(a) (sizeof(a) / sizeof(a[0]))
 
 #define MAX(a, b) ((a >= b) ? a : b)
@@ -40,6 +43,13 @@
   std::string(width <= 8 ? "int8_t" : \
             ((width <= 16 ? "int16_t" : \
             ((width <= 32 ? "int32_t" : "int64_t")))))
+
+#define widthBits(width) \
+        (width <= 8 ? 8 : \
+        ((width <= 16 ? 16 : \
+        ((width <= 32 ? 32 : 64)))))
+
+#define UCast(width) (std::string("(") + widthUType(width) + ")")
 
 #define MAP(c, f) c(f)
 

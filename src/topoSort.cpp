@@ -10,28 +10,48 @@
 int dfsSortNodes(std::vector<Node*>& s, graph* g, int idx) {
   while (!s.empty()) {
     Node* top = s.back();
+    Assert(top->id == -1, "%s is already visited\n", top->name.c_str());
     top->set_id(idx++);
     g->sorted.push_back(top);
     s.pop_back();
-
+// std::cout << "dfs visit: " << top->name << " " << top->id << std::endl;
     for (Node* next : top->next) {
       Assert(next->inEdge > 0, "Invalid inEdge %d for node(%s, %d)\n", next->inEdge, next->name.c_str(), next->id);
-      next->inEdge--;
-      if (!next->inEdge && (next->type != NODE_REG_DST && next->type != NODE_ACTIVE)) s.push_back(next);
+      Node* realNext = next;
+      if (next->type == NODE_ARRAY_MEMBER && !next->parent->arraySplit) realNext = next->parent;
+      realNext->inEdge--;
+
+      if (!realNext->inEdge && (realNext->type != NODE_REG_DST && realNext->type != NODE_ACTIVE)) s.push_back(realNext);
+      // std::cout << "   next: " << next->name << " " << next->inEdge << std::endl;
     }
   }
   return idx;
 }
 
+void updateArrayMember(graph* g) {
+  for (Node* array : g->array) {
+    if (array->arraySplit) continue;
+    for (Node* member : array->member) {
+      member->clusId = array->id;
+      member->clusNodes.push_back(array);
+      array->clusNodes.push_back(member);
+    }
+  }
+}
+
 void computeNextRegs(std::vector<std::vector<Node*>>& nextRegs, graph* g) {
   std::vector<std::set<Node*>>prevRegs(g->sorted.size());
   for (Node* n : g->sources) {
-    for(Node* prevNode : n->regNext->prev) prevRegs[prevNode->id].insert(n);
+    for(Node* prevNode : n->regNext->prev) {
+      if (prevNode->id == -1) continue; // constantArray
+      prevRegs[prevNode->id].insert(n);
+    }
   }
   for (int i = g->sorted.size() - 1; i >= 0; i --) {
     if(g->sorted[i]->type == NODE_REG_SRC) continue;
     for(Node* prevNode : g->sorted[i]->prev) {
-      Assert(prevNode->id <= i, "invalid edge from %d to %d\n", prevNode->id, i);
+      if (prevNode->id == -1) continue;
+      Assert(prevNode->id <= i, "invalid edge from %s to %s\n", prevNode->name.c_str(), g->sorted[i]->name.c_str());
       prevRegs[prevNode->id].insert(prevRegs[i].begin(), prevRegs[i].end());
     }
   }
@@ -84,6 +104,11 @@ void sortRegisters(std::vector<std::vector<Node*>>& nextRegs, graph* g, int idx)
       g->sorted.push_back(n->regNext);
     } else {
       n->regNext->name = n->name;
+      if (n->dimension.size() != 0) {
+        for (size_t i = 0; i < n->member.size(); i ++) {
+          n->regNext->member[i]->name = n->member[i]->name;
+        }
+      }
     }
   }
 
@@ -91,6 +116,7 @@ void sortRegisters(std::vector<std::vector<Node*>>& nextRegs, graph* g, int idx)
     n->regNext->set_id(idx ++);
     g->sorted.push_back(n->regNext);
   }
+
   std::cout << "spilt " << g->sources.size() - order.size() << " (" << g->sources.size() << ") registers\n";
 }
 
@@ -105,7 +131,9 @@ void topoSort(graph* g) {
   s.insert(s.end(), g->memRdata1.begin(), g->memRdata1.end());
 
   idx = dfsSortNodes(s,  g, idx);
+  updateArrayMember(g);
 
   computeNextRegs(nextRegs, g);
   sortRegisters(nextRegs, g, idx);
+
 }

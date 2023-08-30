@@ -20,6 +20,7 @@ class graph {
   std::vector<Node*> constant;
   std::vector<Node*> memory;
   std::vector<Node*> memRdata1;
+  std::vector<Node*> array;
   std::string name;
   int maxTmp = 0;
 };

@@ -46,7 +46,10 @@ void loopDetector(graph* g) {
             Node* info = s.top();
             s.pop();
             if (info->visited == EXPANDED) { std::cout << info->name << std::endl; }
-            if (info == n) return;
+            if (info == n) {
+              Assert(0, "Invalid Loop!\n");
+              return;
+            }
           }
         } else if (n->visited == NOT_VISIT) {
           s.push(n);

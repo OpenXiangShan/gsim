@@ -7,8 +7,6 @@
 
 #include "common.h"
 #include "graph.h"
-#include "Node.h"
-#include "PNode.h"
 #include "syntax.hh"
 #include "Parser.h"
 
@@ -22,6 +20,8 @@ void removeDeadNodes(graph* g);
 void constantPropagation(graph* g);
 void instsGenerator(graph* g);
 void mergeNodes(graph* g);
+void mergeArray(graph* g);
+void sortMergeArray(graph* g);
 extern PNode* root;
 
 /**
@@ -50,6 +50,8 @@ int main(int argc, char** argv) {
   loopDetector(g);
 
   MUX_DEBUG(std::cout << "graph generated\n");
+
+  sortMergeArray(g);
 
   topoSort(g);
 

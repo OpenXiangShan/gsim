@@ -41,7 +41,6 @@ enum {
   P_CONNECT,
   P_PAR_CONNECT,
   P_WHEN,
-  P_ELSE,
   P_MEMORY,
   P_READER,
   P_WRITER,
@@ -53,7 +52,8 @@ enum {
   P_DEPTH,
   P_REF,
   P_REF_DOT,
-  P_REF_IDX,
+  P_REF_IDX_INT,
+  P_REF_IDX_EXPR,
   P_EXPR_INT,
   P_2EXPR,
   P_1EXPR,
@@ -71,10 +71,16 @@ enum {
   P_STATEMENTS,
   P_PRINTF,
   P_EXPRS,
-  P_ASSERT
+  P_ASSERT,
+  P_INDEX,
+  P_CONS_INDEX,
+  P_L_CONS_INDEX,
+  P_L_INDEX,
 };
 
 enum { VALID_PNODE, CONSTANT_PNODE };
+
+class AggrType;
 
 /**
  * @class PNode
@@ -110,14 +116,15 @@ class PNode {
   std::string name;
   std::vector<std::string> extraInfo;
   int type;
-  int width;
+  int width = 0;
   int lineno;
-  bool sign;
+  bool sign = 0;
+  AggrType* aggrType = NULL;
 
   /**
    * @brief set valid_node to CONSTANT_PNODE
    */
-  int status;
+  int status = VALID_PNODE;
   /**
    * @brief CONSTANT_PNODE value
    */
