@@ -139,8 +139,19 @@ inline void dispDimension(std::ofstream& file, Node* node) {
     file << "std::cout << std::hex << \"" << id << ": " << node->name << "(" << node->width << ", " << node->sign \
          << "): \" ";                                                                                             \
     if (node->width > 64) {                                                                                       \
+      if (node->dimension.size() == 0) \
       file << ";mpz_out_str(stdout, 16," << oldName << "); std::cout << \" -> \"; mpz_out_str(stdout, 16, "       \
            << node->name << ");";                                                                                 \
+      else { \
+        file << ";\n"; \
+        std::string idxStr, bracket; \
+        for (size_t i = 0; i < node->dimension.size(); i ++) { \
+          file << "for(int i" << i << " = 0; i" << i << " < " << node->dimension[i] << "; i" << i << " ++) {\n"; \
+          idxStr += "[i" + std::to_string(i) + "]"; \
+          bracket += "}\n"; \
+        } \
+        file << "mpz_out_str(stdout, 16, " << node->name << idxStr << "); std::cout << \" \";\n" << bracket;                    \
+      }  \
     } else {                                                                                                      \
       if (node->dimension.size() == 0)file << " << +" << oldName << " << \" -> \" << +" << node->name << ";";     \
       else{ \
@@ -460,10 +471,28 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 #ifdef DIFFTEST_PER_SIG
   for (Node* node: g->sources) {
     if (node->regNext->insts.size() == 0) continue;
-    if (node->width > 64)
-      sfile << "mpz_set(" << node->name << "$prev, " << node->name << ");\n";
-    else
-      sfile << node->name << "$prev = " << node->name << ";\n";
+    if (node->width > 64) {
+      if (node->dimension.size() == 0)
+        sfile << "mpz_set(" << node->name << "$prev, " << node->name << ");\n";
+      else {
+        std::string indexStr;
+        std::string bracket;
+        for (size_t depth = 0; depth < node->dimension.size(); depth ++) {
+          sfile << "for(int i" << depth << " = 0; i" << depth << " < " << node->dimension[depth] << "; i" << depth << " ++) {\n";
+          indexStr += "[i" + std::to_string(depth) + "]";
+          bracket += "}\n";
+        }
+        sfile << "mpz_set(" << node->name << "$prev" << indexStr << ", " << node->name << indexStr << ");\n";
+        sfile << bracket;
+      }
+    }
+    else {
+      if (node->dimension.size() == 0) {
+        sfile << node->name << "$prev = " << node->name << ";\n";
+      } else {
+        sfile << "memcpy(" << node->name << "$prev, " << node->name << ", sizeof(" << node->name << "));\n";
+      }
+    }
   }
 #endif
 
