@@ -1001,8 +1001,8 @@ void visitWhenPrintf(std::string prefix, graph* g, PNode* print, Node* cond) {
     n->workingVal->ops.push_back(pnode);
     if (!whenTrace[i].first) {
       PNode* pnode_not = new PNode(P_1EXPR);
-      pnode->name = "not";
-      pnode->width = 1;
+      pnode_not->name = "not";
+      pnode_not->width = 1;
       n->workingVal->ops.push_back(pnode_not);
     }
     Operand* operand = new Operand();
@@ -1035,7 +1035,7 @@ void visitWhenAssert(std::string prefix, graph* g, PNode* ass, Node* cond) {
     n->workingVal->ops.push_back(pnode);
     if (!whenTrace[i].first) {
       PNode* pnode_not = new PNode(P_1EXPR);
-      pnode->name = "not";
+      pnode_not->name = "not";
       n->workingVal->ops.push_back(pnode_not);
     }
     Operand* operand = new Operand();
