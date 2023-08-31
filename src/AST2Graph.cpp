@@ -4,6 +4,7 @@
  */
 
 #include <map>
+#include <vector>
 
 #include "common.h"
 #include "graph.h"
@@ -341,19 +342,40 @@ Node* getUpdateArray(std::vector<Index>index, Node* node) {
   return arrayDst;
 }
 
+void updateNameIdx(Node* node, std::vector<int>& nameIdx) {
+  int idx = node->dimension.size() - 1;
+  nameIdx[idx] ++;
+  while(idx > 0) {
+    if (nameIdx[idx] > node->dimension[idx]) {
+      nameIdx[idx] -= node->dimension[idx] + 1;
+      nameIdx[idx - 1] ++;
+      idx --;
+    } else {
+      return;
+    }
+  }
+}
+
 void allocArrayMember(Node* node) {
   if (node->dimension.size() == 0) return;
   int memberNum = 1;
-  for (size_t idx = 0; idx < node->dimension.size(); idx ++) {
+  for (int idx = node->dimension.size() - 1; idx >= 0; idx --) {
     if (idx == 0) memberNum *= node->dimension[idx];
     else memberNum *= node->dimension[idx] + 1;
   }
+  std::vector <int> nameIdx(node->dimension.size(), 0);
   for (int i = 0; i < memberNum; i ++) {   // only need to alloc when used
     Node* member = allocNode(NODE_ARRAY_MEMBER);
-    member->name = node->name + "$__" + std::to_string(i);  // TODO: 2维名称
+    member->name = node->name + "$";
+    for (size_t j = 0; j < nameIdx.size(); j ++) {
+      if(nameIdx[j] == node->dimension[j]) break;
+      member->name += "__" + std::to_string(nameIdx[j]);
+    }
+    updateNameIdx(node, nameIdx);
     SET_TYPE(member, node);
     node->member.push_back(member);
     member->parent = node;
+    member->whenDepth = node->whenDepth;
   }
 }
 
