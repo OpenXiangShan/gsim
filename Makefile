@@ -14,9 +14,9 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 OBJ_DIR = obj
 $(shell mkdir -p $(OBJ_DIR))
 
-# NAME ?= newtop
+NAME ?= newtop
 # NAME ?= freechips.rocketchip.system.DefaultConfig
-NAME ?= Exp8AllTest
+# NAME ?= Exp7AllTest
 
 TEST_FILE = ready-to-run/$(NAME)
 

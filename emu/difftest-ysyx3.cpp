@@ -22,8 +22,6 @@ extern "C" void sdcard_read(int offset, long long* rdata){ }
 extern "C" void sdcard_write(int offset, long long wdata){ }
 #endif
 
-
-
 #define MAX_PROGRAM_SIZE 0x8000000
 uint8_t program[MAX_PROGRAM_SIZE];
 int program_sz = 0;
@@ -93,13 +91,6 @@ int main(int argc, char** argv) {
   memcpy(&ref->rootp->newtop__DOT__mem__DOT__ram, program, program_sz);
   ref_reset();
 #endif
-#if defined(VERILATOR) && defined(GSIM)
-  // if(checkSignals(false)) {
-  //   std::cout << "Diff after reset!\n";
-  //   checkSignals(true);
-  //   return 0;
-  // }
-#endif
   std::cout << "start testing.....\n";
   bool dut_end = false;
   int cycles = 0;
@@ -132,7 +123,7 @@ int main(int argc, char** argv) {
     if(dut_end) {
       clock_t dur = clock() - start;
 #if defined(GSIM)
-      if(mod->cpu$regs$regs_0 == 0){
+      if(mod->cpu$regs$regs[0] == 0){
 #else
       if(ref->rootp->newtop__DOT__cpu__DOT__regs__DOT__regs_0 == 0) {
 #endif
