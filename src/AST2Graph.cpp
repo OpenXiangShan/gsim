@@ -421,7 +421,7 @@ void visitExtModule(std::string prefix, graph* g, PNode* module) {
 
 void addAggrMemberDimension(Node* node, int dimension) {
   if (!node->aggrType) {
-    node->dimension.push_back(dimension);
+    node->dimension.insert(node->dimension.begin(), dimension);
     node->entryNum *= dimension;
     return;
   }
