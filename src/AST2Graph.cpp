@@ -964,7 +964,7 @@ void visitWhenConnect(std::string prefix, graph* g, PNode* connect,
     }
     int arrayIdx = getUpdateArrayIdx(index, dst);
 
-    Node* arrayDst = arrayIdx < 0 ? dst : dst->member[arrayIdx];
+    Node* arrayDst = (index.size() == 0 || arrayIdx < 0) ? dst : dst->member[arrayIdx];
     if ((size_t)whenDepth == arrayDst->imps.size()) {
       opIdx = arrayDst->workingVal->ops.size();
       operandIdx = arrayDst->workingVal->operands.size();
