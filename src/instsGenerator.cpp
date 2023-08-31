@@ -627,7 +627,6 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
       cond_true = ("mpz_get_ui(" + interVals.back()->value + ")");
     } else {
       if (interVals.back()->isArray && interVals.back()->isCons) {
-        Assert(nodeEnd && opIdx == 0, "%s array copy\n", node->name.c_str());
         cond_true = ("memcpy(" + node->name + ", (const " + widthUType(node->width) + "[]){" + interVals.back()->value + "}, "
                     + std::to_string(interVals.back()->entryNum) + "*sizeof(" + widthUType(node->width) + "))");
       } else {
