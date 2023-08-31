@@ -1001,7 +1001,8 @@ void visitWhenConnect(std::string prefix, graph* g, PNode* connect,
         operand->node = index[idx].nidx;
         arrayDst->workingVal->operands.insert(arrayDst->workingVal->operands.begin() + operandIdx, operand);
         operandIdx ++;
-        arrayDst->workingVal->ops.push_back(NULL);
+        arrayDst->workingVal->ops.insert(arrayDst->workingVal->ops.begin() + opIdx, NULL);
+        opIdx ++;
       }
     }
   }
