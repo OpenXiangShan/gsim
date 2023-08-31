@@ -533,8 +533,8 @@ bool insts_index(Node* node, int opIdx, int& prevIdx, int rindexBegin) {
   if (interVals.back()->isCons) index = std::stoi(interVals.back()->value);
   deleteAndPop();
   if (rindexBegin) interVals.push_back(new InterVal(-1, -1, false, -1, rindexStr, NULL));
-  else interVals.back()->value += rindexStr;
-  interVals.back()->index.push_back(index);   // FIXME: 检查一下index，在为变量时用-1表示
+  else interVals.back()->value = rindexStr + interVals.back()->value;
+  interVals.back()->index.insert(interVals.back()->index.begin(), index);   // FIXME: 检查一下index，在为变量时用-1表示
   interVals.back()->indexEnd = node->workingVal->ops[opIdx]->lineno == 0;
   topValid = false;
   return node->workingVal->ops[opIdx]->lineno == 0;
@@ -544,9 +544,9 @@ bool insts_index(Node* node, int opIdx, int& prevIdx, int rindexBegin) {
 bool insts_cons_index(Node* node, int opIdx, int& prevIdx, bool rindexBegin) {
   PNode* op = node->workingVal->ops[opIdx];
   if (rindexBegin) interVals.push_back(new InterVal(-1, -1, false, -1, "[" + op->name + "]", NULL));
-  else interVals.back()->value += "[" + op->name + "]";
+  else interVals.back()->value = "[" + op->name + "]" + interVals.back()->value;
   topValid = false;
-  interVals.back()->index.push_back(std::stoi(op->name));
+  interVals.back()->index.insert(interVals.back()->index.begin(), std::stoi(op->name));
   interVals.back()->indexEnd = node->workingVal->ops[opIdx]->lineno == 0;
 
   return node->workingVal->ops[opIdx]->lineno == 0;
