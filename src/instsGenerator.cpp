@@ -252,13 +252,13 @@ static void setPrev(Node* node, int& prevIdx) {
           bool isFixIndex = true;
           int fixIdx = 0;
           int memberIdx = 0;
-          for (int idx : interVals.back()->index) {
+          for (size_t idx = 0; idx < interVals.back()->index.size(); idx ++) {
             if(idx < 0) {
               isFixIndex = false;
               break;
             } else {
-              fixIdx = fixIdx * (operandNode->dimension[idx]) + idx;
-              memberIdx = memberIdx * (operandNode->dimension[idx] + 1) + idx;
+              fixIdx = fixIdx * (operandNode->dimension[idx]) + interVals.back()->index[idx];
+              memberIdx = memberIdx * (operandNode->dimension[idx] + 1) + interVals.back()->index[idx];
             }
           }
           if (isFixIndex) {
