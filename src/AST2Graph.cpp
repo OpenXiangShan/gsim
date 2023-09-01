@@ -204,6 +204,7 @@ void addEdgeOperand(Node* src, Node* dst, bool connectRecursive, std::vector<Ind
         addEdgeOperand(src, dst->aggrMember[i], connectRecursive, lindex, rindex);
       }
     }
+    return;
   }
   if (dst->type == NODE_REG_SRC) { dst = dst->regNext; }
 
