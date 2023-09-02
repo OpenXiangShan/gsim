@@ -614,7 +614,15 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
     }
     if(muxType == 0) {
       if(isIf) {
-        node->insts.push_back("if (" + cond + "){\n" + cond_true + ";\n} else {\n" + cond_false + ";\n}");
+        std::cout << cond_true << " " << cond_false << " " << node->name << std::endl;
+        if (cond_true == node->name && cond_false == node->name) {
+
+        } else if (cond_true == node->name) {
+          node->insts.push_back("if (!" + cond + "){\n" + cond_false + ";\n}");
+        } else if (cond_false == node->name) {
+          node->insts.push_back("if (" + cond + "){\n" + cond_true + ";\n}");
+        } else
+          node->insts.push_back("if (" + cond + "){\n" + cond_true + ";\n} else {\n" + cond_false + ";\n}");
       } else {
         node->insts.push_back(cond + "? " + cond_true + " : " + cond_false + ";");
       }
@@ -649,7 +657,14 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
     std::string value;
     if(muxType == 0) {
       if (isIf) {
-        value = "if (" + cond + "){\n" + cond_true + ";\n} else {\n" + cond_false + ";\n}";
+        if (cond_true == node->name && cond_false == node->name) {
+
+        } else if (cond_true == node->name) {
+          value = "if (!" + cond + "){\n" + cond_false + ";\n}";
+        } else if (cond_false == node->name) {
+          value = "if (" + cond + "){\n" + cond_true + ";\n}";
+        } else
+          value = "if (" + cond + "){\n" + cond_true + ";\n} else {\n" + cond_false + ";\n}";
       } else {
         value = "(" + cond + "? " + cond_true + " : \n" + cond_false + ")";
       }
@@ -657,9 +672,10 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
     else if(muxType == 1) value = cond_false;
     else if(muxType == 2) value = cond_true;
     if (opIdx == 0 && nodeEnd) {
-      if (isIf)
-        node->insts.push_back(value);
-      else
+      if (isIf) {
+        if (value.length() > 0)
+          node->insts.push_back(value);
+      } else
         node->insts.push_back(VAR_NAME(node) + " = " + value + ";");
     }
     dstName = value;
