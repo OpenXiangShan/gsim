@@ -19,6 +19,7 @@
   do {                                                               \
     nodeNum++;                                                       \
     file << "void S" << g->name << "::step" << node->id << "() {\n"; \
+    MUX_COUNT(file << "activeNum ++;\n"); \
   } while (0)
 #define SET_OLDVAL(file, node) \
   file << (node->width > 64 ? "mpz_set(oldVal, " + node->name + ")" : nodeType(node) + " oldValBasic = " + node->name) << ";\n"
@@ -213,6 +214,7 @@ void genHeader(graph* g, std::string headerFile) {
   INCLUDE_LIB(hfile, "assert.h");
   INCLUDE_LIB(hfile, "cstdint");
   INCLUDE_LIB(hfile, "cstring");
+  INCLUDE_LIB(hfile, "ctime");
   INCLUDE(hfile, "functions.h");
 
   hfile << "#define likely(x) __builtin_expect(!!(x), 1)\n#define unlikely(x) "
@@ -333,7 +335,9 @@ void genHeader(graph* g, std::string headerFile) {
     Assert(n->width <= 128, "Data type of memory %s is larger than 128\n", n->name.c_str());
     hfile << n->name << "[" << n->val << "];\n";
   }
-
+  // Test
+  MUX_COUNT(hfile << "uint64_t activeNum = 0;\n");
+  MUX_COUNT(hfile << "double funcTime = 0, activeTime = 0, regsTime = 0, memoryTime = 0;\n"); // ms;
   // set functions
   for (Node* node : g->input) {
     if (node->width > 64) {
@@ -495,7 +499,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
     }
   }
 #endif
-
+  MUX_COUNT(sfile << "clock_t befFunc = std::clock();\n");
   for (size_t i = 0; i < g->sorted.size(); i++) {
     if (g->sorted[i]->type == NODE_REG_SRC) continue;
     if (g->sorted[i]->insts.size() == 0 && g->sorted[i]->dimension.size() == 0
@@ -504,13 +508,17 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
     sfile << "if(unlikely(activeFlags[" << g->sorted[i]->id << "])) "
           << "step" << g->sorted[i]->id << "();\n";
   }
-
+  MUX_COUNT(sfile << "clock_t aftFunc = std::clock();\n");
+  MUX_COUNT(sfile << "funcTime += (double)(aftFunc - befFunc) * 1000 / CLOCKS_PER_SEC;\n");
   // active nodes
+  MUX_COUNT(sfile << "clock_t befActive = std::clock();\n");
   for (Node* n : g->active) {
     for (size_t i = 0; i < n->insts.size(); i++) sfile << n->insts[i] << "\n";
   }
-
+  MUX_COUNT(sfile << "clock_t aftActive = std::clock();\n");
+  MUX_COUNT(sfile << "activeTime += (double)(aftActive - befActive) * 1000 / CLOCKS_PER_SEC;\n");
   // update registers
+  MUX_COUNT(sfile << "clock_t befRegs = std::clock();\n");
   for (Node* node : g->sources) {
     if (node->regNext->status == CONSTANT_NODE || !node->regSplit) continue;
     if (node->dimension.size() == 0) {
@@ -555,7 +563,10 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
       }
     }
   }
+  MUX_COUNT(sfile << "clock_t aftRegs = std::clock();\n");
+  MUX_COUNT(sfile << "regsTime += (double)(aftRegs - befRegs) * 1000 / CLOCKS_PER_SEC;\n");
   // update memory rdata & wdata
+  MUX_COUNT(sfile << "clock_t befMemory = std::clock();\n");
   sfile << "uint64_t oldValBasic;\n";
   for (Node* node : g->memory) {
     for (Node* rw : node->member) {
@@ -597,6 +608,8 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
       }
     }
   }
+  MUX_COUNT(sfile << "clock_t aftMemory = std::clock();\n");
+  MUX_COUNT(sfile << "memoryTime += (double)(aftMemory - befMemory) * 1000 / CLOCKS_PER_SEC;\n");
   // sfile << "std::cout << \"------\\n\";\n";
   sfile << "cycles ++;\n}\n";
 }

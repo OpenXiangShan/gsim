@@ -57,4 +57,12 @@
 #define EXPANDED 1
 #define VISITED 2
 
+// #define TIME_COUNT
+
+#ifdef TIME_COUNT
+#define MUX_COUNT(...) __VA_ARGS__
+#else
+#define MUX_COUNT(...)
+#endif
+
 #endif
