@@ -52,6 +52,9 @@ void sortMergeArray(graph* g) {
       for (Node* member : array->member) {
         member->name = array->name;
         array->next.insert(array->next.end(), member->next.begin(), member->next.end());
+        for (Node* next : array->next) {
+          *(find(next->prev.begin(), next->prev.end(), member)) = array;
+        }
       }
     }
   }
