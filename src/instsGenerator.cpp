@@ -615,11 +615,13 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
     if(muxType == 0) {
       if(isIf) {
         std::cout << cond_true << " " << cond_false << " " << node->name << std::endl;
-        if (cond_true == node->name && cond_false == node->name) {
+        bool trueFix = cond_true == node->name || (node->type == NODE_REG_DST && cond_true == node->regNext->name);
+        bool falseFix = cond_false == node->name || (node->type == NODE_REG_DST && cond_false == node->regNext->name);
+        if (trueFix && falseFix) {
 
-        } else if (cond_true == node->name) {
+        } else if (trueFix) {
           node->insts.push_back("if (!" + cond + "){\n" + cond_false + ";\n}");
-        } else if (cond_false == node->name) {
+        } else if (falseFix) {
           node->insts.push_back("if (" + cond + "){\n" + cond_true + ";\n}");
         } else
           node->insts.push_back("if (" + cond + "){\n" + cond_true + ";\n} else {\n" + cond_false + ";\n}");
@@ -657,11 +659,13 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
     std::string value;
     if(muxType == 0) {
       if (isIf) {
-        if (cond_true == node->name && cond_false == node->name) {
+        bool trueFix = cond_true == node->name || (node->type == NODE_REG_DST && cond_true == node->regNext->name);
+        bool falseFix = cond_false == node->name || (node->type == NODE_REG_DST && cond_false == node->regNext->name);
+        if (trueFix && falseFix) {
 
-        } else if (cond_true == node->name) {
+        } else if (trueFix) {
           value = "if (!" + cond + "){\n" + cond_false + ";\n}";
-        } else if (cond_false == node->name) {
+        } else if (falseFix) {
           value = "if (" + cond + "){\n" + cond_true + ";\n}";
         } else
           value = "if (" + cond + "){\n" + cond_true + ";\n} else {\n" + cond_false + ";\n}";
