@@ -915,7 +915,7 @@ void computeArray(Node* node, bool nodeEnd) {
     combineVal(delta);
   }
   if (nodeEnd) {
-    node->insts.push_back(interVals.back()->value + ";");
+    if(stmtValid || delta > 0) node->insts.push_back(interVals.back()->value + ";");  // insts may added in visitWhen
     deleteAndPop();
     // valSize --;
     topValid = false;
