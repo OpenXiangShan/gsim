@@ -2,6 +2,10 @@
 #include <time.h>
 #include <cstring>
 #include <cassert>
+#include <vector>
+#include <numeric>
+#include <algorithm>
+#include <fstream>
 
 #if defined(GSIM)
 #include <top.h>
@@ -25,6 +29,20 @@ extern "C" void sdcard_write(int offset, long long wdata){ }
 #define MAX_PROGRAM_SIZE 0x8000000
 uint8_t program[MAX_PROGRAM_SIZE];
 int program_sz = 0;
+
+template <typename T>
+std::vector<size_t> sort_indexes(const std::vector<T> &v) {
+
+  // initialize original index locations
+  std::vector<size_t> idx(v.size());
+  iota(idx.begin(), idx.end(), 0);
+
+  // when v contains elements of equal values
+  stable_sort(idx.begin(), idx.end(),
+       [&v](size_t i1, size_t i2) {return v[i1] < v[i2];});
+
+  return idx;
+}
 
 void load_program(char* filename){
 
@@ -93,7 +111,7 @@ int main(int argc, char** argv) {
 #endif
   std::cout << "start testing.....\n";
   bool dut_end = false;
-  int cycles = 0;
+  uint64_t cycles = 0;
   clock_t start = clock();
   while(!dut_end) {
 #ifdef VERILATOR
@@ -104,6 +122,17 @@ int main(int argc, char** argv) {
     if(cycles % 1000000 == 0) {
       clock_t dur = clock() - start;
       printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+    }
+    if (cycles % 10000000 == 0) {
+      std::ofstream out("data_active/activeTimes" + std::to_string(cycles / 10000000) + ".txt");
+      std::vector<uint64_t> activeTimes(mod->allActiveTimes);
+      std::vector<uint64_t> sorted = sort_indexes(activeTimes);
+      out << "posActives " << mod->posActivate << " " << mod->posActivate / cycles << std::endl;
+      for (int i = sorted.size()-1; i >= 0; i --) {
+        if (mod->allNames[sorted[i]].length() == 0) continue;
+        out << mod->allNames[sorted[i]] << " " << mod->nodeNum[sorted[i]] << " " << (double)activeTimes[sorted[i]] / cycles << " " << activeTimes[sorted[i]] << " " \
+            << mod->posActives[sorted[i]] << " "  << (double)mod->posActives[sorted[i]] / activeTimes[sorted[i]] << std::endl;
+      }
     }
 #endif
 #if defined(GSIM)
