@@ -22,6 +22,7 @@ void instsGenerator(graph* g);
 void mergeNodes(graph* g);
 void mergeArray(graph* g);
 void sortMergeArray(graph* g);
+void aliasAnalysis(graph* g);
 extern PNode* root;
 
 /**
@@ -58,6 +59,8 @@ int main(int argc, char** argv) {
   removeDeadNodes(g);
 
   constantPropagation(g);
+
+  aliasAnalysis(g);
 
   mergeNodes(g);
 

@@ -24,6 +24,7 @@ enum {
   NODE_LOCAL, // local node in when statment
   NODE_OTHERS,
   NODE_ARRAY_MEMBER,
+  NODE_INVALID,  // should never occur in process
 };
 
 enum { VALID_NODE, DEAD_NODE, CONSTANT_NODE };
