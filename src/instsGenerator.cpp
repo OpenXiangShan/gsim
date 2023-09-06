@@ -219,61 +219,56 @@ void setConsArrayPrev(Node* node) {
 }
 
 static void setPrev(Node* node, int& prevIdx) {
-  Operand* operand = node->workingVal->operands[prevIdx];
-  if (!operand) {     // for empty when/else stmt
-    TODO(); // not needed
-    // valName.push_back(valType(node->width, node->sign, true, 1, node->name, NULL));
-  } else {
-    Node* operandNode = operand->node;
-    // std::cout << "operand: " << prevIdx << " " << operandNode->name << "(" << operandNode->status << ")" << " node: " << node->name << " " << operandNode->clusId << " " << operandNode->id << std::endl;
-    if (operandNode->status == CONSTANT_NODE && operandNode->dimension.size() == 0) {
-      if (operandNode->workingVal->consVal.length() == 0) {
-        if (operandNode->workingVal->ops.size() == 0 && operandNode->workingVal->operands.size() == 0) {
-          interVals.push_back(new InterVal(operandNode->width, operandNode->sign, true, 1, "0x0", "0"));
-        } else {
-          size_t size = interVals.size();
-          computeNode(operandNode, false);
-          Assert(interVals.size() == size + 1, "Invalid size for %s (%ld -> %ld) in %s\n", operandNode->name.c_str(), size, interVals.size(), node->name.c_str());
-        }
+  Node* operand = node->workingVal->operands[prevIdx];
+   // std::cout << "operand: " << prevIdx << " " << operand->name << "(" << operand->status << ")" << " node: " << node->name << " " << operand->clusId << " " << operand->id << std::endl;
+  if (operand->status == CONSTANT_NODE && operand->dimension.size() == 0) {
+    if (operand->workingVal->consVal.length() == 0) {
+      if (operand->workingVal->ops.size() == 0 && operand->workingVal->operands.size() == 0) {
+        interVals.push_back(new InterVal(operand->width, operand->sign, true, 1, "0x0", "0"));
       } else {
-        interVals.push_back(new InterVal(operandNode->width, operandNode->sign, true, 1, "0x" + operandNode->workingVal->consVal, operandNode->workingVal->consVal.c_str()));
+        size_t size = interVals.size();
+        computeNode(operand, false);
+        Assert(interVals.size() == size + 1, "Invalid size for %s (%ld -> %ld) in %s\n", operand->name.c_str(), size, interVals.size(), node->name.c_str());
       }
-    } else if (operandNode->status == CONSTANT_NODE) { // constant array
-      setConsArrayPrev(operandNode);
-    } else if (operandNode->id != operandNode->clusId) {
-      size_t size = interVals.size();
-      computeNode(operandNode, false);
-      Assert(interVals.size() == size + 1, "Invalid size for %s (%ld -> %ld) in %s\n", operandNode->name.c_str(), size, interVals.size(), node->name.c_str());
     } else {
-      std::string name = operandNode->name;
-      Node* nextNode = NULL;
-      if (interVals.size() > 0 && interVals.back()->indexEnd && interVals.back()->index.size() != 0) {
-        if (operandNode->arraySplit) {
-          bool isFixIndex = true;
-          int fixIdx = 0;
-          int memberIdx = 0;
-          for (size_t idx = 0; idx < interVals.back()->index.size(); idx ++) {
-            if(idx < 0) {
-              isFixIndex = false;
-              break;
-            } else {
-              fixIdx = fixIdx * (operandNode->dimension[idx]) + interVals.back()->index[idx];
-              memberIdx = memberIdx * (operandNode->dimension[idx] + 1) + interVals.back()->index[idx];
-            }
-          }
-          if (isFixIndex) {
-            name += "$__" + std::to_string(fixIdx);
-            nextNode = operandNode->member[memberIdx];
-          } else TODO();
-        } else {
-          name += interVals.back()->value;
-        }
-        deleteAndPop();
-      }
-      if (nextNode) computeNode(nextNode, false);
-      else interVals.push_back(new InterVal(operandNode->width, operandNode->sign, false, 1, name, NULL));
+      interVals.push_back(new InterVal(operand->width, operand->sign, true, 1, "0x" + operand->workingVal->consVal, operand->workingVal->consVal.c_str()));
     }
+  } else if (operand->status == CONSTANT_NODE) { // constant array
+    setConsArrayPrev(operand);
+  } else if (operand->id != operand->clusId) {
+    size_t size = interVals.size();
+    computeNode(operand, false);
+    Assert(interVals.size() == size + 1, "Invalid size for %s (%ld -> %ld) in %s\n", operand->name.c_str(), size, interVals.size(), node->name.c_str());
+  } else {
+    std::string name = operand->name;
+    Node* nextNode = NULL;
+    if (interVals.size() > 0 && interVals.back()->indexEnd && interVals.back()->index.size() != 0) {
+      if (operand->arraySplit) {
+        bool isFixIndex = true;
+        int fixIdx = 0;
+        int memberIdx = 0;
+        for (size_t idx = 0; idx < interVals.back()->index.size(); idx ++) {
+          if(idx < 0) {
+            isFixIndex = false;
+            break;
+          } else {
+            fixIdx = fixIdx * (operand->dimension[idx]) + interVals.back()->index[idx];
+            memberIdx = memberIdx * (operand->dimension[idx] + 1) + interVals.back()->index[idx];
+          }
+        }
+        if (isFixIndex) {
+          name += "$__" + std::to_string(fixIdx);
+          nextNode = operand->member[memberIdx];
+        } else TODO();
+      } else {
+        name += interVals.back()->value;
+      }
+      deleteAndPop();
+    }
+    if (nextNode) computeNode(nextNode, false);
+    else interVals.push_back(new InterVal(operand->width, operand->sign, false, 1, name, NULL));
   }
+
   topValid = true;
   prevIdx--;
 }
@@ -925,7 +920,7 @@ void computeArray(Node* node, bool nodeEnd) {
 }
 
 void computeNode(Node* node, bool nodeEnd) {
-  // std::cout << "compute " << node->name << "(" << node->id << ") " << nodeEnd << std::endl;
+  // std::cout << "compute " << node->name << "(" << node->id << ") " << nodeEnd << " " << topValid << std::endl;
   if (node->status == CONSTANT_NODE && node->dimension.size() == 0) {
     Assert(node->workingVal->consVal.length() > 0, "consVal is not set in node %s\n", node->name.c_str());
     return;

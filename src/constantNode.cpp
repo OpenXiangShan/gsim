@@ -63,11 +63,10 @@ static inline void allocVal() {
 
 static void setPrev(Node* node, int& prevIdx) {
   allocVal();
-  if (node->workingVal->operands[prevIdx]->node->dimension.size() == 0) {
-    mpz_set_str(val.back()->a, node->workingVal->operands[prevIdx]->node->workingVal->consVal.c_str(), 16);
+  if (node->workingVal->operands[prevIdx]->dimension.size() == 0) {
+    mpz_set_str(val.back()->a, node->workingVal->operands[prevIdx]->workingVal->consVal.c_str(), 16);
   }
-  val.back()->n = node->workingVal->operands[prevIdx]->node;
-  Assert(node->workingVal->operands[prevIdx]->index.size() == 0, "invalid operand array %s\n", node->workingVal->operands[prevIdx]->node->name.c_str());
+  val.back()->n = node->workingVal->operands[prevIdx];
   topValid = true;
   prevIdx--;
 }
@@ -290,23 +289,21 @@ void checkAndComputeConstant(Node* node) {
   // std::cout << "checking " << node->name << std::endl;
   checked.insert(node);
   bool isConstant = true;
-  for (Operand* operand : node->workingVal->operands) {
-    if (!operand) continue;  // for when statments
-    if (potentialUncheckedType(operand->node) && checked.find(operand->node) == checked.end()) {
-      checkAndComputeConstant(operand->node);
+  for (Node* operand : node->workingVal->operands) {
+    if (potentialUncheckedType(operand) && checked.find(operand) == checked.end()) {
+      checkAndComputeConstant(operand);
     }
-    if (!POTENTIAL_TYPE(operand->node) || operand->node->status != CONSTANT_NODE) {
+    if (!POTENTIAL_TYPE(operand) || operand->status != CONSTANT_NODE) {
       isConstant = false;
     }
   }
   if (node->dimension.size() != 0) {
     for (Node* member : node->member) {
-      for (Operand* operand : member->workingVal->operands) {
-        if (!operand) continue;  // for when statments
-        if (potentialUncheckedType(operand->node) && checked.find(operand->node) == checked.end()) {
-          checkAndComputeConstant(operand->node);
+      for (Node* operand : member->workingVal->operands) {
+        if (potentialUncheckedType(operand) && checked.find(operand) == checked.end()) {
+          checkAndComputeConstant(operand);
         }
-        if (!POTENTIAL_TYPE(operand->node) || operand->node->status != CONSTANT_NODE) {
+        if (!POTENTIAL_TYPE(operand) || operand->status != CONSTANT_NODE) {
           isConstant = false;
         }
       }
@@ -323,7 +320,7 @@ void checkAndComputeConstant(Node* node) {
     if (node->workingVal->ops.size() == 0) {
       if (node->workingVal->operands.size() != 0) {
         Assert(node->workingVal->operands.size() == 1, "Invalid operand size %ld for %s\n", node->workingVal->operands.size(), node->name.c_str());
-        node->workingVal->consVal = node->workingVal->operands[0]->node->workingVal->consVal;
+        node->workingVal->consVal = node->workingVal->operands[0]->workingVal->consVal;
       } else {
         node->workingVal->consVal = "0";
       }

@@ -208,9 +208,7 @@ void addEdgeOperand(Node* src, Node* dst, bool connectRecursive, std::vector<Ind
   }
   if (dst->type == NODE_REG_SRC) { dst = dst->regNext; }
 
-  Operand* operand = new Operand;
-  operand->node = src;
-  dst->workingVal->operands.push_back(operand);
+  dst->workingVal->operands.push_back(src);
 
   if (rindex.size() != 0)  {
     int arrayIdx = getUpdateArrayIdx(rindex, src);
@@ -218,9 +216,7 @@ void addEdgeOperand(Node* src, Node* dst, bool connectRecursive, std::vector<Ind
     for (size_t i = 0; i < rindex.size(); i ++) {
       dst->workingVal->ops.push_back(allocRIndex(src, rindex[i], i));
       if (rindex[i].type == INDEX_NODE) {
-        Operand* operand = new Operand;
-        operand->node = rindex[i].nidx;
-        dst->workingVal->operands.push_back(operand);
+        dst->workingVal->operands.push_back(rindex[i].nidx);
         addEdge(rindex[i].nidx, dst);
       }
     }
@@ -255,9 +251,7 @@ void saveOps2Imp(Node* node, int depth) {
   if (node->workingVal->ops.size() == 0 && node->workingVal->operands.size() == 0) {
     ExprValue* imp = new ExprValue();
     if (node->type == NODE_REG_DST) {
-      Operand* operand = new Operand;
-      operand->node = node->regNext;
-      imp->operands.push_back(operand);
+      imp->operands.push_back(node->regNext);
     } else {  // for invalid signal
       PNode* zeroOp = new PNode(P_EXPR_INT_INIT);
       zeroOp->setWidth(node->width);
@@ -334,9 +328,7 @@ Node* getUpdateArray(std::vector<Index>index, Node* node) {
     arrayDst->workingVal->ops.push_back(allocLIndex(node, index[idx], idx));
     if (index[idx].type == INDEX_NODE) {
       addEdge(index[idx].nidx, arrayDst);
-      Operand* operand = new Operand;
-      operand->node = index[idx].nidx;
-      arrayDst->workingVal->operands.push_back(operand);
+      arrayDst->workingVal->operands.push_back(index[idx].nidx);
       arrayDst->workingVal->ops.push_back(NULL);
     }
   }
@@ -463,7 +455,7 @@ void addAggrMemberOps(Node* node, PNode* op) {
   }
 }
 
-void addAggrMemberOperands(Node* node, Operand* operand) {
+void addAggrMemberOperands(Node* node, Node* operand) {
   if (!node->aggrType) {
     node->workingVal->operands.push_back(operand);
     return;
@@ -998,9 +990,7 @@ void visitWhenConnect(std::string prefix, graph* g, PNode* connect,
       opIdx ++;
       if (index[idx].type == INDEX_NODE) {
         addEdge(index[idx].nidx, arrayDst);
-        Operand* operand = new Operand;
-        operand->node = index[idx].nidx;
-        arrayDst->workingVal->operands.insert(arrayDst->workingVal->operands.begin() + operandIdx, operand);
+        arrayDst->workingVal->operands.insert(arrayDst->workingVal->operands.begin() + operandIdx, index[idx].nidx);
         operandIdx ++;
         arrayDst->workingVal->ops.insert(arrayDst->workingVal->ops.begin() + opIdx, NULL);
         opIdx ++;
@@ -1029,9 +1019,7 @@ void visitWhenPrintf(std::string prefix, graph* g, PNode* print, Node* cond) {
       pnode_not->width = 1;
       n->workingVal->ops.push_back(pnode_not);
     }
-    Operand* operand = new Operand();
-    operand->node = whenTrace[i].second;
-    n->workingVal->operands.push_back(operand);
+    n->workingVal->operands.push_back(whenTrace[i].second);
     n->workingVal->ops.push_back(NULL);
   }
   visitExpr(prefix, n, print->getChild(1), false);
@@ -1062,9 +1050,7 @@ void visitWhenAssert(std::string prefix, graph* g, PNode* ass, Node* cond) {
       pnode_not->name = "not";
       n->workingVal->ops.push_back(pnode_not);
     }
-    Operand* operand = new Operand();
-    operand->node = whenTrace[i].second;
-    n->workingVal->operands.push_back(operand);
+    n->workingVal->operands.push_back(whenTrace[i].second);
     n->workingVal->ops.push_back(NULL);
   }
   visitExpr(prefix, n, ass->getChild(2), false);
@@ -1318,9 +1304,7 @@ void aggrMergeResetValue(Node* node) {
 void aggrMergeValue(Node* node) {
   if(!node->aggrType) {
     if (node->value->ops.size() == 0 && node->value->operands.size() == 0) {
-      Operand* operand = new Operand();
-      operand->node = node->regNext;
-      node->workingVal->operands.push_back(operand);
+      node->workingVal->operands.push_back(node->regNext);
     } else {
       node->workingVal->ops.insert(node->workingVal->ops.end(), node->value->ops.begin(), node->value->ops.end());
       node->workingVal->operands.insert(node->workingVal->operands.end(), node->value->operands.begin(), node->value->operands.end());

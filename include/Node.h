@@ -40,12 +40,6 @@ public:
   Node* nidx;
 };
 
-class Operand {
-public:
-  std::vector<Index> index;
-  Node* node;
-};
-
 class AggrMember {
 public:
   bool isFlip;
@@ -70,7 +64,7 @@ public:
 class ExprValue {
 public:
   std::vector<PNode*> ops;
-  std::vector<Operand*> operands;
+  std::vector<Node*> operands;
   std::string consVal;
 };
 
