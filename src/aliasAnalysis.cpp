@@ -53,12 +53,20 @@ void markAlias(Node* node) {
   }
 }
 
+bool aliasArray(Node* node) {
+  if (node->workingVal->ops.size() != 0 || node->workingVal->operands.size() != 1) return false;
+  for (Node* member : node->member) {
+    if (member->workingVal->ops.size() != 0 || member->workingVal->operands.size() != 0) return false;
+  }
+  return true;
+}
+
 void aliasAnalysis(graph* g) {
   for (size_t i = 0; i < g->sorted.size(); i ++) {
     Node* node = g->sorted[i];
     switch(node->type) {
       case NODE_OTHERS:
-        if (node->dimension.size() != 0) continue; // TODO
+        if (node->dimension.size() != 0 && !aliasArray(node)) continue;
         if (node->workingVal->ops.size() == 0 && node->workingVal->operands.size() == 1) {
           markAlias(node);
         }
