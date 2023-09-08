@@ -437,6 +437,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         break;
       case NODE_READER:
         STEP_START(sfile, g, node);
+        sfile << "activeFlags[" << node->id << "] = false;\n";
         latency = node->parent->latency[0];
         if (latency == 0) SET_OLDVAL(sfile, node->member[3]);
         DISP_CLUS_INSTS(sfile, node);
@@ -445,7 +446,6 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
           DISP_INSTS(sfile, member);
         }
         if (latency == 0) {
-          sfile << "activeFlags[" << node->id << "] = false;\n";
           MEM_READ(sfile, node->parent->width, node->parent->name, node->member[0], node->member[3]);
           activate(sfile, node->member[3], node->next, 0);
           EMU_LOG(sfile, node->id, OLDNAME(node->parent->width), node->member[3]);
@@ -454,6 +454,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         break;
       case NODE_WRITER:
         STEP_START(sfile, g, node);
+        sfile << "activeFlags[" << node->id << "] = false;\n";
         DISP_CLUS_INSTS(sfile, node);
         for (Node* member : node->member) {
           DISP_CLUS_INSTS(sfile, member);
@@ -461,7 +462,6 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         }
         latency = node->parent->latency[1];
         if (latency == 0) {
-          sfile << "activeFlags[" << node->id << "] = false;\n";
           sfile << "if(" << nodeEqualsZero(node->member[1]) << "&&" << nodeEqualsZero(node->member[4]) << ") {\n";
           MEM_WRITE(sfile, node->parent->width, node->parent->name, node->member[0], node->member[3]);
           WRITE_LOG(sfile, node->parent->name, node->member[0]->name, node->member[3]->name, node->width);
@@ -486,7 +486,6 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
         // write mode
         sfile << "if(" << node->member[6]->name << "){\n";
         if (node->parent->latency[1] == 0) {
-          sfile << "activeFlags[" << node->id << "] = false;\n";
           sfile << "if(" << nodeEqualsZero(node->member[1]) << "&&" << nodeEqualsZero(node->member[5]) << ") {\n";
           MEM_WRITE(sfile, node->parent->width, node->parent->name, node->member[0], node->member[4]);
           WRITE_LOG(sfile, node->parent->name, node->member[0]->name, node->member[4]->name, node->width);
