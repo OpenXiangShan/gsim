@@ -85,7 +85,7 @@ void activate(std::ofstream& file, Node* node, std::vector<Node*>& nextNodes, in
   }
   if (activeType != 2) {
     MUX_COUNT(file << "posActivate ++;\n");
-    MUX_COUNT(file << "posActives[" << node->id << "] ++;\n");
+    MUX_COUNT(file << "posActives[" << (node->type == NODE_MEMBER ? node->parent->id : node->id) << "] ++;\n");
   }
   for (int idx : s) file << "activeFlags[" << idx << "] = true;\n";
   if (node->dimension.size() == 0 && s.size() != 0) file << "}\n";
