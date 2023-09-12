@@ -24,10 +24,12 @@ void removeDeadNodes(graph* g) {  // after topo sort
   for (int i = g->sorted.size() - 1; i >= 0; i--) {
     if (N(i)->dimension.size() != 0 || N(i)->type == NODE_ARRAY_MEMBER) continue; // TODO
     Assert(N(i)->id >= 0 && N(i)->id < (int)g->sorted.size(), "%s id %d\n", N(i)->name.c_str(), N(i)->id);
-    bool isDeadNode = N(i)->type == NODE_OTHERS && (N(i)->next.size() == 0 || N(i)->next.size() == info[N(i)->id]);
+    bool isDeadNode = (N(i)->type == NODE_OTHERS && (N(i)->next.size() == 0 || N(i)->next.size() == info[N(i)->id])) ||
+                      (N(i)->type == NODE_REG_SRC && (N(i)->next.size() == 0 || N(i)->next.size() == info[N(i)->id]));
 
     if (isDeadNode == true) {  // deadNode
-      for (Node* n : N(i)->prev) {
+      Node* node = N(i)->type == NODE_REG_SRC ? N(i)->regNext : N(i);
+      for (Node* n : node->prev) {
         if (n->id < 0) {
           Assert(n->type == NODE_ARRAY_MEMBER, "%s %d type %d\n", n->name.c_str(), n->id, n->type);
           continue;
@@ -37,6 +39,7 @@ void removeDeadNodes(graph* g) {  // after topo sort
       }
       deadNum++;
       N(i)->status = DEAD_NODE;
+      node->status = DEAD_NODE;
       // std::cout << "deadNode: " << N(i)->name << " " << N(i)->id<< std::endl;
     }
   }
