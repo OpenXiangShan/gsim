@@ -4,54 +4,68 @@
 
 #define IS_RW(node) (node->type == NODE_READER || node->type == NODE_WRITER || node->type == NODE_READWRITER)
 
-void replaceNode(Node* oldNode, Node* newNode, Node* dst) {
+void updateOperand(Node* oldNode, Node* newNode, Node* dst) {
   auto ptr = find(dst->workingVal->operands.begin(), dst->workingVal->operands.end(), oldNode);
   if (ptr == dst->workingVal->operands.end()) {
-    Assert(dst->type == NODE_MEMBER || IS_RW(dst) || dst->type == NODE_ARRAY_MEMBER || dst->dimension.size() != 0, "%s not found in %s\n", oldNode->name.c_str(), dst->name.c_str());
+    Assert((dst->type == NODE_MEMBER || dst->type == NODE_L1_RDATA)|| IS_RW(dst) || dst->type == NODE_ARRAY_MEMBER || dst->dimension.size() != 0, "%s not found in %s %d\n", oldNode->name.c_str(), dst->name.c_str(), dst->type);
     return;
   }
   while (ptr != dst->workingVal->operands.end()) {
     *ptr = newNode;
     ptr = find(dst->workingVal->operands.begin(), dst->workingVal->operands.end(), oldNode);
   }
-  auto prevPtr = dst->prev.end();
-  while ((prevPtr = find(dst->prev.begin(), dst->prev.end(), oldNode)) != dst->prev.end()) {
-    *prevPtr = newNode;
+}
+
+void updateConnect(Node* oldNode, Node* newNode, Node* dst) {
+  if(dst->prev.find(oldNode) != dst->prev.end()) {
+    dst->prev.erase(oldNode);
+    dst->prev.insert(newNode);
+    // oldNode->next.erase(dst);
+    newNode->next.insert(dst);
   }
 }
 
-void replacePrevNode(Node* oldNode, Node* dst) {
+void replacePrevNode(Node* oldNode, Node* newNode, Node* dst) {
   auto ptr = dst->next.end();
-  while((ptr = find(dst->next.begin(), dst->next.end(), oldNode)) != dst->next.end()) {
+  if((ptr = find(dst->next.begin(), dst->next.end(), oldNode)) != dst->next.end()) {
     dst->next.erase(ptr);
   }
 }
+/*
+A -> |         | -> E
+     | C  -> D |
+B -> |         | -> F
+      new   old
+*/
 
 void markAlias(Node* node) {
-  Node* replace = node->workingVal->operands[0];
-  if (node->width != replace->width) return; // TODO
-  node->type = NODE_INVALID;
-  for (Node* prev : node->prev) {
-    replacePrevNode(node, prev);
-    if (node->dimension.size() != 0 || IS_RW(prev)) {
-      for (Node* member : prev->member) replacePrevNode(node, member);
+  Node* oldNode = node;
+  Node* newNode = node->workingVal->operands[0];
+
+  if (oldNode->width != newNode->width) return; // TODO
+  oldNode->type = NODE_INVALID;
+  // delete edge prev->old
+  for (Node* prev : oldNode->prev) {
+    replacePrevNode(oldNode, newNode, prev);
+    if (oldNode->dimension.size() != 0 || IS_RW(prev)) {
+      for (Node* member : prev->member) replacePrevNode(oldNode, newNode, member);
     }
-    prev->next.insert(prev->next.end(), node->next.begin(), node->next.end());
   }
-  std::set<Node*> nextNodes;
-  for (Node* next : node->next) {
-    if (nextNodes.find(next) != nextNodes.end()) continue;
-    replaceNode(node, replace, next);
-    nextNodes.insert(next);
-    if (node->dimension.size() != 0 || IS_RW(next)) {
+  // update prev & operands in old.next
+  newNode->next.erase(oldNode);
+  newNode->master->next.erase(oldNode->master);
+  for (Node* next : oldNode->next) {
+    updateOperand(oldNode, newNode, next);
+    updateConnect(oldNode, newNode, next);
+    if (next->dimension.size() != 0 || IS_RW(next)) {
       for (Node* member : next->member) {
-        if (nextNodes.find(member) != nextNodes.end()) continue;
-        replaceNode(node, replace, member);
-        nextNodes.insert(member);
+        updateOperand(oldNode, newNode, member);
       }
     }
+    newNode->master->next.insert(next->master);
   }
-}
+
+ }
 
 bool aliasArray(Node* node) {
   if (node->workingVal->ops.size() != 0 || node->workingVal->operands.size() != 1) return false;
@@ -79,4 +93,14 @@ void aliasAnalysis(graph* g) {
   }
   g->sorted.erase(std::remove_if(g->sorted.begin(), g->sorted.end(), [](const Node* n) { return n->type == NODE_INVALID; }),
                   g->sorted.end());
+#if 0
+  for (Node* superNode : g->superNodes) {
+    std::cout << superNode->name << " " << superNode->id << ": ";
+    for (Node* member : superNode->setOrder) std::cout << member->name <<  "(" << member->id << ", " << (member->type == NODE_INVALID ? "invalid " : "valid ") << member->prev.size()<< " " << member->next.size() << ") ";
+    std::cout << "\nprev: " << std::endl;
+    for (Node* prevSuper : superNode->prev) std::cout << "  " <<prevSuper->name << " " << prevSuper->id << std::endl;
+    std::cout << "next: " << std::endl;
+    for (Node* nextSuper : superNode->next) std::cout << "  " <<nextSuper->name << " " << nextSuper->id << std::endl;
+  }
+#endif
 }

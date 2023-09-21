@@ -91,6 +91,7 @@ void mod_reset() {
 }
 #endif
 #if defined(VERILATOR) && defined(GSIM)
+
 bool checkSignals(bool display) {
   #include "../obj/checkSig.h"
 }
@@ -119,15 +120,17 @@ int main(int argc, char** argv) {
 #endif
     cycles ++;
 #if (!defined(GSIM) && defined(VERILATOR)) || (defined(GSIM) && !defined(VERILATOR))
-    if(cycles % 1000000 == 0) {
+    if(cycles % 1000000 == 0 && cycles < 600000000) {
       clock_t dur = clock() - start;
       printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
     }
-    if (cycles % 10000000 == 0) {
-      std::ofstream out("data_active/activeTimes" + std::to_string(cycles / 10000000) + ".txt");
+#if 0
+    if (cycles % 10000000 == 0 && cycles < 600000000) {
+      std::ofstream out("data/active/activeTimes" + std::to_string(cycles / 10000000) + ".txt");
       std::vector<uint64_t> activeTimes(mod->allActiveTimes);
       std::vector<uint64_t> sorted = sort_indexes(activeTimes);
-      out << "posActives " << mod->posActivate << " " << mod->posActivate / cycles << std::endl;
+      out << "posActives " << mod->posActivate << " " << mod->posActivate / cycles << " actives " << mod->activeNum / cycles << std::endl;
+      out << "funcTime " << mod->funcTime << " activeTime " << mod->activeTime << " regsTime " << mod->regsTime << " memoryTime " << mod->memoryTime << std::endl;
       for (int i = sorted.size()-1; i >= 0; i --) {
         if (mod->allNames[sorted[i]].length() == 0) continue;
         out << mod->allNames[sorted[i]] << " " << mod->nodeNum[sorted[i]] << " " << (double)activeTimes[sorted[i]] / cycles << " " << activeTimes[sorted[i]] << " " \
@@ -135,9 +138,10 @@ int main(int argc, char** argv) {
       }
     }
 #endif
+#endif
 #if defined(GSIM)
     mod->step();
-    dut_end = (mod->cpu$writeback$valid_r == 1) && (mod->cpu$writeback$inst_r == 0x6b);
+    // dut_end = (mod->cpu$writeback$valid_r == 1) && (mod->cpu$writeback$inst_r == 0x6b);
 #endif
 #if defined(VERILATOR) && defined(GSIM)
     bool isDiff = checkSignals(false);

@@ -138,6 +138,7 @@ std::map<std::string, std::tuple<uint8_t, int (*)(int, int, bool)>> expr1Map = {
 static std::map<std::string, PNode*> moduleMap;
 static std::map<std::string, Node*> allSignals;
 static int whenDepth = 0;
+static PNode* topWhen = NULL;
 static std::vector<std::pair<bool, Node*>> whenTrace;  // cond Node trace
 static std::vector<Index> emptyIdx;
 void visitStmts(std::string prefix, graph* g, PNode* stmts);
@@ -183,10 +184,10 @@ void addSignal(std::string s, Node* n) {
 }
 
 void addEdge (Node* src, Node* dst) {
-  dst->inEdge++;
-  src->next.push_back(dst);
-  dst->prev.push_back(src);  // get arguments in instGenerator
-  // std::cout << src->name << " " << src << " -> " << dst->name << " " << dst << " " << dst->workingVal->operands.size() << std::endl;
+  if (dst->prev.find(src) == dst->prev.end()) dst->inEdge++;
+  src->next.insert(dst);
+  dst->prev.insert(src);  // get arguments in instGenerator
+  // std::cout << src->name << " " << src << " -> " << dst->name << " " << dst << " " << dst->inEdge << std::endl;
 }
 
 void addEdgeOperand(Node* src, Node* dst, bool connectRecursive, std::vector<Index>& lindex = emptyIdx,
@@ -306,6 +307,9 @@ int getUpdateArrayIdx(std::vector<Index>index, Node* node) {
       fixIndex = (fixIndex * (node->dimension[idx] + 1)) + index[idx].idx;
     }
   }
+  if (fixIndex >= 0) {
+    for (size_t idx = index.size(); idx < node->dimension.size(); idx ++) fixIndex = fixIndex * (node->dimension[idx] + 1) + node->dimension[idx];
+  }
   return fixIndex;
 }
 
@@ -361,7 +365,10 @@ void allocArrayMember(Node* node) {
     Node* member = allocNode(NODE_ARRAY_MEMBER);
     member->name = node->name + "$";
     for (size_t j = 0; j < nameIdx.size(); j ++) {
-      if(nameIdx[j] == node->dimension[j]) break;
+      if(nameIdx[j] == node->dimension[j]) {
+        for (size_t k = j; k < node->dimension.size(); k ++) member->memberDimension.push_back(node->dimension[k]);
+        break;
+      }
       member->name += "__" + std::to_string(nameIdx[j]);
     }
     updateNameIdx(node, nameIdx);
@@ -379,6 +386,13 @@ void aggrAllocArrayMember(Node* node) {
   }
   for (Node* member : node->aggrMember) {
     aggrAllocArrayMember(member);
+  }
+}
+
+void inline connectNodeWhen(graph* g, std::set<Node*>& nodes, PNode* when) {
+  g->when2NodeSet[when].insert(nodes.begin(), nodes.end());
+  for (Node* n : nodes) {
+    g->node2WhenSet[n].insert(when);
   }
 }
 
@@ -771,8 +785,8 @@ void visitConnect(std::string prefix, PNode* connect) {
   dst->index.insert(dst->index.end(), index.begin(), index.end());  // TODO: check & remove
   if (dst->dimension.size() == 0 && (dst->workingVal->ops.size() != 0 || dst->workingVal->operands.size() != 0)) { // override previous connection
     for (Node* prev : dst->prev) {
-      Assert(find(prev->next.begin(), prev->next.end(), dst) != prev->next.end(), "no connection between %s and %s\n", prev->name.c_str(), dst->name.c_str());
-      prev->next.erase(find(prev->next.begin(), prev->next.end(), dst));
+      Assert(prev->next.find(dst) != prev->next.end(), "no connection between %s and %s\n", prev->name.c_str(), dst->name.c_str());
+      prev->next.erase(dst);
     }
     dst->workingVal->ops.erase(dst->workingVal->ops.begin(), dst->workingVal->ops.end());
     dst->workingVal->operands.erase(dst->workingVal->operands.begin(), dst->workingVal->operands.end());
@@ -1112,6 +1126,7 @@ void updateWhenNode(Node* n, Node* cond, PNode* when, bool flip) {
 
 void visitWhen(std::string prefix, graph* g, PNode* when, Node* prevCond, std::set<Node*>& allNodes) { 
   // TODO: remove cStack & rename nextStack
+  if (whenDepth == 0) topWhen = when;
   whenDepth ++;
   Node* cond = allocNode(NODE_OTHERS);
   cond->name = prefix + "$WHEN_COND_" + std::to_string(when->lineno);
@@ -1145,6 +1160,8 @@ void visitWhen(std::string prefix, graph* g, PNode* when, Node* prevCond, std::s
   std::set<Node*> curNodes;
   curNodes.insert(trueNodes.begin(), trueNodes.end());
   curNodes.insert(falseNodes.begin(), falseNodes.end());
+
+  connectNodeWhen(g, curNodes, topWhen);
 
   for (auto iter = curNodes.begin(); iter != curNodes.end(); ) {
     if ((*iter)->whenDepth >= whenDepth) iter = curNodes.erase(iter);
@@ -1358,7 +1375,7 @@ graph* AST2Garph(PNode* root) {
     if (n.second->dimension.size() != 0) {
       g->array.push_back(n.second);
       for (Node* member : n.second->member) {
-        n.second->inEdge += member->inEdge;
+        n.second->inEdge += member->inEdge;  // TODO: superNode & member
       }
     }
   }

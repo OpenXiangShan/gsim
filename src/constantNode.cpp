@@ -342,6 +342,13 @@ void checkAndComputeConstant(Node* node) {
   }
 }
 
+void removeInValid(std::set<Node*>& nodeSet) {
+  for (auto iter = nodeSet.begin(); iter != nodeSet.end(); ) {
+    if ((*iter)->status != VALID_NODE) iter = nodeSet.erase(iter);
+    else iter ++;
+  }
+}
+
 // compute constant val
 void constantPropagation(graph* g) {
   for (size_t i = 0; i < g->sorted.size(); i++) {
@@ -386,18 +393,25 @@ void constantPropagation(graph* g) {
 
   for (size_t i = 0; i < g->sorted.size(); i++) {
     if (N(i)->status == VALID_NODE) {
-      N(i)->prev.erase(
-          std::remove_if(N(i)->prev.begin(), N(i)->prev.end(), [](const Node* n) { return n->status != VALID_NODE; }),
-          N(i)->prev.end());
-      N(i)->next.erase(
-          std::remove_if(N(i)->next.begin(), N(i)->next.end(), [](const Node* n) { return n->status != VALID_NODE; }),
-          N(i)->next.end());
+      removeInValid(N(i)->prev);
+      removeInValid(N(i)->next);
     }
   }
+
 
   g->sorted.erase(
       std::remove_if(g->sorted.begin(), g->sorted.end(), [](const Node* n) { return n->status != VALID_NODE; }),
       g->sorted.end());
 
   std::cout << "find " << constantNode << " constant nodes (" << totalNode << ")\n";
+#if 0
+  for (Node* superNode : g->superNodes) {
+    std::cout << superNode->name << " " << superNode->id << ": ";
+    for (Node* member : superNode->setOrder) std::cout << member->name <<  "(" << member->id << ", " << (member->type == NODE_INVALID ? "invalid " : "valid ") << member->prev.size()<< " " << member->next.size() << ") ";
+    std::cout << "\nprev: " << std::endl;
+    for (Node* prevSuper : superNode->prev) std::cout << "  " <<prevSuper->name << " " << prevSuper->id << std::endl;
+    std::cout << "next: " << std::endl;
+    for (Node* nextSuper : superNode->next) std::cout << "  " <<nextSuper->name << " " << nextSuper->id << std::endl;
+  }
+#endif
 }

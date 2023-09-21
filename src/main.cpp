@@ -23,6 +23,8 @@ void mergeNodes(graph* g);
 void mergeArray(graph* g);
 void sortMergeArray(graph* g);
 void aliasAnalysis(graph* g);
+void mergeWhen(graph* g);
+void removeInvalidSuperNodes(graph* g);
 extern PNode* root;
 
 /**
@@ -54,6 +56,8 @@ int main(int argc, char** argv) {
 
   sortMergeArray(g);
 
+  mergeWhen(g);
+
   topoSort(g);
 
   removeDeadNodes(g);
@@ -70,6 +74,8 @@ int main(int argc, char** argv) {
     if (n->status != DEAD_NODE && n->status != CONSTANT_NODE)
       std::cout << "check: " << n->type << " " << n->status << " " << n->name << std::endl;
   }
+
+  removeInvalidSuperNodes(g);
 
   generator(g, "top", "top");
 

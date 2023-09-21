@@ -9,6 +9,7 @@
 #include "common.h"
 #include "Node.h"
 #include "debug.h"
+#include <map>
 
 class graph {
  public:
@@ -16,6 +17,7 @@ class graph {
   std::vector<Node*> output;
   std::vector<Node*> sources;
   std::vector<Node*> sorted;
+  std::vector<Node*> superNodes;
   std::vector<Node*> active;
   std::vector<Node*> constant;
   std::vector<Node*> memory;
@@ -23,6 +25,8 @@ class graph {
   std::vector<Node*> array;
   std::string name;
   int maxTmp = 0;
+  std::map<Node*, std::set<PNode*>> node2WhenSet;
+  std::map<PNode*, std::set<Node*>> when2NodeSet;
 };
 
 #endif

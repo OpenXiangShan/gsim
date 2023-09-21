@@ -25,9 +25,12 @@ enum {
   NODE_OTHERS,
   NODE_ARRAY_MEMBER,
   NODE_INVALID,  // should never occur in process
+  NODE_SUPER,
+  NODE_SUPER_REG_DST,
+  NODE_SUPER_ACTIVE
 };
 
-enum { VALID_NODE, DEAD_NODE, CONSTANT_NODE };
+enum { VALID_NODE, DEAD_NODE, CONSTANT_NODE, VALID_NOT_USE };
 enum { INDEX_INT, INDEX_NODE };
 
 class PNode;
@@ -111,13 +114,16 @@ class Node {
   int whenDepth = 0;
   AggrType* aggrType = NULL;
   std::vector<int> dimension;
+  std::vector<int> memberDimension; // TODO: 最终应合并到dimension中，引入是为了防止出现其他bug
   int entryNum = 1;
-  std::vector<Node*> next;
-  std::vector<Node*> prev;
+  std::set<Node*> next;
+  std::set<Node*> prev;
   std::vector<Index> index;
   std::vector<ExprValue*> imps;
   std::vector<ExprValue*> whenStack;
   std::vector<Node*> clusNodes;
+  std::set<Node*> setNodes;
+  std::vector<Node*> setOrder;
   std::vector<Node*> aggrMember;    // can not combine into aggrType, as many nodes may share a single aggrType
   std::vector<std::string> consArray;
   ExprValue* workingVal = NULL;
@@ -127,6 +133,7 @@ class Node {
   int inEdge;  // for topo sort
   std::vector<Node*> member;
   Node* parent = NULL;
+  Node* master = NULL;
   int latency[2];
   Node* regNext;
   std::vector<std::string> insts;

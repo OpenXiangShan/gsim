@@ -25,13 +25,13 @@ void removeDeadNodes(graph* g) {  // after topo sort
     if (N(i)->dimension.size() != 0 || N(i)->type == NODE_ARRAY_MEMBER) continue; // TODO
     Assert(N(i)->id >= 0 && N(i)->id < (int)g->sorted.size(), "%s id %d\n", N(i)->name.c_str(), N(i)->id);
     bool isDeadNode = (N(i)->type == NODE_OTHERS && (N(i)->next.size() == 0 || N(i)->next.size() == info[N(i)->id])) ||
-                      (N(i)->type == NODE_REG_SRC && (N(i)->next.size() == 0 || N(i)->next.size() == info[N(i)->id]));
+                      (N(i)->type == NODE_REG_DST && !N(i)->regNext->regSplit && (N(i)->next.size() == 0 || N(i)->next.size() == info[N(i)->id]));
 
     if (isDeadNode == true) {  // deadNode
-      Node* node = N(i)->type == NODE_REG_SRC ? N(i)->regNext : N(i);
+      Node* node =  N(i);
       for (Node* n : node->prev) {
         if (n->id < 0) {
-          Assert(n->type == NODE_ARRAY_MEMBER, "%s %d type %d\n", n->name.c_str(), n->id, n->type);
+          Assert(n->type == NODE_ARRAY_MEMBER, "%s %d type %d <--- %s\n", n->name.c_str(), n->id, n->type, node->name.c_str());
           continue;
         }
         Assert(n->id >= 0 && n->id < (int)g->sorted.size(), "%s(%d %d) -> %s\n", n->name.c_str(), n->id, n->clusId, N(i)->name.c_str());
@@ -45,4 +45,15 @@ void removeDeadNodes(graph* g) {  // after topo sort
   }
 
   std::cout << "find " << deadNum << " deadNodes( " << g->sorted.size() << " )\n";
+
+#if 0
+  for (Node* superNode : g->superNodes) {
+    std::cout << superNode->name << " " << superNode->id << ": ";
+    for (Node* member : superNode->setOrder) std::cout << member->name <<  "(" << member->id << ", " << (member->type == NODE_INVALID ? "invalid " : "valid ") << member->prev.size()<< " " << member->next.size() << ") ";
+    std::cout << "\nprev: " << std::endl;
+    for (Node* prevSuper : superNode->prev) std::cout << "  " <<prevSuper->name << " " << prevSuper->id << std::endl;
+    std::cout << "next: " << std::endl;
+    for (Node* nextSuper : superNode->next) std::cout << "  " <<nextSuper->name << " " << nextSuper->id << std::endl;
+  }
+#endif
 }

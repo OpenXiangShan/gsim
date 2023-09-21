@@ -49,13 +49,25 @@ void sortMergeArray(graph* g) {
       for (Node* member :array->member) member->type = NODE_OTHERS;
       spiltNum ++;
     } else {
+      std::set<Node*> arrayNext;
       for (Node* member : array->member) {
         member->name = array->name;
-        array->next.insert(array->next.end(), member->next.begin(), member->next.end());
-        // for (Node* next : array->next) {
-        //   *(find(next->prev.begin(), next->prev.end(), member)) = array;
-        // }
+        array->next.insert(member->next.begin(), member->next.end());
+        array->prev.insert(member->prev.begin(), member->prev.end());
+        for (Node* next : member->next) {
+          Node* edgeNext = (next->type == NODE_ARRAY_MEMBER) && !next->parent->arraySplit ? next->parent : next;
+          Assert(edgeNext->inEdge > 0, "array %s next %s inEdge %d\n", array->name.c_str(), edgeNext->name.c_str(), edgeNext->inEdge);
+          edgeNext->inEdge --;
+          arrayNext.insert(edgeNext);
+          next->prev.erase(member);
+          next->prev.insert(array);
+        }
+        for (Node* prev : member->prev) {
+          prev->next.erase(member);
+          prev->next.insert(array);
+        }
       }
+      for (Node* next: arrayNext) next->inEdge ++;
     }
   }
 
