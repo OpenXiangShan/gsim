@@ -12,6 +12,7 @@
 #include "common.h"
 #include "Node.h"
 #include "graph.h"
+#include <queue>
 
 enum { DEAD = 1, VALID };
 
@@ -21,26 +22,24 @@ void removeDeadNodes(graph* g) {  // after topo sort
   std::vector<size_t> info(g->sorted.size(), 0);
   int deadNum = 0;
 
-  for (int i = g->sorted.size() - 1; i >= 0; i--) {
+  std::queue<Node*>s;
+  for (size_t i = 0; i < g->sorted.size(); i ++) {
     if (N(i)->dimension.size() != 0 || N(i)->type == NODE_ARRAY_MEMBER) continue; // TODO
     Assert(N(i)->id >= 0 && N(i)->id < (int)g->sorted.size(), "%s id %d\n", N(i)->name.c_str(), N(i)->id);
-    bool isDeadNode = (N(i)->type == NODE_OTHERS && (N(i)->next.size() == 0 || N(i)->next.size() == info[N(i)->id])) ||
-                      (N(i)->type == NODE_REG_DST && !N(i)->regNext->regSplit && (N(i)->next.size() == 0 || N(i)->next.size() == info[N(i)->id]));
-
-    if (isDeadNode == true) {  // deadNode
-      Node* node =  N(i);
-      for (Node* n : node->prev) {
-        if (n->id < 0) {
-          Assert(n->type == NODE_ARRAY_MEMBER, "%s %d type %d <--- %s\n", n->name.c_str(), n->id, n->type, node->name.c_str());
-          continue;
-        }
-        Assert(n->id >= 0 && n->id < (int)g->sorted.size(), "%s(%d %d) -> %s\n", n->name.c_str(), n->id, n->clusId, N(i)->name.c_str());
-        info[n->id]++;
+    if ((N(i)->type == NODE_OTHERS || (N(i)->type == NODE_REG_DST && !N(i)->regNext->regSplit)) &&
+                    N(i)->next.size() == 0)
+        s.push(N(i));
+  }
+  while (!s.empty()) {
+    Node* top = s.front();
+    s.pop();
+    top->status = DEAD_NODE;
+    for (Node* prev : top->prev) {
+      if (prev->id < 0 || prev->status != VALID_NODE) continue;
+      if (prev->type == NODE_OTHERS || (prev->type == NODE_REG_DST && !prev->regNext->regSplit)) {
+        info[prev->id ] ++;
+        if (prev->next.size() == info[prev->id]) s.push(prev);
       }
-      deadNum++;
-      N(i)->status = DEAD_NODE;
-      node->status = DEAD_NODE;
-      // std::cout << "deadNode: " << N(i)->name << " " << N(i)->id<< std::endl;
     }
   }
 
