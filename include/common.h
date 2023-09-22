@@ -34,6 +34,9 @@
             ((node->width <= 16 ? "uint16_t" : \
             ((node->width <= 32 ? "uint32_t" : "uint64_t")))))
 
+#define LocalType(width, sign)                     \
+  (sign ? widthSType(width) : widthUType(width))
+
 #define widthUType(width) \
   std::string(width <= 8 ? "uint8_t" : \
             ((width <= 16 ? "uint16_t" : \

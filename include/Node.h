@@ -111,6 +111,8 @@ class Node {
   int scratch;
   bool regSplit = false;
   bool arraySplit = false;
+  bool computed = false;
+  std::string valName;
   int whenDepth = 0;
   AggrType* aggrType = NULL;
   std::vector<int> dimension;
@@ -140,6 +142,10 @@ class Node {
   void set_id(int _id) {
     id     = _id;
     clusId = id;
+  }
+  void set_compute(std::string _valName) {
+    valName = _valName;
+    computed = true;
   }
 };
 

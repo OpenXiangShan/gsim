@@ -9,7 +9,7 @@
 
 #define INCLUDE_LIB(f, s) f << "#include <" << s << ">\n";
 #define INCLUDE(f, s) f << "#include \"" << s << "\"\n";
-#define OLDNAME(node) (node->name + "$oldVal")
+#define OLDNAME(node, width) (width <= 64 ? (node->name + "$oldVal") : "oldValMpz")
 
 #define UI(x) (std::string("mpz_get_ui(") + x + ")")
 #define nameUI(node) (node->width > 64 ? UI(node->name) : node->name)
@@ -29,7 +29,7 @@ void setOldVal(std::ofstream& file, Node* node) {
   }
   std::string oldName = node->name + "$oldVal";
   file << (node->width > 64 ? "mpz_set(oldValMpz, " + node->name + ")" :
-            nodeType(node) + " " + oldName + " = " + node->name) << ";\n";
+            widthUType(node->width) + " " + oldName + " = " + node->name) << ";\n";
 }
 
 void activateNode(std::ofstream& file, Node* node, std::set<Node*>& nextNodes, std::set<int>& s, int activeType, Node* superNode) {
@@ -282,7 +282,7 @@ void genNodeDef(Node* node, std::ofstream& hfile, std::string& mpz_vals
         if (member->width > 64)
           mpz_vals += "mpz_t " + member->name + ";\n";
         else
-          hfile << nodeType(member) << " " << member->name << ";\n";
+          hfile << widthUType(member->width) << " " << member->name << ";\n";
       }
       break;
     case NODE_L1_RDATA: break;
@@ -294,7 +294,7 @@ void genNodeDef(Node* node, std::ofstream& hfile, std::string& mpz_vals
         for (int idx : node->dimension) mpz_vals += "[" + std::to_string(idx) + "]";
         mpz_vals += ";\n";
       } else {
-        hfile << nodeType(node) << " " << node->name;
+        hfile << widthUType(node->width) << " " << node->name;
         dispDimension(hfile, node);
         hfile << ";\n";
       }
@@ -370,7 +370,7 @@ void genHeader(graph* g, std::string headerFile) {
       for (int idx : node->dimension) mpz_vals += "[" + std::to_string(idx) + "]";
       mpz_vals += ";\n";
     } else {
-      hfile << nodeType(node) << " " << node->name << "$prev";
+      hfile << widthUType(node->width) << " " << node->name << "$prev";
       dispDimension(hfile, node);
       hfile << ";\n";
     }
@@ -439,7 +439,7 @@ void genNodeInsts(Node* node, std::ofstream& sfile, Node* superNode) {
       Assert(node->type == NODE_REG_DST, "invalid Node %s\n", node->name.c_str());
       activate(sfile, node, node->regNext->regSplit ? node->regNext->next : node->next, 1, superNode);
       if (!node->regNext->regSplit) {
-        EMU_LOG(sfile, superNode->id, OLDNAME(node), node);
+        EMU_LOG(sfile, superNode->id, OLDNAME(node, node->width), node);
       } else {
         EMU_LOG(sfile, superNode->id, node->regNext->name, node);
       }
@@ -453,7 +453,7 @@ void genNodeInsts(Node* node, std::ofstream& sfile, Node* superNode) {
       DISP_INSTS(sfile, node);
       activeNode = node->type == NODE_REG_DST ? node->regNext : node;
       activate(sfile, activeNode, activeNode->next, 0, superNode);
-      EMU_LOG(sfile, superNode->id, OLDNAME(node), node);
+      EMU_LOG(sfile, superNode->id, OLDNAME(node, node->width), node);
       break;
     case NODE_READER:
       latency = node->parent->latency[0];
@@ -466,7 +466,7 @@ void genNodeInsts(Node* node, std::ofstream& sfile, Node* superNode) {
       if (latency == 0) {
         MEM_READ(sfile, node->parent->width, node->parent->name, node->member[0], node->member[3]);
         activate(sfile, node->member[3], node->next, 0, superNode);
-        EMU_LOG(sfile, superNode->id, OLDNAME(node->member[3]), node->member[3]);
+        EMU_LOG(sfile, superNode->id, OLDNAME(node->member[3], node->parent->width), node->member[3]);
         EMU_LOG2(sfile, superNode->id, node->member[0]);
       }
       break;
@@ -512,7 +512,7 @@ void genNodeInsts(Node* node, std::ofstream& sfile, Node* superNode) {
         sfile << "activeFlags[" << node->id << "] = false;\n";
         MEM_READ(sfile, node->parent->width, node->parent->name, node->member[0], node->member[3]);
         activate(sfile, node->member[3], node->next, 0, superNode);
-        EMU_LOG(sfile, superNode->id, OLDNAME(node), node->member[3]);
+        EMU_LOG(sfile, superNode->id, OLDNAME(node, node->parent->width), node->member[3]);
       }
       break;
     case NODE_INP: return;
@@ -605,6 +605,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   // active nodes
   MUX_COUNT(sfile << "clock_t befActive = std::clock();\n");
   for (Node* n : g->active) {
+    DISP_CLUS_INSTS(sfile, n);
     for (size_t i = 0; i < n->insts.size(); i++) sfile << n->insts[i] << "\n";
   }
   MUX_COUNT(sfile << "clock_t aftActive = std::clock();\n");

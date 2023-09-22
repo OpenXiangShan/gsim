@@ -237,8 +237,11 @@ static void setPrev(Node* node, int& prevIdx) {
     setConsArrayPrev(operand);
   } else if (operand->id != operand->clusId) {
     size_t size = interVals.size();
-    computeNode(operand, false);
-    Assert(interVals.size() == size + 1, "Invalid size for %s (%ld -> %ld) in %s\n", operand->name.c_str(), size, interVals.size(), node->name.c_str());
+    if (!operand->computed) {
+      computeNode(operand, false);
+    }
+    Assert(interVals.size() == size, "Invalid size for %s (%ld -> %ld) in %s\n", operand->name.c_str(), size, interVals.size(), node->name.c_str());
+    interVals.push_back(new InterVal(operand->width, operand->sign, false, 1, operand->valName, NULL));
   } else {
     std::string name = operand->name;
     Node* nextNode = NULL;
@@ -315,7 +318,7 @@ void insts_1expr1int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
           node->insts.push_back(widthUType(valWidth) + " " + operandName + " = " + interVals.back()->value + ";");
         } else
           operandName = interVals.back()->value;
-        dstName = "(-((" + nodeType(op) + ")(" + operandName + " >> " + std::to_string(valWidth - 1) +
+        dstName = "(-((" + widthUType(op->width) + ")(" + operandName + " >> " + std::to_string(valWidth - 1) +
                   ") << " + std::to_string(valWidth) + ") | " + operandName + ")";
       }
     } else if (op->name == "tail") {
@@ -590,7 +593,7 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
     dstOpNum = 1;
     std::string cond_true, cond_false;
     if (!interVals.back()->isCons) {
-      cond_true = (interVals.back()->opNum == 1 ? "mpz_set(" : "mpz_set_ui(") + dstName + ", " + interVals.back()->value + ")";
+      cond_true = ((interVals.back()->opNum == 1 && interVals.back()->width > 64)? "mpz_set(" : "mpz_set_ui(") + dstName + ", " + interVals.back()->value + ")";
     } else {
       if (interVals.back()->value.length() <= 18)
         cond_true = "mpz_set_ui(" + dstName + ", " + interVals.back()->value + ")";
@@ -600,7 +603,7 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
     deleteAndPop();
 
     if (!interVals.back()->isCons) {
-      cond_false = (interVals.back()->opNum == 1 ? "mpz_set(" : "mpz_set_ui(") + dstName + ", " + interVals.back()->value + ")";
+      cond_false = ((interVals.back()->opNum == 1 && interVals.back()->width > 64) ? "mpz_set(" : "mpz_set_ui(") + dstName + ", " + interVals.back()->value + ")";
     } else {
       if (interVals.back()->value.length() <= 18)
         cond_false = "mpz_set_ui(" + dstName + ", " + interVals.back()->value + ")";
@@ -609,7 +612,6 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
     }
     if(muxType == 0) {
       if(isIf) {
-        std::cout << cond_true << " " << cond_false << " " << node->name << std::endl;
         bool trueFix = cond_true == node->name || (node->type == NODE_REG_DST && cond_true == node->regNext->name);
         bool falseFix = cond_false == node->name || (node->type == NODE_REG_DST && cond_false == node->regNext->name);
         if (trueFix && falseFix) {
@@ -665,7 +667,7 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
         } else
           value = "if (" + cond + "){\n" + cond_true + ";\n} else {\n" + cond_false + ";\n}";
       } else {
-        value = "(" + cond + "? " + cond_true + " : \n" + cond_false + ")";
+        value = "(" + cond + "? " + cond_true + " : " + cond_false + ")";
       }
     }
     else if(muxType == 1) value = cond_false;
@@ -927,9 +929,11 @@ void computeNode(Node* node, bool nodeEnd) {
   }
   if (node->dimension.size() != 0) {
     computeArray(node, nodeEnd);
+    node->set_compute("INVALID_ARRAY");
     return;
   }
   if (node->workingVal->ops.size() == 0 && node->workingVal->operands.size() == 0) {
+    node->set_compute("INVALID_EMPTY");
     return;
   }
 
@@ -961,24 +965,38 @@ void computeNode(Node* node, bool nodeEnd) {
   }
   if (!topValid) {
     setPrev(node, prevIdx);
-    if (!nodeEnd) return;
+    if (nodeEnd) {
+      if (node->width > 64 && interVals.back()->width > 64) {
+        node->insts.push_back("mpz_set(" + node->name + ", " + interVals.back()->value + ");");
+      } else if (node->width > 64 && interVals.back()->width <= 64) {
+        node->insts.push_back("mpz_set_ui(" + node->name + ", " + interVals.back()->value + ");");
+      } else if (node->width <= 64 && interVals.back()->width > 64) {
+        node->insts.push_back(node->name + " = mpz_get_ui(" + interVals.back()->value + ");");
+      } else {
+        node->insts.push_back(VAR_NAME(node) + " = " + interVals.back()->value + ";");
+      }
+    }
+  }
+  if (nodeEnd) node->set_compute(node->name);
+  else {
     if (node->width > 64 && interVals.back()->width > 64) {
-      node->insts.push_back("mpz_set(" + node->name + ", " + interVals.back()->value + ");");
+        node->set_compute(interVals.back()->value);
     } else if (node->width > 64 && interVals.back()->width <= 64) {
-      node->insts.push_back("mpz_set_ui(" + node->name + ", " + interVals.back()->value + ");");
+        std::string name = NEW_TMP;
+        node->insts.push_back("mpz_set_ui(" + name + ", " + interVals.back()->value + ");");
+        node->set_compute(name);
     } else if (node->width <= 64 && interVals.back()->width > 64) {
-      node->insts.push_back(node->name + " = mpz_get_ui(" + interVals.back()->value + ");");
+        node->insts.push_back(LocalType(node->width, node->sign) + " " + node->name + " = mpz_get_ui(" + interVals.back()->value + ");");
+        node->set_compute(node->name);
     } else {
-      node->insts.push_back(VAR_NAME(node) + " = " + interVals.back()->value + ";");
+        node->insts.push_back(LocalType(node->width, node->sign) + " " + VAR_NAME(node) + " = " + interVals.back()->value + ";");
+        node->set_compute(node->name);
     }
   }
   Assert(!interVals.back()->isCons, "Invalid constant %s in node %s\n", interVals.back()->value.c_str(), node->name.c_str());
-  if (nodeEnd) {
-    Assert(interVals.size() > 0, "empty interVals for %s\n", node->name.c_str());
-    deleteAndPop();
-    topValid = false;
-    Assert(interVals.size() == 0 && valSize == 0, "interVals %ld valSize %d\n", interVals.size(), valSize);
-  }
+  deleteAndPop();
+  topValid = false;
+
 }
 
 void instsGenerator(graph* g) {
