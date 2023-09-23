@@ -187,7 +187,7 @@ static void setConsValName(PNode* op) {
 static void inline setConstantNode(Node* node) {
   node->status = CONSTANT_NODE;
   char * str = mpz_get_str(NULL, 16, interVals.back()->mpzVal);
-  node->workingVal->consVal = std::string("0x") + str;
+  node->workingVal->consVal = str;
   free(str);
 }
 
@@ -241,7 +241,11 @@ static void setPrev(Node* node, int& prevIdx) {
       computeNode(operand, false);
     }
     Assert(interVals.size() == size, "Invalid size for %s (%ld -> %ld) in %s\n", operand->name.c_str(), size, interVals.size(), node->name.c_str());
-    interVals.push_back(new InterVal(operand->width, operand->sign, false, 1, operand->valName, NULL));
+    if (operand->status == CONSTANT_NODE) {
+      interVals.push_back(new InterVal(operand->width, operand->sign, true, 1, "0x" + operand->workingVal->consVal, operand->workingVal->consVal.c_str()));
+    } else {
+      interVals.push_back(new InterVal(operand->width, operand->sign, false, 1, operand->valName, NULL));
+    }
   } else {
     std::string name = operand->name;
     Node* nextNode = NULL;
@@ -567,15 +571,21 @@ bool insts_l_cons_index(Node* node, int opIdx, int& prevIdx, std::vector<std::st
   return op->lineno == 0;
 }
 
-
 void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
   PNode* op = node->workingVal->ops[opIdx];
   if (!topValid) setPrev(node, prevIdx);
-  bool dstCons = interVals.back()->isCons && interVals[interVals.size() - 2]->isCons && interVals[interVals.size()-3]->isCons;
-  if (dstCons) {
+
+  if (interVals.back()->isCons && interVals[interVals.size() - 2]->isCons && interVals[interVals.size()-3]->isCons) {
     us_mux(interVals[interVals.size() - 3]->mpzVal, interVals.back()->mpzVal, interVals[interVals.size() - 2]->mpzVal, interVals[interVals.size() - 3]->mpzVal);
     deleteAndPop();
     deleteAndPop();
+    if (opIdx == 0) setConstantNode(node);
+    return;
+  } else if (interVals[interVals.size() - 2]->isCons && interVals[interVals.size()-3]->isCons &&
+              mpz_cmp(interVals[interVals.size()-2]->mpzVal, interVals[interVals.size()-3]->mpzVal) == 0) {
+    deleteAndPop();
+    deleteAndPop();
+    interVals.back()->width = op->width;
     if (opIdx == 0) setConstantNode(node);
     return;
   }
@@ -983,17 +993,17 @@ void computeNode(Node* node, bool nodeEnd) {
         node->set_compute(interVals.back()->value);
     } else if (node->width > 64 && interVals.back()->width <= 64) {
         std::string name = NEW_TMP;
-        node->insts.push_back("mpz_set_ui(" + name + ", " + interVals.back()->value + ");");
+        if (node->status != CONSTANT_NODE) node->insts.push_back("mpz_set_ui(" + name + ", " + interVals.back()->value + ");");
         node->set_compute(name);
     } else if (node->width <= 64 && interVals.back()->width > 64) {
-        node->insts.push_back(LocalType(node->width, node->sign) + " " + node->name + " = mpz_get_ui(" + interVals.back()->value + ");");
+        if (node->status != CONSTANT_NODE) node->insts.push_back(LocalType(node->width, node->sign) + " " + node->name + " = mpz_get_ui(" + interVals.back()->value + ");");
         node->set_compute(node->name);
     } else {
-        node->insts.push_back(LocalType(node->width, node->sign) + " " + VAR_NAME(node) + " = " + interVals.back()->value + ";");
+        if (node->status != CONSTANT_NODE) node->insts.push_back(LocalType(node->width, node->sign) + " " + VAR_NAME(node) + " = " + interVals.back()->value + ";");
         node->set_compute(node->name);
     }
   }
-  Assert(!interVals.back()->isCons, "Invalid constant %s in node %s\n", interVals.back()->value.c_str(), node->name.c_str());
+  // Assert(!interVals.back()->isCons, "Invalid constant %s in node %s\n", interVals.back()->value.c_str(), node->name.c_str());
   deleteAndPop();
   topValid = false;
 
