@@ -16,7 +16,7 @@ $(shell mkdir -p $(OBJ_DIR))
 
 NAME ?= newtop
 # NAME ?= freechips.rocketchip.system.DefaultConfig
-# NAME ?= Exp7AllTest
+# NAME ?= Exp1AllTest
 
 TEST_FILE = ready-to-run/$(NAME)
 
@@ -67,6 +67,7 @@ VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
 VERI_VSRCS += $(addprefix ready-to-run/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v)
 VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIR)/difftest-ysyx3.cpp
+VERI_HEADER = $(shell find $(OBJ_DIR) -name "*.h")
 VERI_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(VERI_CSRCS:.cpp=.o))
 
 GSIM_CFLAGS = -O3 $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME)
@@ -78,9 +79,9 @@ $(GSIM_BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(dir $@) && echo + CXX $<
 	@$(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
 
-$(EMU_BUILD_DIR)/%.o: %.cpp
+$(EMU_BUILD_DIR)/%.o: %.cpp $(VERI_HEADER)
 	@mkdir -p $(dir $@) && echo + CXX $<
-	$(CXX) $^ $(GSIM_CFLAGS) -c -o $@
+	$(CXX) $< $(GSIM_CFLAGS) -c -o $@
 
 $(TARGET): makedir $(PARSER_OBJS) $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) $(PARSER_OBJS) -o $(GSIM_BUILD_DIR)/$(TARGET) -lgmp
@@ -95,7 +96,7 @@ compile: $(TARGET)
 clean:
 	rm -rf obj parser/build obj_dir build
 
-emu: obj/top.cpp $(EMU_SRC) compile
+emu: obj/top.cpp $(EMU_SRC)
 	g++ $(EMU_SRC) obj/top.cpp -DMOD_NAME=S$(NAME) -Wl,-lgmp -Iobj -I$(EMU_SRC_DIR) -o $(GSIM_BUILD_DIR)/$(EMU_TARGET)
 	$(GSIM_BUILD_DIR)/$(EMU_TARGET)
 
