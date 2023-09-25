@@ -75,7 +75,7 @@ GSIM_CFLAGS = -O3 $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(N
 mainargs = ready-to-run/bin/bbl-hello.bin
 # mainargs = ysyx3-bin/rtthread.bin
 
-$(GSIM_BUILD_DIR)/%.o: %.cpp
+$(GSIM_BUILD_DIR)/%.o: %.cpp $(PARSER_SRCS)
 	@mkdir -p $(dir $@) && echo + CXX $<
 	@$(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
 
