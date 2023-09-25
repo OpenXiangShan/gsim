@@ -21,6 +21,7 @@
     file << "void S" << g->name << "::step" << node->id << "() {\n"; \
     MUX_COUNT(file << "allActiveTimes[" << node->id << "] ++;\n"); \
     MUX_COUNT(file << "activeNum ++;\n"); \
+    MUX_COUNT(file << "bool isActive = false;\n"); \
   } while (0)
 
 void setOldVal(std::ofstream& file, Node* node) {
@@ -90,8 +91,7 @@ void activate(std::ofstream& file, Node* node, std::set<Node*>& nextNodes, int a
           << "){\n";
   }
   if (activeType != 2) {
-    MUX_COUNT(file << "posActivate ++;\n");
-    MUX_COUNT(file << "posActives[" << (node->type == NODE_MEMBER ? node->parent->id : node->id) << "] ++;\n");
+    MUX_COUNT(file << "isActive = true;\n");
   }
   for (int idx : s) file << "activeFlags[" << idx << "] = true;\n";
   if (node->dimension.size() == 0 && s.size() != 0) file << "}\n";
@@ -342,8 +342,9 @@ void genHeader(graph* g, std::string headerFile) {
   // constructor
   hfile << "S" << g->name << "() {" << std::endl;
   hfile << "init_functions();\n";
-  MUX_COUNT(for (size_t i = 0; i < g->sorted.size(); i ++) hfile << "allNames[" << g->sorted[i]->id << "] = \"" << g->sorted[i]->name << "\";\n"; );
-  MUX_COUNT(for (size_t i = 0; i < g->sorted.size(); i ++) hfile << "nodeNum[" << g->sorted[i]->id << "] = " << g->sorted[i]->clusNodes.size() + 1 << ";\n"; );
+  MUX_COUNT(for (size_t i = 0; i < g->superNodes.size(); i ++) hfile << "allNames[" << g->superNodes[i]->id << "] = \"" \
+                          << (g->superNodes[i]->setOrder.size() > 0 ? g->superNodes[i]->setOrder[0]->name : "") << "\";\n"; );
+  MUX_COUNT(for (size_t i = 0; i < g->sorted.size(); i ++) hfile << "nodeNum[" << g->sorted[i]->master->id << "] = " << g->sorted[i]->clusNodes.size() + 1 << ";\n"; );
   for (int i = 1; i <= g->maxTmp; i++) hfile << "mpz_init(__tmp__" << i << ");\n";
   hfile << "mpz_init(t0);\n";
   hfile << "mpz_init(oldValMpz);\n";
@@ -395,10 +396,10 @@ void genHeader(graph* g, std::string headerFile) {
   MUX_COUNT(hfile << "uint64_t activeNum = 0;\n");
   MUX_COUNT(hfile << "uint64_t posActivate = 0;\n");
   MUX_COUNT(hfile << "double funcTime = 0, activeTime = 0, regsTime = 0, memoryTime = 0;\n"); // ms;
-  MUX_COUNT(hfile << "std::vector<uint64_t> allActiveTimes = std::vector<uint64_t>(" << g->sorted.back()->id << ", 0);\n");
-  MUX_COUNT(hfile << "std::vector<uint64_t> posActives = std::vector<uint64_t>(" << g->sorted.back()->id << ", 0);\n");
-  MUX_COUNT(hfile << "std::vector<std::string> allNames = std::vector<std::string>(" << g->sorted.back()->id << ", \"\");\n");
-  MUX_COUNT(hfile << "std::vector<uint64_t> nodeNum = std::vector<uint64_t>(" << g->sorted.back()->id << ", 0);\n");
+  MUX_COUNT(hfile << "std::vector<uint64_t> allActiveTimes = std::vector<uint64_t>(" << g->superNodes.back()->id << ", 0);\n");
+  MUX_COUNT(hfile << "std::vector<uint64_t> posActives = std::vector<uint64_t>(" << g->superNodes.back()->id << ", 0);\n");
+  MUX_COUNT(hfile << "std::vector<std::string> allNames = std::vector<std::string>(" << g->superNodes.back()->id << ", \"\");\n");
+  MUX_COUNT(hfile << "std::vector<uint64_t> nodeNum = std::vector<uint64_t>(" << g->superNodes.back()->id << ", 0);\n");
   // set functions
   for (Node* node : g->input) {
     if (node->width > 64) {
@@ -562,6 +563,8 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
     for (Node* n : node->setOrder) {
       genNodeInsts(n, sfile, node);
     }
+    MUX_COUNT(sfile << "posActivate += isActive;\n");
+    MUX_COUNT(sfile << "posActives[" << node->id << "] += isActive;\n");
     sfile << "}\n";
   }
 
