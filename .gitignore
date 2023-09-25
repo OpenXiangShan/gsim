@@ -12,3 +12,4 @@ tmp*
 compile_commands.json
 data/
 doc/html
+*.out
