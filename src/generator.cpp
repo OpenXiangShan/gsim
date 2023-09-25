@@ -33,7 +33,7 @@ void setOldVal(std::ofstream& file, Node* node) {
             widthUType(node->width) + " " + oldName + " = " + node->name) << ";\n";
 }
 
-void activateNode(std::ofstream& file, Node* node, std::set<Node*>& nextNodes, std::set<int>& s, int activeType, Node* superNode) {
+void activateNode(Node* node, std::set<Node*>& nextNodes, std::set<int>& s, int activeType, Node* superNode) {
   for (Node * next : nextNodes) {
     if (next->type == NODE_ARRAY_MEMBER) next = next->parent;
     if (next->status == VALID_NODE && next->type != NODE_ACTIVE) { // TODO: next->type == SUPER_NODE
@@ -56,8 +56,10 @@ void activateNode(std::ofstream& file, Node* node, std::set<Node*>& nextNodes, s
 
       } else if (activeType == 1) {  // regs in stepId()
         if (activateID > superNode->id) continue;
-      } else {
+      } else if (activeType == 2) {
         if (activateID <= superNode->id) continue;
+      } else {
+        Assert(0, "should not reach here\n");
       }
       if(s.find(activateID) == s.end()) {
         s.insert(activateID);
@@ -79,10 +81,10 @@ void activate(std::ofstream& file, Node* node, std::set<Node*>& nextNodes, int a
   std::set<int> s;
   std::string oldName = node->type == NODE_REG_DST && node->regNext->regSplit ? node->regNext->name :
                         (node->width > 64 ? "oldValMpz" : node->name + "$oldVal");
-  activateNode(file, node, nextNodes, s, activeType, superNode);
+  activateNode(node, nextNodes, s, activeType, superNode);
   if (node->dimension.size() != 0) {
     for (Node* member : node->member) {
-      activateNode(file, member, member->next, s, activeType, superNode);
+      activateNode(member, member->next, s, activeType, superNode);
     }
   }
   if (node->dimension.size() == 0 && s.size() != 0) {
@@ -90,7 +92,7 @@ void activate(std::ofstream& file, Node* node, std::set<Node*>& nextNodes, int a
           << (node->width > 64 ? "mpz_cmp(" + oldName + ", " + node->name + ") != 0" : oldName + " != " + node->name)
           << "){\n";
   }
-  if (activeType != 2) {
+  if (activeType == 0 || activeType == 1) {
     MUX_COUNT(file << "isActive = true;\n");
   }
   for (int idx : s) file << "activeFlags[" << idx << "] = true;\n";
@@ -627,12 +629,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
       else
         sfile << node->name << " = " << node->name << "$next;\n";
     } else {
-      for (Node* next : node->next) {
-        int activateId = next->id == next->clusId ? next->id : next->clusNodes[0]->id;
-        if (next->status == VALID_NODE && next->type != NODE_ACTIVE && activateId > node->id) {
-          sfile << "activeFlags[" << activateId << "] = true;\n";
-        }
-      }
+      activate(sfile, node->regNext, node->next, 2, node->regNext->master);
       if (node->width > 64) {
         std::string idxStr;
         std::string outBracket;
