@@ -993,14 +993,17 @@ void computeNode(Node* node, bool nodeEnd) {
         node->set_compute(interVals.back()->value);
     } else if (node->width > 64 && interVals.back()->width <= 64) {
         std::string name = NEW_TMP;
-        if (node->status != CONSTANT_NODE) node->insts.push_back("mpz_set_ui(" + name + ", " + interVals.back()->value + ");");
-        node->set_compute(name);
+        // if (node->status != CONSTANT_NODE) node->insts.push_back("mpz_set_ui(" + name + ", " + interVals.back()->value + ");");
+        // node->set_compute(name);
+        node->set_compute(interVals.back()->value);
     } else if (node->width <= 64 && interVals.back()->width > 64) {
-        if (node->status != CONSTANT_NODE) node->insts.push_back(LocalType(node->width, node->sign) + " " + node->name + " = mpz_get_ui(" + interVals.back()->value + ");");
-        node->set_compute(node->name);
+        // if (node->status != CONSTANT_NODE) node->insts.push_back(LocalType(node->width, node->sign) + " " + node->name + " = mpz_get_ui(" + interVals.back()->value + ");");
+        // node->set_compute(node->name);
+        node->set_compute("mpz_get_ui(" + interVals.back()->value + ")");
     } else {
-        if (node->status != CONSTANT_NODE) node->insts.push_back(LocalType(node->width, node->sign) + " " + VAR_NAME(node) + " = " + interVals.back()->value + ";");
-        node->set_compute(node->name);
+        // if (node->status != CONSTANT_NODE) node->insts.push_back(LocalType(node->width, node->sign) + " " + VAR_NAME(node) + " = " + interVals.back()->value + ";");
+        // node->set_compute(node->name);
+        node->set_compute(interVals.back()->value);
     }
   }
   // Assert(!interVals.back()->isCons, "Invalid constant %s in node %s\n", interVals.back()->value.c_str(), node->name.c_str());
