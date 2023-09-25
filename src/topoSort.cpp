@@ -166,7 +166,7 @@ void sortRegisters(std::vector<std::vector<Node*>>& nextRegs, graph* g, int idx)
     g->superNodes.push_back(n->regNext->master);
   }
 
-  std::cout << "spilt " << g->sources.size() - order.size() << " (" << g->sources.size() << ") registers\n";
+  std::cout << "split " << g->sources.size() - order.size() << " (" << g->sources.size() << ") registers\n";
 
 }
 
@@ -223,6 +223,14 @@ void topoSort(graph* g) {
     for (Node* prevSuper : superNode->prev) std::cout << "  " <<prevSuper->name << " " << prevSuper->id << std::endl;
     std::cout << "next: " << std::endl;
     for (Node* nextSuper : superNode->next) std::cout << "  " <<nextSuper->name << " " << nextSuper->id << std::endl;
+  }
+  for (Node* node : g->sorted) {
+    std::cout << node->name << " " << node->id << " " << node->master->name << " " << node->master->id << ": (" << node->next.size() << ", " << node->regSplit << ")" << std::endl;
+    for (Node* next : node->next) {
+      std::cout << "   next " << next->name << " " << next->id << " ";
+      if (next->master) std::cout << next->master->name << " " << next->master->id << std::endl;
+      else std::cout << "NULL " << std::endl;
+    }
   }
 #endif
 

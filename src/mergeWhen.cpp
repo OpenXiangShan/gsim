@@ -116,7 +116,6 @@ void mergeWhen(graph* g) {
 
   updateSuperConnect(g);
   updateArrayMaster(g);
-  std::cout << "superNode " << g->superNodes.size() << std::endl;
 }
 
 void removeInvalidSuperNodes(graph* g) {

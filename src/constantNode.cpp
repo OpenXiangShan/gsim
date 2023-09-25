@@ -407,11 +407,19 @@ void constantPropagation(graph* g) {
 #if 0
   for (Node* superNode : g->superNodes) {
     std::cout << superNode->name << " " << superNode->id << ": ";
-    for (Node* member : superNode->setOrder) std::cout << member->name <<  "(" << member->id << ", " << (member->type == NODE_INVALID ? "invalid " : "valid ") << member->prev.size()<< " " << member->next.size() << ") ";
+    for (Node* member : superNode->setOrder) std::cout << member->name <<  "(" << member->id << ", " << (member->status != VALID_NODE ? "invalid " : "valid ") << member->prev.size()<< " " << member->next.size() << ") ";
     std::cout << "\nprev: " << std::endl;
     for (Node* prevSuper : superNode->prev) std::cout << "  " <<prevSuper->name << " " << prevSuper->id << std::endl;
     std::cout << "next: " << std::endl;
     for (Node* nextSuper : superNode->next) std::cout << "  " <<nextSuper->name << " " << nextSuper->id << std::endl;
+  }
+  for (Node* node : g->sorted) {
+    std::cout << node->name << " " << node->id << " " << node->master->name << " " << node->master->id << ": (" << node->next.size() << ")" << std::endl;
+    for (Node* next : node->next) {
+      std::cout << "   next " << next->name << " " << next->id << " ";
+      if (next->master) std::cout << next->master->name << " " << next->master->id << std::endl;
+      else std::cout << "NULL " << std::endl;
+    }
   }
 #endif
 }

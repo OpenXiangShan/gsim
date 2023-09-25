@@ -102,5 +102,13 @@ void aliasAnalysis(graph* g) {
     std::cout << "next: " << std::endl;
     for (Node* nextSuper : superNode->next) std::cout << "  " <<nextSuper->name << " " << nextSuper->id << std::endl;
   }
+  for (Node* node : g->sorted) {
+    std::cout << node->name << " " << node->id << " " << node->master->name << " " << node->master->id << ": (" << node->status << ")" << std::endl;
+    for (Node* next : node->next) {
+      std::cout << "   next " << next->name << " " << next->id << " ";
+      if (next->master) std::cout << next->master->name << " " << next->master->id << std::endl;
+      else std::cout << "NULL " << std::endl;
+    }
+  }
 #endif
 }
