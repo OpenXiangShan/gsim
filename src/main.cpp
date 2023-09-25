@@ -25,6 +25,7 @@ void sortMergeArray(graph* g);
 void aliasAnalysis(graph* g);
 void mergeWhen(graph* g);
 void removeInvalidSuperNodes(graph* g);
+void mergeRegister(graph* g);
 extern PNode* root;
 
 /**
@@ -67,6 +68,8 @@ int main(int argc, char** argv) {
   aliasAnalysis(g);
 
   mergeNodes(g);
+
+  mergeRegister(g);
 
   instsGenerator(g);
 
