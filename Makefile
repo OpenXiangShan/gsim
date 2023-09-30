@@ -129,10 +129,10 @@ gendoc:
 	doxygen
 	python3 -m http.server 8080 --directory doc/html
 
-format:
-	@clang-format -i --style=file $(SRCS) $(HEADERS)
+# format:
+# 	@clang-format -i --style=file $(SRCS) $(HEADERS)
 
 format-obj:
 	@clang-format -i --style=file obj/top.cpp
 
-.PHONY: compile clean emu difftest count makedir gendoc format
+.PHONY: compile clean emu difftest count makedir gendoc format-obj
