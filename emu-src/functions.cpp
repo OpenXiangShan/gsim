@@ -27,6 +27,11 @@ unsigned long ui_tail(mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
   u_tail(t2, src, bitcnt, n);
   return mpz_get_ui(t2);
 }
+__uint128_t ui_tail128(mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
+  u_tail(t2, src, bitcnt, n);
+  if (mpz_size(t2) == 1) return mpz_get_ui(t2);
+  else return (__uint128_t)mpz_getlimbn(src, 1) << 64 | mpz_get_ui(src);
+}
 // u_head: remove the last n bits
 void u_head(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
   mpz_tdiv_q_2exp(dst, src, n);
@@ -40,8 +45,19 @@ void u_cat_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt) {
   mpz_mul_2exp(dst, src, bitcnt);
   mpz_add_ui(dst, dst, val);
 }
+void u_cat_ui_r128(mpz_t& dst, mpz_t& src, __uint128_t val, mp_bitcnt_t bitcnt) {
+  mpz_mul_2exp(dst, src, bitcnt - 64);
+  mpz_add_ui(dst, dst, val >> 64);
+  mpz_mul_2exp(dst, src, 64);
+  mpz_add_ui(dst, dst, val >> 64);
+}
 void u_cat_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& src, mp_bitcnt_t bitcnt2) {
   mpz_set_ui(dst, val);
+  mpz_mul_2exp(dst, dst, bitcnt2);
+  mpz_add(dst, dst, src);
+}
+void u_cat_ui_l128(mpz_t& dst, __uint128_t val, mp_bitcnt_t bitcnt1, mpz_t& src, mp_bitcnt_t bitcnt2) {
+  mpz_import(dst, 2, -1, 8, 0, 0, (mp_limb_t*)&val);
   mpz_mul_2exp(dst, dst, bitcnt2);
   mpz_add(dst, dst, src);
 }
@@ -193,6 +209,12 @@ void u_sub_ui_l(mpz_t& dst, unsigned long val, mp_bitcnt_t bitcnt1, mpz_t& src, 
 void u_sub_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt) {
   mpz_sub_ui(dst, src, val);
 }
+
+void u_sub_ui_r128(mpz_t& dst, mpz_t& src, __uint128_t val, mp_bitcnt_t bitcnt) {
+  mpz_import(t1, 2, -1, 8, 0, 0, (mp_limb_t*)&val);
+  mpz_sub(dst, src, t1);
+}
+
 void u_sub_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long val2, mp_bitcnt_t bitcnt2) {
   mpz_set_ui(dst, val1);
   mpz_sub_ui(dst, dst, val2);
@@ -213,6 +235,12 @@ void u_mul_ui_r(mpz_t& dst, mpz_t& src, unsigned long val, mp_bitcnt_t bitcnt) {
 void u_mul_si_r(mpz_t& dst, mpz_t& src, long val, mp_bitcnt_t bitcnt) {
   mpz_mul_si(dst, src, val);
 }
+
+void u_mul_si_r128(mpz_t& dst, mpz_t& src, __int128_t val, mp_bitcnt_t bitcnt) {
+  mpz_import(t1, 2, -1, 8, 0, 0, &val);
+  mpz_mul(dst, src, t1);
+}
+
 void u_mul_ui2(mpz_t& dst, unsigned long val1, mp_bitcnt_t bitcnt1, unsigned long val2, mp_bitcnt_t bitcnt2) {
   mpz_set_ui(dst, val1);
   mpz_mul_ui(dst, dst, val2);

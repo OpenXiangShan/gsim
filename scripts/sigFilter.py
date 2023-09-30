@@ -33,7 +33,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
       if idx != -1:
         ref_width = self.width(idx, ref)
         refName = "ref->rootp->" + line[3]
-        if ref_width > 64:
+        if ref_width > 128:
           num = int((ref_width + 31) / 32)
           self.dstfp.writelines("mpz_set_ui(tmp1, ref->rootp->" + line[3] + "[" + str(num-1) +"U]);\n")
           for i in range(num - 1, 0, -1):
@@ -42,7 +42,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
           refName = "tmp1"
           if sign :
             self.dstfp.writelines("u_asUInt(tmp2, " + "mod->" + line[2] + ", " + line[1] +");\n")
-        modName = "tmp2" if sign and ref_width > 64 else "mod->" + line[2]
+        modName = "tmp2" if sign and ref_width > 128 else "mod->" + line[2]
         if refName == "tmp1" :
           self.dstfp.writelines( \
           "if(display || mpz_cmp(" + modName + ", " + refName + ") != 0){\n" + \
@@ -52,10 +52,20 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
           "  std::cout << \" \"; mpz_out_str(stdout, 16, " + refName + "); std::cout << std::endl;\n}\n"
           )
         else :
+          refName128 = ""
+          if ref_width > 64:
+            num = int((ref_width + 31) / 32)
+            for i in range(num):
+              refName128 = refName128 + (" | " if i != 0 else "") + "((__uint128_t)" + refName + "[" + str(i) + "] << " + str(i * 32) + ")"
+            refName = refName.lstrip("ref->rootp->") + "_128"
+            self.dstfp.writelines("__uint128_t " + refName + " = " + refName128 + ";\n")
+          mask = hex((1 << ref_width) - 1) if ref_width <= 64 else "((__uint128_t)" + hex((1 << (ref_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
           self.dstfp.writelines( \
-          "if(display || ((" + modName + " & " + hex((1 << ref_width) - 1) + ") != " + refName + ") != 0){\n" + \
+          "if(display || (" + modName + " & " + mask + ") != " + refName + "){\n" + \
           "  ret = true;\n" + \
-          "  std::cout << std::hex <<\"" + line[2] + ": \" << +" + modName + " << \"  \" << +" + refName + "<< std::endl;\n" + \
+          "  std::cout << std::hex <<\"" + line[2] + ": \" << +" +  \
+          (modName if ref_width <= 64 else "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName) + " << \"  \" << +" + \
+            (refName if ref_width <= 64 else "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName) + "<< std::endl;\n" + \
           "} \n")
     self.dstfp.writelines("return ret;\n")
     self.srcfp.close()

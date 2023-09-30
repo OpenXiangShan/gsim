@@ -77,17 +77,18 @@ class mpz_wrap {
 
 #define NEW_TMP ("__tmp__" + std::to_string(++tmpIdx))
 #define FUNC_NAME(sign, s) ((sign ? std::string("s_") : std::string("u_")) + s)
-#define FUNC_BASIC(sign, s) ((sign ? std::string("s_") : std::string("u_")) + s + "_basic")
+#define FUNC_BASIC(sign, s, width) ((sign ? std::string("s_") : std::string("u_")) + s + "_basic" + (width > 64 ? "128" : ""))
 #define FUNC_UI(sign, s) ((sign ? std::string("s_") : std::string("u_")) + s + "_ui")
 #define FUNC_UI_R(sign, s) ((sign ? std::string("s_") : std::string("u_")) + s + "_ui_r")
 #define FUNC_UI2(sign, s) ((sign ? std::string("s_") : std::string("u_")) + s + "_ui2")
-#define FUNC_I(sign, s) ((sign ? std::string("si_") : std::string("ui_")) + s)
-#define FUNC_I_UI(sign, s) ((sign ? std::string("si_") : std::string("ui_")) + s + "_ui")
-#define FUNC_SUI_R(fsign, vsign, s) ((fsign ? std::string("s_") : std::string("u_")) + s + (vsign ? "_si_r" : "_ui_r"))
-#define FUNC_SUI_L(fsign, vsign, s) ((fsign ? std::string("s_") : std::string("u_")) + s + (vsign ? "_si_l" : "_ui_l"))
+#define FUNC_I(sign, s, width) ((sign ? std::string("si_") : std::string("ui_")) + s + (width > 64 ? "128" : ""))
+// #define FUNC_I_UI(sign, s) ((sign ? std::string("si_") : std::string("ui_")) + s + "_ui")
+#define FUNC_SUI_R(fsign, vsign, s, width) ((fsign ? std::string("s_") : std::string("u_")) + s + (vsign ? "_si_r" : "_ui_r") + (width > 64 ? "128" : ""))
+#define FUNC_SUI_L(fsign, vsign, s, width) ((fsign ? std::string("s_") : std::string("u_")) + s + (vsign ? "_si_l" : "_ui_l") + (width > 64 ? "128" : ""))
 #define MAX_U64 0xffffffffffffffff
-#define valEqualsZero(width, str) (width > 64 ? "mpz_sgn(" + str + ")" : str)
-#define valUI(width, str) (width > 64 ? "mpz_get_ui(" + str + ")" : str)
+#define MAX_U128 (uint128_t)(__int128_t(-1L))
+#define valEqualsZero(width, str) (width > BASIC_WIDTH ? "mpz_sgn(" + str + ")" : str)
+#define valUI(width, str) (width > BASIC_WIDTH ? "mpz_get_ui(" + str + ")" : str)
 #define MPZ_SET(sign) std::string(sign ? "mpz_set_si" : "mpz_set_ui")
 #define VAR_NAME(node) (node->name)
 class InterVal {
@@ -133,7 +134,7 @@ class InterVal {
 int p_stoi(const char* str);
 std::string cons2str(std::string s);
 std::pair<int, std::string> strBaseAll(std::string s);
-std::string to_hex_string(unsigned long x);
+std::string to_hex_string(BASIC_TYPE x);
 void computeNode(Node* node, bool nodeEnd);
 
 static std::vector<InterVal*> interVals;
@@ -168,6 +169,18 @@ static std::map<std::string, std::string> opMap = {
   {"cvt", ""},
   {"orr", "0 != "}
 };
+
+static std::string bitMask(int width) {
+  std::string ret = std::string(width/4, 'f');
+  const char* headTable[] = {"", "1", "3", "7"};
+  ret = headTable[width % 4] + ret;
+  if (ret.length() > 16) {
+    ret = ("UINT128(0x" + ret.substr(0, ret.length()-16) + ", 0x" + ret.substr(ret.length()-16, 16) + ")");
+  } else {
+    ret = "0x" + ret;
+  }
+  return ret;
+}
 
 static void deleteAndPop() {
   delete interVals.back();
@@ -220,18 +233,22 @@ void setConsArrayPrev(Node* node) {
 
 static void setPrev(Node* node, int& prevIdx) {
   Node* operand = node->workingVal->operands[prevIdx];
-   // std::cout << "operand: " << prevIdx << " " << operand->name << "(" << operand->status << ")" << " node: " << node->name << " " << operand->clusId << " " << operand->id << std::endl;
+  //  std::cout << "operand: " << prevIdx << " " << operand->name << "(" << operand->status << ")" << " node: " << node->name << " " << operand->clusId << " " << operand->id << std::endl;
   if (operand->status == CONSTANT_NODE && operand->dimension.size() == 0) {
     if (operand->workingVal->consVal.length() == 0) {
       if (operand->workingVal->ops.size() == 0 && operand->workingVal->operands.size() == 0) {
         interVals.push_back(new InterVal(operand->width, operand->sign, true, 1, "0x0", "0"));
       } else {
+        TODO();
         size_t size = interVals.size();
         computeNode(operand, false);
         Assert(interVals.size() == size + 1, "Invalid size for %s (%ld -> %ld) in %s\n", operand->name.c_str(), size, interVals.size(), node->name.c_str());
       }
     } else {
-      interVals.push_back(new InterVal(operand->width, operand->sign, true, 1, "0x" + operand->workingVal->consVal, operand->workingVal->consVal.c_str()));
+      int length = operand->workingVal->consVal.length();
+      std::string consStr = operand->width > 64 && length > 16?
+                ("UINT128(0x" + operand->workingVal->consVal.substr(0, length-16) + ", 0x" + operand->workingVal->consVal.substr(length-16, 16) + ")") :  "0x" + operand->workingVal->consVal;
+      interVals.push_back(new InterVal(operand->width, operand->sign, true, 1, consStr, operand->workingVal->consVal.c_str()));
     }
   } else if (operand->status == CONSTANT_NODE) { // constant array
     setConsArrayPrev(operand);
@@ -242,7 +259,10 @@ static void setPrev(Node* node, int& prevIdx) {
     }
     Assert(interVals.size() == size, "Invalid size for %s (%ld -> %ld) in %s\n", operand->name.c_str(), size, interVals.size(), node->name.c_str());
     if (operand->status == CONSTANT_NODE) {
-      interVals.push_back(new InterVal(operand->width, operand->sign, true, 1, "0x" + operand->workingVal->consVal, operand->workingVal->consVal.c_str()));
+      int length = operand->workingVal->consVal.length();
+      std::string consStr = operand->width > 64 && length > 16?
+                ("UINT128(0x" + operand->workingVal->consVal.substr(0, length-16) + ", 0x" + operand->workingVal->consVal.substr(length-16, 16) + ")") :  "0x" + operand->workingVal->consVal;
+      interVals.push_back(new InterVal(operand->width, operand->sign, true, 1, consStr, operand->workingVal->consVal.c_str()));
     } else {
       interVals.push_back(new InterVal(operand->width, operand->sign, false, 1, operand->valName, NULL));
     }
@@ -289,8 +309,8 @@ void insts_1expr1int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   std::string dstName;
   int dstOpNum = interVals.back()->opNum;
   bool dstCons = interVals.back()->isCons;
-  bool result_mpz  = op->width > 64;
-  bool operand_mpz = valWidth > 64;
+  bool result_mpz  = op->width > BASIC_WIDTH;
+  bool operand_mpz = valWidth > BASIC_WIDTH;
 
   if (dstCons) {
     std::tuple<EXPR1INT_FUNC_TYPE, EXPR1INT_FUNC_TYPE> funcs = expr1int1Map[op->name];
@@ -302,11 +322,13 @@ void insts_1expr1int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   if (result_mpz) {
     dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
     dstOpNum = 1;
-    if (valWidth > 64)
+    if (valWidth > BASIC_WIDTH)
       add_insts_3expr(node, FUNC_NAME(op->sign, op->name), dstName, interVals.back()->value,
                       std::to_string(interVals.back()->width), std::to_string(n));
-    else
+    else {
+      TODO();
       add_insts_2expr(node, FUNC_UI(op->sign, op->name), dstName, interVals.back()->value, std::to_string(n));
+    }
   } else if (!operand_mpz) {
     if (opMap.find(op->name) != opMap.end()) {
       dstOpNum ++;
@@ -327,19 +349,19 @@ void insts_1expr1int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
       }
     } else if (op->name == "tail") {
       dstOpNum ++;
-      unsigned long mask = n == 64 ? MAX_U64 : (((unsigned long)1 << n) - 1);
-      dstName = "(" + interVals.back()->value + " & 0x" + to_hex_string(mask) + ")";
+      dstName = "(" + interVals.back()->value + " & " + bitMask(n) + ")";
     } else if (op->name == "shl") {
       dstOpNum ++;
       dstName = "(" + UCast(op->width) + interVals.back()->value + " << " + std::to_string(n) + ")";
     } else {
       dstOpNum ++;
-      dstName = FUNC_BASIC(op->sign, op->name) + "(" + interVals.back()->value + ", " + std::to_string(n) + ")";
+      dstName = FUNC_BASIC(op->sign, op->name, op->width) + "(" + interVals.back()->value + ", " + std::to_string(n) + ")";
+      TODO();
     }
     if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
-  } else if (operand_mpz) {
+  } else if (operand_mpz) { // !result_mpz && operand_mpz
     dstOpNum ++;
-    dstName = FUNC_I(op->sign, op->name) + "(" + interVals.back()->value + ", " +
+    dstName = FUNC_I(op->sign, op->name, op->width) + "(" + interVals.back()->value + ", " +
               std::to_string(interVals.back()->width) + ", " + std::to_string(n) + ")";
     if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
   }
@@ -361,13 +383,12 @@ void insts_1expr2int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   }
   std::string dstName;
   int dstOpNum = interVals.back()->opNum;
-  if (op->width <= 64) {
-    if (interVals.back()->width <= 64) {
+  if (op->width <= BASIC_WIDTH) {
+    if (interVals.back()->width <= BASIC_WIDTH) {
       int l = p_stoi(op->getExtra(0).c_str()), r = p_stoi(op->getExtra(1).c_str()), w = l - r + 1;
-      unsigned long mask = w == 64 ? MAX_U64 : ((unsigned long)1 << w) - 1;
-      dstName = "((" + interVals.back()->value + " >> " + std::to_string(r) + ") & 0x" + to_hex_string(mask) + ")";
+      dstName = "((" + interVals.back()->value + " >> " + std::to_string(r) + ") & " + bitMask(w) + ")";
     } else {
-      dstName = FUNC_BASIC(op->sign, op->name) + "(" + interVals.back()->value + ", " +
+      dstName = FUNC_BASIC(op->sign, op->name, op->width) + "(" + interVals.back()->value + ", " +
                 std::to_string(interVals.back()->width) + ", " + cons2str(op->getExtra(0)) + ", " +
                 cons2str(op->getExtra(1)) + ")";
     }
@@ -402,9 +423,9 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
     return;
   }
   std::string dstName;
-  bool result_mpz  = op->width > 64;
-  bool left_mpz    = interVals.back()->width > 64;
-  bool right_mpz   = interVals[interVals.size() - 2]->width > 64;
+  bool result_mpz  = op->width > BASIC_WIDTH;
+  bool left_mpz    = interVals.back()->width > BASIC_WIDTH;
+  bool right_mpz   = interVals[interVals.size() - 2]->width > BASIC_WIDTH;
   bool operand_mpz = left_mpz && right_mpz;
   if (result_mpz && operand_mpz) {
     dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
@@ -417,7 +438,7 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
       add_insts_3expr(node, FUNC_UI_R(funcSign, op->name), dstName, interVals.back()->value,
                       interVals[interVals.size() - 2]->value, std::to_string(interVals[interVals.size() - 2]->width));
     } else if (interVals.back()->isCons && !interVals[interVals.size() - 2]->isCons) {
-      add_insts_4expr(node, FUNC_SUI_L(funcSign, interVals.back()->sign, op->name), dstName,
+      add_insts_4expr(node, FUNC_SUI_L(funcSign, interVals.back()->sign, op->name, interVals.back()->width), dstName,
                       interVals.back()->value, std::to_string(interVals.back()->width),
                       interVals[interVals.size() - 2]->value, std::to_string(interVals[interVals.size() - 2]->width));
     } else {
@@ -436,13 +457,14 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
         dstName = "(" + interVals.back()->value + opMap[op->name] + interVals[interVals.size() - 2]->value + ")";
       }
     } else if (op->name == "cat") {
-      dstName = "((uint64_t)" + interVals.back()->value + " << " +
+      dstName = "((uint128_t)" + interVals.back()->value + " << " +
                 std::to_string(interVals[interVals.size() - 2]->width) + " | " +
                 interVals[interVals.size() - 2]->value + ")";
     } else if (op->name == "dshl") {
       dstName = "(" + UCast(op->width) + interVals.back()->value + " << " + interVals[interVals.size() - 2]->value + ")";
     } else {
-      dstName = FUNC_BASIC(op->sign, op->name) + "(" + interVals.back()->value + ", " +
+      TODO();
+      dstName = FUNC_BASIC(op->sign, op->name, op->width) + "(" + interVals.back()->value + ", " +
                 interVals[interVals.size() - 2]->value + ")";
     }
     if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
@@ -450,21 +472,30 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
     dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
     dstOpNum = 1;
     if (left_mpz) {
-      add_insts_3expr(node, FUNC_SUI_R(funcSign, interVals[interVals.size() - 2]->sign, op->name),
+      add_insts_3expr(node, FUNC_SUI_R(funcSign, interVals[interVals.size() - 2]->sign, op->name, interVals[interVals.size() - 2]->width),
                     dstName, interVals.back()->value, interVals[interVals.size() - 2]->value,
                     std::to_string(interVals[interVals.size() - 2]->width));
     } else if (right_mpz) {
-      add_insts_4expr(node, FUNC_SUI_L(funcSign, interVals.back()->sign, op->name), dstName,
+      add_insts_4expr(node, FUNC_SUI_L(funcSign, interVals.back()->sign, op->name, interVals.back()->width), dstName,
                     interVals.back()->value, std::to_string(interVals.back()->width),
                     interVals[interVals.size() - 2]->value, std::to_string(interVals[interVals.size() - 2]->width));
     } else {
-      node->insts.push_back(MPZ_SET(interVals.back()->sign) + "(" + dstName + ", " + interVals.back()->value + ");");
-      add_insts_3expr(node, FUNC_SUI_R(funcSign, interVals[interVals.size() - 2]->sign, op->name), dstName, dstName,
-                      interVals[interVals.size() - 2]->value, std::to_string(interVals[interVals.size() - 2]->width));
+      if (interVals.back()->width > 64) {
+        std::string ui_dst = dstName + "_ui";
+        node->insts.push_back(LocalType(interVals.back()->width, interVals.back()->sign) + " " + ui_dst + " = " + interVals.back()->value + ";");
+        node->insts.push_back("mpz_import(" + dstName + ", 2, -1, 8, 0, 0, &" + ui_dst + ");");
+        // TODO: 测试在sint时的情形
+        if (interVals.back()->sign) TODO();
+      } else {
+        node->insts.push_back(MPZ_SET(interVals.back()->sign) + "(" + dstName + ", " + interVals.back()->value + ");");
+      }
+      add_insts_3expr(node, FUNC_SUI_R(funcSign, interVals[interVals.size() - 2]->sign, op->name, interVals[interVals.size() - 2]->width),
+                      dstName, dstName, interVals[interVals.size() - 2]->value, std::to_string(interVals[interVals.size() - 2]->width));
     }
   } else if (!result_mpz && operand_mpz) {
+    TODO();
     dstOpNum ++;
-    dstName = FUNC_I(op->sign, op->name) + "(" + interVals.back()->value + ", " + std::to_string(interVals.back()->width) +
+    dstName = FUNC_I(op->sign, op->name, op->width) + "(" + interVals.back()->value + ", " + std::to_string(interVals.back()->width) +
               ", " + interVals[interVals.size() - 2]->value + ", " + std::to_string(interVals[interVals.size() - 2]->width) + ")";
     if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
   }
@@ -486,8 +517,8 @@ void insts_1expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   }
   int dstOpNum = interVals.back()->opNum;
   std::string dstName;
-  bool result_mpz  = op->width > 64;
-  bool operand_mpz = interVals.back()->width > 64;
+  bool result_mpz  = op->width > BASIC_WIDTH;
+  bool operand_mpz = interVals.back()->width > BASIC_WIDTH;
   if (result_mpz) {
     dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
     dstOpNum = 1;
@@ -497,24 +528,22 @@ void insts_1expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
     if (opMap.find(op->name) != opMap.end()) {
       dstName = "(" + opMap[op->name] + interVals.back()->value + ")";
       dstOpNum ++;
-    } else if (op->name == "not") {
-      unsigned long mask = op->width == 64 ? MAX_U64 : (((unsigned long)1 << op->width) - 1);
-      dstName = "(" + interVals.back()->value + " ^ 0x" + to_hex_string(mask) + ")";
+    } else if (op->name == "not") {      
+      dstName = "(" + interVals.back()->value + " ^ " + bitMask(op->width) + ")";
       dstOpNum ++;
     } else if (op->name == "asSInt") {
       int shiftBits = widthBits(op->width) - op->width;
       std::string shiftStr = std::to_string(shiftBits);
       dstName = "(((" + widthSType(op->width) + ")(" + interVals.back()->value + " << " + shiftStr + ")) >> " + shiftStr + ")";
     } else if (op->name == "asUInt") {
-      unsigned long mask = interVals.back()->width == 64 ? MAX_U64 : (((unsigned long)1 << interVals.back()->width) - 1);
-      dstName = "((" + widthUType(op->width) + ")" + interVals.back()->value + " & 0x" + to_hex_string(mask) + ")";
+      dstName = "((" + widthUType(op->width) + ")" + interVals.back()->value + " & " + bitMask(interVals.back()->width) + ")";
     } else if (op->name == "andr") {
-      unsigned long mask = interVals.back()->width == 64 ? MAX_U64 : (((unsigned long)1 << interVals.back()->width) - 1);
-      dstName = "(" + interVals.back()->value + " == 0x" + to_hex_string(mask) + ")";
+      dstName = "(" + interVals.back()->value + " == " + bitMask(interVals.back()->width) + ")";
     } else if (op->name == "xorr") {
       dstName = "(__builtin_parity(" + interVals.back()->value + ") & 1)";
     } else {
-      dstName = FUNC_BASIC(op->sign, op->name) + "(" + interVals.back()->value + ")";
+      TODO();
+      dstName = FUNC_BASIC(op->sign, op->name, op->width) + "(" + interVals.back()->value + ")";
       dstOpNum ++;
     }
     if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
@@ -598,12 +627,22 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
   std::string dstName;
   int dstOpNum = interVals.back()->opNum + interVals[interVals.size() - 2]->opNum;
   int dstWidth = op->type == P_WHEN ? node->width : op->width;
-  if (dstWidth > 64) {
+  if (dstWidth > BASIC_WIDTH) {
     dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
     dstOpNum = 1;
     std::string cond_true, cond_false;
     if (!interVals.back()->isCons) {
-      cond_true = ((interVals.back()->opNum == 1 && interVals.back()->width > 64)? "mpz_set(" : "mpz_set_ui(") + dstName + ", " + interVals.back()->value + ")";
+      if (interVals.back()->opNum == 1 && interVals.back()->width > BASIC_WIDTH) {
+        cond_true = "mpz_set(" + dstName + ", " + interVals.back()->value + ")";
+      } else {
+        if (interVals.back()->width > 64) {
+          std::string localName = dstName + "_ui";
+          node->insts.push_back(LocalType(interVals.back()->width, interVals.back()->sign) + " " + localName + " = " + interVals.back()->value + ";");
+          cond_true = "(void)mpz_import(" + dstName + ", 2, -1, 8, 0, 0, &" + localName + ")";
+        } else {
+          cond_true = "mpz_set_ui(" + dstName + ", " + interVals.back()->value + ")";
+        }
+      }
     } else {
       if (interVals.back()->value.length() <= 18)
         cond_true = "mpz_set_ui(" + dstName + ", " + interVals.back()->value + ")";
@@ -613,7 +652,17 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
     deleteAndPop();
 
     if (!interVals.back()->isCons) {
-      cond_false = ((interVals.back()->opNum == 1 && interVals.back()->width > 64) ? "mpz_set(" : "mpz_set_ui(") + dstName + ", " + interVals.back()->value + ")";
+      if (interVals.back()->opNum == 1 && interVals.back()->width > BASIC_WIDTH) {
+        cond_false = "mpz_set(" + dstName + ", " + interVals.back()->value + ")";
+      } else {
+        if (interVals.back()->width > 64) {
+          std::string localName = dstName + "_ui";
+          node->insts.push_back(LocalType(interVals.back()->width, interVals.back()->sign) + " " + localName + " = " + interVals.back()->value + ";");
+          cond_false = "(void)mpz_import(" + dstName + ", 2, -1, 8, 0, 0, &" + localName + ")";
+        } else {
+          cond_false = "mpz_set_ui(" + dstName + ", " + interVals.back()->value + ")";
+        }
+      }
     } else {
       if (interVals.back()->value.length() <= 18)
         cond_false = "mpz_set_ui(" + dstName + ", " + interVals.back()->value + ")";
@@ -637,11 +686,14 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
       }
     } else if(muxType == 1) node->insts.push_back(cond_false + ";");
     else if(muxType == 2) node->insts.push_back(cond_true + ";");
-  } else {
+  } else { // dstWidth < BASIC_WIDTH
     std::string cond_true, cond_false;
-    if (interVals.back()->width > 64) {
+    if (interVals.back()->width > BASIC_WIDTH) {
       if (interVals.back()->isArray && interVals.back()->isCons) TODO();
-      cond_true = ("mpz_get_ui(" + interVals.back()->value + ")");
+      std::string firstHalf = "mpz_getlimbn(" + interVals.back()->value + ", 1)";
+      std::string secondHalf = "mpz_get_ui(" + interVals.back()->value + ")";
+      cond_true = "mpz_size(" + interVals.back()->value + ") == 1 ?" + secondHalf + " : ((uint128_t)" + firstHalf + " << 64 | " + secondHalf + ")" ;
+      if (interVals.back()->sign) TODO();
     } else {
       if (interVals.back()->isArray && interVals.back()->isCons) {
         cond_true = ("memcpy(" + node->name + ", (const " + widthUType(node->width) + "[]){" + interVals.back()->value + "}, "
@@ -651,9 +703,12 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
       }
     }
     deleteAndPop();
-    if (interVals.back()->width > 64) {
+    if (interVals.back()->width > BASIC_WIDTH) {
       if (interVals.back()->isArray && interVals.back()->isCons) TODO();
-      cond_false = ("mpz_get_ui(" + interVals.back()->value + ")");
+      std::string firstHalf = "mpz_getlimbn(" + interVals.back()->value + ", 1)";
+      std::string secondHalf = "mpz_get_ui(" + interVals.back()->value + ")";
+      cond_false = "mpz_size(" + interVals.back()->value + ") == 1 ?" + secondHalf + " : ((uint128_t)" + firstHalf + " << 64 | " + secondHalf + ")" ;
+      if (interVals.back()->sign) TODO();
     } else {
       if (interVals.back()->isArray && interVals.back()->isCons) {
         Assert(nodeEnd && opIdx == 0, "%s array copy\n", node->name.c_str());
@@ -801,7 +856,7 @@ void computeArrayMember(Node* node) {
       std::string newValue = node->name;
       for (int i = index.size() - 1; i >= 0; i --) newValue += "[" + index[i] + "]";
       Assert(interVals.size() > 0, "empty interVals in node %s\n", node->name.c_str());
-      if (node->width <= 64)
+      if (node->width <= BASIC_WIDTH)
         interVals.back()->value = newValue + " = " + interVals.back()->value;
       else {
         if (interVals.back()->isCons) {
@@ -838,7 +893,7 @@ void computeArray(Node* node, bool nodeEnd) {
     setPrev(node, prevIdx);
     if (!nodeEnd) return;
     if (!interVals.back()->isCons) {
-      if (node->width > 64) {
+      if (node->width > BASIC_WIDTH) {
         TODO();
         node->insts.push_back("mpz_set(" + node->name + ", " + interVals.back()->value + ");");
       } else if (nodeEnd) {
@@ -896,9 +951,15 @@ void computeArray(Node* node, bool nodeEnd) {
       std::string newValue = node->name;
       for (int i = index.size() - 1; i >= 0; i --) newValue += "[" + index[i] + "]";
       Assert(interVals.size() > 0, "empty interVals in node %s\n", node->name.c_str());
-      if (node->width <= 64)
+      if (node->width <= BASIC_WIDTH && interVals.back()->width <= BASIC_WIDTH) {
         interVals.back()->value = newValue + " = " + interVals.back()->value;
-      else {
+      } else if (node->width <= BASIC_WIDTH) {
+
+        std::string firstHalf = "mpz_getlimbn(" + interVals.back()->value + ", 1)";
+        std::string secondHalf = "mpz_get_ui(" + interVals.back()->value + ")";
+        interVals.back()->value = newValue + " = mpz_size(" + interVals.back()->value + ") == 1 ? "
+                               + secondHalf + " : ((uint128_t)" + firstHalf + " << 64 | " + secondHalf + ")";
+      } else {
         if (interVals.back()->isCons) {
           if (interVals.back()->value.length() <= 18)
             interVals.back()->value = "mpz_set_ui(" + newValue + ", " + interVals.back()->value + ")";
@@ -976,11 +1037,11 @@ void computeNode(Node* node, bool nodeEnd) {
   if (!topValid) {
     setPrev(node, prevIdx);
     if (nodeEnd) {
-      if (node->width > 64 && interVals.back()->width > 64) {
+      if (node->width > BASIC_WIDTH && interVals.back()->width > BASIC_WIDTH) {
         node->insts.push_back("mpz_set(" + node->name + ", " + interVals.back()->value + ");");
-      } else if (node->width > 64 && interVals.back()->width <= 64) {
+      } else if (node->width > BASIC_WIDTH && interVals.back()->width <= BASIC_WIDTH) {
         node->insts.push_back("mpz_set_ui(" + node->name + ", " + interVals.back()->value + ");");
-      } else if (node->width <= 64 && interVals.back()->width > 64) {
+      } else if (node->width <= BASIC_WIDTH && interVals.back()->width > BASIC_WIDTH) {
         node->insts.push_back(node->name + " = mpz_get_ui(" + interVals.back()->value + ");");
       } else {
         node->insts.push_back(VAR_NAME(node) + " = " + interVals.back()->value + ";");
@@ -989,14 +1050,14 @@ void computeNode(Node* node, bool nodeEnd) {
   }
   if (nodeEnd) node->set_compute(node->name);
   else {
-    if (node->width > 64 && interVals.back()->width > 64) {
+    if (node->width > BASIC_WIDTH && interVals.back()->width > BASIC_WIDTH) {
         node->set_compute(interVals.back()->value);
-    } else if (node->width > 64 && interVals.back()->width <= 64) {
+    } else if (node->width > BASIC_WIDTH && interVals.back()->width <= BASIC_WIDTH) {
         std::string name = NEW_TMP;
         // if (node->status != CONSTANT_NODE) node->insts.push_back("mpz_set_ui(" + name + ", " + interVals.back()->value + ");");
         // node->set_compute(name);
         node->set_compute(interVals.back()->value);
-    } else if (node->width <= 64 && interVals.back()->width > 64) {
+    } else if (node->width <= BASIC_WIDTH && interVals.back()->width > BASIC_WIDTH) {
         // if (node->status != CONSTANT_NODE) node->insts.push_back(LocalType(node->width, node->sign) + " " + node->name + " = mpz_get_ui(" + interVals.back()->value + ");");
         // node->set_compute(node->name);
         node->set_compute("mpz_get_ui(" + interVals.back()->value + ")");

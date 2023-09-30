@@ -36,7 +36,6 @@ int getUpdateArrayIdx(std::vector<Index>index, Node* node);
 
 int p_stoi(const char* str);
 std::string cons2str(std::string s);
-std::pair<int, std::string> strBase(std::string s);
 
 static inline Node* allocNode(int type = NODE_OTHERS) {
   Node* node = new Node(type);

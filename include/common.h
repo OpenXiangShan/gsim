@@ -32,7 +32,8 @@
 #define nodeType(node)                     \
   std::string(node->width <= 8 ? "uint8_t" : \
             ((node->width <= 16 ? "uint16_t" : \
-            ((node->width <= 32 ? "uint32_t" : "uint64_t")))))
+            ((node->width <= 32 ? "uint32_t" : \
+            (node->width <= 64 ? "uint64_t" : "uint128_t"))))))
 
 #define LocalType(width, sign)                     \
   (sign ? widthSType(width) : widthUType(width))
@@ -40,17 +41,24 @@
 #define widthUType(width) \
   std::string(width <= 8 ? "uint8_t" : \
             ((width <= 16 ? "uint16_t" : \
-            ((width <= 32 ? "uint32_t" : "uint64_t")))))
+            ((width <= 32 ? "uint32_t" : \
+            (width <= 64 ? "uint64_t" : "uint128_t"))))))
 
 #define widthSType(width) \
   std::string(width <= 8 ? "int8_t" : \
             ((width <= 16 ? "int16_t" : \
-            ((width <= 32 ? "int32_t" : "int64_t")))))
+            ((width <= 32 ? "int32_t" : \
+            (width <= 64 ? "int64_t" : "int128_t"))))))
 
 #define widthBits(width) \
         (width <= 8 ? 8 : \
         ((width <= 16 ? 16 : \
-        ((width <= 32 ? 32 : 64)))))
+        ((width <= 32 ? 32 : \
+        (width <= 64 ? 64 : 128))))))
+
+#define BASIC_WIDTH 128
+#define BASIC_TYPE __uint128_t
+#define uint128_t __uint128_t
 
 #define UCast(width) (std::string("(") + widthUType(width) + ")")
 
