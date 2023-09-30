@@ -12,10 +12,14 @@
 MOD_NAME* mod;
 #endif
 
+#if defined(VERILATOR) || defined(GSIM_DIFF)
+#include <top_ref.h>
+REF_NAME* ref;
+#endif
+
 #if defined(VERILATOR)
 #include "verilated.h"
 #include HEADER
-REF_NAME* ref;
 extern "C" void update_reg(int id, long long val){ }
 extern "C" void update_indi(svBit cpu_is_mmio, svBit cpu_valid, int rcsr_id){ }
 extern "C" void update_pc(long long pc, int inst){ }
@@ -90,7 +94,15 @@ void mod_reset() {
   mod->set_reset(0);
 }
 #endif
-#if defined(VERILATOR) && defined(GSIM)
+#ifdef GSIM_DIFF
+void ref_reset() {
+  ref->set_reset(1);
+  ref->step();
+  ref->set_reset(0);
+}
+#endif
+
+#if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
 
 bool checkSignals(bool display) {
   #include "../obj/checkSig.h"
@@ -109,6 +121,12 @@ int main(int argc, char** argv) {
   ref = new REF_NAME();
   memcpy(&ref->rootp->newtop__DOT__mem__DOT__ram, program, program_sz);
   ref_reset();
+#endif
+#ifdef GSIM_DIFF
+  ref = new REF_NAME();
+  memcpy(&ref->mem$ram, program, program_sz);
+  ref_reset();
+  ref->step();
 #endif
   std::cout << "start testing.....\n";
   bool dut_end = false;
@@ -143,7 +161,7 @@ int main(int argc, char** argv) {
     mod->step();
     // dut_end = (mod->cpu$writeback$valid_r == 1) && (mod->cpu$writeback$inst_r == 0x6b);
 #endif
-#if defined(VERILATOR) && defined(GSIM)
+#if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
     bool isDiff = checkSignals(false);
     if(isDiff) {
       std::cout << "all Sigs:\n -----------------\n";

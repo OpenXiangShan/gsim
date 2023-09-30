@@ -41,23 +41,7 @@ PARSER_OBJS := $(PARSER_SRCS:.cc=.o)
 HEADERS := $(foreach x, $(INCLUDE_DIR), $(wildcard $(addprefix $(x)/*,.h)))
 
 MODE ?= 0
-
-ifeq ($(DEBUG),1)
-	CXXFLAGS += -DDEBUG
-endif
-
-
-ifeq ($(MODE),0)
-	MODE_FLAGS += -DGSIM
-	target = $(EMU_BUILD_DIR)/S$(NAME)
-else ifeq ($(MODE), 1)
-	MODE_FLAGS += -DVERILATOR
-	target = ./obj_dir/V$(NAME)
-else
-	MODE_FLAGS += -DGSIM -DVERILATOR
-	CXXFLAGS += -DDIFFTEST_PER_SIG
-	target = ./obj_dir/V$(NAME)
-endif
+DIFF_VERSION ?= 2023_9_18
 
 VERI_INC_DIR = $(OBJ_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME)
@@ -70,10 +54,37 @@ VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIR)/di
 VERI_HEADER = $(shell find $(OBJ_DIR) -name "*.h")
 VERI_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(VERI_CSRCS:.cpp=.o))
 
+REF_GSIM_DIR = $(EMU_DIR)/obj_$(DIFF_VERSION)
+REF_GSIM_SRCS = $(REF_GSIM_DIR)/top_ref.cpp
+REF_GSIM_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(REF_GSIM_SRCS:.cpp=.o))
+
 GSIM_CFLAGS = -O3 $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME)
 
 mainargs = ready-to-run/bin/bbl-hello.bin
 # mainargs = ysyx3-bin/rtthread.bin
+
+ifeq ($(DEBUG),1)
+	CXXFLAGS += -DDEBUG
+endif
+
+ifeq ($(MODE),0)
+	MODE_FLAGS += -DGSIM
+	target = $(EMU_BUILD_DIR)/S$(NAME)
+else ifeq ($(MODE), 1)
+	MODE_FLAGS += -DVERILATOR
+	target = ./obj_dir/V$(NAME)
+else ifeq ($(MODE), 2)
+	MODE_FLAGS += -DGSIM -DVERILATOR
+	CXXFLAGS += -DDIFFTEST_PER_SIG
+	target = ./obj_dir/V$(NAME)
+	SIG_COMMAND = python3 scripts/sigFilter.py
+else
+	MODE_FLAGS += -DGSIM -DGSIM_DIFF
+	target = $(EMU_BUILD_DIR)/S$(NAME)_diff
+	CXXFLAGS += -DDIFFTEST_PER_SIG
+	GSIM_CFLAGS += -I$(REF_GSIM_DIR) -DREF_NAME=DiffNewTop
+	SIG_COMMAND = python3 scripts/genSigDiff.py
+endif
 
 $(GSIM_BUILD_DIR)/%.o: %.cpp $(PARSER_SRCS)
 	@mkdir -p $(dir $@) && echo + CXX $<
@@ -92,6 +103,7 @@ makedir:
 
 compile: $(TARGET)
 	$(GSIM_BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
+	$(SIG_COMMAND)
 
 clean:
 	rm -rf obj parser/build obj_dir build
@@ -114,9 +126,12 @@ $(PARSER_BUILD)/%.o: $(PARSER_BUILD)/%.cc $(PARSER_SRCS)
 $(EMU_BUILD_DIR)/S$(NAME): $(VERI_OBJS)
 	$(CXX) $^ $(GSIM_CFLAGS) -lgmp -o $@
 
+$(EMU_BUILD_DIR)/S$(NAME)_diff: $(VERI_OBJS) $(REF_GSIM_OBJS)
+	echo $(REF_GSIM_OBJS)
+	$(CXX) $^ $(GSIM_CFLAGS) -lgmp -o $@
+
 ./obj_dir/V$(NAME): $(VERI_CSRCS)
 	verilator $(VERI_VFLAGS) -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $^
-	python3 scripts/sigFilter.py
 	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
 
 difftest: $(target)
