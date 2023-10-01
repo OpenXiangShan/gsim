@@ -136,6 +136,9 @@ int main(int argc, char** argv) {
 #ifdef VERILATOR
     ref_cycle(1);
 #endif
+#ifdef GSIM_DIFF
+    ref->step();
+#endif
     cycles ++;
 #if (!defined(GSIM) && defined(VERILATOR)) || (defined(GSIM) && !defined(VERILATOR))
     if(cycles % 1000000 == 0 && cycles < 600000000) {
