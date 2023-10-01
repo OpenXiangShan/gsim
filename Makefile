@@ -138,7 +138,7 @@ difftest: $(target)
 	$(target) $(mainargs)
 
 count:
-	find emu parser src include emu-src scripts -name "*.cpp" -o -name "*.h" -o -name "*.y" -o -name "*.l" -o -name "*.py" |xargs wc
+	find emu parser src include emu-src scripts -name "*.cpp" -o -name "*.h" -o -name "*.y" -o -name "*.l" -o -name "*.py" |grep -v "emu/obj*" |xargs wc
 
 gendoc:
 	doxygen
