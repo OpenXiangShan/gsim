@@ -105,7 +105,7 @@ std::map<std::string, std::tuple<bool, bool, int (*)(int, int, bool)>> expr2Map 
   {"neq",   {0, 0, boolWidth,}},
   {"dshl",  {1, 1, dshlWidth,}},
   {"dshr",  {1, 1, firstWidth,}},
-  {"and",   {0, 1, maxWidth,}},
+  {"and",   {0, 1, minWidth,}},
   {"or",    {0, 1, maxWidth,}},
   {"xor",   {0, 1, maxWidth,}},
   {"cat",   {0, 1, sumWidth,}},
