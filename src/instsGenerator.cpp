@@ -171,6 +171,7 @@ static std::map<std::string, std::string> opMap = {
 };
 
 static std::string bitMask(int width) {
+  Assert(width >= 0, "invalid width %d\n", width);
   std::string ret = std::string(width/4, 'f');
   const char* headTable[] = {"", "1", "3", "7"};
   ret = headTable[width % 4] + ret;
@@ -187,8 +188,8 @@ static void deleteAndPop() {
   interVals.pop_back();
 }
 
-static void setConsValName(PNode* op) {
-  interVals.back()->width = op->width;
+static void setConsValName(PNode* op, int width) {
+  interVals.back()->width = width;
   interVals.back()->sign = op->sign;
   interVals.back()->isCons = true;
   interVals.back()->opNum = 1;
@@ -247,7 +248,8 @@ static void setPrev(Node* node, int& prevIdx) {
     } else {
       int length = operand->workingVal->consVal.length();
       std::string consStr = operand->width > 64 && length > 16?
-                ("UINT128(0x" + operand->workingVal->consVal.substr(0, length-16) + ", 0x" + operand->workingVal->consVal.substr(length-16, 16) + ")") :  "0x" + operand->workingVal->consVal;
+                ("UINT128(0x" + operand->workingVal->consVal.substr(0, length-16) + ", 0x" + operand->workingVal->consVal.substr(length-16, 16) + ")") :
+                "0x" + operand->workingVal->consVal;
       interVals.push_back(new InterVal(operand->width, operand->sign, true, 1, consStr, operand->workingVal->consVal.c_str()));
     }
   } else if (operand->status == CONSTANT_NODE) { // constant array
@@ -262,9 +264,9 @@ static void setPrev(Node* node, int& prevIdx) {
       int length = operand->workingVal->consVal.length();
       std::string consStr = operand->width > 64 && length > 16?
                 ("UINT128(0x" + operand->workingVal->consVal.substr(0, length-16) + ", 0x" + operand->workingVal->consVal.substr(length-16, 16) + ")") :  "0x" + operand->workingVal->consVal;
-      interVals.push_back(new InterVal(operand->width, operand->sign, true, 1, consStr, operand->workingVal->consVal.c_str()));
+      interVals.push_back(new InterVal(operand->width, operand->sign, true, operand->opNum, consStr, operand->workingVal->consVal.c_str()));
     } else {
-      interVals.push_back(new InterVal(operand->width, operand->sign, false, 1, operand->valName, NULL));
+      interVals.push_back(new InterVal(operand->width, operand->sign, false, operand->opNum, operand->valName, NULL));
     }
   } else {
     std::string name = operand->name;
@@ -302,20 +304,26 @@ static void setPrev(Node* node, int& prevIdx) {
 
 void insts_1expr1int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   PNode* op = node->workingVal->ops[opIdx];
+  int opWidth = node->opBits[opIdx];
   if (!topValid) setPrev(node, prevIdx);
   unsigned long n = p_stoi(op->getExtra(0).c_str());
   int valWidth = interVals.back()->width;
-  if (op->name == "head" || op->name == "tail") n = valWidth - n;
+  if (op->name == "tail") n = opWidth;
+  else if (op->name == "head") {
+    n = opWidth - valWidth;
+    Assert(n >= 0, "invalid constant %ld in node %s\n", n, node->name.c_str());
+  }
+
   std::string dstName;
   int dstOpNum = interVals.back()->opNum;
   bool dstCons = interVals.back()->isCons;
-  bool result_mpz  = op->width > BASIC_WIDTH;
+  bool result_mpz  = opWidth > BASIC_WIDTH;
   bool operand_mpz = valWidth > BASIC_WIDTH;
 
   if (dstCons) {
     std::tuple<EXPR1INT_FUNC_TYPE, EXPR1INT_FUNC_TYPE> funcs = expr1int1Map[op->name];
     (op->sign ? std::get<1>(funcs) : std::get<0>(funcs))(interVals.back()->mpzVal, interVals.back()->mpzVal, valWidth, n);
-    setConsValName(op);
+    setConsValName(op, node->opBits[opIdx]);
     if (opIdx == 0) setConstantNode(node);
     return;
   }
@@ -344,7 +352,7 @@ void insts_1expr1int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
           node->insts.push_back(widthUType(valWidth) + " " + operandName + " = " + interVals.back()->value + ";");
         } else
           operandName = interVals.back()->value;
-        dstName = "(-((" + widthUType(op->width) + ")(" + operandName + " >> " + std::to_string(valWidth - 1) +
+        dstName = "(-((" + widthUType(opWidth) + ")(" + operandName + " >> " + std::to_string(valWidth - 1) +
                   ") << " + std::to_string(valWidth) + ") | " + operandName + ")";
       }
     } else if (op->name == "tail") {
@@ -352,43 +360,44 @@ void insts_1expr1int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
       dstName = "(" + interVals.back()->value + " & " + bitMask(n) + ")";
     } else if (op->name == "shl") {
       dstOpNum ++;
-      dstName = "(" + UCast(op->width) + interVals.back()->value + " << " + std::to_string(n) + ")";
+      dstName = "(" + UCast(opWidth) + interVals.back()->value + " << " + std::to_string(n) + ")";
     } else {
       dstOpNum ++;
-      dstName = FUNC_BASIC(op->sign, op->name, op->width) + "(" + interVals.back()->value + ", " + std::to_string(n) + ")";
+      dstName = FUNC_BASIC(op->sign, op->name, opWidth) + "(" + interVals.back()->value + ", " + std::to_string(n) + ")";
       TODO();
     }
     if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
   } else if (operand_mpz) { // !result_mpz && operand_mpz
     dstOpNum ++;
-    dstName = FUNC_I(op->sign, op->name, op->width) + "(" + interVals.back()->value + ", " +
+    dstName = FUNC_I(op->sign, op->name, opWidth) + "(" + interVals.back()->value + ", " +
               std::to_string(interVals.back()->width) + ", " + std::to_string(n) + ")";
     if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
   }
   deleteAndPop();
-  interVals.push_back(new InterVal(op->width, op->sign, false, dstOpNum, dstName, NULL));
+  interVals.push_back(new InterVal(opWidth, op->sign, false, dstOpNum, dstName, NULL));
 }
 
 void insts_1expr2int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   PNode* op = node->workingVal->ops[opIdx];
+  int opWidth = node->opBits[opIdx];
   if (!topValid) setPrev(node, prevIdx);
   bool dstCons = interVals.back()->isCons;
   Assert (!op->sign, "signed bits in line %d\n", op->lineno);
   if (dstCons) {
     u_bits(interVals.back()->mpzVal, interVals.back()->mpzVal, interVals.back()->width, p_stoi(op->getExtra(0).c_str()),
                   p_stoi(op->getExtra(1).c_str()));
-    setConsValName(op);
+    setConsValName(op, node->opBits[opIdx]);
     if (opIdx == 0) setConstantNode(node);
     return;
   }
   std::string dstName;
   int dstOpNum = interVals.back()->opNum;
-  if (op->width <= BASIC_WIDTH) {
+  if (opWidth <= BASIC_WIDTH) {
     if (interVals.back()->width <= BASIC_WIDTH) {
       int l = p_stoi(op->getExtra(0).c_str()), r = p_stoi(op->getExtra(1).c_str()), w = l - r + 1;
       dstName = "((" + interVals.back()->value + " >> " + std::to_string(r) + ") & " + bitMask(w) + ")";
     } else {
-      dstName = FUNC_BASIC(op->sign, op->name, op->width) + "(" + interVals.back()->value + ", " +
+      dstName = FUNC_BASIC(op->sign, op->name, opWidth) + "(" + interVals.back()->value + ", " +
                 std::to_string(interVals.back()->width) + ", " + cons2str(op->getExtra(0)) + ", " +
                 cons2str(op->getExtra(1)) + ")";
     }
@@ -401,11 +410,12 @@ void insts_1expr2int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
                     std::to_string(interVals.back()->width), cons2str(op->getExtra(0)), cons2str(op->getExtra(1)));
   }
   deleteAndPop();
-  interVals.push_back(new InterVal(op->width, op->sign, false, dstOpNum, dstName, NULL));
+  interVals.push_back(new InterVal(opWidth, op->sign, false, dstOpNum, dstName, NULL));
 }
 
 void insts_2expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   PNode* op = node->workingVal->ops[opIdx];
+  int opWidth = node->opBits[opIdx];
   if (!topValid) setPrev(node, prevIdx);
   int funcSign = op->sign;
   if (op->name == "add" || op->name == "mul" || op->name == "sub" || op->name == "div" || op->name == "rem")
@@ -418,12 +428,12 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
     (op->sign ? std::get<1>(funcs) : std::get<0>(funcs))(interVals[interVals.size() - 2]->mpzVal, interVals.back()->mpzVal,
                   interVals.back()->width, interVals[interVals.size() - 2]->mpzVal, interVals[interVals.size() - 2]->width);
     deleteAndPop();
-    setConsValName(op);
+    setConsValName(op, node->opBits[opIdx]);
     if (opIdx == 0) setConstantNode(node);
     return;
   }
   std::string dstName;
-  bool result_mpz  = op->width > BASIC_WIDTH;
+  bool result_mpz  = opWidth > BASIC_WIDTH;
   bool left_mpz    = interVals.back()->width > BASIC_WIDTH;
   bool right_mpz   = interVals[interVals.size() - 2]->width > BASIC_WIDTH;
   bool operand_mpz = left_mpz && right_mpz;
@@ -461,10 +471,10 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
                 std::to_string(interVals[interVals.size() - 2]->width) + " | " +
                 interVals[interVals.size() - 2]->value + ")";
     } else if (op->name == "dshl") {
-      dstName = "(" + UCast(op->width) + interVals.back()->value + " << " + interVals[interVals.size() - 2]->value + ")";
+      dstName = "(" + UCast(opWidth) + interVals.back()->value + " << " + interVals[interVals.size() - 2]->value + ")";
     } else {
       TODO();
-      dstName = FUNC_BASIC(op->sign, op->name, op->width) + "(" + interVals.back()->value + ", " +
+      dstName = FUNC_BASIC(op->sign, op->name, opWidth) + "(" + interVals.back()->value + ", " +
                 interVals[interVals.size() - 2]->value + ")";
     }
     if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
@@ -495,29 +505,30 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   } else if (!result_mpz && operand_mpz) {
     TODO();
     dstOpNum ++;
-    dstName = FUNC_I(op->sign, op->name, op->width) + "(" + interVals.back()->value + ", " + std::to_string(interVals.back()->width) +
+    dstName = FUNC_I(op->sign, op->name, opWidth) + "(" + interVals.back()->value + ", " + std::to_string(interVals.back()->width) +
               ", " + interVals[interVals.size() - 2]->value + ", " + std::to_string(interVals[interVals.size() - 2]->width) + ")";
     if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
   }
   deleteAndPop();
   deleteAndPop();
-  interVals.push_back(new InterVal(op->width, op->sign, false, dstOpNum, dstName, NULL));
+  interVals.push_back(new InterVal(opWidth, op->sign, false, dstOpNum, dstName, NULL));
 }
 
 void insts_1expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
   PNode* op = node->workingVal->ops[opIdx];
+  int opWidth = node->opBits[opIdx];
   if (!topValid) setPrev(node, prevIdx);
   bool dstCons = interVals.back()->isCons;
   if (dstCons) {
     std::tuple<EXPR1_FUNC_TYPE, EXPR1_FUNC_TYPE> funcs = expr1Map[op->name];
     (op->sign ? std::get<1>(funcs) : std::get<0>(funcs))(interVals.back()->mpzVal, interVals.back()->mpzVal, interVals.back()->width);
-    setConsValName(op);
+    setConsValName(op, node->opBits[opIdx]);
     if (opIdx == 0) setConstantNode(node);
     return;
   }
   int dstOpNum = interVals.back()->opNum;
   std::string dstName;
-  bool result_mpz  = op->width > BASIC_WIDTH;
+  bool result_mpz  = opWidth > BASIC_WIDTH;
   bool operand_mpz = interVals.back()->width > BASIC_WIDTH;
   if (result_mpz) {
     dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
@@ -529,21 +540,21 @@ void insts_1expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
       dstName = "(" + opMap[op->name] + interVals.back()->value + ")";
       dstOpNum ++;
     } else if (op->name == "not") {      
-      dstName = "(" + interVals.back()->value + " ^ " + bitMask(op->width) + ")";
+      dstName = "(" + interVals.back()->value + " ^ " + bitMask(opWidth) + ")";
       dstOpNum ++;
     } else if (op->name == "asSInt") {
-      int shiftBits = widthBits(op->width) - op->width;
+      int shiftBits = widthBits(opWidth) - opWidth;
       std::string shiftStr = std::to_string(shiftBits);
-      dstName = "(((" + widthSType(op->width) + ")(" + interVals.back()->value + " << " + shiftStr + ")) >> " + shiftStr + ")";
+      dstName = "(((" + widthSType(opWidth) + ")(" + interVals.back()->value + " << " + shiftStr + ")) >> " + shiftStr + ")";
     } else if (op->name == "asUInt") {
-      dstName = "((" + widthUType(op->width) + ")" + interVals.back()->value + " & " + bitMask(interVals.back()->width) + ")";
+      dstName = "((" + widthUType(opWidth) + ")" + interVals.back()->value + " & " + bitMask(interVals.back()->width) + ")";
     } else if (op->name == "andr") {
       dstName = "(" + interVals.back()->value + " == " + bitMask(interVals.back()->width) + ")";
     } else if (op->name == "xorr") {
       dstName = "(__builtin_parity(" + interVals.back()->value + ") & 1)";
     } else {
       TODO();
-      dstName = FUNC_BASIC(op->sign, op->name, op->width) + "(" + interVals.back()->value + ")";
+      dstName = FUNC_BASIC(op->sign, op->name, opWidth) + "(" + interVals.back()->value + ")";
       dstOpNum ++;
     }
     if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
@@ -553,7 +564,7 @@ void insts_1expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
     TODO();
   }
   deleteAndPop();
-  interVals.push_back(new InterVal(op->width, op->sign, false, dstOpNum, dstName, NULL));
+  interVals.push_back(new InterVal(opWidth, op->sign, false, dstOpNum, dstName, NULL));
 }
 
 bool insts_index(Node* node, int opIdx, int& prevIdx, int rindexBegin) {
@@ -602,6 +613,7 @@ bool insts_l_cons_index(Node* node, int opIdx, int& prevIdx, std::vector<std::st
 
 void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
   PNode* op = node->workingVal->ops[opIdx];
+  int opWidth = node->opBits[opIdx];
   if (!topValid) setPrev(node, prevIdx);
 
   if (interVals.back()->isCons && interVals[interVals.size() - 2]->isCons && interVals[interVals.size()-3]->isCons) {
@@ -614,7 +626,7 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
               mpz_cmp(interVals[interVals.size()-2]->mpzVal, interVals[interVals.size()-3]->mpzVal) == 0) {
     deleteAndPop();
     deleteAndPop();
-    interVals.back()->width = op->width;
+    interVals.back()->width = opWidth;
     if (opIdx == 0) setConstantNode(node);
     return;
   }
@@ -626,7 +638,7 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
   deleteAndPop();
   std::string dstName;
   int dstOpNum = interVals.back()->opNum + interVals[interVals.size() - 2]->opNum;
-  int dstWidth = op->type == P_WHEN ? node->width : op->width;
+  int dstWidth = op->type == P_WHEN ? node->width : opWidth;
   if (dstWidth > BASIC_WIDTH) {
     dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
     dstOpNum = 1;
@@ -748,7 +760,7 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
     dstOpNum += muxType == 0;
   }
   deleteAndPop();
-  interVals.push_back(new InterVal(op->width, op->sign, false, dstOpNum, dstName, NULL));
+  interVals.push_back(new InterVal(opWidth, op->sign, false, dstOpNum, dstName, NULL));
 }
 
 void insts_intInit(Node* node, int opIdx) {
@@ -791,7 +803,7 @@ void insts_assert(Node* node, int opIdx, int& prevIdx) {
 }
 
 void insts_when(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
-  node->workingVal->ops[opIdx]->width = node->width;
+  node->workingVal->ops[opIdx]->width = node->opBits[opIdx] = node->width;
   insts_mux(node, opIdx, prevIdx, nodeEnd, true);
   return;
 }
@@ -1000,11 +1012,11 @@ void computeNode(Node* node, bool nodeEnd) {
   }
   if (node->dimension.size() != 0) {
     computeArray(node, nodeEnd);
-    node->set_compute("INVALID_ARRAY");
+    node->set_compute("INVALID_ARRAY", -1);
     return;
   }
   if (node->workingVal->ops.size() == 0 && node->workingVal->operands.size() == 0) {
-    node->set_compute("INVALID_EMPTY");
+    node->set_compute("INVALID_EMPTY", -1);
     return;
   }
 
@@ -1025,7 +1037,7 @@ void computeNode(Node* node, bool nodeEnd) {
       case P_EXPR_INT_INIT: insts_intInit(node, i); break;
       case P_PRINTF: insts_printf(node, i, prevIdx); break;
       case P_ASSERT: insts_assert(node, i, prevIdx); break;
-      case P_WHEN : node->workingVal->ops[i]->width = node->width;
+      case P_WHEN : node->workingVal->ops[i]->width = node->opBits[i] = node->width;
                     insts_mux(node, i, prevIdx, nodeEnd, false); break;
       case P_INDEX : rindexBegin = insts_index(node, i, prevIdx, rindexBegin); break;
       case P_CONS_INDEX : rindexBegin = insts_cons_index(node, i, prevIdx, rindexBegin); break;
@@ -1048,23 +1060,23 @@ void computeNode(Node* node, bool nodeEnd) {
       }
     }
   }
-  if (nodeEnd) node->set_compute(node->name);
+  if (nodeEnd) node->set_compute(node->name, 1);
   else {
     if (node->width > BASIC_WIDTH && interVals.back()->width > BASIC_WIDTH) {
-        node->set_compute(interVals.back()->value);
+        node->set_compute(interVals.back()->value, interVals.back()->opNum);
     } else if (node->width > BASIC_WIDTH && interVals.back()->width <= BASIC_WIDTH) {
         std::string name = NEW_TMP;
         // if (node->status != CONSTANT_NODE) node->insts.push_back("mpz_set_ui(" + name + ", " + interVals.back()->value + ");");
         // node->set_compute(name);
-        node->set_compute(interVals.back()->value);
+        node->set_compute(interVals.back()->value, interVals.back()->opNum);
     } else if (node->width <= BASIC_WIDTH && interVals.back()->width > BASIC_WIDTH) {
         // if (node->status != CONSTANT_NODE) node->insts.push_back(LocalType(node->width, node->sign) + " " + node->name + " = mpz_get_ui(" + interVals.back()->value + ");");
         // node->set_compute(node->name);
-        node->set_compute("mpz_get_ui(" + interVals.back()->value + ")");
+        node->set_compute("mpz_get_ui(" + interVals.back()->value + ")", 1);
     } else {
         // if (node->status != CONSTANT_NODE) node->insts.push_back(LocalType(node->width, node->sign) + " " + VAR_NAME(node) + " = " + interVals.back()->value + ";");
         // node->set_compute(node->name);
-        node->set_compute(interVals.back()->value);
+        node->set_compute(interVals.back()->value, interVals.back()->opNum);
     }
   }
   // Assert(!interVals.back()->isCons, "Invalid constant %s in node %s\n", interVals.back()->value.c_str(), node->name.c_str());

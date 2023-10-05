@@ -26,6 +26,7 @@ void aliasAnalysis(graph* g);
 void mergeWhen(graph* g);
 void removeInvalidSuperNodes(graph* g);
 void mergeRegister(graph* g);
+void usedBits(graph* g);
 extern PNode* root;
 
 /**
@@ -66,6 +67,8 @@ int main(int argc, char** argv) {
   constantPropagation(g);
 
   aliasAnalysis(g);
+
+  usedBits(g);
 
   mergeNodes(g);
 

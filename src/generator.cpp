@@ -276,6 +276,25 @@ void genNodeInit(Node* node, std::ofstream& hfile) {
     }
 }
 
+void genSig(std::ofstream& sigFile, Node* node) {
+#ifdef DIFFTEST_PER_SIG
+  std::string name = std::string(DST_NAME) + "__DOT__" +
+    (node->type == NODE_REG_DST ? node->regNext->name : node->name);
+  size_t pos;
+  while ((pos = name.find("$")) != std::string::npos) {
+    if (name.substr(pos + 1, 2) == "io") {
+      name.replace(pos, 1, "_");
+    } else
+      name.replace(pos, 1, "__DOT__");
+  }
+  if (node->type == NODE_REG_DST)
+    sigFile << node->sign << " " << node->width << " " << node->regNext->name + "$prev"
+            << " " << name << " " << node->regSplit << std::endl;
+  else if (node->type != NODE_REG_SRC)
+    sigFile << node->sign << " " << node->width << " " << node->name << " " << name << " 0" << std::endl;
+#endif
+}
+
 void genNodeDef(Node* node, std::ofstream& hfile, std::string& mpz_vals
 #ifdef DIFFTEST_PER_SIG
 , std::ofstream& sigFile
@@ -289,6 +308,9 @@ void genNodeDef(Node* node, std::ofstream& hfile, std::string& mpz_vals
           mpz_vals += "mpz_t " + member->name + ";\n";
         else
           hfile << widthUType(member->width) << " " << member->name << ";\n";
+#ifdef DIFFTEST_PER_SIG
+        genSig(sigFile, member);
+#endif
       }
       break;
     case NODE_L1_RDATA: break;
@@ -304,22 +326,10 @@ void genNodeDef(Node* node, std::ofstream& hfile, std::string& mpz_vals
         dispDimension(hfile, node);
         hfile << ";\n";
       }
-#ifdef DIFFTEST_PER_SIG
-      std::string name = std::string(DST_NAME) + "__DOT__" +
-        (node->type == NODE_REG_DST ? node->regNext->name : node->name);
-      size_t pos;
-      while ((pos = name.find("$")) != std::string::npos) {
-        if (name.substr(pos + 1, 2) == "io") {
-          name.replace(pos, 1, "_");
-        } else
-          name.replace(pos, 1, "__DOT__");
-      }
-      if (node->type == NODE_REG_DST)
-        sigFile << node->sign << " " << node->width << " " << node->regNext->name + "$prev"
-                << " " << name << std::endl;
-      else if (node->type != NODE_REG_SRC)
-        sigFile << node->sign << " " << node->width << " " << node->name << " " << name << std::endl;
-#endif
+      #ifdef DIFFTEST_PER_SIG
+        genSig(sigFile, node);
+      #endif
+
   }
 }
 

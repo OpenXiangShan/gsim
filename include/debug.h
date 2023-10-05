@@ -19,6 +19,7 @@
   } while (0)
 
 #define TODO() Assert(0, "Implement ME!")
+#define Panic() Assert(0, "Should Not Reach Here!")
 #ifdef DEBUG
 #define MUX_DEBUG(...) __VA_ARGS__
 #else

@@ -41,7 +41,7 @@ PARSER_OBJS := $(PARSER_SRCS:.cc=.o)
 HEADERS := $(foreach x, $(INCLUDE_DIR), $(wildcard $(addprefix $(x)/*,.h)))
 
 MODE ?= 0
-DIFF_VERSION ?= 2023_9_18
+DIFF_VERSION ?= 2023_10_4
 
 VERI_INC_DIR = $(OBJ_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME)

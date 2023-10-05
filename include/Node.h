@@ -109,9 +109,11 @@ class Node {
   int status = VALID_NODE;
   int visited;
   int scratch;
+  int usedBits = -1;
   bool regSplit = false;
   bool arraySplit = false;
   bool computed = false;
+  int opNum = 0;
   std::string valName;
   int whenDepth = 0;
   AggrType* aggrType = NULL;
@@ -120,6 +122,7 @@ class Node {
   int entryNum = 1;
   std::set<Node*> next;
   std::set<Node*> prev;
+  std::vector<int> opBits;
   std::vector<Index> index;
   std::vector<ExprValue*> imps;
   std::vector<ExprValue*> whenStack;
@@ -143,9 +146,10 @@ class Node {
     id     = _id;
     clusId = id;
   }
-  void set_compute(std::string _valName) {
+  void set_compute(std::string _valName, int _opNum) {
     valName = _valName;
     computed = true;
+    opNum = _opNum;
   }
 };
 
