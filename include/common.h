@@ -76,4 +76,20 @@
 #define MUX_COUNT(...)
 #endif
 
+#define MUX_DEF(macro, ...) \
+  do { \
+    if (macro) { \
+      __VA_ARGS__ \
+    } \
+  } while(0)
+
+#define MUX_NDEF(macro, ...) \
+  do { \
+    if (!macro) { \
+      __VA_ARGS__ \
+    } \
+  } while(0)
+
+#define EVENT_DRIVEN 0
+
 #endif

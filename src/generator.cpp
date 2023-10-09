@@ -28,9 +28,11 @@ void setOldVal(std::ofstream& file, Node* node) {
   if (node->type != NODE_REG_SRC && node->status == VALID_NOT_USE) {
     return;
   }
+  MUX_DEF(EVENT_DRIVEN,
   std::string oldName = node->name + "$oldVal";
   file << (node->width > BASIC_WIDTH ? "mpz_set(oldValMpz, " + node->name + ")" :
-            widthUType(node->width) + " " + oldName + " = " + node->name) << ";\n";
+            widthUType(node->width) + " " + oldName + " = " + node->name) << ";\n";);
+
 }
 
 void activateNode(Node* node, std::set<Node*>& nextNodes, std::set<int>& s, int activeType, Node* superNode) {
@@ -88,15 +90,17 @@ void activate(std::ofstream& file, Node* node, std::set<Node*>& nextNodes, int a
     }
   }
   if (node->dimension.size() == 0 && s.size() != 0) {
+    MUX_DEF(EVENT_DRIVEN,
     file << "if("
           << (node->width > BASIC_WIDTH ? "mpz_cmp(" + oldName + ", " + node->name + ") != 0" : oldName + " != " + node->name)
-          << "){\n";
+          << "){\n";);
   }
   if (activeType == 0 || activeType == 1) {
     MUX_COUNT(file << "isActive = true;\n");
   }
-  for (int idx : s) file << "activeFlags[" << idx << "] = true;\n";
-  if (node->dimension.size() == 0 && s.size() != 0) file << "}\n";
+  MUX_DEF(EVENT_DRIVEN,
+    for (int idx : s) file << "activeFlags[" << idx << "] = true;\n";
+    if (node->dimension.size() == 0 && s.size() != 0) file << "}\n";);
 }
 
 void activate_uncond(std::ofstream& file, Node* node, std::vector<Node*>& nextNodes) {
@@ -105,7 +109,8 @@ void activate_uncond(std::ofstream& file, Node* node, std::vector<Node*>& nextNo
     if (next->status == VALID_NODE && next->type != NODE_ACTIVE) {
       int activateID = next->id == next->clusId ? next->id : next->clusNodes[0]->id;
       if(s.find(activateID) == s.end()) {
-        file << "activeFlags[" << activateID << "] = true;\n";
+        MUX_DEF(EVENT_DRIVEN,
+          file << "activeFlags[" << activateID << "] = true;\n";);
         s.insert(activateID);
       }
     }
@@ -372,10 +377,10 @@ void genHeader(graph* g, std::string headerFile) {
     genNodeInit(node, hfile);
   }
   hfile << "}\n";
-
   // active flags
-  hfile << "std::vector<bool> activeFlags = "
-        << "std::vector<bool>(" << g->superNodes.back()->id << ", true);\n";
+  MUX_DEF(EVENT_DRIVEN,
+    hfile << "std::vector<bool> activeFlags = "
+          << "std::vector<bool>(" << g->superNodes.back()->id << ", true);\n";);
   // all sigs
   std::string mpz_vals;
   for (Node* node : g->sorted)
@@ -431,7 +436,8 @@ void genHeader(graph* g, std::string headerFile) {
       if (next->setOrder.size() != 0)
         ids.insert(next->id);
     }
-    for (int id : ids) hfile << "activeFlags[" << id << "] = true;\n";
+    MUX_DEF(EVENT_DRIVEN,
+      for (int id : ids) hfile << "activeFlags[" << id << "] = true;\n";);
     hfile << "}\n";
   }
   // step functions
@@ -527,7 +533,8 @@ void genNodeInsts(Node* node, std::ofstream& sfile, Node* superNode) {
       // read mode
       sfile << "} else {\n";
       if (node->parent->latency[0] == 0) {
-        sfile << "activeFlags[" << node->id << "] = false;\n";
+        MUX_DEF(EVENT_DRIVEN,
+          sfile << "activeFlags[" << node->id << "] = false;\n";);
         MEM_READ(sfile, node->parent->width, node->parent->name, node->member[0], node->member[3]);
         activate(sfile, node->member[3], node->next, 0, superNode);
         emu_log(sfile, superNode->id, OLDNAME(node, node->parent->width), node->member[3]);
@@ -576,7 +583,8 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
     if (node->status == VALID_NOT_USE) continue;
     // generate function
     STEP_START(sfile, g, node);
-    sfile << "activeFlags[" << node->id << "] = false;\n";
+    MUX_DEF(EVENT_DRIVEN,
+      sfile << "activeFlags[" << node->id << "] = false;\n";);
     for (Node* n : node->setOrder) {
       genNodeInsts(n, sfile, node);
     }
@@ -617,8 +625,11 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   MUX_COUNT(sfile << "clock_t befFunc = std::clock();\n");
   for (Node* superNode : g->superNodes) {
     if (superNode->status == VALID_NOT_USE) continue;
-    sfile << "if(unlikely(activeFlags[" << superNode->id << "])) "
-          << "step" << superNode->id << "();\n";
+    MUX_DEF(EVENT_DRIVEN,
+      sfile << "if(unlikely(activeFlags[" << superNode->id << "])) "
+            << "step" << superNode->id << "();\n";);
+    MUX_NDEF(EVENT_DRIVEN,
+      sfile << "step" << superNode->id << "();";);
   }
   MUX_COUNT(sfile << "clock_t aftFunc = std::clock();\n");
   MUX_COUNT(sfile << "funcTime += (double)(aftFunc - befFunc) * 1000 / CLOCKS_PER_SEC;\n");
@@ -680,10 +691,11 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
       } else if (rw->type == NODE_WRITER && node->latency[1] == 1) {
         sfile << "if(" << nodeEqualsZero(rw->member[1]) << " && " << nodeEqualsZero(rw->member[4]) << ") {\n";
         MEM_WRITE(sfile, node->width, node->name, rw->member[0], rw->member[3]);
-        for (Node* reader : rw->parent->member) {
-          if (reader->type == NODE_READER || reader->type == NODE_READWRITER)
-            sfile << "activeFlags[" << reader->master->id << "] = true;\n";
-        }
+        MUX_DEF(EVENT_DRIVEN,
+          for (Node* reader : rw->parent->member) {
+            if (reader->type == NODE_READER || reader->type == NODE_READWRITER)
+              sfile << "activeFlags[" << reader->master->id << "] = true;\n";
+          });
         write_log(sfile, node->name, rw->member[0]->name, rw->member[3]->name, node->width);
         sfile << "}\n";
       } else if (rw->type == NODE_READWRITER) {
@@ -699,10 +711,11 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
           sfile << "if(" << rw->member[6]->name << "){\n";
           sfile << "if(" << nodeEqualsZero(rw->member[1]) << " && " << nodeEqualsZero(rw->member[5]) << ") {\n";
           MEM_WRITE(sfile, node->width, node->name, rw->member[0], rw->member[4]);
-          for (Node* reader : rw->parent->member) {
-            if (reader->type == NODE_READER || reader->type == NODE_READWRITER)
-              sfile << "activeFlags[" << reader->id << "] = true;\n";
-          }
+          MUX_DEF(EVENT_DRIVEN,
+            for (Node* reader : rw->parent->member) {
+              if (reader->type == NODE_READER || reader->type == NODE_READWRITER)
+                sfile << "activeFlags[" << reader->id << "] = true;\n";
+            });
           sfile << "}\n";
         }
       }
