@@ -12,7 +12,7 @@
 MOD_NAME* mod;
 #endif
 
-#if defined(VERILATOR) || defined(GSIM_DIFF)
+#if defined(GSIM_DIFF)
 #include <top_ref.h>
 REF_NAME* ref;
 #endif
@@ -20,6 +20,7 @@ REF_NAME* ref;
 #if defined(VERILATOR)
 #include "verilated.h"
 #include HEADER
+REF_NAME* ref;
 extern "C" void update_reg(int id, long long val){ }
 extern "C" void update_indi(svBit cpu_is_mmio, svBit cpu_valid, int rcsr_id){ }
 extern "C" void update_pc(long long pc, int inst){ }
