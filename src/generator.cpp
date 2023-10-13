@@ -434,7 +434,7 @@ void genHeader(graph* g, std::string headerFile) {
     }
     std::set<int>ids;
     for (Node* next : node->master->next) {
-      if (next->setOrder.size() != 0)
+      if (next->status != VALID_NOT_USE)
         ids.insert(next->id);
     }
     MUX_DEF(EVENT_DRIVEN,
@@ -734,8 +734,7 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
 void reorderSuperNodes(graph* g) {
   int idx = 0;
   for (Node* superNode : g->superNodes) {
-    if (superNode->status != VALID_NOT_USE) superNode->id = idx ++;
-    else superNode->id = -1;
+    superNode->id = idx ++;
   }
 }
 
@@ -743,6 +742,9 @@ void generator(graph* g, std::string header, std::string src) {
   for (Node* n : g->superNodes) {
     checkValid(n);
   }
+  g->superNodes.erase(
+      std::remove_if(g->superNodes.begin(), g->superNodes.end(), [](const Node* n) { return n->status == VALID_NOT_USE; }),
+      g->superNodes.end());
   reorderSuperNodes(g);
   genHeader(g, header);
   genSrc(g, header, src);
