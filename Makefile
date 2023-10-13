@@ -41,7 +41,7 @@ PARSER_OBJS := $(PARSER_SRCS:.cc=.o)
 HEADERS := $(foreach x, $(INCLUDE_DIR), $(wildcard $(addprefix $(x)/*,.h)))
 
 MODE ?= 0
-DIFF_VERSION ?= 2023_10_4
+DIFF_VERSION ?= 2023_10_11
 
 VERI_INC_DIR = $(OBJ_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME)
@@ -108,6 +108,9 @@ compile: $(TARGET)
 clean:
 	rm -rf obj parser/build obj_dir build
 
+clean-obj:
+	rm -rf obj_dir
+
 emu: obj/top.cpp $(EMU_SRC)
 	g++ $(EMU_SRC) obj/top.cpp -DMOD_NAME=S$(NAME) -Wl,-lgmp -Iobj -I$(EMU_SRC_DIR) -o $(GSIM_BUILD_DIR)/$(EMU_TARGET)
 	$(GSIM_BUILD_DIR)/$(EMU_TARGET)
@@ -136,6 +139,15 @@ $(EMU_BUILD_DIR)/S$(NAME)_diff: $(VERI_OBJS) $(REF_GSIM_OBJS)
 
 difftest: $(target)
 	$(target) $(mainargs)
+
+perf: $(target)
+	sudo perf record -e branch-instructions,branch-misses,cache-misses,\
+	cache-references,instructions,L1-dcache-load-misses,L1-dcache-loads,\
+	L1-dcache-store,L1-icache-load-misses,LLC-load-misses,LLC-loads,\
+	LLC-store-misses,LLC-store,branch-load-misses,branch-loads,\
+	l2_rqsts.code_rd_miss,l2_rqsts.code_rd_hit,l2_rqsts.pf_hit,\
+	l2_rqsts.pf_miss,l2_rqsts.all_demand_miss,l2_rqsts.all_demand_data_rd,\
+	l2_rqsts.miss $(target) $(mainargs)
 
 count:
 	find emu parser src include emu-src scripts -name "*.cpp" -o -name "*.h" -o -name "*.y" -o -name "*.l" -o -name "*.py" |grep -v "emu/obj*" |xargs wc
