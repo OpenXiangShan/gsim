@@ -90,6 +90,6 @@
     } \
   } while(0)
 
-#define EVENT_DRIVEN 0
+#define EVENT_DRIVEN 1
 
 #endif
