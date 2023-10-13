@@ -442,7 +442,10 @@ void genHeader(graph* g, std::string headerFile) {
     hfile << "}\n";
   }
   // step functions
-  for (size_t i = 0; i < g->superNodes.size(); i++) { hfile << "void step" << g->superNodes[i]->id << "();\n"; }
+  for (size_t i = 0; i < g->superNodes.size(); i++) {
+    if (g->superNodes[i]->status != VALID_NOT_USE)
+      hfile << "void step" << g->superNodes[i]->id << "();\n";
+  }
 
   // functions
   hfile << "void step();\n";
@@ -728,10 +731,19 @@ void genSrc(graph* g, std::string headerFile, std::string srcFile) {
   sfile << "cycles ++;\n}\n";
 }
 
+void reorderSuperNodes(graph* g) {
+  int idx = 0;
+  for (Node* superNode : g->superNodes) {
+    if (superNode->status != VALID_NOT_USE) superNode->id = idx ++;
+    else superNode->id = -1;
+  }
+}
+
 void generator(graph* g, std::string header, std::string src) {
   for (Node* n : g->superNodes) {
     checkValid(n);
   }
+  reorderSuperNodes(g);
   genHeader(g, header);
   genSrc(g, header, src);
 
