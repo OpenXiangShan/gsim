@@ -18,6 +18,7 @@
 #define STEP_START(file, g, node)                                    \
   do {                                                               \
     nodeNum++;                                                       \
+    MUX_NDEF(EVENT_DRIVEN, file << "inline ";);                      \
     file << "void S" << g->name << "::step" << node->id << "() {\n"; \
     MUX_COUNT(file << "allActiveTimes[" << node->id << "] ++;\n"); \
     MUX_COUNT(file << "activeNum ++;\n"); \
