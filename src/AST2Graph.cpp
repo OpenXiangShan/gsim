@@ -832,6 +832,27 @@ void aggrRecoverWorkingVal(Node* node) {
   }
 }
 
+void aggrAllocWorkingVal(Node* node) {
+  if (!node->aggrType) node->workingVal = new ExprValue();
+  else {
+    for (Node* n : node->aggrMember) aggrAllocWorkingVal(n);
+  }
+}
+
+void aggrSetiValue(Node* node) {
+  if (!node->aggrType) node->iValue = node->workingVal;
+  else {
+    for (Node* n : node->aggrMember) aggrSetiValue(n);
+  }
+}
+
+void aggrSetWorkingVal(Node* node) {
+  if (!node->aggrType) node->workingVal = node->value;
+  else {
+    for (Node* n : node->aggrMember) aggrSetWorkingVal(n);
+  }
+}
+
 void visitRegDef(std::string prefix, graph* g, PNode* reg) {
   Node* newReg = allocNode(NODE_REG_SRC);
   newReg->name = prefix + (prefix.length() == 0 ? "" : "$") + reg->name;
@@ -1335,15 +1356,15 @@ void addRegReset(graph* g) {
     PNode* mux = new PNode(P_WHEN);
     Node* regDst = n->regNext;
     mux->width = regDst->width;
-    regDst->workingVal = new ExprValue();
+    aggrAllocWorkingVal(regDst);
     addAggrMemberOps(regDst, mux);
     aggrMergeResetCond(regDst);
     addAggrMemberOps(regDst, NULL);
     aggrMergeResetValue(regDst);
     addAggrMemberOps(regDst, NULL);
     aggrMergeValue(regDst);
-    delete regDst->value;
-    regDst->value = regDst->workingVal;
+    aggrSetiValue(regDst);
+    aggrSetWorkingVal(regDst);
   }
 }
 

@@ -183,6 +183,17 @@ static std::string bitMask(int width) {
   return ret;
 }
 
+static std::string consVal128(std::string consVal) {
+  return consVal.length() > 16 ?
+          ("UINT128(0x" + consVal.substr(0, consVal.length() - 16) + ", 0x" + consVal.substr(consVal.length()-16, 16) + ")")
+          : ("0x" + consVal);
+}
+
+static std::string consValArray(Node* node, std::string consVal, int entryNum) {
+  return "memcpy(" + node->name + ", (const " + widthUType(node->width) + "[]){" + consVal + "}, "
+                    + std::to_string(entryNum) + "*sizeof(" + widthUType(node->width) + "))";
+}
+
 static void deleteAndPop() {
   delete interVals.back();
   interVals.pop_back();
@@ -630,6 +641,7 @@ void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
     if (opIdx == 0) setConstantNode(node);
     return;
   }
+
   int muxType = interVals.back()->isCons ? (interVals.back()->value == "0x0" ? 1 : 2) : 0;
   Assert(!interVals.back()->isCons || interVals.back()->value == "0x0" || interVals.back()->value == "0x1",
               "invalid constant cond %s for node %s\n", interVals.back()->value.c_str(), node->name.c_str());
@@ -912,8 +924,8 @@ void computeArray(Node* node, bool nodeEnd) {
         node->insts.push_back("memcpy(" + VAR_NAME(node) + ", " + interVals.back()->value + ", sizeof(" + VAR_NAME(node) + "));");
       }
     } else {
-      TODO();
-      // Assert(0, "invalid constant\n");
+      node->insts.push_back("memcpy(" + node->name + ", (const " + widthUType(node->width) + "[]){" + interVals.back()->value + "}, "
+                    + std::to_string(interVals.back()->entryNum) + "*sizeof(" + widthUType(node->width) + "));");
     }
     if (nodeEnd) {
       deleteAndPop();
@@ -1005,7 +1017,7 @@ void computeArray(Node* node, bool nodeEnd) {
 }
 
 void computeNode(Node* node, bool nodeEnd) {
-  // std::cout << "compute " << node->name << "(" << node->id << ") " << nodeEnd << " " << topValid << std::endl;
+  // std::cout << "compute " << node->name << "(" << node->width << ") " << nodeEnd << " " << node->status << " " << node->type << std::endl;
   if (node->status == CONSTANT_NODE && node->dimension.size() == 0) {
     Assert(node->workingVal->consVal.length() > 0, "consVal is not set in node %s\n", node->name.c_str());
     return;
@@ -1086,6 +1098,9 @@ void computeNode(Node* node, bool nodeEnd) {
 }
 
 void instsGenerator(graph* g) {
+  Node* tmp;
+  std::string tmpStr;
+  int oldStatus;
   for (size_t i = 0; i < g->sorted.size(); i++) {
     if (g->sorted[i]->status == CONSTANT_NODE) continue;
 
@@ -1098,6 +1113,28 @@ void instsGenerator(graph* g) {
         }
         break;
       }
+      case NODE_REG_DST:
+        if (g->sorted[i]->resetCond->consVal.length() == 0) {
+          g->sorted[i]->workingVal = g->sorted[i]->resetVal;
+          tmpStr = g->sorted[i]->name;
+          oldStatus = g->sorted[i]->status;
+          g->sorted[i]->name = g->sorted[i]->regNext->name;
+          computeNode(g->sorted[i], true);
+          Assert(g->sorted[i]->resetCond->operands.size() == 1, "reset is not input for node %s\n", g->sorted[i]->name.c_str());
+          tmp = g->sorted[i]->resetCond->operands[0];
+          tmp->insts.insert(tmp->insts.end(), g->sorted[i]->insts.begin(), g->sorted[i]->insts.end());
+          if (g->sorted[i]->workingVal->consVal.length() != 0) {
+            if (g->sorted[i]->dimension.size() == 0) {
+              tmp->insts.push_back(g->sorted[i]->name + " = " + consVal128(g->sorted[i]->workingVal->consVal) + ";");
+            } else {
+              tmp->insts.push_back(consValArray(g->sorted[i], g->sorted[i]->workingVal->consVal, g->sorted[i]->entryNum) + ";");
+            }
+          }
+          g->sorted[i]->insts.erase(g->sorted[i]->insts.begin(), g->sorted[i]->insts.end());
+          g->sorted[i]->workingVal = g->sorted[i]->value;
+          g->sorted[i]->name = tmpStr;
+          g->sorted[i]->status = oldStatus;
+        }
       default: computeNode(g->sorted[i], true);
     }
 

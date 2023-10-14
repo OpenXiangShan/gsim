@@ -431,11 +431,17 @@ void genHeader(graph* g, std::string headerFile) {
     } else {
       hfile << "void set_" << node->name << "(uint64_t val) {\n";
       hfile << node->name << " = val;\n";
+      DISP_INSTS(hfile, node);
     }
     std::set<int>ids;
-    for (Node* next : node->master->next) {
-      if (next->status != VALID_NOT_USE)
-        ids.insert(next->id);
+    for (Node* next : node->next) {
+      Node* nextNode = (node->type == NODE_REG_DST && node->regNext->regSplit) ? next->regNext : next;
+      for (Node* n2 : nextNode->next) {
+        if (n2->status == VALID_NODE && n2->type != NODE_ACTIVE && n2->master->status != VALID_NOT_USE) {
+          ids.insert(n2->master->id);
+        }
+
+      }
     }
     MUX_DEF(EVENT_DRIVEN,
       for (int id : ids) hfile << "activeFlags[" << id << "] = true;\n";);
@@ -459,12 +465,13 @@ void genNodeInsts(Node* node, std::ofstream& sfile, Node* superNode) {
   int latency;
   switch (node->type) {
     case NODE_REG_SRC:
+      return;
     case NODE_REG_DST:
-      if (node->insts.size() == 0) return;
+      if (node->insts.size() == 0 && node->dimension.size() == 0) return;
       if (!node->regNext->regSplit && node->dimension.size() == 0) setOldVal(sfile, node->regNext);
       DISP_CLUS_INSTS(sfile, node);
       DISP_INSTS(sfile, node);
-      Assert(node->type == NODE_REG_DST, "invalid Node %s\n", node->name.c_str());
+      Assert(node->type == NODE_REG_DST, "invalid Node %s type %d\n", node->name.c_str(), node->type);
       activate(sfile, node, node->regNext->regSplit ? node->regNext->next : node->next, 1, superNode);
       if (!node->regNext->regSplit) {
         emu_log(sfile, superNode->id, OLDNAME(node, node->width), node);
@@ -555,7 +562,7 @@ bool checkValid(Node* n) {
     switch (member->type) {
       case NODE_REG_SRC:
       case NODE_REG_DST:
-        if (member->insts.size() == 0) {
+        if (member->insts.size() == 0 && member->dimension.size() == 0) {
           continue;
         }
         retVal = true;

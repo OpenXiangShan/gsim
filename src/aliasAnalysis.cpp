@@ -4,15 +4,20 @@
 
 #define IS_RW(node) (node->type == NODE_READER || node->type == NODE_WRITER || node->type == NODE_READWRITER)
 
-void updateOperand(Node* oldNode, Node* newNode, Node* dst) {
-  auto ptr = find(dst->workingVal->operands.begin(), dst->workingVal->operands.end(), oldNode);
-  if (ptr == dst->workingVal->operands.end()) {
-    Assert((dst->type == NODE_MEMBER || dst->type == NODE_L1_RDATA)|| IS_RW(dst) || dst->type == NODE_ARRAY_MEMBER || dst->dimension.size() != 0, "%s not found in %s %d\n", oldNode->name.c_str(), dst->name.c_str(), dst->type);
-    return;
-  }
-  while (ptr != dst->workingVal->operands.end()) {
+void updateExprValue(Node* oldNode, Node* newNode, ExprValue* exprValue) {
+  auto ptr = find(exprValue->operands.begin(), exprValue->operands.end(), oldNode);
+  while (ptr != exprValue->operands.end()) {
     *ptr = newNode;
-    ptr = find(dst->workingVal->operands.begin(), dst->workingVal->operands.end(), oldNode);
+    ptr = find(exprValue->operands.begin(), exprValue->operands.end(), oldNode);
+  }
+}
+
+void updateOperand(Node* oldNode, Node* newNode, Node* dst) {
+  updateExprValue(oldNode, newNode, dst->workingVal);
+  if (dst->type == NODE_REG_DST) {
+    updateExprValue(oldNode, newNode, dst->resetCond);
+    updateExprValue(oldNode, newNode, dst->resetVal);
+    updateExprValue(oldNode, newNode, dst->iValue);
   }
 }
 

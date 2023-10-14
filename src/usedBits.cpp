@@ -77,7 +77,6 @@ void setUsedBits(Node* node, int bits) {
 }
 
 void getBits(Node* node) {
-  // std::cout << "getBit " << node->name << " " << node->width << " " << node->usedBits << " " << node->type << std::endl;
   if (node->status == CONSTANT_NODE && node->dimension.size() == 0) return;
   if (node->workingVal->ops.size() == 0 && node->workingVal->operands.size() == 0) {
     return;
@@ -155,15 +154,26 @@ void usedBits(graph* g) {
     if (g->sorted[i]->status == CONSTANT_NODE) continue;
     switch (g->sorted[i]->type) {
       case NODE_READER:
-      case NODE_WRITER: {
+      case NODE_WRITER:
         for (Node* node : g->sorted[i]->member) {
           if (node->status == CONSTANT_NODE) continue;
           getBits(node);
         }
         break;
-      }
       case NODE_REG_DST:
         g->sorted[i]->usedBits = g->sorted[i]->width;
+        if (g->sorted[i]->dimension.size() != 0) {
+          for (Node* member : g->sorted[i]->member) {
+            if (member->iValue)
+              member->workingVal = member->iValue;
+            getBits(member);
+            member->workingVal = member->value;
+          }
+        }
+        g->sorted[i]->workingVal = g->sorted[i]->iValue;
+        getBits(g->sorted[i]);
+        g->sorted[i]->workingVal = g->sorted[i]->value;
+        break;
       default:
         if (g->sorted[i]->dimension.size() != 0) {
           for (Node* member : g->sorted[i]->member) getBits(member);

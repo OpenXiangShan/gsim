@@ -135,6 +135,7 @@ class Node {
   ExprValue* value = NULL;
   ExprValue* resetVal = NULL;  // for regs
   ExprValue* resetCond = NULL;
+  ExprValue* iValue = NULL; // intergrated value for reg dst
   int inEdge;  // for topo sort
   std::vector<Node*> member;
   Node* parent = NULL;

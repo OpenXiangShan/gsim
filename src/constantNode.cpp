@@ -25,6 +25,7 @@
 int p_stoi(const char* str);
 std::pair<int, std::string> strBaseAll(std::string s);
 void checkAndComputeConstant(Node* node);
+void checkRegDst(Node* node);
 static std::set<Node*> checked;
 static int constantNode = 0;
 static int totalNode    = 0;
@@ -286,12 +287,13 @@ void computeArrayConstant(Node* node) {
 
 
 void checkAndComputeConstant(Node* node) {
-  // std::cout << "checking " << node->name << std::endl;
+  // std::cout << "checking " << node->name << " " << node->type << std::endl;
   checked.insert(node);
   bool isConstant = true;
   for (Node* operand : node->workingVal->operands) {
     if (potentialUncheckedType(operand) && checked.find(operand) == checked.end()) {
-      checkAndComputeConstant(operand);
+      if (operand->type == NODE_REG_DST && operand->dimension.size() == 0) checkRegDst(operand);
+      else checkAndComputeConstant(operand);
     }
     if (!POTENTIAL_TYPE(operand) || operand->status != CONSTANT_NODE) {
       isConstant = false;
@@ -349,16 +351,44 @@ void removeInValid(std::set<Node*>& nodeSet) {
   }
 }
 
+void checkRegDst(Node* node) {
+  int tmp = node->status;
+    checkAndComputeConstant(node);
+    node->workingVal = node->resetVal;
+    checkAndComputeConstant(node);
+    node->workingVal = node->resetCond;
+    checkAndComputeConstant(node);
+    node->workingVal = node->value;
+    if (node->value->operands.size() == 0 && node->value->ops.size() == 0 && node->resetVal->consVal.length() != 0) {
+      node->status = CONSTANT_NODE;
+      node->workingVal = node->resetVal;
+    } else if (node->value->consVal.length() == 0) {
+      node->status = tmp;
+    } else if (node->value->consVal == node->resetVal->consVal) {
+      node->status = CONSTANT_NODE;
+    } else if (node->resetCond->consVal.length() != 0) {
+      node->status = CONSTANT_NODE;
+      if (p_stoi(node->resetCond->consVal.c_str()) != 0) {
+        node->workingVal = node->resetVal;
+      }
+    } else {
+      node->status = tmp;
+    }
+}
+
 // compute constant val
 void constantPropagation(graph* g) {
   for (size_t i = 0; i < g->sorted.size(); i++) {
     // std::cout << N(i)->name << " " << N(i)->type << " " << N(i)->status << "======="<< std::endl;
-    if (N(i)->status == CONSTANT_NODE) {
+    if (N(i)->status == CONSTANT_NODE && N(i)->type != NODE_REG_DST) {
       checkAndComputeConstant(N(i));
       continue;
     }
-    if (N(i)->status != VALID_NODE) continue;
+    if (N(i)->status != VALID_NODE && N(i)->status != CONSTANT_NODE) {
+      continue;
+    }
     totalNode++;
+    int tmp = 0;
     switch (N(i)->type) {
       case NODE_READER: {
         checkAndComputeConstant(N(i)->member[0]);  // addr
@@ -383,8 +413,33 @@ void constantPropagation(graph* g) {
       case NODE_OTHERS:
       case NODE_OUT:
       case NODE_ACTIVE:
-      case NODE_REG_DST: {
         checkAndComputeConstant(N(i));
+        break;
+      case NODE_REG_DST: {
+        checkRegDst(N(i));
+        break;
+        tmp = N(i)->status;
+        checkAndComputeConstant(N(i));
+        N(i)->workingVal = N(i)->resetVal;
+        checkAndComputeConstant(N(i));
+        N(i)->workingVal = N(i)->resetCond;
+        checkAndComputeConstant(N(i));
+        N(i)->workingVal = N(i)->value;
+        if (N(i)->value->operands.size() == 0 && N(i)->value->ops.size() == 0 && N(i)->resetVal->consVal.length() != 0) {
+          N(i)->status = CONSTANT_NODE;
+          N(i)->workingVal = N(i)->resetVal;
+        } else if (N(i)->value->consVal.length() == 0) {
+          N(i)->status = tmp;
+        } else if (N(i)->value->consVal == N(i)->resetVal->consVal) {
+          N(i)->status = CONSTANT_NODE;
+        } else if (N(i)->resetCond->consVal.length() != 0) {
+          N(i)->status = CONSTANT_NODE;
+          if (p_stoi(N(i)->resetCond->consVal.c_str()) != 0) {
+            N(i)->workingVal = N(i)->resetVal;
+          }
+        } else {
+          N(i)->status = tmp;
+        }
         break;
       }
       default: break;
