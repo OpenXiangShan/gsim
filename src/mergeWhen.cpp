@@ -119,22 +119,13 @@ void mergeWhen(graph* g) {
 }
 
 void removeInvalidSuperNodes(graph* g) {
-  size_t nodeIdx = 0;
-  size_t superIdx = 0;
-  while(superIdx < g->superNodes.size()) {
-    std::vector<Node*>validNodes;
-    Node* superNode = g->superNodes[superIdx];
-    for (Node* member : superNode->setOrder) {
-      if (member == g->sorted[nodeIdx]) {
-        validNodes.push_back(member);
-        nodeIdx ++;
-      }
-    }
-    superNode->setOrder = validNodes;
-    superNode->setNodes.erase(superNode->setNodes.begin(), superNode->setNodes.end());
-    superIdx ++;
+  for (Node* superNode : g->superNodes) {
+    superNode->setOrder.erase(superNode->setOrder.begin(), superNode->setOrder.end());
   }
-  Assert(nodeIdx == g->sorted.size(), "nodeIdx %ld nodeSize %ld (%s, %d)\n", nodeIdx, g->sorted.size(), g->sorted[nodeIdx]->name.c_str(), g->sorted[nodeIdx]->type);
+  for (Node* node : g->sorted) {
+    node->master->setOrder.push_back(node);
+  }
+
   g->superNodes.erase(std::remove_if(g->superNodes.begin(), g->superNodes.end(), [](const Node* n) { return n->setOrder.size() == 0;}), g->superNodes.end());
   for (Node* superNode : g->superNodes) {
     for (auto iter = superNode->prev.begin(); iter != superNode->prev.end(); ) {

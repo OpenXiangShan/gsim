@@ -30,6 +30,14 @@ void mergeToNext(Node* node) {
   node->clusNodes.push_back(masterNode);
 }
 
+void mergeToPrev(Node* node) {
+  Node* prevNode = *node->prev.begin();
+  prevNode->master->setOrder.push_back(node);
+  Assert(std::find(node->master->setOrder.begin(), node->master->setOrder.end(), node) != node->master->setOrder.end(), "node %s -> %s %s \n", prevNode->name.c_str(), node->name.c_str(), node->master->name.c_str());
+  node->master->setOrder.erase(std::find(node->master->setOrder.begin(), node->master->setOrder.end(), node));
+  node->master = prevNode->master;
+}
+
 void mergeNodes(graph* g) {
   int num = 0;
 
@@ -50,6 +58,17 @@ void mergeNodes(graph* g) {
           std::cout << "Node " << g->sorted[i]->name << " with single next. Type: " << g->sorted[i]->type << std::endl;
         }
       break;
+    }
+  }
+
+  for (size_t i = 0; i < g->sorted.size(); i++) {
+    if (g->sorted[i]->clusId != g->sorted[i]->id) continue;
+    switch (g->sorted[i]->type) {
+      case NODE_OTHERS:
+        if (g->sorted[i]->prev.size() == 1 && (*g->sorted[i]->prev.begin())->type == NODE_OTHERS && g->sorted[i]->dimension.size() == 0 && (*g->sorted[i]->next.begin())->type != NODE_ARRAY_MEMBER) { // TODO: enable array combine
+          mergeToPrev(g->sorted[i]);
+          num++;
+        }
     }
   }
 

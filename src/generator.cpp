@@ -55,6 +55,7 @@ void activateNode(Node* node, std::set<Node*>& nextNodes, std::set<int>& s, int 
           std::cout << "invalid " << node->name << " " << node->type << " " << superNode->id << " -> " << activateID << std::endl;
         } else if (activateID <= superNode->id) {
           std::cout << "invalid " << node->name << " " << superNode->id << " -> " << activateID << std::endl;
+          continue;
         }
 
       } else if (activeType == 1) {  // regs in stepId()
