@@ -310,6 +310,7 @@ void genNodeDef(Node* node, std::ofstream& hfile, std::string& mpz_vals
     case NODE_READER:
     case NODE_WRITER:
       for (Node* member : node->member) {
+        if (member->name == node->name + "$clk") continue;
         if (member->width > BASIC_WIDTH)
           mpz_vals += "mpz_t " + member->name + ";\n";
         else
@@ -495,6 +496,7 @@ void genNodeInsts(Node* node, std::ofstream& sfile, Node* superNode) {
       if (latency == 0) setOldVal(sfile, node->member[3]);
       DISP_CLUS_INSTS(sfile, node);
       for (Node* member : node->member) {
+        if (member->name == node->name + "$clk") continue;
         DISP_CLUS_INSTS(sfile, member);
         DISP_INSTS(sfile, member);
       }
@@ -508,6 +510,7 @@ void genNodeInsts(Node* node, std::ofstream& sfile, Node* superNode) {
     case NODE_WRITER:
       DISP_CLUS_INSTS(sfile, node);
       for (Node* member : node->member) {
+        if (member->name == node->name + "$clk") continue;
         DISP_CLUS_INSTS(sfile, member);
         DISP_INSTS(sfile, member);
       }
@@ -530,6 +533,7 @@ void genNodeInsts(Node* node, std::ofstream& sfile, Node* superNode) {
       }
       DISP_CLUS_INSTS(sfile, node);
       for (Node* member : node->member) {
+        if (member->name == node->name + "$clk") continue;
         DISP_CLUS_INSTS(sfile, member);
         DISP_INSTS(sfile, member);
       }
