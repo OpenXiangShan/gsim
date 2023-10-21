@@ -18,10 +18,14 @@ NAME ?= newtop
 # NAME ?= freechips.rocketchip.system.DefaultConfig
 # NAME ?= Exp1AllTest
 
+MODE ?= 0
+DIFF_VERSION ?= 2023_10_11
+EVENT_DRIVEN ?= 1
+
 TEST_FILE = ready-to-run/$(NAME)
 
 CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror \
-	-DDST_NAME=\"$(NAME)\"
+	-DDST_NAME=\"$(NAME)\" -DEVENT_DRIVEN=$(EVENT_DRIVEN)
 CXX = g++
 TARGET = GraphEmu
 
@@ -39,9 +43,6 @@ OBJS := $(addprefix $(GSIM_BUILD_DIR)/, $(addsuffix .o, $(basename $(SRCS))))
 PARSER_SRCS := $(addprefix $(PARSER_BUILD)/, $(addsuffix $(FIRRTL_VERSION).cc, $(LEXICAL_NAME) $(SYNTAX_NAME)))
 PARSER_OBJS := $(PARSER_SRCS:.cc=.o)
 HEADERS := $(foreach x, $(INCLUDE_DIR), $(wildcard $(addprefix $(x)/*,.h)))
-
-MODE ?= 0
-DIFF_VERSION ?= 2023_10_11
 
 VERI_INC_DIR = $(OBJ_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME)
@@ -137,6 +138,8 @@ $(EMU_BUILD_DIR)/S$(NAME)_diff: $(VERI_OBJS) $(REF_GSIM_OBJS)
 	verilator $(VERI_VFLAGS) -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $^
 	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
 
+build-emu: $(target)
+
 difftest: $(target)
 	$(target) $(mainargs)
 
@@ -162,4 +165,4 @@ gendoc:
 format-obj:
 	@clang-format -i --style=file obj/top.cpp
 
-.PHONY: compile clean emu difftest count makedir gendoc format-obj
+.PHONY: compile clean emu difftest count makedir gendoc format-obj build-emu
