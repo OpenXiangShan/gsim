@@ -49,7 +49,6 @@ void activateNode(Node* node, std::set<Node*>& nextNodes, std::set<int>& s, int 
 
       // std::cout << node->name << " " << node->type << " activate " << activeNode->name << " " << activateID << " " << nextNodes.size()<< " origin " << next->name << " "<< next->id << std::endl;
       if (activeType == 0) {  // normal nodes
-        Assert(activateID > superNode->id, "%s %d -> %d (<== %s)\n", activeNode->name.c_str(), superNode->id, activateID, activeNode->name.c_str());
         if (node->type == NODE_REG_DST) {
           if (activateID > superNode->id)
           std::cout << "invalid " << node->name << " " << node->type << " " << superNode->id << " -> " << activateID << std::endl;
