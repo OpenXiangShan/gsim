@@ -71,5 +71,5 @@ void sortMergeArray(graph* g) {
     }
   }
 
-  std::cout << "split(" << spiltNum << "/" << g->array.size() << ") arrys" << std::endl;
+  std::cout << "split(" << spiltNum << "/" << g->array.size() << ") arrays" << std::endl;
 }
