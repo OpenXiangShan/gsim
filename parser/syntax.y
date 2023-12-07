@@ -92,6 +92,7 @@ ALLID: ID {$$ = $1; }
     | Of { $$ = strdup("of"); }
     | Reg { $$ = strdup("reg"); }
     | Output { $$ = strdup("output"); }
+    | Target { $$ = strdup("target"); }
     | Invalid { $$ = strdup("invalid"); }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
