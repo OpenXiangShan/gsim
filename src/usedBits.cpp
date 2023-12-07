@@ -37,10 +37,9 @@ int bits_1expr1int(Node* node, int parentBits, int opIdx) {
 */
 int bits_1expr2int(Node* node, int parentBits, int opIdx) {
   PNode* op = node->workingVal->ops[opIdx];
-  // int l = p_stoi(op->getExtra(0).c_str());
+  int l = p_stoi(op->getExtra(0).c_str());
   int r = p_stoi(op->getExtra(1).c_str());
-  int usedBits = parentBits + r;
-
+  int usedBits = MIN(parentBits + r, l + 1);
   bits.push_back(usedBits);
   return usedBits;
 }
