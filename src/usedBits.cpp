@@ -19,14 +19,15 @@ parentBits: The used-Bits for current op
 */
 int bits_1expr1int(Node* node, int parentBits, int opIdx) {
   PNode* op = node->workingVal->ops[opIdx];
-  unsigned long n = p_stoi(op->getExtra(0).c_str());
+  int n = p_stoi(op->getExtra(0).c_str());
 
   int usedBits = parentBits;
   if (op->name == "shl") usedBits = parentBits - n;
   else if (op->name == "shr") usedBits = parentBits + n;
   else if (op->name == "head") usedBits = n;
+  else if (op->name == "pad") usedBits = MIN(op->getChild(0)->width, n);
 
-  Assert(usedBits > 0 && usedBits <= op->width, "usedBit %d op->width %d parent %d in node %s\n", usedBits, op->width, parentBits, node->name.c_str());
+  Assert(usedBits > 0 && usedBits <= op->getChild(0)->width, "usedBit %d op->child(0)->width %d parent %d in node %s <- %s\n", usedBits, op->getChild(0)->width, parentBits, node->name.c_str(), op->getChild(0)->name.c_str());
   // node->opBits.push_back(usedBits);
   bits.push_back(usedBits);
   return usedBits;
