@@ -14,9 +14,13 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 OBJ_DIR = obj
 $(shell mkdir -p $(OBJ_DIR))
 
-NAME ?= newtop
+# NAME ?= newtop
 # NAME ?= freechips.rocketchip.system.DefaultConfig
 # NAME ?= Exp1AllTest
+NAME ?= SimTop
+
+# EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
+EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
 
 MODE ?= 0
 DIFF_VERSION ?= 2023_10_11
@@ -50,8 +54,8 @@ VERI_CFLAGS = -O3 $(addprefix -I../, $(VERI_INC_DIR)) $(MODE_FLAGS)
 VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\"
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
-VERI_VSRCS += $(addprefix ready-to-run/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v)
-VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIR)/difftest-ysyx3.cpp
+VERI_VSRCS += $(addprefix ready-to-run/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v DifftestMemInitializer.v)
+VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIFFTEST)
 VERI_HEADER = $(shell find $(OBJ_DIR) -name "*.h")
 VERI_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(VERI_CSRCS:.cpp=.o))
 
@@ -61,7 +65,8 @@ REF_GSIM_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(REF_GSIM_SRCS:.cpp=.o))
 
 GSIM_CFLAGS = -O3 $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME)
 
-mainargs = ready-to-run/bin/bbl-hello.bin
+mainargs = ready-to-run/bin/linux-NutShell.bin
+# mainargs = ready-to-run/bin/bbl-hello.bin
 # mainargs = ysyx3-bin/rtthread.bin
 
 ifeq ($(DEBUG),1)
@@ -74,6 +79,7 @@ ifeq ($(MODE),0)
 else ifeq ($(MODE), 1)
 	MODE_FLAGS += -DVERILATOR
 	target = ./obj_dir/V$(NAME)
+	VERI_CSRCS = $(EMU_DIFFTEST)
 else ifeq ($(MODE), 2)
 	MODE_FLAGS += -DGSIM -DVERILATOR
 	CXXFLAGS += -DDIFFTEST_PER_SIG
