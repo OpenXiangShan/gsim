@@ -21,14 +21,6 @@ REF_NAME* ref;
 #include "verilated.h"
 #include HEADER
 REF_NAME* ref;
-extern "C" void update_reg(int id, long long val){ }
-extern "C" void update_indi(svBit cpu_is_mmio, svBit cpu_valid, int rcsr_id){ }
-extern "C" void update_pc(long long pc, int inst){ }
-extern "C" void update_csr(int id, long long val){ }
-extern "C" void update_priv(int priv){ }
-extern "C" void update_excep(svBit intr, long long cause, long long pc){ }
-extern "C" void sdcard_read(int offset, long long* rdata){ }
-extern "C" void sdcard_write(int offset, long long wdata){ }
 #endif
 
 #define MAX_PROGRAM_SIZE 0x8000000
