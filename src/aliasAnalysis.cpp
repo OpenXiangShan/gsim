@@ -46,7 +46,7 @@ B -> |         | -> F
 void markAlias(Node* node) {
   Node* oldNode = node;
   Node* newNode = node->workingVal->operands[0];
-
+  if (newNode->type == NODE_MEMBER) return;
   if (oldNode->width != newNode->width) return; // TODO
   oldNode->type = NODE_INVALID;
   // delete edge prev->old
