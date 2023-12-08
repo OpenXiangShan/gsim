@@ -6,6 +6,8 @@ static bool popOperand = true;
 
 #define CHILD_BITS -1
 
+static std::set<Node*> computed;
+
 int popBits() {
   Assert(bits.size() > 0, "bits empty\n");
   int ret = bits.back();
@@ -77,6 +79,13 @@ void setUsedBits(Node* node, int bits) {
 }
 
 void getBits(Node* node) {
+  if (computed.find(node) != computed.end()) return;
+  computed.insert(node);
+  for (Node* next : node->next) {
+    if(computed.find(next) == computed.end()) {
+      getBits(next);
+    }
+  }
   if (node->status == CONSTANT_NODE && node->dimension.size() == 0) return;
   if (node->workingVal->ops.size() == 0 && node->workingVal->operands.size() == 0) {
     return;
@@ -161,7 +170,7 @@ void usedBits(graph* g) {
         }
         break;
       case NODE_REG_DST:
-        g->sorted[i]->usedBits = g->sorted[i]->width;
+        // g->sorted[i]->usedBits = g->sorted[i]->width;
         if (g->sorted[i]->dimension.size() != 0) {
           for (Node* member : g->sorted[i]->member) {
             if (member->iValue)
@@ -188,10 +197,9 @@ void usedBits(graph* g) {
     switch (n->type) {
       case NODE_REG_DST:
       case NODE_REG_SRC:
-        continue;
+        // continue;
       case NODE_OTHERS:
         n->width = n->usedBits;
-        
     }
   }
 }
