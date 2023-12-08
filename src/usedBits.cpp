@@ -197,6 +197,7 @@ void usedBits(graph* g) {
     switch (n->type) {
       case NODE_REG_DST:
       case NODE_REG_SRC:
+        if (!n->regSplit) n->regNext->width = n->usedBits;
         // continue;
       case NODE_OTHERS:
         n->width = n->usedBits;
