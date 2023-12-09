@@ -116,6 +116,20 @@ void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t h, mp_bitcnt
   mpz_and(dst, dst, t1);
 }
 
+__uint128_t u_bits_basic128(mpz_t& src, mp_bitcnt_t bitcnt, int h, int l) {
+  int n = h - l + 1;
+  mpz_tdiv_q_2exp(t1, src, l);
+  mpz_set_ui(t2, 1);
+  mpz_mul_2exp(t2, t2, n);
+  mpz_sub_ui(t2, t2, 1);
+  mpz_and(t1, t1, t2);
+  if (n > 64) {
+    return (__uint128_t)mpz_getlimbn(t1, 1) << 64 | mpz_get_ui(t1);
+  } else {
+    return mpz_get_ui(t1);
+  }
+}
+
 unsigned long u_bits_basic(mpz_t& src, mp_bitcnt_t bitcnt, int h, int l) {
   if(mpz_sgn(src) < 0) {
     mpz_set_ui(t1, 1);

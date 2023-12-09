@@ -31,6 +31,7 @@ void u_asUInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_asClock(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t l, mp_bitcnt_t r);
 unsigned long u_bits_basic(mpz_t& src, mp_bitcnt_t bitcnt, int h, int l);
+__uint128_t u_bits_basic128(mpz_t& src, mp_bitcnt_t bitcnt, int h, int l);
 void u_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n);
 void u_pad_ui(mpz_t& dst, unsigned long src, mp_bitcnt_t n);
 void s_pad(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t n);
