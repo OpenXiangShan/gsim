@@ -430,7 +430,7 @@ void genHeader(graph* g, std::string headerFile) {
       hfile << "void set_" << node->name << "(mpz_t val) {\n";
       hfile << "mpz_set(" << node->name << ", val);\n";
     } else {
-      hfile << "void set_" << node->name << "(uint64_t val) {\n";
+      hfile << "void set_" << node->name << "(uint128_t val) {\n";
       hfile << node->name << " = val;\n";
       DISP_INSTS(hfile, node);
     }
