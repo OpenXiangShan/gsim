@@ -172,7 +172,7 @@ inline void dispDimension(std::ofstream& file, Node* node) {
 #if 0
 void emu_log(std::ofstream& file, int id, std::string oldName, Node* node) {
   file << "if(cycles >= 0) {\n";
-    file << "std::cout << std::hex << \"" << id << ": " << node->name << "(" << node->width << ", " << node->sign
+    file << "std::cout << std::hex << cycles << \" \" << \"" << id << ": " << node->name << "(" << node->width << ", " << node->sign
          << "): \" ";
     if (node->width > BASIC_WIDTH) {
       if (node->dimension.size() == 0)
@@ -214,7 +214,7 @@ void emu_log(std::ofstream& file, int id, std::string oldName, Node* node) {
 }
 void write_log(std::ofstream& file, std::string name, std::string idx, std::string val, int width) {
   file << "if(cycles >= 0) {\n";
-  file << "std::cout << \"" << name << "[\";";
+  file << "std::cout << cycles << \" \" << \"" << name << "[\";";
   file << "std::cout << +" << idx << ";";
   file << "std::cout << \"] = \"; ";
   if (width > BASIC_WIDTH) {
@@ -229,7 +229,7 @@ void write_log(std::ofstream& file, std::string name, std::string idx, std::stri
 
 void emu_log2(std::ofstream& file, int id, Node* node) {
   file << "if(cycles >= 0) {\n";
-  file << "std::cout << \"" << id << ": " << node->name << "(" << node->width << ", " << node->sign << "): \" ;";
+  file << "std::cout << cycles << \" \" << \"" << id << ": " << node->name << "(" << node->width << ", " << node->sign << "): \" ;";
   if (node->width > BASIC_WIDTH) {
     file << "mpz_out_str(stdout, 16, " << node->name << "); ";
   } else if(node->width > 64) {
