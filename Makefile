@@ -24,7 +24,7 @@ EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
 
 MODE ?= 0
 DIFF_VERSION ?= 2023_10_11
-EVENT_DRIVEN ?= 1
+EVENT_DRIVEN ?= 0
 
 TEST_FILE = ready-to-run/$(NAME)
 
