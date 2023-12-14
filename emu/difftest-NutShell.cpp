@@ -104,14 +104,15 @@ int main(int argc, char** argv) {
   memcpy(&mod->mem$rdata_mem$mem, program, program_sz);
   mod->set_io_logCtrl_log_begin(0);
   mod->set_io_logCtrl_log_end(0);
-  mod->set_io_uart_in_ch(0);
+  mod->set_io_uart_in_ch(-1);
   mod_reset();
   mod->step();
 #endif
 #ifdef VERILATOR
   ref = new REF_NAME();
   memcpy(&ref->rootp->SimTop__DOT__mem__DOT__rdata_mem__DOT__mem, program, program_sz);
-  ref->io_logCtrl_log_begin = ref->io_logCtrl_log_begin = ref->io_uart_in_ch = 0;
+  ref->io_logCtrl_log_begin = ref->io_logCtrl_log_begin = 0;
+  ref->io_uart_in_ch = -1;
   ref_reset();
 #endif
 #ifdef GSIM_DIFF
