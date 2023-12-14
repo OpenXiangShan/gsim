@@ -475,7 +475,7 @@ void insts_2expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
         dstName = "(" + typeStr + interVals.back()->value + opMap[op->name] + typeStr +
                   interVals[interVals.size() - 2]->value + ")";
       } else {
-        dstName = "((" + widthUType(opWidth) + ")" + interVals.back()->value + opMap[op->name] + interVals[interVals.size() - 2]->value + ")";
+        dstName = "((" + widthUType(MAX(opWidth, interVals.back()->width)) + ")" + interVals.back()->value + opMap[op->name] + interVals[interVals.size() - 2]->value + ")";
       }
     } else if (op->name == "cat") {
       dstName = "((uint128_t)" + interVals.back()->value + " << " +
