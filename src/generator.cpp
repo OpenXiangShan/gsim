@@ -170,6 +170,7 @@ inline void dispDimension(std::ofstream& file, Node* node) {
   } while (0)
 
 #if 0
+#if EVENT_DRIVEN
 void emu_log(std::ofstream& file, int id, std::string oldName, Node* node) {
   file << "if(cycles >= 0) {\n";
     file << "std::cout << std::hex << cycles << \" \" << \"" << id << ": " << node->name << "(" << node->width << ", " << node->sign
@@ -239,6 +240,80 @@ void emu_log2(std::ofstream& file, int id, Node* node) {
   }
   file << "std::cout << std::endl;\n}\n";
 }
+#else
+
+void emu_log(std::ofstream& file, int id, std::string oldName, Node* node) {
+  file << "if(cycles >= 0) {\n";
+    file << "std::cout << std::hex << cycles << \" \" << \"" << id << ": " << node->name << "(" << node->width << ", " << node->sign
+         << "): \" ";
+    if (node->width > BASIC_WIDTH) {
+      if (node->dimension.size() == 0)
+      file << "; mpz_out_str(stdout, 16, "
+           << node->name << ");";
+      else {
+        file << ";\n";
+        std::string idxStr, bracket;
+        for (size_t i = 0; i < node->dimension.size(); i ++) {
+          file << "for(int i" << i << " = 0; i" << i << " < " << node->dimension[i] << "; i" << i << " ++) {\n";
+          idxStr += "[i" + std::to_string(i) + "]";
+          bracket += "}\n";
+        }
+        file << "mpz_out_str(stdout, 16, " << node->name << idxStr << "); std::cout << \" \";\n" << bracket;
+      }
+    } else {
+      if (node->dimension.size() == 0) {
+        if (node->width <= 64)
+          file << " << +" << node->name << ";";
+        else
+          file << " << +(uint64_t)(" <<
+          node->name << " >> 64) << \" \" << (uint64_t)" << node->name << ";";
+      } else{
+        file << ";\n";
+        std::string idxStr, bracket;
+        for (size_t i = 0; i < node->dimension.size(); i ++) {
+          file << "for(int i" << i << " = 0; i" << i << " < " << node->dimension[i] << "; i" << i << " ++) {\n";
+          idxStr += "[i" + std::to_string(i) + "]";
+          bracket += "}\n";
+        }
+        if (node->width <= 64)
+          file << "std::cout <<std::hex<< +" << node->name << idxStr << " << \" \";\n" << bracket;
+        else
+          file << "std::cout <<std::hex<< +(uint64_t)(" << node->name << idxStr << " >> 64) << \" \" << (uint64_t)" <<
+          node->name << idxStr << " << \" \";\n" << bracket;
+      }
+    }                                                                                                             \
+    file << "std::cout << std::endl;\n}\n";                                                                       \
+}
+void write_log(std::ofstream& file, std::string name, std::string idx, std::string val, int width) {
+  file << "if(cycles >= 0) {\n";
+  file << "std::cout << cycles << \" \" << \"" << name << "[\";";
+  file << "std::cout << +" << idx << ";";
+  file << "std::cout << \"] = \"; ";
+  if (width > BASIC_WIDTH) {
+    file << "mpz_out_str(stdout, 16, " << val << ");";
+  } else if (width > 64) {
+    file << "std::cout << std::hex << +(uint64_t)(" << val << " >> 64) << \" \" << (uint64_t)" << val << ";";
+  } else {
+    file << "std::cout << std::hex << +" << val << ";";
+  }
+  file << "std::cout << std::endl;\n}\n";
+}
+
+void emu_log2(std::ofstream& file, int id, Node* node) {
+  file << "if(cycles >= 0) {\n";
+  file << "std::cout << cycles << \" \" << \"" << id << ": " << node->name << "(" << node->width << ", " << node->sign << "): \" ;";
+  if (node->width > BASIC_WIDTH) {
+    file << "mpz_out_str(stdout, 16, " << node->name << "); ";
+  } else if(node->width > 64) {
+    file << "std::cout << std::hex << +(uint64_t)(" << node->name << " >> 64) << \" \" << (uint64_t)" << node->name << ";";
+  } else {
+    file << "std::cout << std::hex << +" << node->name << ";";
+  }
+  file << "std::cout << std::endl;\n}\n";
+}
+
+
+#endif
 
 #else
 void write_log(std::ofstream& file, std::string name, std::string idx, std::string val, int width) {}
