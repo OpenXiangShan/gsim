@@ -59,9 +59,9 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
               refName128 = refName128 + (" | " if i != 0 else "") + "((__uint128_t)" + refName + "[" + str(i) + "] << " + str(i * 32) + ")"
             refName = refName.lstrip("ref->rootp->") + "_128"
             self.dstfp.writelines("__uint128_t " + refName + " = " + refName128 + ";\n")
-          mask = hex((1 << ref_width) - 1) if ref_width <= 64 else "((__uint128_t)" + hex((1 << (ref_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
+          mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((__uint128_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
           self.dstfp.writelines( \
-          "if(display || (" + modName + " & " + mask + ") != " + refName + "){\n" + \
+          "if(display || (" + modName + " & " + mask + ") != (" + refName + "&" + mask + ")){\n" + \
           "  ret = true;\n" + \
           "  std::cout << std::hex <<\"" + line[2] + ": \" << +" +  \
           (modName if ref_width <= 64 else "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName) + " << \"  \" << +" + \
@@ -74,4 +74,4 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
 
 if __name__ == "__main__":
   sigFilter = SigFilter()
-  sigFilter.filter("obj/allSig.h", "obj_dir/Vnewtop___024root.h", "obj/checkSig.h")
+  sigFilter.filter("obj/allSig.h", "obj_dir/VSimTop___024root.h", "obj/checkSig.h")
