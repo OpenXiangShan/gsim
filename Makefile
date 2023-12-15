@@ -20,7 +20,7 @@ $(shell mkdir -p $(OBJ_DIR))
 NAME ?= SimTop
 
 # EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
-EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
+EMU_DIFFTEST = $(EMU_DIR)/emu-NutShell.cpp
 
 MODE ?= 0
 DIFF_VERSION ?= 2023_10_11
