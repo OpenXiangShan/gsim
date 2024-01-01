@@ -4,7 +4,7 @@
  */
 
 #include <cstdarg>
-#include "PNode.h"
+#include "common.h"
 
 void PNode::appendChild(PNode* p) {
   if (p) child.push_back(p);
@@ -17,7 +17,9 @@ void PNode::setWidth(int _width) { width = _width; }
 
 int PNode::getChildNum() { return child.size(); }
 
-PNode* PNode::getChild(int idx) { return child[idx]; }
+PNode* PNode::getChild(int idx) {
+  Assert(idx < (int)child.size(), "idx %d is outof bound(%ld)", idx, child.size()); return child[idx];
+}
 
 void pnewNode(PNode* parent, int num, va_list valist) {
   for (int i = 0; i < num; i++) {
@@ -26,7 +28,7 @@ void pnewNode(PNode* parent, int num, va_list valist) {
   }
 }
 
-PNode* newNode(int type, int lineno, char* info, char* name, int num, ...) {
+PNode* newNode(PNodeType type, int lineno, char* info, char* name, int num, ...) {
   PNode* parent = new PNode(type, lineno);
   if (info) parent->info = std::string(info);
   if (name) parent->name = std::string(name);
@@ -37,7 +39,7 @@ PNode* newNode(int type, int lineno, char* info, char* name, int num, ...) {
   return parent;
 }
 
-PNode* newNode(int type, int lineno, char* name, int num, ...) {
+PNode* newNode(PNodeType type, int lineno, char* name, int num, ...) {
   PNode* parent = new PNode(type, lineno);
   if (name) parent->name = std::string(name);
   va_list valist;
@@ -47,7 +49,7 @@ PNode* newNode(int type, int lineno, char* name, int num, ...) {
   return parent;
 }
 
-PNode* newNode(int type, int lineno, char* info, char* name, PList* plist) {
+PNode* newNode(PNodeType type, int lineno, char* info, char* name, PList* plist) {
   PNode* parent = new PNode(type, lineno);
   if (info) parent->info = std::string(info);
   if (name) parent->name = std::string(name);

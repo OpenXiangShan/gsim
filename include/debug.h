@@ -1,7 +1,6 @@
-/**
- * @file debug.h
- * @brief macros for debugging
- */
+/*
+ macros for debugging
+*/
 
 #ifndef DEBUG_H
 #define DEBUG_H

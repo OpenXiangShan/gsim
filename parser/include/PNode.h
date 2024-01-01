@@ -5,7 +5,6 @@
 
 #ifndef PNODE_H
 #define PNODE_H
-#include "common.h"
 
 /**
  * @class PList
@@ -13,27 +12,18 @@
  *
  */
 class PList;
-
-/**
- * @class Node
- * @brief A class representing a node in a parse tree.
- *
- */
 class Node;
 
-/**
- * @brief An enumeration of the types of PNodes.
- */
-enum {
-  P_INVALID, /**< An invalid node. */
-  P_CIRCUIT, /**< A circuit node. */
-  P_CIR_MODS, /**< A  circuit module node. */
-  P_MOD, /**< A module node. */
-  P_EXTMOD, /**< An external module node. */
-  P_INTMOD, /**< An internal module node. */
-  P_PORTS, /**< A ports node. */
-  P_INPUT, /**< An input node. */
-  P_OUTPUT, /**< An output node. */
+/* AST Node */
+enum PNodeType{
+  P_INVALID,
+  P_CIRCUIT,
+  P_MOD,
+  P_EXTMOD,
+  P_INTMOD,
+  P_PORTS,
+  P_INPUT,
+  P_OUTPUT,
   P_WIRE_DEF,
   P_REG_DEF,
   P_INST,
@@ -54,7 +44,6 @@ enum {
   P_REF_DOT,
   P_REF_IDX_INT,
   P_REF_IDX_EXPR,
-  P_EXPR_INT,
   P_2EXPR,
   P_1EXPR,
   P_1EXPR1INT,
@@ -78,7 +67,7 @@ enum {
   P_L_INDEX,
 };
 
-enum { VALID_PNODE, CONSTANT_PNODE };
+enum PNodeState { VALID_PNODE, CONSTANT_PNODE };
 
 class AggrType;
 
@@ -99,7 +88,7 @@ class PNode {
    *
    * @param _type The type of the node.
    */
-  PNode(int _type, int _lineno = -1) { type = _type; lineno = _lineno; }
+  PNode(PNodeType _type, int _lineno = -1) { type = _type; lineno = _lineno; }
 
   /**
    * @brief Constructor with a string parameter.
@@ -115,18 +104,18 @@ class PNode {
   std::string info;
   std::string name;
   std::vector<std::string> extraInfo;
-  int type;
+  PNodeType type;
   int width = 0;
   int lineno;
   bool sign = 0;
-  AggrType* aggrType = NULL;
-
+  // AggrType* aggrType = NULL;
+  int id = -1;
   /**
    * @brief set valid_node to CONSTANT_PNODE
    */
-  int status = VALID_PNODE;
+  PNodeState status = VALID_PNODE;
   /**
-   * @brief CONSTANT_PNODE value
+   * @brief used for CONSTANT_PNODE
    */
   std::string consVal;
 
@@ -163,8 +152,8 @@ class PList {
   void concat(PList* plist);
 };
 
-PNode* newNode(int type, int lineno, char* info, char* name, int num, ...);
-PNode* newNode(int type, int lineno, char* name, int num, ...);
-PNode* newNode(int type, int lineno, char* info, char* name, PList* plist);
+PNode* newNode(PNodeType type, int lineno, char* info, char* name, int num, ...);
+PNode* newNode(PNodeType type, int lineno, char* name, int num, ...);
+PNode* newNode(PNodeType type, int lineno, char* info, char* name, PList* plist);
 
 #endif

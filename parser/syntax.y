@@ -8,8 +8,6 @@
 
 int p_stoi(const char* str);
 //   int  yylex (yy::parser::value_type* yylval);
-  PNode* newNode(int type, char* info, char* name, int num, ...);
-  PNode* newNode(int type, char* info, PList* plist);
   char* emptyStr = NULL;
 %}
 

@@ -10,23 +10,9 @@
 #include "syntax.hh"
 #include "Parser.h"
 
-void generator(graph* g, std::string header, std::string src);
-void randomGraph(graph* g);
 void preorder_traversal(PNode* root);
-graph* AST2Garph(PNode* root);
-void loopDetector(graph* g);
-void topoSort(graph* g);
-void removeDeadNodes(graph* g);
-void constantPropagation(graph* g);
-void instsGenerator(graph* g);
-void mergeNodes(graph* g);
-void mergeArray(graph* g);
-void sortMergeArray(graph* g);
-void aliasAnalysis(graph* g);
-void mergeWhen(graph* g);
-void removeInvalidSuperNodes(graph* g);
-void mergeRegister(graph* g);
-void usedBits(graph* g);
+graph* AST2Graph(PNode* root);
+
 extern PNode* root;
 
 /**
@@ -46,44 +32,23 @@ int main(int argc, char** argv) {
 
   syntax.parse();
 
-  MUX_DEBUG(std::cout << "after parser\n");
+  MUX_DEBUG(std::cout << "parser finished\n");
 
-  graph* g = AST2Garph(root);
+  graph* g = AST2Graph(root);
 
   MUX_DEBUG(preorder_traversal(root));
 
-  loopDetector(g);
+  g->detectLoop();
+  
+  g->usedBits();
 
-  MUX_DEBUG(std::cout << "graph generated\n");
+  g->topoSort();
 
-  sortMergeArray(g);
+  // g->traversal();
 
-  mergeWhen(g);
-
-  topoSort(g);
-
-  removeDeadNodes(g);
-
-  constantPropagation(g);
-
-  aliasAnalysis(g);
-
-  usedBits(g);
-
-  mergeNodes(g);
-
-  mergeRegister(g);
-
-  instsGenerator(g);
-
-  for (Node* n : g->constant) {
-    if (n->status != DEAD_NODE && n->status != CONSTANT_NODE)
-      std::cout << "check: " << n->type << " " << n->status << " " << n->name << std::endl;
-  }
-
-  removeInvalidSuperNodes(g);
-
-  generator(g, "top", "top");
+  g->instsGenerator();
+  
+  g->cppEmitter();
 
   return 0;
 }

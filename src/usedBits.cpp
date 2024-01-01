@@ -1,206 +1,153 @@
-#include <graph.h>
-#include <common.h>
-int p_stoi(const char* str);
-static std::vector<int>bits;
-static bool popOperand = true;
-
-#define CHILD_BITS -1
-
-static std::set<Node*> computed;
-
-int popBits() {
-  Assert(bits.size() > 0, "bits empty\n");
-  int ret = bits.back();
-  bits.pop_back();
-  return ret;
-}
 /*
-compute child bits
-parentBits: The used-Bits for current op
->pad|shl|shr|head|tail
+ Compute the usedBits for every nodes and enodes
+ can merged into inferWidth
 */
-int bits_1expr1int(Node* node, int parentBits, int opIdx) {
-  PNode* op = node->workingVal->ops[opIdx];
-  int n = p_stoi(op->getExtra(0).c_str());
 
-  int usedBits = parentBits;
-  if (op->name == "shl") usedBits = parentBits - n;
-  else if (op->name == "shr") usedBits = parentBits + n;
-  else if (op->name == "head") usedBits = n;
-  else if (op->name == "pad") usedBits = MIN(op->getChild(0)->width, n);
+#include "common.h"
+#include <map>
+#include <stack>
+#include <set>
 
-  Assert(usedBits > 0 && usedBits <= op->getChild(0)->width, "usedBit %d op->child(0)->width %d parent %d in node %s <- %s\n", usedBits, op->getChild(0)->width, parentBits, node->name.c_str(), op->getChild(0)->name.c_str());
-  // node->opBits.push_back(usedBits);
-  bits.push_back(usedBits);
-  return usedBits;
-}
-/*
->bits
-*/
-int bits_1expr2int(Node* node, int parentBits, int opIdx) {
-  PNode* op = node->workingVal->ops[opIdx];
-  int l = p_stoi(op->getExtra(0).c_str());
-  int r = p_stoi(op->getExtra(1).c_str());
-  int usedBits = MIN(parentBits + r, l + 1);
-  bits.push_back(usedBits);
-  return usedBits;
-}
-/*
-add|sub|mul|div|rem|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat
-*/
-void bits_2expr(Node* node, int parentBits, int opIdx) {
-  PNode* op = node->workingVal->ops[opIdx];
-  int usedBits1 = CHILD_BITS, usedBits2 = CHILD_BITS;
-  if (op->name == "and" || op->name == "or" || op->name == "xor") {
-    usedBits1 = usedBits2 = parentBits;
-  } else if (op->name == "cat") {
-    // TODO
-  }
-  bits.push_back(usedBits2);
-  bits.push_back(usedBits1);
-}
-/*
-asUInt|asSInt|asClock|asAsyncReset|cvt|neg|not|andr|orr|xorr
-*/
-void bits_1expr(Node* node, int parentBits, int opIdx) {
-  PNode* op = node->workingVal->ops[opIdx];
-  int usedBits = CHILD_BITS;
-  if (op->name == "asUInt" || op->name == "asSInt" || op->name == "cvt" || op->name == "not") {
-    usedBits = parentBits;
-  } else if (op->name == "neg") {
-    usedBits = parentBits - 1;
-  }
-  bits.push_back(usedBits);
-}
+#define Child(id, name) getChild(id)->name
 
-void setUsedBits(Node* node, int bits) {
-  if (bits == CHILD_BITS) bits = node->width;
-  node->usedBits = MIN(node->width, MAX(node->usedBits, bits));
-}
+static std::map<Node*, int> usedBits;
+/* all nodes that may affect their previous ndoes*/
+static std::vector<Node*> checkNodes;
 
-void getBits(Node* node) {
-  if (computed.find(node) != computed.end()) return;
-  computed.insert(node);
-  for (Node* next : node->next) {
-    if(computed.find(next) == computed.end()) {
-      getBits(next);
+void ENode::passWidthToChild() {
+  std::vector<int>childBits;
+  if (nodePtr) {
+    if (usedBit > nodePtr->usedBit) {
+      checkNodes.push_back(nodePtr);
     }
-  }
-  if (node->status == CONSTANT_NODE && node->dimension.size() == 0) return;
-  if (node->workingVal->ops.size() == 0 && node->workingVal->operands.size() == 0) {
+    nodePtr->update_usedBit(usedBit);
     return;
   }
-  int operandIdx = 0;
-  if (node->usedBits == -1) node->usedBits = node->width;
-  bits.push_back(node->usedBits);
-  for (int opIdx = 0; opIdx < (int)node->workingVal->ops.size(); opIdx ++) {
-    if (!node->workingVal->ops[opIdx]) { // update operands
-      if (popOperand) setUsedBits(node->workingVal->operands[operandIdx ++], popBits());
-      node->opBits.push_back(CHILD_BITS);
-      popOperand = true;
-      continue;
-    }
-    PNode* op = node->workingVal->ops[opIdx];
-    int opBits = popBits();
-    node->opBits.push_back(opBits == CHILD_BITS ? op->width : opBits);
-    switch(op->type) {
-      case P_1EXPR1INT: bits_1expr1int(node, opBits, opIdx); break;
-      case P_1EXPR2INT: bits_1expr2int(node, opBits, opIdx); break;
-      case P_2EXPR: bits_2expr(node, opBits, opIdx); break;
-      case P_1EXPR: bits_1expr(node, opBits, opIdx); break;
-      case P_EXPR_MUX:
-      case P_WHEN:
-        bits.push_back(opBits); bits.push_back(opBits); bits.push_back(1);
-        break;
-      case P_EXPR_INT_INIT:
-        popOperand = false;
-        break;
-      case P_PRINTF:
-        bits.push_back(1);
-        for (int i = 0; i < op->getChild(2)->getChildNum(); i ++) {
-          bits.push_back(CHILD_BITS);
-        }
-        break;
-      case P_ASSERT:
-        bits.push_back(1);
-        bits.push_back(1);
-        break;
-      case P_INDEX:
-        if (popOperand) {
-          setUsedBits(node->workingVal->operands[operandIdx ++], opBits);
-          popOperand = true;
-        }
-        bits.push_back(CHILD_BITS);
-        break;
-      case P_CONS_INDEX:
-        bits.push_back(opBits);
-        break;
-      case P_L_CONS_INDEX:
-        bits.push_back(opBits);
-        break;
-      case P_L_INDEX:
-        bits.push_back(opBits);
-        bits.push_back(CHILD_BITS);
-        break;
-      default:
-        std::cout << node->name << " " << op->type << std::endl;
-        Panic();
+  if (child.size() == 0) return;
+  switch (opType) {
+    case OP_ADD:  case OP_SUB: case OP_OR: case OP_XOR: case OP_AND:
+      childBits.push_back(usedBit);
+      childBits.push_back(usedBit);
+      break;
+    case OP_MUL: case OP_DIV: case OP_REM: case OP_DSHL: case OP_DSHR:
+    case OP_LT: case OP_LEQ: case OP_GT: case OP_GEQ: case OP_EQ: case OP_NEQ:
+      childBits.push_back(Child(0, width));
+      childBits.push_back(Child(1, width));
+      break;
+    case OP_CAT:
+      childBits.push_back(MAX(usedBit - Child(1, width), 0));
+      childBits.push_back(MIN(Child(1, width), usedBit));      
+      break;
+    case OP_CVT:
+      childBits.push_back(Child(0, sign) ? usedBit : usedBit - 1);
+      break;
+    case OP_ASCLOCK: case OP_ASASYNCRESET: case OP_ANDR:
+    case OP_ORR: case OP_XORR: case OP_INDEX_INT: case OP_INDEX:
+      childBits.push_back(Child(0, width));
+      break;
+    case OP_ASUINT: case OP_ASSINT: case OP_NOT: case OP_NEG: case OP_PAD: case OP_TAIL:
+      childBits.push_back(usedBit);
+      break;
+    case OP_SHL:
+      childBits.push_back(MAX(0, usedBit - values[0]));
+      break;
+    case OP_SHR:
+      childBits.push_back(usedBit + values[0]);
+      break;
+    case OP_HEAD:
+      // childBits.push_back(Child(0, width) - (values[0] - usedBit));
+      childBits.push_back(Child(0, width));
+      break;
+    case OP_BITS:
+      childBits.push_back(MIN(usedBit + values[1], values[0] + 1));
+      break;
+    case OP_MUX:
+    case OP_WHEN:
+      childBits.push_back(1);
+      childBits.push_back(usedBit);
+      childBits.push_back(usedBit);
+      break;
+    default:
+      Panic();
+  }
+
+  Assert(child.size() == childBits.size(), "child.size %ld childBits.size %ld in op %d", child.size(), childBits.size(), opType);
+  for (size_t i = 0; i < child.size(); i ++) {
+    if (!child[i]) continue;
+    int realBits = MIN(child[i]->width, childBits[i]);
+    Assert(child[i]->usedBit == -1 || child[i]->usedBit == realBits,
+        "child[%ld]->usedBits %d realBits %d op %d child->width %d childBits %d",
+          i, child[i]->usedBit, realBits, opType, child[i]->width, childBits[i]);
+    if (child[i]->usedBit != realBits) {
+      child[i]->usedBit = realBits;
+      child[i]->passWidthToChild();
     }
   }
 
-  if (operandIdx != (int)node->workingVal->operands.size()) {
-    Assert(node->workingVal->operands.size() - operandIdx == bits.size(), "operandIdx %d size %ld in node %s\n", operandIdx, node->workingVal->operands.size(), node->name.c_str());
-    for (size_t i = 0; i < bits.size(); i ++)
-      setUsedBits(node->workingVal->operands[operandIdx ++], popBits());
-  }
-  popOperand = true;
-  Assert(bits.size() == 0, "bits is not empty after %s\n", node->name.c_str());
-  Assert(node->opBits.size() == node->workingVal->ops.size(), "opBits size %ld opsize %ld in node %s\n", node->opBits.size(), node->workingVal->ops.size(), node->name.c_str());
 }
 
-void usedBits(graph* g) {
-  for (int i = g->sorted.size() - 1; i >= 0; i --) {
-    if (g->sorted[i]->status == CONSTANT_NODE) continue;
-    switch (g->sorted[i]->type) {
-      case NODE_READER:
-      case NODE_WRITER:
-        for (Node* node : g->sorted[i]->member) {
-          if (node->status == CONSTANT_NODE) continue;
-          getBits(node);
-        }
-        break;
-      case NODE_REG_DST:
-        // g->sorted[i]->usedBits = g->sorted[i]->width;
-        if (g->sorted[i]->dimension.size() != 0) {
-          for (Node* member : g->sorted[i]->member) {
-            if (member->iValue)
-              member->workingVal = member->iValue;
-            getBits(member);
-            member->workingVal = member->value;
-          }
-        }
-        g->sorted[i]->workingVal = g->sorted[i]->iValue;
-        getBits(g->sorted[i]);
-        g->sorted[i]->workingVal = g->sorted[i]->value;
-        break;
-      default:
-        if (g->sorted[i]->dimension.size() != 0) {
-          for (Node* member : g->sorted[i]->member) getBits(member);
-        }
-        getBits(g->sorted[i]);
+/* the with of node->next may be updated, thus node should also re-compute */
+void Node::passWidthToPrev() {
+  if (!valTree) return;
+
+  if (usedBit != valTree->getRoot()->usedBit) {
+    valTree->getRoot()->usedBit = usedBit;
+    valTree->getRoot()->passWidthToChild();
+  }
+  return;
+}
+
+void graph::usedBits() {
+  std::set<Node*> visitedNodes;
+  /* add all sink nodes in topological order */
+  for (Node* reg : regsrc) checkNodes.push_back(reg->getDst());
+  for (Node* out : output) checkNodes.push_back(out);
+  for (Node* mem : memory) { // all memory input
+    for (Node* port : mem->member) {
+      if (port->type == NODE_READER) {
+        checkNodes.push_back(port->get_member(READER_ADDR));
+        checkNodes.push_back(port->get_member(READER_EN));
+        // checkNodes.push(port->get_member(READER_CLK));
+      } else if (port->type == NODE_WRITER) {
+        checkNodes.push_back(port->get_member(WRITER_ADDR));
+        checkNodes.push_back(port->get_member(WRITER_EN));
+        checkNodes.push_back(port->get_member(WRITER_MASK));
+        checkNodes.push_back(port->get_member(WRITER_DATA));
+      } else if (port->type == NODE_READWRITER) {
+        checkNodes.push_back(port->get_member(READWRITER_ADDR));
+        checkNodes.push_back(port->get_member(READWRITER_EN));
+        checkNodes.push_back(port->get_member(READWRITER_WDATA));
+        checkNodes.push_back(port->get_member(READWRITER_WMASK));
+        checkNodes.push_back(port->get_member(READWRITER_WMODE));
+      }
     }
   }
-  for (Node* active : g->active) {
-    getBits(active);
+  for (Node* node: checkNodes) {
+    node->usedBit = node->width;
   }
-  for (Node* n : g->sorted) {
-    switch (n->type) {
-      case NODE_REG_DST:
-      case NODE_REG_SRC:
-        if (!n->regSplit) n->regNext->width = n->usedBits;
-        // continue;
-      case NODE_OTHERS:
-        n->width = n->usedBits;
+re_check:
+  while (!checkNodes.empty()) {
+    Node* top = checkNodes.back();
+    visitedNodes.insert(top);
+    checkNodes.pop_back();
+    top->passWidthToPrev();
+  }
+
+  for (Node* reg : regsrc) {
+    Assert(reg->usedBit <= reg->getDst()->usedBit, "usedBit reg %d regDst %d", reg->usedBit, reg->getDst()->usedBit);
+    if (reg->usedBit != reg->getDst()->usedBit) {
+      checkNodes.push_back(reg->getDst());
+      reg->getDst()->usedBit = reg->usedBit;
     }
   }
+
+  if (!checkNodes.empty()) goto re_check;
+
+/* NOTE: reset cond & reset val tree*/
+
+  for (Node* node : visitedNodes) {
+    node->width = node->usedBit;
+    if (node->valTree) node->valTree->getRoot()->updateWidth();
+  }
+
 }

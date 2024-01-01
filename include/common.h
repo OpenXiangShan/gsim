@@ -17,11 +17,10 @@
 #include <string.h>
 #include <algorithm>
 #include <set>
+#include <gmp.h>
+#include <cstdarg>
 
-#include "debug.h"
-
-#include "Node.h"
-#include "PNode.h"
+// #define EMU_LOG
 
 #define LENGTH(a) (sizeof(a) / sizeof(a[0]))
 
@@ -35,7 +34,10 @@
             ((node->width <= 32 ? "uint32_t" : \
             (node->width <= 64 ? "uint64_t" : "uint128_t"))))))
 
-#define LocalType(width, sign)                     \
+#define Cast(width, sign)                     \
+  ("(" + (sign ? widthSType(width) : widthUType(width)) + ")")
+
+#define widthType(width, sign)                     \
   (sign ? widthSType(width) : widthUType(width))
 
 #define widthUType(width) \
@@ -64,10 +66,6 @@
 
 #define MAP(c, f) c(f)
 
-#define NOT_VISIT 0
-#define EXPANDED 1
-#define VISITED 2
-
 // #define TIME_COUNT
 
 #ifdef TIME_COUNT
@@ -89,5 +87,22 @@
       __VA_ARGS__ \
     } \
   } while(0)
+
+class TypeInfo;
+class PNode;
+class Node;
+class AggrParentNode;
+class ExpTree;
+class SuperNode;
+class valInfo;
+
+#include "debug.h"
+#include "Node.h"
+#include "PNode.h"
+#include "ExpTree.h"
+#include "graph.h"
+#include "valInfo.h"
+
+#include "util.h"
 
 #endif

@@ -16,11 +16,12 @@ $(shell mkdir -p $(OBJ_DIR))
 
 # NAME ?= newtop
 # NAME ?= freechips.rocketchip.system.DefaultConfig
-# NAME ?= Exp1AllTest
-NAME ?= SimTop
+NAME ?= Exp1AllTest
+# NAME ?= SimTop
+# NAME ?= test
 
 # EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
-EMU_DIFFTEST = $(EMU_DIR)/emu-NutShell.cpp
+EMU_DIFFTEST = $(EMU_DIR)/emu.cpp
 
 MODE ?= 0
 DIFF_VERSION ?= 2023_10_11
@@ -55,8 +56,8 @@ VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Sy
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
 VERI_VSRCS += $(addprefix ready-to-run/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v DifftestMemInitializer.v)
-VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIFFTEST)
-VERI_HEADER = $(shell find $(OBJ_DIR) -name "*.h")
+VERI_CSRCS = $(shell find $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIFFTEST) $(OBJ_DIR)/$(NAME).cpp
+VERI_HEADER = $(OBJ_DIR)/$(NAME).h
 VERI_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(VERI_CSRCS:.cpp=.o))
 
 REF_GSIM_DIR = $(EMU_DIR)/obj_$(DIFF_VERSION)
@@ -93,7 +94,7 @@ else
 	SIG_COMMAND = python3 scripts/genSigDiff.py
 endif
 
-$(GSIM_BUILD_DIR)/%.o: %.cpp $(PARSER_SRCS)
+$(GSIM_BUILD_DIR)/%.o: %.cpp $(PARSER_SRCS) $(HEADERS)
 	@mkdir -p $(dir $@) && echo + CXX $<
 	@$(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
 

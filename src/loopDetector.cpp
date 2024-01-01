@@ -1,64 +1,50 @@
-/**
- * @file loopDetector.cpp
- * @brief 检测图是否有环
- */
+/*
+  using dfs to detect if there is any loop
+*/
 
 #include <stack>
-#include <graph.h>
-#include <Node.h>
-
+#include <map>
 #include "common.h"
 
-void loopDetector(graph* g) {
-  std::stack<Node*> s;
+#define NOT_VISIT 0
+#define EXPANDED 1
+#define VISITED 2
 
-  for (size_t i = 0; i < g->constant.size(); i++) {
-    s.push(g->constant[i]);
-    g->constant[i]->visited = NOT_VISIT;
-  }
+void graph::detectLoop() {
+  std::stack<SuperNode*> s;
+  std::map<SuperNode*, int> states;
 
-  for (size_t i = 0; i < g->sources.size(); i++) {
-    s.push(g->sources[i]);
-    g->sources[i]->visited = NOT_VISIT;
-  }
-
-  for (size_t i = 0; i < g->input.size(); i++) {
-    s.push(g->input[i]);
-    g->input[i]->visited = NOT_VISIT;
+  for (SuperNode* node : supersrc) {
+    s.push(node);
+    states[node] = NOT_VISIT;
   }
 
   while (!s.empty()) {
-    Node* top = s.top();
+    SuperNode* top = s.top();
+    if (states[top] == NOT_VISIT) {
+      states[top] = EXPANDED;
 
-    if (top->visited == EXPANDED) {
-      top->visited = VISITED;
-
-      s.pop();
-    } else if (top->visited == NOT_VISIT) {
-      top->visited = EXPANDED;
-
-      for (Node* n : top->next) {
-        if (n->visited == EXPANDED) {
-          std::cout << "detect Loop: \n";
-          std::cout << n->name << std::endl;
-
+      for (SuperNode* next : top->next) {
+        if (states.find(next) == states.end()) {
+          s.push(next);
+          states[next] = NOT_VISIT;
+        } else if (states[next] == EXPANDED) { // find an expanded loop
+          printf("Detect Loop:\n");
+          printf("  %s\n", next->name.c_str());
           while (!s.empty()) {
-            Node* info = s.top();
+            SuperNode* n = s.top();
             s.pop();
-            if (info->visited == EXPANDED) { std::cout << info->name << std::endl; }
-            if (info == n) {
-              Assert(0, "Invalid Loop!\n");
-              return;
-            }
+            // display all expanded nodes until n
+            if (states[n] == EXPANDED) printf("  %s\n", n->name.c_str());
+            if (n == next) Assert(0, "-------");
           }
-        } else if (n->visited == NOT_VISIT) {
-          s.push(n);
         }
+    
       }
-    } else {
+    } else if (states[top] == EXPANDED) {
+      states[top] = VISITED;
       s.pop();
-    }
+    } 
   }
-
   std::cout << "NO Loop!\n";
 }

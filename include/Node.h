@@ -1,69 +1,74 @@
-/**
- * @file Node.h
- * @brief Declaration of Node classes.
- */
+/*
+  nodes in circuit graph
+*/
 
 #ifndef NODE_H
 #define NODE_H
 
-#include "common.h"
-
-enum {
+enum NodeType{
+  NODE_INVALID,
   NODE_REG_SRC,
   NODE_REG_DST,
-  NODE_ACTIVE,
+  NODE_SPECIAL, // printf & assert
   NODE_INP,
   NODE_OUT,
   NODE_MEMORY,
   NODE_READER,
   NODE_WRITER,
   NODE_READWRITER,
-  NODE_MEMBER,
-  NODE_L1_RDATA,
-  NODE_TMP,
-  NODE_LOCAL, // local node in when statment
+  NODE_MEM_MEMBER,
   NODE_OTHERS,
   NODE_ARRAY_MEMBER,
-  NODE_INVALID,  // should never occur in process
-  NODE_SUPER,
-  NODE_SUPER_REG_DST,
-  NODE_SUPER_ACTIVE
 };
 
-enum { VALID_NODE, DEAD_NODE, CONSTANT_NODE, VALID_NOT_USE };
-enum { INDEX_INT, INDEX_NODE };
+enum NodeStatus{ VALID_NODE, DEAD_NODE, CONSTANT_NODE, MERGED_NODE };
+enum IndexType{ INDEX_INT, INDEX_NODE };
 
-class PNode;
-class Node;
-class AggrType;
+enum ReaderMember { READER_ADDR = 0, READER_EN, READER_CLK, READER_DATA, READER_MEMBER_NUM};
+enum WriterMember { WRITER_ADDR = 0, WRITER_EN, WRITER_CLK, WRITER_DATA, WRITER_MASK, WRITER_MEMBER_NUM};
+enum ReadWriterMember { READWRITER_ADDR = 0, READWRITER_EN, READWRITER_CLK,
+                      READWRITER_RDATA, READWRITER_WDATA, READWRITER_WMASK,
+                      READWRITER_WMODE, READWRITER_MEMBER_NUM};
 
-class Index {
+
+class TypeInfo {
 public:
-  int type;
-  int idx;
-  Node* nidx;
+  int width;
+  bool sign;
+  std::vector<int> dimension;
+  std::vector<Node*> aggrMember; // all members, if not empty, all other infos above are invalid
+  std::vector<AggrParentNode*> aggrParent; // the later the outer
+
+  void add(Node* node) { aggrMember.push_back(node); }
+  void set_width(int _width) { width = _width; }
+  void set_sign(bool _sign) { sign = _sign; }
+  void mergeInto(TypeInfo* info);
+  bool isAggr() { return aggrParent.size() != 0; }
+  void addDim(int num);
+  void newParent(std::string name);
 };
 
-class AggrMember {
-public:
-  bool isFlip;
-  Node* n;
-};
-
-class _AggrType {
-public:
-  int width = 0;
-  bool sign = false;
-  bool isFlip = false;
+/*
+e.g. {{a, b}x, {c}y }z;
+  z.parent = {z_x, z_y} z.member = {z_x_a, z_x_b, z_y_c};
+  x.parent = {}, x.member = {z_x_a, z_x_b}
+*/
+class AggrParentNode {  // virtual type_aggregate node, used for aggregate connect
+  public:
   std::string name;
-  AggrType* aggrType;
+  std::vector<Node*> member;  // leaf member
+  std::vector<AggrParentNode*> parent; // non-leaf member (aggregate type), increasing partial order
+  AggrParentNode(std::string _name, TypeInfo* info = nullptr);
+  int size() {
+    return member.size();
+  }
+  void addMember(Node* _member) {
+    member.push_back(_member);
+  }
+  void addParent(AggrParentNode* _parent) {
+    parent.push_back(_parent);
+  }
 };
-
-class AggrType {
-public:
-  std::vector<_AggrType> aggr;
-};
-
 
 class ExprValue {
 public:
@@ -74,84 +79,141 @@ public:
 
 class Node {
  public:
-  /**
-   * @brief Default constructor.
-   */
-  Node() {
-    type    = NODE_OTHERS;
-    visited = 0;
-    inEdge  = 0;
-  }
 
-  /**
-   * @brief Constructor with a type parameter.
-   *
-   * @param _type The type of the node.
-   */
-  Node(int _type) {
+  Node(NodeType _type = NODE_OTHERS) {
     type    = _type;
-    visited = 0;
-    inEdge  = 0;
   }
 
-  // update in AST2Graph
-  /**
-   * @brief update in AST2Graph; concat the module name in order (member in structure / temp
-   * variable)
-   */
   std::string name;  // concat the module name in order (member in structure / temp variable)
   int id = -1;
-  int clusId = -1;
-  int type;
+  NodeType type;
   int width = 0;
   bool sign = false;
-  int val;
-  int status = VALID_NODE;
-  int visited;
-  int scratch;
-  int usedBits = -1;
-  bool regSplit = false;
-  bool arraySplit = false;
-  bool computed = false;
-  int opNum = 0;
-  std::string valName;
-  int whenDepth = 0;
-  AggrType* aggrType = NULL;
+  int usedBit = -1;
+  NodeStatus status = VALID_NODE;
   std::vector<int> dimension;
-  std::vector<int> memberDimension; // TODO: 最终应合并到dimension中，引入是为了防止出现其他bug
-  int entryNum = 1;
+
   std::set<Node*> next;
   std::set<Node*> prev;
-  std::vector<int> opBits;
-  std::vector<Index> index;
-  std::vector<ExprValue*> imps;
-  std::vector<ExprValue*> whenStack;
-  std::vector<Node*> clusNodes;
-  std::set<Node*> setNodes;
-  std::vector<Node*> setOrder;
-  std::vector<Node*> aggrMember;    // can not combine into aggrType, as many nodes may share a single aggrType
-  std::vector<std::string> consArray;
-  ExprValue* workingVal = NULL;
-  ExprValue* value = NULL;
-  ExprValue* resetVal = NULL;  // for regs
-  ExprValue* resetCond = NULL;
-  ExprValue* iValue = NULL; // intergrated value for reg dst
-  int inEdge;  // for topo sort
+  ExpTree* valTree = nullptr;
+  ExpTree* resetCond = nullptr;  // valid in reg_src
+  ExpTree* resetVal = nullptr;   // valid in reg_src
+  std::vector<ExpTree*> arrayVal;
+
+  SuperNode* super = nullptr;
+/* used for memory */
+  int rlatency;
+  int wlatency;
+  int depth;
   std::vector<Node*> member;
-  Node* parent = NULL;
-  Node* master = NULL;
-  int latency[2];
+  Node* parent = nullptr;  // also used in arrayMember
+/* used for registers */
   Node* regNext;
+  bool regSplit = true;
+/* used for instGerator */
+  valInfo* computeInfo = nullptr;
+/* used for visitWhen in AST2Graph */
+
   std::vector<std::string> insts;
   void set_id(int _id) {
     id     = _id;
-    clusId = id;
   }
-  void set_compute(std::string _valName, int _opNum) {
-    valName = _valName;
-    computed = true;
-    opNum = _opNum;
+  void updateInfo(TypeInfo* info);
+  void setType(int _width, bool _sign) {
+    width = _width;
+    sign = _sign;
   }
+  Node* dup(NodeType _type = NODE_INVALID, std::string _name = "");
+  /* bind two the splitted registers */
+  void bindReg(Node* reg) {
+    regNext = reg;
+    reg->regNext = this;
+  }
+
+  Node* getDst () {
+    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node is not register");
+    if (type == NODE_REG_SRC) return this->regNext;
+    return this;
+  }
+  Node* getSrc () {
+    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node is not register");
+    if (type == NODE_REG_DST) return this->regNext;
+    return this;
+  }
+  void set_memory(int _depth, int r, int w) {
+    depth = _depth;
+    rlatency = r;
+    wlatency = w;
+  }
+  void add_member(Node* _member) {
+    member.push_back(_member);
+    if(_member) _member->set_parent(this);
+  }
+  void set_member(int id, Node* node) {
+    Assert(id < (int)member.size(), "id %d is out of bound [0, %ld)", id, member.size());
+    member[id] = node;
+    node->set_parent(this);
+  }
+  Node* get_member(int id) {
+    Assert(id < (int)member.size(), "id %d is out of bound [0, %ld)", id, member.size());
+    return member[id];
+  }
+  void set_parent(Node* _parent) {
+    Assert(!parent, "parent in %s is already set", name.c_str());
+    parent = _parent;
+  }
+  bool isArray() {
+    return dimension.size() != 0;
+  }
+  void addArrayVal(ExpTree* val) {
+    arrayVal.push_back(val);
+  }
+  void set_super(SuperNode* _super) {
+    super = _super;
+  }
+  void update_usedBit(int bits) {
+    usedBit = MAX(bits, usedBit);
+  }
+  void updateConnect();
+  void inferWidth();
+  void addReset();
+  void constructSuperNode(); // alloc superNode for every node
+  void constructSuperConnect(); // connect superNode
+  valInfo* compute(); // compute node
+  valInfo* computeArray();
+  void passWidthToPrev();
+};
+
+class SuperNode {
+private:
+  static int counter;  // initialize to 1
+public:
+  std::string name;
+  std::set<SuperNode*> prev;
+  std::set<SuperNode*> next;
+  std::vector<Node*> member; // The order of member is neccessary
+  int id;
+  SuperNode() {
+    id = counter ++;
+  }
+  SuperNode(Node* _member) {
+    member.push_back(_member);
+    id = counter ++;
+  }
+  void add_member(Node* _member) {
+    Assert(std::find(member.begin(), member.end(), _member) == member.end(), "member %s is already in superNode %d", _member->name.c_str(), id);
+    member.push_back(_member);
+    _member->set_super(this);
+  }
+  void add_prev(SuperNode* _prev) {
+    prev.insert(_prev);
+    _prev->next.insert(this);
+  }
+  void add_next(SuperNode* _next) {
+    next.insert(_next);
+    _next->prev.insert(this);
+  }
+  bool instsEmpty();
 };
 
 #endif

@@ -1,7 +1,7 @@
-/**
- * @file instsGenerator.cpp
- * @brief instsGenerator
- */
+/*
+  Generator instructions for every nodes in sortedSuperNodes
+  merge constantNode into here
+*/
 
 #include <map>
 #include <gmp.h>
@@ -12,166 +12,53 @@
 #include "graph.h"
 #include "opFuncs.h"
 
-/* internal computing functions, used for constant nodes or intermediate values */
-#define EXPR1INT_FUNC_TYPE void (*)(mpz_t & dst, mpz_t & src, mp_bitcnt_t bitcnt, mp_bitcnt_t n)
-#define EXPR1_FUNC_TYPE void (*)(mpz_t & dst, mpz_t & src, mp_bitcnt_t bitcnt)
-#define EXPR2_FUNC_TYPE void (*)(mpz_t & dst, mpz_t & src1, mp_bitcnt_t bitcnt1, mpz_t & src2, mp_bitcnt_t bitcnt2)
+#define Child(id, name) getChild(id)->name
+#define ChildInfo(id, name) getChild(id)->computeInfo->name
 
-static std::map<std::string, std::tuple<EXPR1INT_FUNC_TYPE, EXPR1INT_FUNC_TYPE>> expr1int1Map = {
-    {"pad",   {u_pad, s_pad}},
-    {"shl",   {u_shl, invalidExpr1Int1}},
-    {"shr",   {u_shr, s_shr}},
-    {"head",  {u_head, invalidExpr1Int1}},
-    {"tail",  {u_tail, invalidExpr1Int1}},
+#define newLocalTmp() ("TMP$" + std::to_string(localTmpNum ++))
+static int localTmpNum = 0;
+
+static std::map<OPType, std::string> opMap = {
+  {OP_ADD, " + "},
+  {OP_SUB, " - "},
+  {OP_MUL, " * "},
+  {OP_DIV, " / "},
+  {OP_REM, " % "},
+  {OP_LT,  " < "},
+  {OP_LEQ, " <= "},
+  {OP_GT,  " > "},
+  {OP_GEQ, " >= "},
+  {OP_EQ,  " == "},
+  {OP_NEQ, " != "},
+  {OP_DSHL, " >> "},
+  {OP_AND, " & "},
+  {OP_OR,  " | "},
+  {OP_XOR, " ^ "},
+  {OP_ASCLOCK, "0 != "},
+  {OP_NEG, " - "},
+  {OP_CVT, ""},
+  {OP_ORR, "0 != "},
+  {OP_SHL, " << "},
+  {OP_SHR, " >> "},
 };
 
-static std::map<std::string, std::tuple<EXPR1_FUNC_TYPE, EXPR1_FUNC_TYPE>> expr1Map = {
-    {"asUInt",    {u_asUInt, invalidExpr1}},
-    {"asSInt",    {invalidExpr1, s_asSInt}},
-    {"asClock",   {u_asClock, invalidExpr1}},
-    {"asAsyncReset", {invalidExpr1, invalidExpr1}},
-    {"cvt",       {u_cvt, s_cvt}},
-    {"neg",       {invalidExpr1, s_neg}},
-    {"not",       {u_not, invalidExpr1}},
-    {"andr",      {u_andr, invalidExpr1}},
-    {"orr",       {u_orr, invalidExpr1}},
-    {"xorr",      {u_xorr, invalidExpr1}},
-};
+/* return: 0 - same size, positive - the first is larger, negative - the second is larger  */
+static int typeCmp(int width1, int width2) {
+  if (width1 <= 8 && width2 <= 8) return 0;
+  int bits1 = upperLog2(width1);
+  int bits2 = upperLog2(width2);
+  return bits1 - bits2;
+}
 
-static std::map<std::string, std::tuple<EXPR2_FUNC_TYPE, EXPR2_FUNC_TYPE>> expr2Map = {
-    {"add",   {us_add, us_add}},
-    {"sub",   {us_sub, us_sub}},
-    {"mul",   {us_mul, us_mul}},
-    {"div",   {us_div, us_div}},
-    {"rem",   {us_rem, us_rem}},
-    {"lt",    {us_lt, us_lt}},
-    {"leq",   {us_leq, us_leq}},
-    {"gt",    {us_gt, us_gt}},
-    {"geq",   {us_geq, us_geq}},
-    {"eq",    {us_eq, us_eq}},
-    {"neq",   {us_neq, us_neq}},
-    {"dshl",  {u_dshl, invalidExpr2}},
-    {"dshr",  {u_dshr, s_dshr}},
-    {"and",   {u_and, invalidExpr2}},
-    {"or",    {u_ior, invalidExpr2}},
-    {"xor",   {u_xor, invalidExpr2}},
-    {"cat",   {u_cat, invalidExpr2}},
-};
-
-class mpz_wrap {
- public:
-  mpz_wrap() { mpz_init(a); }
-  mpz_t a;
-};
-
-#define add_insts_1expr(n, func, dst, expr1) n->insts.push_back(func + "(" + dst + ", " + expr1 + ");")
-
-#define add_insts_2expr(n, func, dst, expr1, expr2) \
-  n->insts.push_back(func + "(" + dst + ", " + expr1 + ", " + expr2 + ");")
-
-#define add_insts_3expr(n, func, dst, expr1, expr2, expr3) \
-  n->insts.push_back(func + "(" + dst + ", " + expr1 + ", " + expr2 + ", " + expr3 + ");")
-
-#define add_insts_4expr(n, func, dst, expr1, expr2, expr3, expr4) \
-  n->insts.push_back(func + "(" + dst + ", " + expr1 + ", " + expr2 + ", " + expr3 + ", " + expr4 + ");")
-
-#define NEW_TMP ("__tmp__" + std::to_string(++tmpIdx))
-#define FUNC_NAME(sign, s) ((sign ? std::string("s_") : std::string("u_")) + s)
-#define FUNC_BASIC(sign, s, width) ((sign ? std::string("s_") : std::string("u_")) + s + "_basic" + (width > 64 ? "128" : ""))
-#define FUNC_UI(sign, s) ((sign ? std::string("s_") : std::string("u_")) + s + "_ui")
-#define FUNC_UI_R(sign, s) ((sign ? std::string("s_") : std::string("u_")) + s + "_ui_r")
-#define FUNC_UI2(sign, s) ((sign ? std::string("s_") : std::string("u_")) + s + "_ui2")
-#define FUNC_I(sign, s, width) ((sign ? std::string("si_") : std::string("ui_")) + s + (width > 64 ? "128" : ""))
-// #define FUNC_I_UI(sign, s) ((sign ? std::string("si_") : std::string("ui_")) + s + "_ui")
-#define FUNC_SUI_R(fsign, vsign, s, width) ((fsign ? std::string("s_") : std::string("u_")) + s + (vsign ? "_si_r" : "_ui_r") + (width > 64 ? "128" : ""))
-#define FUNC_SUI_L(fsign, vsign, s, width) ((fsign ? std::string("s_") : std::string("u_")) + s + (vsign ? "_si_l" : "_ui_l") + (width > 64 ? "128" : ""))
-#define MAX_U64 0xffffffffffffffff
-#define MAX_U128 (uint128_t)(__int128_t(-1L))
-#define valEqualsZero(width, str) (width > BASIC_WIDTH ? "mpz_sgn(" + str + ")" : str)
-#define valUI(width, str) (width > BASIC_WIDTH ? "mpz_get_ui(" + str + ")" : str)
-#define MPZ_SET(sign) std::string(sign ? "mpz_set_si" : "mpz_set_ui")
-#define VAR_NAME(node) (node->name)
-class InterVal {
-  public:
-    InterVal(int _w = -1, bool _sign = 0, bool _cons = 0, int _opNum = -1, std::string _value = "", const char* _mpzStr = NULL, int _base = 16) {
-      mpz_init(mpzVal);
-      width = _w;
-      sign = _sign;
-      isCons = _cons;
-      opNum = _opNum;
-      value = _value;
-      if (_mpzStr) mpz_set_str(mpzVal, _mpzStr, _base);
-      indexEnd = false;
-    }
-    void alignValueMpz() {
-      char* str = mpz_get_str(NULL, 16, mpzVal);
-      value = std::string("0x") + str;
-      free(str);
-    }
-    int width;
-    bool sign;
-    bool isCons;
-    bool indexEnd;
-    bool isArray = false;
-    int entryNum = 0;
-    int opNum;
-    std::string value;
-    mpz_t mpzVal;
-    std::vector<int> index;
-};
-
-#define valType std::tuple<int, bool, bool, int, std::string, mpz_wrap*>
-
-#define valWidth(entry) std::get<0>(entry)
-#define valSign(entry)  std::get<1>(entry)
-#define valCons(entry)  std::get<2>(entry)
-#define valOpNum(entry) std::get<3>(entry)
-#define valValue(entry) std::get<4>(entry)
-#define valMpzWrap(entry) std::get<5>(entry)
-#define valMpz(entry)   std::get<5>(entry)->a
-#define valIsIndex(entry) (valOpNum(entry) == -1)
-
-int p_stoi(const char* str);
-std::string cons2str(std::string s);
-std::pair<int, std::string> strBaseAll(std::string s);
-std::string to_hex_string(BASIC_TYPE x);
-void computeNode(Node* node, bool nodeEnd);
-
-static std::vector<InterVal*> interVals;
-static std::vector<std::string> whenStr;
-static bool topValid = false;
-static bool stmtValid = false;
-static int tmpIdx = 0;
-static int valSize = 0;
-
-static std::map<std::string, std::string> opMap = {
-  {"add", "+"},
-  {"sub", "-"},
-  {"mul", "*"},
-  {"div", "/"},
-  {"rem", "%"},
-  {"lt", "<"},
-  {"leq", "<="},
-  {"gt", ">"},
-  {"geq", ">="},
-  {"eq", "=="},
-  {"neq", "!="},
-  // {"dshl", "<<"},
-  {"dshr", ">>"},
-  {"and", "&"},
-  {"or", "|"},
-  {"xor", "^"},
-  // {"shl", "<<"},
-  {"shr", ">>"},
-  {"asClock", "0!="},
-  {"neg", "-"},
-  // {"not", "~"},
-  {"cvt", ""},
-  {"orr", "0 != "}
-};
+static std::string upperCast(int width1, int width2, bool sign) {
+  if (typeCmp(width1, width2) > 0) { 
+    return Cast(width1, sign);
+  }
+  return "";
+}
 
 static std::string bitMask(int width) {
-  Assert(width >= 0, "invalid width %d\n", width);
+  Assert(width > 0, "invalid width %d", width);
   std::string ret = std::string(width/4, 'f');
   const char* headTable[] = {"", "1", "3", "7"};
   ret = headTable[width % 4] + ret;
@@ -183,968 +70,975 @@ static std::string bitMask(int width) {
   return ret;
 }
 
-static std::string consVal128(std::string consVal) {
-  return consVal.length() > 16 ?
-          ("UINT128(0x" + consVal.substr(0, consVal.length() - 16) + ", 0x" + consVal.substr(consVal.length()-16, 16) + ")")
-          : ("0x" + consVal);
-}
-
-static std::string consValArray(Node* node, std::string consVal, int entryNum) {
-  return "memcpy(" + node->name + ", (const " + widthUType(node->width) + "[]){" + consVal + "}, "
-                    + std::to_string(entryNum) + "*sizeof(" + widthUType(node->width) + "))";
-}
-
-static void deleteAndPop() {
-  delete interVals.back();
-  interVals.pop_back();
-}
-
-static void setConsValName(PNode* op, int width) {
-  interVals.back()->width = width;
-  interVals.back()->sign = op->sign;
-  interVals.back()->isCons = true;
-  interVals.back()->opNum = 1;
-  char* str = mpz_get_str(NULL, 16, interVals.back()->mpzVal);
-  interVals.back()->value = std::string("0x") + str;
-  free(str);
-}
-
-static void inline setConstantNode(Node* node) {
-  node->status = CONSTANT_NODE;
-  char * str = mpz_get_str(NULL, 16, interVals.back()->mpzVal);
-  node->workingVal->consVal = str;
-  free(str);
-}
-
-void setConsArrayPrev(Node* node) {
-  int startIdx = 0, len = 1;
-  std::string consStr;
-  if (interVals.size() != 0 && interVals.back()->indexEnd) {
-    for (size_t i = 0; i < interVals.back()->index.size(); i ++) {
-      int idx = interVals.back()->index[i];
-      Assert(idx >= 0, "Invalid fix idx for node %s\n", node->name.c_str());
-      startIdx = startIdx * node->dimension[i] + idx;
-    }
-    for (size_t i = interVals.back()->index.size(); i < node->dimension.size(); i ++) {
-      startIdx *= node->dimension[i];
-      len *= node->dimension[i];
-    }
-    for (int i = 0; i < len; i ++) {
-      if (i != 0) consStr += ", ";
-      consStr += node->consArray[startIdx + i];
-    }
-    deleteAndPop();
-  } else {
-    len = node->entryNum;
-    consStr = node->workingVal->consVal;
-  }
-  interVals.push_back(new InterVal(node->width, node->sign, true, 1, consStr, len == 1 ? consStr.c_str() : NULL));
-  interVals.back()->isArray = len > 1;
-  interVals.back()->entryNum = len;
-}
-
-static void setPrev(Node* node, int& prevIdx) {
-  Node* operand = node->workingVal->operands[prevIdx];
-  //  std::cout << "operand: " << prevIdx << " " << operand->name << "(" << operand->status << ")" << " node: " << node->name << " " << operand->clusId << " " << operand->id << std::endl;
-  if (operand->status == CONSTANT_NODE && operand->dimension.size() == 0) {
-    if (operand->workingVal->consVal.length() == 0) {
-      if (operand->workingVal->ops.size() == 0 && operand->workingVal->operands.size() == 0) {
-        interVals.push_back(new InterVal(operand->width, operand->sign, true, 1, "0x0", "0"));
-      } else {
-        TODO();
-        size_t size = interVals.size();
-        computeNode(operand, false);
-        Assert(interVals.size() == size + 1, "Invalid size for %s (%ld -> %ld) in %s\n", operand->name.c_str(), size, interVals.size(), node->name.c_str());
-      }
-    } else {
-      int length = operand->workingVal->consVal.length();
-      std::string consStr = operand->width > 64 && length > 16?
-                ("UINT128(0x" + operand->workingVal->consVal.substr(0, length-16) + ", 0x" + operand->workingVal->consVal.substr(length-16, 16) + ")") :
-                "0x" + operand->workingVal->consVal;
-      interVals.push_back(new InterVal(operand->width, operand->sign, true, 1, consStr, operand->workingVal->consVal.c_str()));
-    }
-  } else if (operand->status == CONSTANT_NODE) { // constant array
-    setConsArrayPrev(operand);
-  } else if (operand->id != operand->clusId) {
-    size_t size = interVals.size();
-    if (!operand->computed) {
-      computeNode(operand, false);
-    }
-    Assert(interVals.size() == size, "Invalid size for %s (%ld -> %ld) in %s\n", operand->name.c_str(), size, interVals.size(), node->name.c_str());
-    if (operand->status == CONSTANT_NODE) {
-      int length = operand->workingVal->consVal.length();
-      std::string consStr = operand->width > 64 && length > 16?
-                ("UINT128(0x" + operand->workingVal->consVal.substr(0, length-16) + ", 0x" + operand->workingVal->consVal.substr(length-16, 16) + ")") :  "0x" + operand->workingVal->consVal;
-      interVals.push_back(new InterVal(operand->width, operand->sign, true, operand->opNum, consStr, operand->workingVal->consVal.c_str()));
-    } else {
-      interVals.push_back(new InterVal(operand->width, operand->sign, false, operand->opNum, operand->valName, NULL));
-    }
-  } else {
-    std::string name = operand->name;
-    Node* nextNode = NULL;
-    if (interVals.size() > 0 && interVals.back()->indexEnd && interVals.back()->index.size() != 0) {
-      if (operand->arraySplit) {
-        bool isFixIndex = true;
-        int fixIdx = 0;
-        int memberIdx = 0;
-        for (size_t idx = 0; idx < interVals.back()->index.size(); idx ++) {
-          if(idx < 0) {
-            isFixIndex = false;
-            break;
-          } else {
-            fixIdx = fixIdx * (operand->dimension[idx]) + interVals.back()->index[idx];
-            memberIdx = memberIdx * (operand->dimension[idx] + 1) + interVals.back()->index[idx];
-          }
-        }
-        if (isFixIndex) {
-          name += "$__" + std::to_string(fixIdx);
-          nextNode = operand->member[memberIdx];
-        } else TODO();
-      } else {
-        name += interVals.back()->value;
-      }
-      deleteAndPop();
-    }
-    if (nextNode) computeNode(nextNode, false);
-    else interVals.push_back(new InterVal(operand->width, operand->sign, false, 1, name, NULL));
-  }
-
-  topValid = true;
-  prevIdx--;
-}
-
-void insts_1expr1int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
-  PNode* op = node->workingVal->ops[opIdx];
-  int opWidth = node->opBits[opIdx];
-  if (!topValid) setPrev(node, prevIdx);
-  unsigned long n = p_stoi(op->getExtra(0).c_str());
-  int valWidth = interVals.back()->width;
-  if (op->name == "tail") n = opWidth;
-  else if (op->name == "head") {
-    n = opWidth - valWidth;
-    Assert(n >= 0, "invalid constant %ld in node %s\n", n, node->name.c_str());
-  }
-
-  std::string dstName;
-  int dstOpNum = interVals.back()->opNum;
-  bool dstCons = interVals.back()->isCons;
-  bool result_mpz  = opWidth > BASIC_WIDTH;
-  bool operand_mpz = valWidth > BASIC_WIDTH;
-
-  if (dstCons) {
-    std::tuple<EXPR1INT_FUNC_TYPE, EXPR1INT_FUNC_TYPE> funcs = expr1int1Map[op->name];
-    (op->sign ? std::get<1>(funcs) : std::get<0>(funcs))(interVals.back()->mpzVal, interVals.back()->mpzVal, valWidth, n);
-    setConsValName(op, node->opBits[opIdx]);
-    if (opIdx == 0) setConstantNode(node);
-    return;
-  }
-  if (result_mpz) {
-    dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
-    dstOpNum = 1;
-    if (valWidth > BASIC_WIDTH)
-      add_insts_3expr(node, FUNC_NAME(op->sign, op->name), dstName, interVals.back()->value,
-                      std::to_string(interVals.back()->width), std::to_string(n));
-    else {
-      TODO();
-      add_insts_2expr(node, FUNC_UI(op->sign, op->name), dstName, interVals.back()->value, std::to_string(n));
-    }
-  } else if (!operand_mpz) {
-    if (opMap.find(op->name) != opMap.end()) {
-      dstOpNum ++;
-      dstName = "(" + interVals.back()->value + opMap[op->name] + std::to_string(n) + ")";
-    } else if (op->name == "pad") {
-      if (!op->sign)
-        dstName = interVals.back()->value;
-      else {
-        dstOpNum ++;
-        std::string operandName;
-        if(interVals.back()->opNum != 1) {
-          operandName = op->getChild(0)->name;
-          node->insts.push_back(widthUType(valWidth) + " " + operandName + " = " + interVals.back()->value + ";");
-        } else
-          operandName = interVals.back()->value;
-        dstName = "(-((" + widthUType(opWidth) + ")(" + operandName + " >> " + std::to_string(valWidth - 1) +
-                  ") << " + std::to_string(valWidth) + ") | " + operandName + ")";
-      }
-    } else if (op->name == "tail") {
-      dstOpNum ++;
-      dstName = "(" + interVals.back()->value + " & " + bitMask(n) + ")";
-    } else if (op->name == "shl") {
-      dstOpNum ++;
-      dstName = "(" + UCast(opWidth) + interVals.back()->value + " << " + std::to_string(n) + ")";
-    } else {
-      dstOpNum ++;
-      dstName = FUNC_BASIC(op->sign, op->name, opWidth) + "(" + interVals.back()->value + ", " + std::to_string(n) + ")";
-      TODO();
-    }
-    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
-  } else if (operand_mpz) { // !result_mpz && operand_mpz
-    dstOpNum ++;
-    dstName = FUNC_I(op->sign, op->name, opWidth) + "(" + interVals.back()->value + ", " +
-              std::to_string(interVals.back()->width) + ", " + std::to_string(n) + ")";
-    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
-  }
-  deleteAndPop();
-  interVals.push_back(new InterVal(opWidth, op->sign, false, dstOpNum, dstName, NULL));
-}
-
-void insts_1expr2int(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
-  PNode* op = node->workingVal->ops[opIdx];
-  int opWidth = node->opBits[opIdx];
-  if (!topValid) setPrev(node, prevIdx);
-  bool dstCons = interVals.back()->isCons;
-  Assert (!op->sign, "signed bits in line %d\n", op->lineno);
-  if (dstCons) {
-    u_bits(interVals.back()->mpzVal, interVals.back()->mpzVal, interVals.back()->width, p_stoi(op->getExtra(0).c_str()),
-                  p_stoi(op->getExtra(1).c_str()));
-    setConsValName(op, node->opBits[opIdx]);
-    if (opIdx == 0) setConstantNode(node);
-    return;
-  }
-  std::string dstName;
-  int dstOpNum = interVals.back()->opNum;
-  if (opWidth <= BASIC_WIDTH) {
-    if (interVals.back()->width <= BASIC_WIDTH) {
-      int l = p_stoi(op->getExtra(0).c_str()), r = p_stoi(op->getExtra(1).c_str()), w = l - r + 1;
-      dstName = "((" + interVals.back()->value + " >> " + std::to_string(r) + ") & " + bitMask(w) + ")";
-    } else {
-      dstName = FUNC_BASIC(op->sign, op->name, opWidth) + "(" + interVals.back()->value + ", " +
-                std::to_string(interVals.back()->width) + ", " + cons2str(op->getExtra(0)) + ", " +
-                cons2str(op->getExtra(1)) + ")";
-    }
-    dstOpNum ++;
-    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
-  } else {
-    dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
-    dstOpNum = 1;
-    add_insts_4expr(node, FUNC_NAME(op->sign, op->name), dstName, interVals.back()->value,
-                    std::to_string(interVals.back()->width), cons2str(op->getExtra(0)), cons2str(op->getExtra(1)));
-  }
-  deleteAndPop();
-  interVals.push_back(new InterVal(opWidth, op->sign, false, dstOpNum, dstName, NULL));
-}
-
-void insts_2expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
-  PNode* op = node->workingVal->ops[opIdx];
-  int opWidth = node->opBits[opIdx];
-  if (!topValid) setPrev(node, prevIdx);
-  int funcSign = op->sign;
-  if (op->name == "add" || op->name == "mul" || op->name == "sub" || op->name == "div" || op->name == "rem")
-    funcSign = 0;
-
-  int dstOpNum = interVals.back()->opNum + interVals[interVals.size()-2]->opNum;
-  int dstCons = interVals.back()->isCons && interVals[interVals.size()-2]->isCons;
-  if (dstCons) {
-    std::tuple<EXPR2_FUNC_TYPE, EXPR2_FUNC_TYPE> funcs = expr2Map[op->name];
-    (op->sign ? std::get<1>(funcs) : std::get<0>(funcs))(interVals[interVals.size() - 2]->mpzVal, interVals.back()->mpzVal,
-                  interVals.back()->width, interVals[interVals.size() - 2]->mpzVal, interVals[interVals.size() - 2]->width);
-    deleteAndPop();
-    setConsValName(op, node->opBits[opIdx]);
-    if (opIdx == 0) setConstantNode(node);
-    return;
-  }
-  std::string dstName;
-  bool result_mpz  = opWidth > BASIC_WIDTH;
-  bool left_mpz    = interVals.back()->width > BASIC_WIDTH;
-  bool right_mpz   = interVals[interVals.size() - 2]->width > BASIC_WIDTH;
-  bool operand_mpz = left_mpz && right_mpz;
-  if (result_mpz && operand_mpz) {
-    dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
-    dstOpNum = 1;
-    if (!interVals.back()->isCons && !interVals[interVals.size() - 2]->isCons) {
-      add_insts_4expr(node, FUNC_NAME(funcSign, op->name), dstName, interVals.back()->value,
-                      std::to_string(interVals.back()->width), interVals[interVals.size() - 2]->value,
-                      std::to_string(interVals[interVals.size() - 2]->width));
-    } else if (!interVals.back()->isCons && interVals[interVals.size() - 2]->isCons) {
-      add_insts_3expr(node, FUNC_UI_R(funcSign, op->name), dstName, interVals.back()->value,
-                      interVals[interVals.size() - 2]->value, std::to_string(interVals[interVals.size() - 2]->width));
-    } else if (interVals.back()->isCons && !interVals[interVals.size() - 2]->isCons) {
-      add_insts_4expr(node, FUNC_SUI_L(funcSign, interVals.back()->sign, op->name, interVals.back()->width), dstName,
-                      interVals.back()->value, std::to_string(interVals.back()->width),
-                      interVals[interVals.size() - 2]->value, std::to_string(interVals[interVals.size() - 2]->width));
-    } else {
-      add_insts_4expr(node, FUNC_UI2(funcSign, op->name), dstName, interVals.back()->value,
-                      std::to_string(interVals.back()->width), interVals[interVals.size() - 2]->value,
-                      std::to_string(interVals[interVals.size() - 2]->width));
-    }
-  } else if (!result_mpz && !operand_mpz) {
-    dstOpNum ++;
-    if (opMap.find(op->name) != opMap.end()) {
-      if (interVals.back()->sign) {
-        std::string typeStr = "(" + widthSType(interVals.back()->width) + ")";
-        dstName = "(" + typeStr + interVals.back()->value + opMap[op->name] + typeStr +
-                  interVals[interVals.size() - 2]->value + ")";
-      } else {
-        dstName = "((" + widthUType(MAX(opWidth, interVals.back()->width)) + ")" + interVals.back()->value + opMap[op->name] + interVals[interVals.size() - 2]->value + ")";
-      }
-    } else if (op->name == "cat") {
-      dstName = "((uint128_t)" + interVals.back()->value + " << " +
-                std::to_string(interVals[interVals.size() - 2]->width) + " | " +
-                interVals[interVals.size() - 2]->value + ")";
-    } else if (op->name == "dshl") {
-      dstName = "(" + UCast(opWidth) + interVals.back()->value + " << " + interVals[interVals.size() - 2]->value + ")";
-    } else {
-      TODO();
-      dstName = FUNC_BASIC(op->sign, op->name, opWidth) + "(" + interVals.back()->value + ", " +
-                interVals[interVals.size() - 2]->value + ")";
-    }
-    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
-  } else if (result_mpz && !operand_mpz) {
-    dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
-    dstOpNum = 1;
-    if (left_mpz) {
-      add_insts_3expr(node, FUNC_SUI_R(funcSign, interVals[interVals.size() - 2]->sign, op->name, interVals[interVals.size() - 2]->width),
-                    dstName, interVals.back()->value, interVals[interVals.size() - 2]->value,
-                    std::to_string(interVals[interVals.size() - 2]->width));
-    } else if (right_mpz) {
-      add_insts_4expr(node, FUNC_SUI_L(funcSign, interVals.back()->sign, op->name, interVals.back()->width), dstName,
-                    interVals.back()->value, std::to_string(interVals.back()->width),
-                    interVals[interVals.size() - 2]->value, std::to_string(interVals[interVals.size() - 2]->width));
-    } else {
-      if (interVals.back()->width > 64) {
-        std::string ui_dst = dstName + "_ui";
-        node->insts.push_back(LocalType(interVals.back()->width, interVals.back()->sign) + " " + ui_dst + " = " + interVals.back()->value + ";");
-        node->insts.push_back("mpz_import(" + dstName + ", 2, -1, 8, 0, 0, &" + ui_dst + ");");
-        // TODO: 测试在sint时的情形
-        if (interVals.back()->sign) TODO();
-      } else {
-        node->insts.push_back(MPZ_SET(interVals.back()->sign) + "(" + dstName + ", " + interVals.back()->value + ");");
-      }
-      add_insts_3expr(node, FUNC_SUI_R(funcSign, interVals[interVals.size() - 2]->sign, op->name, interVals[interVals.size() - 2]->width),
-                      dstName, dstName, interVals[interVals.size() - 2]->value, std::to_string(interVals[interVals.size() - 2]->width));
-    }
-  } else if (!result_mpz && operand_mpz) {
-    TODO();
-    dstOpNum ++;
-    dstName = FUNC_I(op->sign, op->name, opWidth) + "(" + interVals.back()->value + ", " + std::to_string(interVals.back()->width) +
-              ", " + interVals[interVals.size() - 2]->value + ", " + std::to_string(interVals[interVals.size() - 2]->width) + ")";
-    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
-  }
-  deleteAndPop();
-  deleteAndPop();
-  interVals.push_back(new InterVal(opWidth, op->sign, false, dstOpNum, dstName, NULL));
-}
-
-void insts_1expr(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
-  PNode* op = node->workingVal->ops[opIdx];
-  int opWidth = node->opBits[opIdx];
-  if (!topValid) setPrev(node, prevIdx);
-  bool dstCons = interVals.back()->isCons;
-  if (dstCons) {
-    std::tuple<EXPR1_FUNC_TYPE, EXPR1_FUNC_TYPE> funcs = expr1Map[op->name];
-    (op->sign ? std::get<1>(funcs) : std::get<0>(funcs))(interVals.back()->mpzVal, interVals.back()->mpzVal, interVals.back()->width);
-    setConsValName(op, node->opBits[opIdx]);
-    if (opIdx == 0) setConstantNode(node);
-    return;
-  }
-  int dstOpNum = interVals.back()->opNum;
-  std::string dstName;
-  bool result_mpz  = opWidth > BASIC_WIDTH;
-  bool operand_mpz = interVals.back()->width > BASIC_WIDTH;
-  if (result_mpz) {
-    dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
-    dstOpNum = 1;
-    add_insts_2expr(node, (operand_mpz ? FUNC_NAME(op->sign, op->name) : FUNC_UI(op->sign, op->name)),
-                    dstName, interVals.back()->value, std::to_string(interVals.back()->width));
-  } else if (!operand_mpz) {
-    if (opMap.find(op->name) != opMap.end()) {
-      dstName = "(" + opMap[op->name] + interVals.back()->value + ")";
-      dstOpNum ++;
-    } else if (op->name == "not") {      
-      dstName = "(" + interVals.back()->value + " ^ " + bitMask(opWidth) + ")";
-      dstOpNum ++;
-    } else if (op->name == "asSInt") {
-      int shiftBits = widthBits(opWidth) - opWidth;
-      std::string shiftStr = std::to_string(shiftBits);
-      dstName = "(((" + widthSType(opWidth) + ")(" + interVals.back()->value + " << " + shiftStr + ")) >> " + shiftStr + ")";
-    } else if (op->name == "asUInt") {
-      dstName = "((" + widthUType(opWidth) + ")" + interVals.back()->value + " & " + bitMask(interVals.back()->width) + ")";
-    } else if (op->name == "andr") {
-      dstName = "(" + interVals.back()->value + " == " + bitMask(interVals.back()->width) + ")";
-    } else if (op->name == "xorr") {
-      dstName = "(__builtin_parity(" + interVals.back()->value + ") & 1)";
-    } else {
-      TODO();
-      dstName = FUNC_BASIC(op->sign, op->name, opWidth) + "(" + interVals.back()->value + ")";
-      dstOpNum ++;
-    }
-    if (opIdx == 0 && nodeEnd) node->insts.push_back(VAR_NAME(node) + " = " + dstName + ";");
-  } else {
-    std::cout << interVals.back()->value << " " << interVals.back()->width << std::endl;
-    std::cout << node->name << " " << op->name << std::endl;
-    TODO();
-  }
-  deleteAndPop();
-  interVals.push_back(new InterVal(opWidth, op->sign, false, dstOpNum, dstName, NULL));
-}
-
-bool insts_index(Node* node, int opIdx, int& prevIdx, int rindexBegin) {
-  if (!topValid) setPrev(node, prevIdx);
-
-  std::string rindexStr = "[" + interVals.back()->value + "]";
-  int index = -1;
-  if (interVals.back()->isCons) index = std::stoi(interVals.back()->value);
-  deleteAndPop();
-  if (rindexBegin) interVals.push_back(new InterVal(-1, -1, false, -1, rindexStr, NULL));
-  else interVals.back()->value = rindexStr + interVals.back()->value;
-  interVals.back()->index.insert(interVals.back()->index.begin(), index);   // FIXME: 检查一下index，在为变量时用-1表示
-  interVals.back()->indexEnd = node->workingVal->ops[opIdx]->lineno == 0;
-  topValid = false;
-  return node->workingVal->ops[opIdx]->lineno == 0;
-
-}
-
-bool insts_cons_index(Node* node, int opIdx, int& prevIdx, bool rindexBegin) {
-  PNode* op = node->workingVal->ops[opIdx];
-  if (rindexBegin) interVals.push_back(new InterVal(-1, -1, false, -1, "[" + op->name + "]", NULL));
-  else interVals.back()->value = "[" + op->name + "]" + interVals.back()->value;
-  topValid = false;
-  interVals.back()->index.insert(interVals.back()->index.begin(), std::stoi(op->name));
-  interVals.back()->indexEnd = node->workingVal->ops[opIdx]->lineno == 0;
-
-  return node->workingVal->ops[opIdx]->lineno == 0;
-
-}
-
-bool insts_l_index(Node* node, int opIdx, int& prevIdx, std::vector<std::string>& index) {
-  PNode* op = node->workingVal->ops[opIdx];
-  if (!topValid) setPrev(node, prevIdx);
-
-  index.push_back(interVals.back()->value);
-
-  deleteAndPop();
-  return op->lineno == 0;
-}
-
-bool insts_l_cons_index(Node* node, int opIdx, int& prevIdx, std::vector<std::string>& index) {
-  PNode* op = node->workingVal->ops[opIdx];
-  index.push_back(op->name);
-  return op->lineno == 0;
-}
-
-void insts_mux(Node* node, int opIdx, int& prevIdx, bool nodeEnd, bool isIf) {
-  PNode* op = node->workingVal->ops[opIdx];
-  int opWidth = node->opBits[opIdx];
-  if (!topValid) setPrev(node, prevIdx);
-
-  if (interVals.back()->isCons && interVals[interVals.size() - 2]->isCons && interVals[interVals.size()-3]->isCons) {
-    us_mux(interVals[interVals.size() - 3]->mpzVal, interVals.back()->mpzVal, interVals[interVals.size() - 2]->mpzVal, interVals[interVals.size() - 3]->mpzVal);
-    deleteAndPop();
-    deleteAndPop();
-    if (opIdx == 0) setConstantNode(node);
-    return;
-  } else if (interVals[interVals.size() - 2]->isCons && interVals[interVals.size()-3]->isCons &&
-              mpz_cmp(interVals[interVals.size()-2]->mpzVal, interVals[interVals.size()-3]->mpzVal) == 0) {
-    deleteAndPop();
-    deleteAndPop();
-    interVals.back()->width = opWidth;
-    if (opIdx == 0) setConstantNode(node);
-    return;
-  }
-
-  int muxType = interVals.back()->isCons ? (interVals.back()->value == "0x0" ? 1 : 2) : 0;
-  Assert(!interVals.back()->isCons || interVals.back()->value == "0x0" || interVals.back()->value == "0x1",
-              "invalid constant cond %s for node %s\n", interVals.back()->value.c_str(), node->name.c_str());
-  std::string cond = interVals.back()->isCons ? interVals.back()->value :
-                      valEqualsZero(interVals.back()->width, interVals.back()->value);
-  deleteAndPop();
-  std::string dstName;
-  int dstOpNum = interVals.back()->opNum + interVals[interVals.size() - 2]->opNum;
-  int dstWidth = op->type == P_WHEN ? node->width : opWidth;
-  if (dstWidth > BASIC_WIDTH) {
-    dstName = (opIdx == 0 && nodeEnd) ? node->name : NEW_TMP;
-    dstOpNum = 1;
-    std::string cond_true, cond_false;
-    if (!interVals.back()->isCons) {
-      if (interVals.back()->opNum == 1 && interVals.back()->width > BASIC_WIDTH) {
-        cond_true = "mpz_set(" + dstName + ", " + interVals.back()->value + ")";
-      } else {
-        if (interVals.back()->width > 64) {
-          std::string localName = dstName + "_ui";
-          node->insts.push_back(LocalType(interVals.back()->width, interVals.back()->sign) + " " + localName + " = " + interVals.back()->value + ";");
-          cond_true = "(void)mpz_import(" + dstName + ", 2, -1, 8, 0, 0, &" + localName + ")";
-        } else {
-          cond_true = "mpz_set_ui(" + dstName + ", " + interVals.back()->value + ")";
-        }
-      }
-    } else {
-      if (interVals.back()->value.length() <= 18)
-        cond_true = "mpz_set_ui(" + dstName + ", " + interVals.back()->value + ")";
-      else
-        cond_true = "(void)mpz_set_str(" + dstName + ", \"" + interVals.back()->value.substr(2) + "\", 16)";
-    }
-    deleteAndPop();
-
-    if (!interVals.back()->isCons) {
-      if (interVals.back()->opNum == 1 && interVals.back()->width > BASIC_WIDTH) {
-        cond_false = "mpz_set(" + dstName + ", " + interVals.back()->value + ")";
-      } else {
-        if (interVals.back()->width > 64) {
-          std::string localName = dstName + "_ui";
-          node->insts.push_back(LocalType(interVals.back()->width, interVals.back()->sign) + " " + localName + " = " + interVals.back()->value + ";");
-          cond_false = "(void)mpz_import(" + dstName + ", 2, -1, 8, 0, 0, &" + localName + ")";
-        } else {
-          cond_false = "mpz_set_ui(" + dstName + ", " + interVals.back()->value + ")";
-        }
-      }
-    } else {
-      if (interVals.back()->value.length() <= 18)
-        cond_false = "mpz_set_ui(" + dstName + ", " + interVals.back()->value + ")";
-      else
-        cond_false = "(void)mpz_set_str(" + dstName + ", \"" + interVals.back()->value.substr(2) + "\", 16)";
-    }
-    if(muxType == 0) {
-      if(isIf) {
-        bool trueFix = cond_true == node->name || (node->type == NODE_REG_DST && cond_true == node->regNext->name);
-        bool falseFix = cond_false == node->name || (node->type == NODE_REG_DST && cond_false == node->regNext->name);
-        if (trueFix && falseFix) {
-
-        } else if (trueFix) {
-          node->insts.push_back("if (!" + cond + "){\n" + cond_false + ";\n}");
-        } else if (falseFix) {
-          node->insts.push_back("if (" + cond + "){\n" + cond_true + ";\n}");
-        } else
-          node->insts.push_back("if (" + cond + "){\n" + cond_true + ";\n} else {\n" + cond_false + ";\n}");
-      } else {
-        node->insts.push_back(cond + "? " + cond_true + " : " + cond_false + ";");
-      }
-    } else if(muxType == 1) node->insts.push_back(cond_false + ";");
-    else if(muxType == 2) node->insts.push_back(cond_true + ";");
-  } else { // dstWidth < BASIC_WIDTH
-    std::string cond_true, cond_false;
-    if (interVals.back()->width > BASIC_WIDTH) {
-      if (interVals.back()->isArray && interVals.back()->isCons) TODO();
-      std::string firstHalf = "mpz_getlimbn(" + interVals.back()->value + ", 1)";
-      std::string secondHalf = "mpz_get_ui(" + interVals.back()->value + ")";
-      cond_true = "mpz_size(" + interVals.back()->value + ") == 1 ?" + secondHalf + " : ((uint128_t)" + firstHalf + " << 64 | " + secondHalf + ")" ;
-      if (interVals.back()->sign) TODO();
-    } else {
-      if (interVals.back()->isArray && interVals.back()->isCons) {
-        cond_true = ("memcpy(" + node->name + ", (const " + widthUType(node->width) + "[]){" + interVals.back()->value + "}, "
-                    + std::to_string(interVals.back()->entryNum) + "*sizeof(" + widthUType(node->width) + "))");
-      } else {
-        cond_true = interVals.back()->value;
-      }
-    }
-    deleteAndPop();
-    if (interVals.back()->width > BASIC_WIDTH) {
-      if (interVals.back()->isArray && interVals.back()->isCons) TODO();
-      std::string firstHalf = "mpz_getlimbn(" + interVals.back()->value + ", 1)";
-      std::string secondHalf = "mpz_get_ui(" + interVals.back()->value + ")";
-      cond_false = "mpz_size(" + interVals.back()->value + ") == 1 ?" + secondHalf + " : ((uint128_t)" + firstHalf + " << 64 | " + secondHalf + ")" ;
-      if (interVals.back()->sign) TODO();
-    } else {
-      if (interVals.back()->isArray && interVals.back()->isCons) {
-        Assert(nodeEnd && opIdx == 0, "%s array copy\n", node->name.c_str());
-        cond_false = ("memcpy(" + node->name + ", (" + widthUType(node->width) + "[]){" + interVals.back()->value + "})");
-      } else {
-        cond_false = interVals.back()->value;
-      }
-    }
-
-    std::string value;
-    if(muxType == 0) {
-      if (isIf) {
-        bool trueFix = cond_true == node->name || (node->type == NODE_REG_DST && cond_true == node->regNext->name);
-        bool falseFix = cond_false == node->name || (node->type == NODE_REG_DST && cond_false == node->regNext->name);
-        if (trueFix && falseFix) {
-
-        } else if (trueFix) {
-          value = "if (!" + cond + "){\n" + cond_false + ";\n}";
-        } else if (falseFix) {
-          value = "if (" + cond + "){\n" + cond_true + ";\n}";
-        } else
-          value = "if (" + cond + "){\n" + cond_true + ";\n} else {\n" + cond_false + ";\n}";
-      } else {
-        value = "(" + cond + "? " + cond_true + " : " + cond_false + ")";
-      }
-    }
-    else if(muxType == 1) value = cond_false;
-    else if(muxType == 2) value = cond_true;
-    if (opIdx == 0 && nodeEnd) {
-      if (isIf) {
-        if (value.length() > 0)
-          node->insts.push_back(value);
-      } else
-        node->insts.push_back(VAR_NAME(node) + " = " + value + ";");
-    }
-    dstName = value;
-    dstOpNum += muxType == 0;
-  }
-  deleteAndPop();
-  interVals.push_back(new InterVal(opWidth, op->sign, false, dstOpNum, dstName, NULL));
-}
-
-void insts_intInit(Node* node, int opIdx) {
-  int base;
-  std::string cons;
-  std::tie(base, cons) = strBaseAll(node->workingVal->ops[opIdx]->getExtra(0));
-  interVals.push_back(new InterVal(node->workingVal->ops[opIdx]->width, node->workingVal->ops[opIdx]->sign, true, 1, "", cons.c_str(), base));
-  interVals.back()->alignValueMpz();
-  topValid = true;
-}
-
-void insts_printf(Node* node, int opIdx, int& prevIdx) {
-  if (!topValid) setPrev(node, prevIdx);
-  std::string cond = interVals.back()->isCons ? interVals.back()->value
-                                    : valEqualsZero(interVals.back()->width, interVals.back()->value);
-  std::string inst = "if(" + cond + ") printf(" + node->workingVal->ops[opIdx]->getExtra(0);
-  deleteAndPop();
-  for (int i = 0; i < node->workingVal->ops[opIdx]->getChild(2)->getChildNum(); i++) {
-    inst += ", " + (interVals.back()->isCons ? interVals.back()->value :
-          valUI(interVals.back()->width, interVals.back()->value));
-    deleteAndPop();
-  }
-  node->insts.push_back(inst + ");");
-  interVals.push_back(new InterVal(0, 0, 0, 0, "", NULL));
-}
-
-void insts_assert(Node* node, int opIdx, int& prevIdx) {
-  if (!topValid) setPrev(node, prevIdx);
-  std::string pred = interVals.back()->isCons? interVals.back()->value
-                  : valEqualsZero(interVals.back()->width, interVals.back()->value);
-  deleteAndPop();
-
-  std::string en = interVals.back()->isCons? interVals.back()->value
-                  : valEqualsZero(interVals.back()->width, interVals.back()->value);
-  deleteAndPop();
-
-  std::string inst = "Assert(!" + en + " || " + pred + ", " + node->workingVal->ops[opIdx]->getExtra(0) + ");";
-  node->insts.push_back(inst);
-  interVals.push_back(new InterVal(0, 0, 0, 0, "", NULL));
-}
-
-void insts_when(Node* node, int opIdx, int& prevIdx, bool nodeEnd) {
-  node->workingVal->ops[opIdx]->width = node->opBits[opIdx] = node->width;
-  insts_mux(node, opIdx, prevIdx, nodeEnd, true);
-  return;
-}
-
-void combineVal(int num) {
-  std::string comb;
-  for (int j = 0; j < num; j ++) {
-    comb = interVals.back()->value + ";\n" + comb;
-    deleteAndPop();
-  }
-  interVals.back()->value += ";\n" + comb;
-}
-
-void computeSplitArray(Node* node, bool nodeEnd) {
-  if (node->workingVal->ops.size() == 0 || node->workingVal->operands.size() == 0) {
-    return;
-  }
+valInfo* ENode::computeConstant() {
   TODO();
 }
 
-void computeArrayMember(Node* node) {
-  if (node->workingVal->ops.size() == 0 && node->workingVal->operands.size() == 0) return;
 
-  int prevIdx = node->workingVal->operands.size() - 1;
-  bool indexEnd = false;
-  bool rindexBegin = true;
-  std::vector<std::string> index;
-  for (int i = node->workingVal->ops.size() - 1; i >= 0; i--) {
-    if (!node->workingVal->ops[i]) {
-      if (!topValid && ! stmtValid) {
-        setPrev(node, prevIdx);
-      }
-      topValid = false;
-      stmtValid = false;
-      valSize += 1;
-      int delta = interVals.size() - valSize;
-      Assert(delta >= 0, "interVals.size(%ld) < valSize(%d) %s %d", interVals.size(), valSize, node->name.c_str(), i);
-      if (delta > 0) {
-        combineVal(delta);
-      }
-      continue;
-    }
-    switch (node->workingVal->ops[i]->type) {
-      case P_1EXPR1INT: insts_1expr1int(node, i, prevIdx, false); break;
-      case P_1EXPR2INT: insts_1expr2int(node, i, prevIdx, false); break;
-      case P_2EXPR: insts_2expr(node, i, prevIdx, false); valSize -= 1; break;
-      case P_1EXPR: insts_1expr(node, i, prevIdx, false); break;
-      case P_EXPR_MUX: insts_mux(node, i, prevIdx, false, false); valSize -= 2; break;
-      case P_EXPR_INT_INIT: insts_intInit(node, i); break;
-      case P_PRINTF: insts_printf(node, i, prevIdx); break;
-      case P_ASSERT: insts_assert(node, i, prevIdx); break;
-      case P_WHEN : insts_when(node, i, prevIdx, false); valSize -= 2; break;
-      case P_INDEX : rindexBegin = insts_index(node, i, prevIdx, rindexBegin); valSize -=1; break;
-      case P_CONS_INDEX : rindexBegin = insts_cons_index(node, i, prevIdx, rindexBegin); break;
-      case P_L_INDEX: indexEnd = insts_l_index(node, i, prevIdx, index); valSize -=1; break;
-      case P_L_CONS_INDEX: indexEnd = insts_l_cons_index(node, i, prevIdx, index); break;
-      default: Assert(0, "Invalid op(%s) with type %d\n", node->workingVal->ops[i]->name.c_str(), node->workingVal->ops[i]->type);
-    }
-
-    if (indexEnd) {
-      if(!topValid) setPrev(node, prevIdx);
-      std::string newValue = node->name;
-      for (int i = index.size() - 1; i >= 0; i --) newValue += "[" + index[i] + "]";
-      Assert(interVals.size() > 0, "empty interVals in node %s\n", node->name.c_str());
-      if (node->width <= BASIC_WIDTH)
-        interVals.back()->value = newValue + " = " + interVals.back()->value;
-      else {
-        if (interVals.back()->isCons) {
-          if (interVals.back()->value.length() <= 18)
-            interVals.back()->value = "mpz_set_ui(" + newValue + ", " + interVals.back()->value + ")";
-          else
-            interVals.back()->value = "mpz_set_str(" + newValue + ", \"" + interVals.back()->value.substr(2) + "\", 16)";
-        }
-        else
-          interVals.back()->value = "mpz_set(" + newValue + ", " + interVals.back()->value + ")";
-      }
-      indexEnd = false;
-      index.erase(index.begin(), index.end());
-      topValid = false;
-      stmtValid = true;
-    }
+valInfo* ENode::instsMux() {
+  /* cond is constant */
+  if (ChildInfo(0, status) == VAL_CONSTANT) {
+    if (ChildInfo(0, valStr) == "0x0") return getChild(2)->computeInfo;
+    else return getChild(1)->computeInfo;
   }
-  node->insts.push_back(interVals.back()->value + ";");
-  deleteAndPop();
-  stmtValid = false;
-  topValid = false;
+  /* not constant */
+  bool childBasic = Child(1, width) <= BASIC_WIDTH || Child(2, width) <= BASIC_WIDTH;
+  bool enodeBasic = width <= BASIC_WIDTH;
+  valInfo* ret = new valInfo();
+  ret->opNum = ChildInfo(1, opNum) + ChildInfo(2, opNum) + 1;
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  if (childBasic && enodeBasic) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
+  } else {
+    TODO();
+  }
+  return ret;
 }
 
-void computeArray(Node* node, bool nodeEnd) {
-  if (node->arraySplit) return computeSplitArray(node, nodeEnd);
-  for (Node* member : node->member) {
-    computeArrayMember(member);
+valInfo* ENode::instsWhen(Node* node) {
+  /* cond is constant */
+  if (getChild(0)->computeInfo->status == VAL_CONSTANT) {
+    if (ChildInfo(0, valStr) == "0x0") return getChild(2) ? Child(2, computeInfo) : new valInfo();
+    else return getChild(1) ? getChild(1)->computeInfo : new valInfo();
   }
-  if (node->workingVal->ops.size() == 0) { // TODO: dirty[matchWay][blockIdx] when_cond_6363
-    if (node->workingVal->operands.size() == 0) return;
-    Assert(node->workingVal->operands.size() == 1, "Invalid operands size(%ld) for %s\n", node->workingVal->operands.size(),
-           node->name.c_str());
-    int prevIdx = 0;
-    setPrev(node, prevIdx);
-    if (!nodeEnd) return;
-    if (!interVals.back()->isCons) {
-      if (node->width > BASIC_WIDTH) {
-        TODO();
-        node->insts.push_back("mpz_set(" + node->name + ", " + interVals.back()->value + ");");
-      } else if (nodeEnd) {
-        node->insts.push_back("memcpy(" + VAR_NAME(node) + ", " + interVals.back()->value + ", sizeof(" + VAR_NAME(node) + "));");
-      }
-    } else {
-      node->insts.push_back("memcpy(" + node->name + ", (const " + widthUType(node->width) + "[]){" + interVals.back()->value + "}, "
-                    + std::to_string(interVals.back()->entryNum) + "*sizeof(" + widthUType(node->width) + "));");
+  /* not constant */
+  bool childBasic = Child(1, width) <= BASIC_WIDTH || Child(2, width) <= BASIC_WIDTH;
+  bool enodeBasic = width <= BASIC_WIDTH;
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) {
+    if (childNode) ret->mergeInsts(childNode->computeInfo);
+  }
+  // ret->opNum = ChildInfo(1, opNum) + ChildInfo(2, opNum) + 1;
+  if (childBasic && enodeBasic) {
+    auto assignment = [node](bool isStmt, std::string expr) {
+      return isStmt ? expr : (node->name + " = " + expr + ";");
+    };
+    std::string condStr = "if (" + ChildInfo(0, valStr) + ") ";
+    std::string trueStr = "{ " + (getChild(1) ? assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr)) : "") + " }";
+    std::string falseStr = "else { " + (getChild(2) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr)) : "") + " }";
+    ret->valStr = condStr + trueStr + falseStr;
+    ret->opNum = -1; // assignment rather than expr
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsAdd() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = Child(0, width) <= BASIC_WIDTH || Child(1, width) <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    us_add(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + upperCast(width, Child(0, width), sign) + ChildInfo(0, valStr) + " + " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else if (enodeBaisc) {
+    TODO();
+  } else if (!childBasic && enodeBaisc) {
+    TODO();
+  } else {
+    Panic();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsSub() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    us_sub(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + upperCast(width, Child(0, width), sign) + ChildInfo(0, valStr) + " - " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsMul() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    us_mul(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + upperCast(width, Child(0, width), sign)+ ChildInfo(0, valStr) + " * " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsDIv() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    us_div(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + upperCast(width, Child(0, width), sign)+ ChildInfo(0, valStr) + " / " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsRem() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    us_rem(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + upperCast(width, Child(0, width), sign)+ ChildInfo(0, valStr) + " % " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsLt() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    us_lt(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " < " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsLeq() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    us_leq(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " <= " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsGt() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    us_gt(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " > " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsGeq() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    us_geq(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " >= " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsEq() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    us_eq(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " == " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsNeq() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    us_neq(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " != " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsDshl() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_dshl(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + upperCast(width, Child(0, width), sign) + ChildInfo(0, valStr) + " << " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsDshr() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    (sign ? s_dshr : u_dshr)(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " >> " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsAnd() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_and(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " & " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsOr() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_ior(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " | " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsXor() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_xor(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " ^ " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsCat() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_cat(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    std::string hi = "(" + upperCast(width, Child(0, width), false) + ChildInfo(0, valStr) + " << " + std::to_string(Child(1, width)) + ")";
+    ret->valStr = "(" + hi + " | " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsAsUInt() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_asUInt(ret->consVal, ChildInfo(0, consVal), Child(0, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + Cast(width, false) + ChildInfo(0, valStr) + " & " + bitMask(Child(0, width)) + ")";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsAsSInt() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+
+  if (isConstant) {
+    if (!sign) TODO();
+    s_asSInt(ret->consVal, ChildInfo(0, consVal), Child(0, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    std::string shiftStr = std::to_string(widthBits(width) - Child(0, width));
+    ret->valStr = "((" + Cast(width, true) + ChildInfo(0, valStr) + " << " + shiftStr + ") >> " + shiftStr + ")";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsAsClock() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_asClock(ret->consVal, ChildInfo(0, consVal), Child(0, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " != 0)";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsAsSyncReset() {
+  TODO();
+}
+
+valInfo* ENode::instsCvt() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+
+  if (isConstant) {
+    (sign ? s_cvt : u_cvt)(ret->consVal, ChildInfo(0, consVal), Child(0, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + Cast(width, sign) + ChildInfo(0, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + 1; // may keep same ?
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsNeg() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+
+  if (isConstant) {
+    if (!sign) TODO();
+    s_neg(ret->consVal, ChildInfo(0, consVal), Child(0, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    /* cast explicitly only if type do not match or argument is UInt */
+    std::string castStr = (typeCmp(width, Child(0, width)) > 0 || !getChild(0)->sign) ? Cast(width, sign) : "";
+    ret->valStr = "(-" + castStr + ChildInfo(0, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsNot() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_not(ret->consVal, ChildInfo(0, consVal), Child(0, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " ^ " + bitMask(Child(0, width)) + ")";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsAndr() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_andr(ret->consVal, ChildInfo(0, consVal), Child(0, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " == " + bitMask(Child(0, width)) + ")";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsOrr() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_orr(ret->consVal, ChildInfo(0, consVal), Child(0, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " != 0 )";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsXorr() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = Child(0, width) <= BASIC_WIDTH || Child(1, width) <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_xorr(ret->consVal, ChildInfo(0, consVal), Child(0, width));
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(__builtin_parity(" + ChildInfo(0, valStr) + ") & 1)";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsPad() {
+  /* no operation for UInt variable */
+  if (!sign || (width <= Child(0, width))) {
+    return getChild(0)->computeInfo;
+  }
+  /* SInt padding */
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = Child(0, width) <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+
+  if (isConstant) {
+    (sign ? s_pad : u_pad)(ret->consVal, ChildInfo(0, consVal), Child(0, width), values[0]);  // n(values[0]) == width
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    std::string operandName;
+    if (ChildInfo(0, opNum) == 0) operandName = ChildInfo(0, valStr);
+    else {
+      operandName = newLocalTmp();
+      std::string tmp_def = widthType(Child(0, width), sign) + " TMP$" + std::to_string(localTmpNum ++) + " = " + ChildInfo(0, valStr) + ";";
+      ret->insts.push_back(tmp_def);
     }
-    if (nodeEnd) {
-      deleteAndPop();
-      topValid = false;
+    int shiftBits = widthBits(width) - Child(0, width);
+    std::string lshiftVal = "(" + Cast(width, true) + operandName + " << " + std::to_string(shiftBits) + ")";
+    std::string signExtended = "(" + lshiftVal + " >>" + std::to_string(shiftBits) + ")";
+    ret->valStr = "(" + signExtended + " & " + bitMask(width) + ")";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsShl() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = Child(0, width) <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+  int n = values[0];
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_shl(ret->consVal, ChildInfo(0, consVal), Child(0, width), n);
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + upperCast(width, Child(0, width), sign) + ChildInfo(0, valStr) + " << " + std::to_string(n) + ")";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsShr() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = Child(0, width) <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+  int n = values[0];
+
+  if (isConstant) {
+    (sign ? s_shr : u_shr)(ret->consVal, ChildInfo(0, consVal), Child(0, width), values[0]);  // n(values[0]) == width
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " >> " + std::to_string(n) + ")";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+/*
+  trancate the n least significant bits
+  different from tail operantion defined in firrtl spec (changed in inferWidth)
+*/
+valInfo* ENode::instsHead() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = Child(0, width) <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+  int n = Child(0, width) - values[0];
+  Assert(n > 0, "child width %d is less than current width %d", Child(0, width), values[0]);
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_head(ret->consVal, ChildInfo(0, consVal), Child(0, width), values[0]);
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    if (Child(0, sign)) {
+      ret->valStr = "(" + Cast(width, sign) + ChildInfo(0, valStr) + " >> " + std::to_string(n) + ")";
+    }  else {
+      ret->valStr = "(" + ChildInfo(0, valStr) + " >> " + std::to_string(n) + ")";
     }
-    return;
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+/*
+  remain the n least significant bits
+  different from tail operantion defined in firrtl spec (changed in inferWidth)
+*/
+valInfo* ENode::instsTail() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = Child(0, width) <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+  int n = values[0];
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_tail(ret->consVal, ChildInfo(0, consVal), Child(0, width), n); // u_tail remains the last n bits
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    if (Child(0, sign)) {
+      ret->valStr = "(" + Cast(width, sign) + ChildInfo(0, valStr) + " & " + bitMask(n) + ")";
+    }  else {
+      ret->valStr = "(" + ChildInfo(0, valStr) + " & " + bitMask(n) + ")";
+    }
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsBits() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = Child(0, width) <= BASIC_WIDTH;
+  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+  
+  int hi = values[0];
+  int lo = values[1];
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_bits(ret->consVal, ChildInfo(0, consVal), Child(0, width), hi, lo);
+    ret->setConsStr();
+  } else if (childBasic && enodeBaisc) {
+    std::string shift;
+    if (Child(0, sign)) {
+      shift = "(" + Cast(width, sign) + ChildInfo(0, valStr) + " >> " + std::to_string(lo) + ")";
+    }  else {
+      shift = "(" + ChildInfo(0, valStr) + " >> " + std::to_string(lo) + ")";
+    }
+    ret->valStr = "(" + shift + " & " + bitMask(hi - lo + 1) + ")";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
+valInfo* ENode::instsIndexInt() {
+  valInfo* ret = new valInfo();
+
+  Assert(width <= BASIC_WIDTH, "index width %d > BASIC_WIDTH", width);
+  ret->opNum = 0;
+  ret->valStr = "[" + std::to_string(values[0]) + "]";
+  return ret;
+}
+
+valInfo* ENode::instsIndex() {
+  valInfo* ret = new valInfo();
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+  
+  Assert(width <= BASIC_WIDTH, "index width %d > BASIC_WIDTH", width);
+  ret->opNum = ChildInfo(0, opNum);
+  ret->valStr = "[" + ChildInfo(0, valStr) + "]";
+  return ret;
+}
+
+valInfo* ENode::instsInt() {
+  valInfo* ret = new valInfo();
+  std::string str;
+  int base;
+  std::tie(base, str) = firStrBase(strVal);
+  ret->setConstantByStr(str, base);
+  ret->opNum = 0;
+  return ret;
+}
+
+valInfo* ENode::instsPrintf() {
+  valInfo* ret = new valInfo();
+  ret->status = VAL_FINISH;
+  std::string printfInst = "if(" + ChildInfo(0, valStr) +  ") printf(" + strVal;
+  for (int i = 1; i < getChildNum(); i ++) {
+    if (Child(i, width) > BASIC_WIDTH) TODO();
+    printfInst += ", " + ChildInfo(i, valStr);
+  }
+  printfInst += ");";
+
+  if (ChildInfo(0, status) != VAL_CONSTANT || ChildInfo(0, valStr) != "0x0") {
+    ret->insts.push_back(printfInst);
   }
 
-  int prevIdx = node->workingVal->operands.size() - 1;
-  bool indexEnd = false;
-  bool rindexBegin = true;
-  std::vector<std::string> index;
-  for (int i = node->workingVal->ops.size() - 1; i >= 0; i--) {
-    if (!node->workingVal->ops[i]) {
-      if (!topValid && ! stmtValid) {
-        setPrev(node, prevIdx);
-      }
-      topValid = false;
-      stmtValid = false;
-      valSize += 1;
-      int delta = interVals.size() - valSize;
-      Assert(delta >= 0, "interVals.size(%ld) < valSize(%d) %s %d", interVals.size(), valSize, node->name.c_str(), i);
-      if (delta > 0) {
-        combineVal(delta);
-      }
-      continue;
-    }
-    switch (node->workingVal->ops[i]->type) {
-      case P_1EXPR1INT: insts_1expr1int(node, i, prevIdx, nodeEnd); break;
-      case P_1EXPR2INT: insts_1expr2int(node, i, prevIdx, nodeEnd); break;
-      case P_2EXPR: insts_2expr(node, i, prevIdx, nodeEnd); valSize -= 1; break;
-      case P_1EXPR: insts_1expr(node, i, prevIdx, nodeEnd); break;
-      case P_EXPR_MUX: insts_mux(node, i, prevIdx, nodeEnd, false); valSize -= 2; break;
-      case P_EXPR_INT_INIT: insts_intInit(node, i); break;
-      case P_PRINTF: insts_printf(node, i, prevIdx); break;
-      case P_ASSERT: insts_assert(node, i, prevIdx); break;
-      case P_WHEN : insts_when(node, i, prevIdx, nodeEnd); valSize -= 2; break;
-      case P_INDEX : rindexBegin = insts_index(node, i, prevIdx, rindexBegin); valSize -=1; break;
-      case P_CONS_INDEX : rindexBegin = insts_cons_index(node, i, prevIdx, rindexBegin); break;
-      case P_L_INDEX: indexEnd = insts_l_index(node, i, prevIdx, index); valSize -=1; break;
-      case P_L_CONS_INDEX: indexEnd = insts_l_cons_index(node, i, prevIdx, index); break;
-      default: Assert(0, "Invalid op(%s) with type %d\n", node->workingVal->ops[i]->name.c_str(), node->workingVal->ops[i]->type);
-    }
+  return ret;
+}
 
-    if (indexEnd) {
-      if(!topValid) setPrev(node, prevIdx);
-      std::string newValue = node->name;
-      for (int i = index.size() - 1; i >= 0; i --) newValue += "[" + index[i] + "]";
-      Assert(interVals.size() > 0, "empty interVals in node %s\n", node->name.c_str());
-      if (node->width <= BASIC_WIDTH && interVals.back()->width <= BASIC_WIDTH) {
-        interVals.back()->value = newValue + " = " + interVals.back()->value;
-      } else if (node->width <= BASIC_WIDTH) {
-
-        std::string firstHalf = "mpz_getlimbn(" + interVals.back()->value + ", 1)";
-        std::string secondHalf = "mpz_get_ui(" + interVals.back()->value + ")";
-        interVals.back()->value = newValue + " = mpz_size(" + interVals.back()->value + ") == 1 ? "
-                               + secondHalf + " : ((uint128_t)" + firstHalf + " << 64 | " + secondHalf + ")";
+valInfo* ENode::instsAssert() {
+  valInfo* ret = new valInfo();
+  ret->status = VAL_FINISH;
+  std::string predStr = ChildInfo(0, valStr);
+  std::string enStr = ChildInfo(1, valStr);
+  std::string assertInst;
+  if (ChildInfo(0, status) == VAL_CONSTANT) { // pred is constant
+    if (predStr == "0x0") {
+      if (ChildInfo(1, status) == VAL_CONSTANT) {
+        assertInst = enStr == "0x0" ? "" : ("Assert(true, " + strVal + ");");
       } else {
-        if (interVals.back()->isCons) {
-          if (interVals.back()->value.length() <= 18)
-            interVals.back()->value = "mpz_set_ui(" + newValue + ", " + interVals.back()->value + ")";
-          else
-            interVals.back()->value = "mpz_set_str(" + newValue + ", \"" + interVals.back()->value.substr(2) + "\", 16)";
-        }
-        else
-          interVals.back()->value = "mpz_set(" + newValue + ", " + interVals.back()->value + ")";
+        assertInst = "Assert(!" + enStr + ", " + strVal + ");";
       }
-      indexEnd = false;
-      index.erase(index.begin(), index.end());
-      topValid = false;
-      stmtValid = true;
+    } else { // pred is always satisfied
+      assertInst = "";
     }
+  } else if (ChildInfo(1, status) == VAL_CONSTANT) { // en is constant pred is not constant
+    if (enStr == "0x0") assertInst = "";
+    else {
+      assertInst = "Assert(" + predStr + ", " + strVal + ");";
+    }
+  } else {
+    assertInst = "Assert(!" + enStr + " || " + predStr + ", " + strVal + ");";
+  }
+  
+  if (assertInst.length() != 0) ret->insts.push_back(assertInst);
 
-  }
-  int delta = interVals.size() - valSize - 1;
-  Assert(delta >= 0, "interVals.size(%ld) < valSize(%d)", interVals.size(), valSize);
-
-  if (delta > 0) {
-    combineVal(delta);
-  }
-  if (nodeEnd) {
-    if(stmtValid || delta > 0) node->insts.push_back(interVals.back()->value + ";");  // insts may added in visitWhen
-    deleteAndPop();
-    // valSize --;
-    topValid = false;
-    stmtValid = false;
-    Assert(interVals.size() == 0 && valSize == 0, "interVals %ld valSize %d in node %s\n", interVals.size(), valSize, node->name.c_str());
-  }
+  return ret;
 }
 
-void computeNode(Node* node, bool nodeEnd) {
-  // std::cout << "compute " << node->name << "(" << node->width << ") " << nodeEnd << " " << node->status << " " << node->type << std::endl;
-  if (node->status == CONSTANT_NODE && node->dimension.size() == 0) {
-    Assert(node->workingVal->consVal.length() > 0, "consVal is not set in node %s\n", node->name.c_str());
-    return;
+/* compute enode */
+valInfo* ENode::compute(Node* n) {
+  if (computeInfo) return computeInfo;
+  for (ENode* childNode : child) {
+    if (childNode) childNode->compute(n);
   }
-  if (node->dimension.size() != 0) {
-    computeArray(node, nodeEnd);
-    node->set_compute("INVALID_ARRAY", -1);
-    return;
-  }
-  if (node->workingVal->ops.size() == 0 && node->workingVal->operands.size() == 0) {
-    node->set_compute("INVALID_EMPTY", -1);
-    return;
+  if (nodePtr) {
+    computeInfo = nodePtr->compute();
+    if (child.size() != 0) {
+      valInfo* indexInfo = computeInfo->dup();
+      computeInfo = indexInfo;
+      computeInfo->valStr += child[0]->computeInfo->valStr;
+    }
+    return computeInfo;
   }
 
-  int prevIdx = node->workingVal->operands.size() - 1;
-  bool rindexBegin = true;
-  for (int i = node->workingVal->ops.size() - 1; i >= 0; i--) {
-    if (!node->workingVal->ops[i]) {
-      if (!topValid) setPrev(node, prevIdx);
-      topValid = false;
-      continue;
-    }
-    switch (node->workingVal->ops[i]->type) {
-      case P_1EXPR1INT: insts_1expr1int(node, i, prevIdx, nodeEnd); break;
-      case P_1EXPR2INT: insts_1expr2int(node, i, prevIdx, nodeEnd); break;
-      case P_2EXPR: insts_2expr(node, i, prevIdx, nodeEnd); break;
-      case P_1EXPR: insts_1expr(node, i, prevIdx, nodeEnd); break;
-      case P_EXPR_MUX: insts_mux(node, i, prevIdx, nodeEnd, false); break;
-      case P_EXPR_INT_INIT: insts_intInit(node, i); break;
-      case P_PRINTF: insts_printf(node, i, prevIdx); break;
-      case P_ASSERT: insts_assert(node, i, prevIdx); break;
-      case P_WHEN : node->workingVal->ops[i]->width = node->opBits[i] = node->width;
-                    insts_mux(node, i, prevIdx, nodeEnd, false); break;
-      case P_INDEX : rindexBegin = insts_index(node, i, prevIdx, rindexBegin); break;
-      case P_CONS_INDEX : rindexBegin = insts_cons_index(node, i, prevIdx, rindexBegin); break;
-      case P_L_CONS_INDEX: continue;
-      // case P_L_INDEX: insts_l_index(node, i, prevIdx); break;
-      default: Assert(0, "Invalid op(%s) with type %d\n", node->workingVal->ops[i]->name.c_str(), node->workingVal->ops[i]->type);
-    }
+  valInfo* ret = nullptr;
+  switch(opType) {
+    case OP_ADD: ret = instsAdd(); break;
+    case OP_SUB: ret = instsSub(); break;
+    case OP_MUL: ret = instsMul(); break;
+    case OP_DIV: ret = instsDIv(); break;
+    case OP_REM: ret = instsRem(); break;
+    case OP_LT:  ret = instsLt(); break;
+    case OP_LEQ: ret = instsLeq(); break;
+    case OP_GT:  ret = instsGt(); break;
+    case OP_GEQ: ret = instsGeq(); break;
+    case OP_EQ:  ret = instsEq(); break;
+    case OP_NEQ: ret = instsNeq(); break;
+    case OP_DSHL: ret = instsDshl(); break;
+    case OP_DSHR: ret = instsDshr(); break;
+    case OP_AND: ret = instsAnd(); break;
+    case OP_OR:  ret = instsOr(); break;
+    case OP_XOR: ret = instsXor(); break;
+    case OP_CAT: ret = instsCat(); break;
+    case OP_ASUINT: ret = instsAsUInt(); break;
+    case OP_ASSINT: ret = instsAsSInt(); break;
+    case OP_ASCLOCK: ret = instsAsClock(); break;
+    case OP_ASASYNCRESET: ret = instsAsSyncReset(); break;
+    case OP_CVT: ret = instsCvt(); break;
+    case OP_NEG: ret = instsNeg(); break;
+    case OP_NOT: ret = instsNot(); break;
+    case OP_ANDR: ret = instsAndr(); break;
+    case OP_ORR: ret = instsOrr(); break;
+    case OP_XORR: ret = instsXorr(); break;
+    case OP_PAD: ret = instsPad(); break;
+    case OP_SHL: ret = instsShl(); break;
+    case OP_SHR: ret = instsShr(); break;
+    case OP_HEAD: ret = instsHead(); break;
+    case OP_TAIL: ret = instsTail(); break;
+    case OP_BITS: ret = instsBits(); break;
+    case OP_INDEX_INT: ret = instsIndexInt(); break;
+    case OP_INDEX: ret = instsIndex(); break;
+    case OP_MUX: ret = instsMux(); break;
+    case OP_WHEN: ret = instsWhen(n); break;
+    case OP_INT: ret = instsInt(); break;
+    case OP_PRINTF: ret = instsPrintf(); break;
+    case OP_ASSERT: ret = instsAssert(); break;
+    default:
+      Panic();
   }
-  if (!topValid) {
-    setPrev(node, prevIdx);
-    if (nodeEnd) {
-      if (node->width > BASIC_WIDTH && interVals.back()->width > BASIC_WIDTH) {
-        node->insts.push_back("mpz_set(" + node->name + ", " + interVals.back()->value + ");");
-      } else if (node->width > BASIC_WIDTH && interVals.back()->width <= BASIC_WIDTH) {
-        node->insts.push_back("mpz_set_ui(" + node->name + ", " + interVals.back()->value + ");");
-      } else if (node->width <= BASIC_WIDTH && interVals.back()->width > BASIC_WIDTH) {
-        node->insts.push_back(node->name + " = mpz_get_ui(" + interVals.back()->value + ");");
+  computeInfo = ret;
+  return ret;
+
+}
+/*
+  compute node
+*/
+valInfo* Node::compute() {
+  if (computeInfo) return computeInfo;
+  if (isArray()) return computeArray();
+
+  if (!valTree) {
+    computeInfo = new valInfo();
+    computeInfo->valStr = name;
+    return computeInfo;
+  }
+  Assert(valTree && valTree->getRoot(), "empty valTree in node %s", name.c_str());
+  valInfo* ret = valTree->getRoot()->compute(this)->dup();
+  if (ret->status == VAL_CONSTANT) {
+    status = CONSTANT_NODE;
+  } else {
+    ret->valStr = name;
+  }
+  computeInfo = ret;
+  for (std::string inst : valTree->getRoot()->computeInfo->insts) insts.push_back(inst);
+  return ret;
+}
+
+
+valInfo* Node:: computeArray() {
+  if (computeInfo) return computeInfo;
+
+  for (ExpTree* tree : arrayVal) {
+    valInfo* info = tree->getRoot()->compute(this);
+    for (std::string inst : info->insts) insts.push_back(inst);
+  }
+  computeInfo = new valInfo();
+  computeInfo->valStr = name;
+  return computeInfo;
+}
+
+void graph::instsGenerator() {
+  for (SuperNode* super : sortedSuper) {
+    localTmpNum = 0;
+    for (Node* n : super->member) {
+      if (n->dimension.size() != 0) {
+        n->computeArray();
       } else {
-        node->insts.push_back(VAR_NAME(node) + " = " + interVals.back()->value + ";");
-      }
-    }
-  }
-  if (nodeEnd) node->set_compute(node->name, 1);
-  else {
-    if (node->width > BASIC_WIDTH && interVals.back()->width > BASIC_WIDTH) {
-        node->set_compute(interVals.back()->value, interVals.back()->opNum);
-    } else if (node->width > BASIC_WIDTH && interVals.back()->width <= BASIC_WIDTH) {
-        std::string name = NEW_TMP;
-        // if (node->status != CONSTANT_NODE) node->insts.push_back("mpz_set_ui(" + name + ", " + interVals.back()->value + ");");
-        // node->set_compute(name);
-        node->set_compute(interVals.back()->value, interVals.back()->opNum);
-    } else if (node->width <= BASIC_WIDTH && interVals.back()->width > BASIC_WIDTH) {
-        // if (node->status != CONSTANT_NODE) node->insts.push_back(LocalType(node->width, node->sign) + " " + node->name + " = mpz_get_ui(" + interVals.back()->value + ");");
-        // node->set_compute(node->name);
-        node->set_compute("mpz_get_ui(" + interVals.back()->value + ")", 1);
-    } else {
-        // if (node->status != CONSTANT_NODE) node->insts.push_back(LocalType(node->width, node->sign) + " " + VAR_NAME(node) + " = " + interVals.back()->value + ";");
-        // node->set_compute(node->name);
-        node->set_compute(interVals.back()->value, interVals.back()->opNum);
-    }
-  }
-  // Assert(!interVals.back()->isCons, "Invalid constant %s in node %s\n", interVals.back()->value.c_str(), node->name.c_str());
-  deleteAndPop();
-  topValid = false;
-
-}
-
-void instsGenerator(graph* g) {
-  Node* tmp;
-  std::string tmpStr;
-  int oldStatus;
-  for (size_t i = 0; i < g->sorted.size(); i++) {
-    if (g->sorted[i]->status == CONSTANT_NODE) continue;
-
-    switch (g->sorted[i]->type) {
-      case NODE_READER:
-      case NODE_WRITER: {
-        for (Node* node : g->sorted[i]->member) {
-          if (node->status == CONSTANT_NODE) continue;
-          computeNode(node, true);
-        }
-        break;
-      }
-      case NODE_REG_DST:
-        if (g->sorted[i]->resetCond->consVal.length() == 0) {
-          g->sorted[i]->workingVal = g->sorted[i]->resetVal;
-          tmpStr = g->sorted[i]->name;
-          oldStatus = g->sorted[i]->status;
-          g->sorted[i]->name = g->sorted[i]->regNext->name;
-          computeNode(g->sorted[i], true);
-          Assert(g->sorted[i]->resetCond->operands.size() == 1, "reset is not input for node %s\n", g->sorted[i]->name.c_str());
-          tmp = g->sorted[i]->resetCond->operands[0];
-          tmp->insts.insert(tmp->insts.end(), g->sorted[i]->insts.begin(), g->sorted[i]->insts.end());
-          if (g->sorted[i]->workingVal->consVal.length() != 0) {
-            if (g->sorted[i]->dimension.size() == 0) {
-              tmp->insts.push_back(g->sorted[i]->name + " = " + consVal128(g->sorted[i]->workingVal->consVal) + ";");
-            } else {
-              tmp->insts.push_back(consValArray(g->sorted[i], g->sorted[i]->workingVal->consVal, g->sorted[i]->entryNum) + ";");
+        if (!n->valTree) continue;
+        n->compute();
+        valInfo* assignInfo = n->valTree->getRoot()->computeInfo;
+        if (n->width <= BASIC_WIDTH) {
+          if (assignInfo->status == VAL_VALID) {
+            if (assignInfo->opNum < 0) {
+              n->insts.push_back(assignInfo->valStr);
+            } else if (assignInfo->opNum > 0 || assignInfo->valStr != n->name) {
+              n->insts.push_back(n->name + " = " + assignInfo->valStr + ";");
             }
           }
-          g->sorted[i]->insts.erase(g->sorted[i]->insts.begin(), g->sorted[i]->insts.end());
-          g->sorted[i]->workingVal = g->sorted[i]->value;
-          g->sorted[i]->name = tmpStr;
-          g->sorted[i]->status = oldStatus;
+        } else {
+          TODO();
         }
-      default: computeNode(g->sorted[i], true);
+      }
     }
-
-    g->maxTmp = MAX(tmpIdx, g->maxTmp);
-    tmpIdx    = 0;
-  }
-
-  for (Node* node : g->active) {
-    computeNode(node, true);
-    g->maxTmp = MAX(tmpIdx, g->maxTmp);
-    tmpIdx    = 0;
   }
 }
