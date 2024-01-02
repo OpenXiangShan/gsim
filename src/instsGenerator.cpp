@@ -70,11 +70,6 @@ static std::string bitMask(int width) {
   return ret;
 }
 
-valInfo* ENode::computeConstant() {
-  TODO();
-}
-
-
 valInfo* ENode::instsMux() {
   /* cond is constant */
   if (ChildInfo(0, status) == VAL_CONSTANT) {
