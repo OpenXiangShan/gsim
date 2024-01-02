@@ -125,9 +125,9 @@ void graph::genSrcEnd(FILE* fp) {
 
 void graph::genNodeInsts(FILE* fp, Node* node) {
   std::string ret;
-  if (node->valTree) {
+  if (node->insts.size()) {
     /* save oldVal */
-    if (node->next.size() != 0) {
+    if (node->next.size() != 0 && node->dimension.size() == 0) {
       if (node->width > BASIC_WIDTH) {
         fprintf(fp, "mpz_set(%s, %s);\n", oldMpz(node).c_str(), node->name.c_str());
       } else {
@@ -170,8 +170,10 @@ void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
 }
 
 void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
-  for (Node* member : node->member)
-    activateNext(fp, member, oldName(member));
+  for (Node* member : node->member) {
+    if(member->dimension.size() == 0) activateNext(fp, member, oldName(member));
+    else activateUncondNext(fp, member);
+  }
 #ifdef EMU_LOG
   for (Node* member : node->member) {
     if (member->width > 64 && member->width <= 128) {
@@ -243,7 +245,7 @@ void graph::genStep(FILE* fp) {
 
 bool SuperNode::instsEmpty() {
   for (Node* n : member) {
-    if (n->valTree && n->insts.size() != 0) return false;
+    if (n->insts.size() != 0) return false;
   }
   return true;
 }

@@ -194,6 +194,9 @@ public:
     void setRoot(ENode* _root) {
       root = _root;
     }
+    ENode* getlval() {
+      return lvalue;
+    }
     void display();
     
 };

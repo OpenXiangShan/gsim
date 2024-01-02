@@ -1,6 +1,5 @@
 /*
   Generate design graph (the intermediate representation of the input circuit) from AST
-  the width and sign of leaves are set, while those of the internal are set later
 */
 
 

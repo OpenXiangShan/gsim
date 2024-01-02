@@ -91,3 +91,14 @@ int upperPower2(int x) {
 int upperLog2(int x) {
   return (32 - __builtin_clz(x - 1));
 }
+
+std::string format(const char *fmt, ...) {
+  char buf[256];
+  va_list args;
+  va_start(args, fmt);
+  std::vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  std::string ret = buf;
+  Assert(ret.length() < sizeof(buf), "require larger buf");
+  return ret;
+}

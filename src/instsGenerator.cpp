@@ -1002,13 +1002,22 @@ valInfo* Node::compute() {
 
 valInfo* Node:: computeArray() {
   if (computeInfo) return computeInfo;
-
-  for (ExpTree* tree : arrayVal) {
-    valInfo* info = tree->getRoot()->compute(this);
-    for (std::string inst : info->insts) insts.push_back(inst);
-  }
   computeInfo = new valInfo();
   computeInfo->valStr = name;
+
+  if (width > BASIC_WIDTH) TODO();
+  for (ExpTree* tree : arrayVal) {
+    valInfo* info = tree->getRoot()->compute(this, false);
+    for (std::string inst : info->insts) insts.push_back(inst);
+    valInfo* lindex = nullptr;
+    if (tree->getlval()) {
+      lindex = tree->getlval()->compute(this, false);
+      insts.push_back(format("%s = %s;", lindex ? lindex->valStr.c_str() : "", info->valStr.c_str()));
+      std::cout << name << " ]= " << format("%s = %s;", lindex ? lindex->valStr.c_str() : "", info->valStr.c_str()) << std::endl;
+    } else {
+      TODO();
+    }
+  }
   return computeInfo;
 }
 
