@@ -354,14 +354,14 @@ valInfo* ENode::instsDshl() {
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
   bool childBasic = getChild(0)->width <= BASIC_WIDTH && getChild(1)->width <= BASIC_WIDTH;
-  bool enodeBaisc = width <= BASIC_WIDTH;
+  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
     if (sign) TODO();
     u_dshl(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBaisc) {
+  } else if (childBasic && enodeBasic) {
     ret->valStr = "(" + upperCast(width, Child(0, width), sign) + ChildInfo(0, valStr) + " << " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   } else {
