@@ -98,7 +98,7 @@ valInfo* ENode::instsWhen(Node* node) {
     else return getChild(1) ? getChild(1)->computeInfo : new valInfo();
   }
   /* not constant */
-  bool childBasic = Child(1, width) <= BASIC_WIDTH && Child(2, width) <= BASIC_WIDTH;
+  bool childBasic = (!getChild(1) || Child(1, width) <= BASIC_WIDTH) && (!getChild(2) || Child(2, width) <= BASIC_WIDTH);
   bool enodeBasic = width <= BASIC_WIDTH;
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) {
