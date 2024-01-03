@@ -1,5 +1,5 @@
 #include <iostream>
-#include <Exp1AllTest.h>
+#include MOD_HEADER
 
 MOD_NAME* mod;
 

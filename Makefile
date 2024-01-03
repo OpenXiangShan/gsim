@@ -64,7 +64,7 @@ REF_GSIM_DIR = $(EMU_DIR)/obj_$(DIFF_VERSION)
 REF_GSIM_SRCS = $(REF_GSIM_DIR)/top_ref.cpp
 REF_GSIM_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(REF_GSIM_SRCS:.cpp=.o))
 
-GSIM_CFLAGS = -O3 $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME)
+GSIM_CFLAGS = -O3 $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME) -DMOD_HEADER=\"$(NAME).h\"
 
 mainargs = ready-to-run/bin/linux-NutShell.bin
 # mainargs = ready-to-run/bin/bbl-hello.bin
