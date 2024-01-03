@@ -176,20 +176,31 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
   }
 #ifdef EMU_LOG
   for (Node* member : node->member) {
-    if (member->width > 64 && member->width <= 128) {
+    if (member->dimension.size() != 0) {
+      fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" ;\n", validSuper[node], member->name.c_str());
+      std::string idxStr, bracket;
+      for (size_t i = 0; i < member->dimension.size(); i ++) {
+        fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, member->dimension[i], i);
+        idxStr += "[i" + std::to_string(i) + "]";
+        bracket += "}\n";
+      }
+      fprintf(fp, "std::cout << std::hex << +(uint64_t)%s%s << \" \";", member->name.c_str(), idxStr.c_str());
+      fprintf(fp, "\n%s", bracket.c_str());
+      fprintf(fp, "std::cout << std::endl;\n");
+    } else if (member->width > 64 && member->width <= 128) {
       if (member->next.size() != 0) // display old value and new value
-        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\"  << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s  << \
+        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s  << \
                     \" -> \" << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s << std::endl;\n",
                 validSuper[node], member->name.c_str(), oldName(member).c_str(), oldName(member).c_str(), member->name.c_str(), member->name.c_str());
       else if (member->type != NODE_SPECIAL) {
-        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s << std::endl;\n",
+        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s << std::endl;\n",
             validSuper[node], member->name.c_str(), member->name.c_str(), member->name.c_str());
       }
     } else {
       if (member->next.size() != 0) // display old value and new value
-        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\"  << +%s << \" -> \" << +%s << std::endl;\n", validSuper[node], member->name.c_str(), oldName(member).c_str(), member->name.c_str());
+        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << +%s << \" -> \" << +%s << std::endl;\n", validSuper[node], member->name.c_str(), oldName(member).c_str(), member->name.c_str());
       else if (member->type != NODE_SPECIAL) {
-        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << +%s << std::endl;\n", validSuper[node], member->name.c_str(), member->name.c_str());
+        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << +%s << std::endl;\n", validSuper[node], member->name.c_str(), member->name.c_str());
       }
     }
   }
