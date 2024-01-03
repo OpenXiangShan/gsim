@@ -214,6 +214,7 @@ public:
     _next->prev.insert(this);
   }
   bool instsEmpty();
+  void display();
 };
 
 #endif

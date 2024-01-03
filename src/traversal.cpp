@@ -78,3 +78,10 @@ void graph::traversal() {
     }
   }
 }
+
+void SuperNode::display() {
+   printf("----super %d----:\n", id);
+  for (Node* node : member) {
+    printf("node %s[width %d]:\n", node->name.c_str(), node->width);
+  }
+}

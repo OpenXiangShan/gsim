@@ -30,12 +30,12 @@ void graph::detectLoop() {
           states[next] = NOT_VISIT;
         } else if (states[next] == EXPANDED) { // find an expanded loop
           printf("Detect Loop:\n");
-          printf("  %s\n", next->name.c_str());
+          next->display();
           while (!s.empty()) {
             SuperNode* n = s.top();
             s.pop();
             // display all expanded nodes until n
-            if (states[n] == EXPANDED) printf("  %s\n", n->name.c_str());
+            if (states[n] == EXPANDED) n->display();
             if (n == next) Assert(0, "-------");
           }
         }
