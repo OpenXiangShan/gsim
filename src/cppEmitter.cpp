@@ -56,7 +56,12 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   fprintf(header, "S%s() {\n", name.c_str());
   /* some initialization */
   fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags[i] = true;\n", superId);
+  for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_init(MPZ_TMP$%d);\n", i);
   fprintf(header, "}\n");
+
+  /* mpz variable used for intermidia values */
+  fprintf(header, "mpz_t oldValMpz;\n");
+  for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_t MPZ_TMP$%d;\n", i);
 
   fprintf(header, "bool activeFlags[%d];\n", superId); // or super.size() if id == idx
 

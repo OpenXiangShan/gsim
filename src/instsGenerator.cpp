@@ -16,7 +16,9 @@
 #define ChildInfo(id, name) getChild(id)->computeInfo->name
 
 #define newLocalTmp() ("TMP$" + std::to_string(localTmpNum ++))
+#define newMpzTmp() ("MPZ_TMP$" + std::to_string(mpzTmpNum ++))
 static int localTmpNum = 0;
+static int mpzTmpNum = 0;
 
 static std::map<OPType, std::string> opMap = {
   {OP_ADD, " + "},
@@ -70,7 +72,19 @@ static std::string bitMask(int width) {
   return ret;
 }
 
-valInfo* ENode::instsMux() {
+static std::string setMpz(std::string dstName, ENode* enode) {
+  std::string ret;
+  if (enode->width > BASIC_WIDTH) {
+    ret = format("mpz_set(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
+  } else if (enode->width > 64) {
+    ret = format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
+  } else {
+    ret = format("mpz_set_ui(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
+  }
+  return ret;
+}
+
+valInfo* ENode::instsMux(Node* node, bool isRoot) {
   /* cond is constant */
   if (ChildInfo(0, status) == VAL_CONSTANT) {
     if (ChildInfo(0, valStr) == "0x0") return getChild(2)->computeInfo;
@@ -85,13 +99,20 @@ valInfo* ENode::instsMux() {
 
   if (childBasic && enodeBasic) {
     ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
+  } else if (!childBasic && !enodeBasic) {
+    std::string dstName = isRoot ? node->name : newMpzTmp();
+    std::string trueAssign = setMpz(dstName, getChild(1));
+    std::string falseAssign = setMpz(dstName, getChild(2));
+    ret->insts.push_back(format("if (%s) %s else %s", ChildInfo(0, valStr).c_str(), trueAssign.c_str(), falseAssign.c_str()));
+    ret->valStr = dstName;
+    ret->opNum = 0;
   } else {
     TODO();
   }
   return ret;
 }
 
-valInfo* ENode::instsWhen(Node* node) {
+valInfo* ENode::instsWhen(Node* node, bool isRoot) {
   /* cond is constant */
   if (getChild(0)->computeInfo->status == VAL_CONSTANT) {
     if (ChildInfo(0, valStr) == "0x0") return getChild(2) ? Child(2, computeInfo) : new valInfo();
@@ -120,7 +141,7 @@ valInfo* ENode::instsWhen(Node* node) {
   return ret;
 }
 
-valInfo* ENode::instsAdd() {
+valInfo* ENode::instsAdd(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -144,7 +165,7 @@ valInfo* ENode::instsAdd() {
   return ret;
 }
 
-valInfo* ENode::instsSub() {
+valInfo* ENode::instsSub(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -164,7 +185,7 @@ valInfo* ENode::instsSub() {
   return ret;
 }
 
-valInfo* ENode::instsMul() {
+valInfo* ENode::instsMul(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -184,7 +205,7 @@ valInfo* ENode::instsMul() {
   return ret;
 }
 
-valInfo* ENode::instsDIv() {
+valInfo* ENode::instsDIv(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -204,7 +225,7 @@ valInfo* ENode::instsDIv() {
   return ret;
 }
 
-valInfo* ENode::instsRem() {
+valInfo* ENode::instsRem(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -224,7 +245,7 @@ valInfo* ENode::instsRem() {
   return ret;
 }
 
-valInfo* ENode::instsLt() {
+valInfo* ENode::instsLt(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -244,7 +265,7 @@ valInfo* ENode::instsLt() {
   return ret;
 }
 
-valInfo* ENode::instsLeq() {
+valInfo* ENode::instsLeq(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -264,7 +285,7 @@ valInfo* ENode::instsLeq() {
   return ret;
 }
 
-valInfo* ENode::instsGt() {
+valInfo* ENode::instsGt(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -284,7 +305,7 @@ valInfo* ENode::instsGt() {
   return ret;
 }
 
-valInfo* ENode::instsGeq() {
+valInfo* ENode::instsGeq(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -304,7 +325,7 @@ valInfo* ENode::instsGeq() {
   return ret;
 }
 
-valInfo* ENode::instsEq() {
+valInfo* ENode::instsEq(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -318,13 +339,20 @@ valInfo* ENode::instsEq() {
   } else if (childBasic && enodeBaisc) {
     ret->valStr = "(" + ChildInfo(0, valStr) + " == " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else if (!childBasic && enodeBaisc) {
+    if (Child(0, width) > BASIC_WIDTH && Child(1, width) > BASIC_WIDTH) {
+      ret->valStr = format("(mpz_cmp(%s, %s) == 0)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
+      ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    } else {
+      TODO();
+    }
   } else {
     TODO();
   }
   return ret;
 }
 
-valInfo* ENode::instsNeq() {
+valInfo* ENode::instsNeq(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -344,7 +372,7 @@ valInfo* ENode::instsNeq() {
   return ret;
 }
 
-valInfo* ENode::instsDshl() {
+valInfo* ENode::instsDshl(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -359,13 +387,23 @@ valInfo* ENode::instsDshl() {
   } else if (childBasic && enodeBasic) {
     ret->valStr = "(" + upperCast(width, Child(0, width), sign) + ChildInfo(0, valStr) + " << " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else if (childBasic && !enodeBasic) {
+    std::string dstName = isRoot ? node->name : newMpzTmp();
+    if (Child(0, width) < 64 && Child(1, width) < 64) {
+      ret->insts.push_back(format("mpz_set_ui(%s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str()));
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %s);", dstName.c_str(), dstName.c_str(), ChildInfo(1, valStr).c_str()));
+      ret->valStr = dstName;
+      ret->opNum = 0;
+    } else {
+      TODO();
+    }
   } else {
     TODO();
   }
   return ret;
 }
 
-valInfo* ENode::instsDshr() {
+valInfo* ENode::instsDshr(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -385,7 +423,7 @@ valInfo* ENode::instsDshr() {
   return ret;
 }
 
-valInfo* ENode::instsAnd() {
+valInfo* ENode::instsAnd(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -406,7 +444,7 @@ valInfo* ENode::instsAnd() {
   return ret;
 }
 
-valInfo* ENode::instsOr() {
+valInfo* ENode::instsOr(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -427,7 +465,7 @@ valInfo* ENode::instsOr() {
   return ret;
 }
 
-valInfo* ENode::instsXor() {
+valInfo* ENode::instsXor(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -442,13 +480,22 @@ valInfo* ENode::instsXor() {
   } else if (childBasic && enodeBaisc) {
     ret->valStr = "(" + ChildInfo(0, valStr) + " ^ " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else if (!childBasic && !enodeBaisc) {
+    std::string dstName = isRoot ? node->name : newMpzTmp();
+    if (Child(0, width) > BASIC_WIDTH && Child(1, width) > BASIC_WIDTH) {
+      ret->insts.push_back(format("mpz_xor(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
+      ret->valStr = dstName;
+      ret->opNum = 0;
+    } else {
+      TODO();
+    }
   } else {
     TODO();
   }
   return ret;
 }
 
-valInfo* ENode::instsCat() {
+valInfo* ENode::instsCat(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -464,13 +511,52 @@ valInfo* ENode::instsCat() {
     std::string hi = "(" + upperCast(width, Child(0, width), false) + ChildInfo(0, valStr) + " << " + std::to_string(Child(1, width)) + ")";
     ret->valStr = "(" + hi + " | " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else if (childBasic && !enodeBaisc) { // child <= 128, cur > 128
+    Assert(ChildInfo(0, opNum) >= 0 && ChildInfo(1, opNum) >= 0, "invalid opNum (%d %s) (%d, %s)", ChildInfo(0, opNum), ChildInfo(0, valStr).c_str(), ChildInfo(1, opNum), ChildInfo(1, valStr).c_str());
+    std::string dstName = isRoot ? node->name : newMpzTmp();
+    /* set first value */
+    if (Child(0, width) > 64) {
+      std::string leftName = ChildInfo(0, valStr);
+      if (ChildInfo(0, opNum) > 0) {
+        leftName = newLocalTmp();
+        ret->insts.push_back(widthUType(Child(0, width)) + " " + leftName + " = " + ChildInfo(0, valStr) + ";");
+      }
+      /* import size = 2, least significant first, each 8B, host edian */
+      std::string setLeftInst = "mpz_import(" + dstName + ", 2, -1, 8, 0, 0, (mp_limb_t*)&" + leftName + ");";
+      ret->insts.push_back(setLeftInst);
+    } else {
+      ret->insts.push_back("mpz_set_ui(" + dstName + ", " + ChildInfo(0, valStr) + ");");
+    }
+    /* concat second value*/
+    if (Child(1, width) > 64) {
+      std::string rightName = ChildInfo(1, valStr);
+      if (ChildInfo(1, opNum) > 0) {
+        rightName = newLocalTmp();
+        ret->insts.push_back(format("%s %s = %s;", widthUType(Child(1, width)).c_str(), rightName.c_str(), ChildInfo(1, valStr).c_str()));
+      }
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), dstName.c_str(), Child(1, width) - 64));
+      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s >> 64);", dstName.c_str(), dstName.c_str(), rightName.c_str()));
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, 64);", dstName.c_str(), dstName.c_str()));
+      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), dstName.c_str(), rightName.c_str()));
+    } else {
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), dstName.c_str(), Child(1, width)));
+      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), dstName.c_str(), ChildInfo(1, valStr).c_str()));
+    }
+    ret->valStr = dstName;
+    ret->opNum = 0;
+  } else if (!childBasic && !enodeBaisc) { // child > 128, cur > 128
+    std::string dstName = isRoot ? node->name : newMpzTmp();
+    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), ChildInfo(0, valStr).c_str(), Child(1, width)));
+    ret->insts.push_back(format("mpz_add(%s, %s, %s);", dstName.c_str(), dstName.c_str(), ChildInfo(1, valStr).c_str()));
+    ret->valStr = dstName;
+    ret->opNum = 0;
   } else {
     TODO();
   }
   return ret;
 }
 
-valInfo* ENode::instsAsUInt() {
+valInfo* ENode::instsAsUInt(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -491,7 +577,7 @@ valInfo* ENode::instsAsUInt() {
   return ret;
 }
 
-valInfo* ENode::instsAsSInt() {
+valInfo* ENode::instsAsSInt(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -513,7 +599,7 @@ valInfo* ENode::instsAsSInt() {
   return ret;
 }
 
-valInfo* ENode::instsAsClock() {
+valInfo* ENode::instsAsClock(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -534,11 +620,11 @@ valInfo* ENode::instsAsClock() {
   return ret;
 }
 
-valInfo* ENode::instsAsSyncReset() {
+valInfo* ENode::instsAsSyncReset(Node* node, bool isRoot) {
   TODO();
 }
 
-valInfo* ENode::instsCvt() {
+valInfo* ENode::instsCvt(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -559,7 +645,7 @@ valInfo* ENode::instsCvt() {
   return ret;
 }
 
-valInfo* ENode::instsNeg() {
+valInfo* ENode::instsNeg(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -582,7 +668,7 @@ valInfo* ENode::instsNeg() {
   return ret;
 }
 
-valInfo* ENode::instsNot() {
+valInfo* ENode::instsNot(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -603,7 +689,7 @@ valInfo* ENode::instsNot() {
   return ret;
 }
 
-valInfo* ENode::instsAndr() {
+valInfo* ENode::instsAndr(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -624,7 +710,7 @@ valInfo* ENode::instsAndr() {
   return ret;
 }
 
-valInfo* ENode::instsOrr() {
+valInfo* ENode::instsOrr(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -645,7 +731,7 @@ valInfo* ENode::instsOrr() {
   return ret;
 }
 
-valInfo* ENode::instsXorr() {
+valInfo* ENode::instsXorr(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -666,7 +752,7 @@ valInfo* ENode::instsXorr() {
   return ret;
 }
 
-valInfo* ENode::instsPad() {
+valInfo* ENode::instsPad(Node* node, bool isRoot) {
   /* no operation for UInt variable */
   if (!sign || (width <= Child(0, width))) {
     return getChild(0)->computeInfo;
@@ -687,7 +773,7 @@ valInfo* ENode::instsPad() {
     if (ChildInfo(0, opNum) == 0) operandName = ChildInfo(0, valStr);
     else {
       operandName = newLocalTmp();
-      std::string tmp_def = widthType(Child(0, width), sign) + " TMP$" + std::to_string(localTmpNum ++) + " = " + ChildInfo(0, valStr) + ";";
+      std::string tmp_def = widthType(Child(0, width), sign) + " " + operandName + " = " + ChildInfo(0, valStr) + ";";
       ret->insts.push_back(tmp_def);
     }
     int shiftBits = widthBits(width) - Child(0, width);
@@ -701,7 +787,7 @@ valInfo* ENode::instsPad() {
   return ret;
 }
 
-valInfo* ENode::instsShl() {
+valInfo* ENode::instsShl(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -723,7 +809,7 @@ valInfo* ENode::instsShl() {
   return ret;
 }
 
-valInfo* ENode::instsShr() {
+valInfo* ENode::instsShr(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -747,7 +833,7 @@ valInfo* ENode::instsShr() {
   trancate the n least significant bits
   different from tail operantion defined in firrtl spec (changed in inferWidth)
 */
-valInfo* ENode::instsHead() {
+valInfo* ENode::instsHead(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -778,7 +864,7 @@ valInfo* ENode::instsHead() {
   remain the n least significant bits
   different from tail operantion defined in firrtl spec (changed in inferWidth)
 */
-valInfo* ENode::instsTail() {
+valInfo* ENode::instsTail(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -804,7 +890,7 @@ valInfo* ENode::instsTail() {
   return ret;
 }
 
-valInfo* ENode::instsBits() {
+valInfo* ENode::instsBits(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
@@ -834,7 +920,7 @@ valInfo* ENode::instsBits() {
   return ret;
 }
 
-valInfo* ENode::instsIndexInt() {
+valInfo* ENode::instsIndexInt(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
 
   Assert(width <= BASIC_WIDTH, "index width %d > BASIC_WIDTH", width);
@@ -843,7 +929,7 @@ valInfo* ENode::instsIndexInt() {
   return ret;
 }
 
-valInfo* ENode::instsIndex() {
+valInfo* ENode::instsIndex(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
   
@@ -853,7 +939,7 @@ valInfo* ENode::instsIndex() {
   return ret;
 }
 
-valInfo* ENode::instsInt() {
+valInfo* ENode::instsInt(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   std::string str;
   int base;
@@ -911,10 +997,10 @@ valInfo* ENode::instsAssert() {
 }
 
 /* compute enode */
-valInfo* ENode::compute(Node* n) {
+valInfo* ENode::compute(Node* n, bool isRoot) {
   if (computeInfo) return computeInfo;
   for (ENode* childNode : child) {
-    if (childNode) childNode->compute(n);
+    if (childNode) childNode->compute(n, false);
   }
   if (nodePtr) {
     computeInfo = nodePtr->compute();
@@ -928,44 +1014,44 @@ valInfo* ENode::compute(Node* n) {
 
   valInfo* ret = nullptr;
   switch(opType) {
-    case OP_ADD: ret = instsAdd(); break;
-    case OP_SUB: ret = instsSub(); break;
-    case OP_MUL: ret = instsMul(); break;
-    case OP_DIV: ret = instsDIv(); break;
-    case OP_REM: ret = instsRem(); break;
-    case OP_LT:  ret = instsLt(); break;
-    case OP_LEQ: ret = instsLeq(); break;
-    case OP_GT:  ret = instsGt(); break;
-    case OP_GEQ: ret = instsGeq(); break;
-    case OP_EQ:  ret = instsEq(); break;
-    case OP_NEQ: ret = instsNeq(); break;
-    case OP_DSHL: ret = instsDshl(); break;
-    case OP_DSHR: ret = instsDshr(); break;
-    case OP_AND: ret = instsAnd(); break;
-    case OP_OR:  ret = instsOr(); break;
-    case OP_XOR: ret = instsXor(); break;
-    case OP_CAT: ret = instsCat(); break;
-    case OP_ASUINT: ret = instsAsUInt(); break;
-    case OP_ASSINT: ret = instsAsSInt(); break;
-    case OP_ASCLOCK: ret = instsAsClock(); break;
-    case OP_ASASYNCRESET: ret = instsAsSyncReset(); break;
-    case OP_CVT: ret = instsCvt(); break;
-    case OP_NEG: ret = instsNeg(); break;
-    case OP_NOT: ret = instsNot(); break;
-    case OP_ANDR: ret = instsAndr(); break;
-    case OP_ORR: ret = instsOrr(); break;
-    case OP_XORR: ret = instsXorr(); break;
-    case OP_PAD: ret = instsPad(); break;
-    case OP_SHL: ret = instsShl(); break;
-    case OP_SHR: ret = instsShr(); break;
-    case OP_HEAD: ret = instsHead(); break;
-    case OP_TAIL: ret = instsTail(); break;
-    case OP_BITS: ret = instsBits(); break;
-    case OP_INDEX_INT: ret = instsIndexInt(); break;
-    case OP_INDEX: ret = instsIndex(); break;
-    case OP_MUX: ret = instsMux(); break;
-    case OP_WHEN: ret = instsWhen(n); break;
-    case OP_INT: ret = instsInt(); break;
+    case OP_ADD: ret = instsAdd(n, isRoot); break;
+    case OP_SUB: ret = instsSub(n, isRoot); break;
+    case OP_MUL: ret = instsMul(n, isRoot); break;
+    case OP_DIV: ret = instsDIv(n, isRoot); break;
+    case OP_REM: ret = instsRem(n, isRoot); break;
+    case OP_LT:  ret = instsLt(n, isRoot); break;
+    case OP_LEQ: ret = instsLeq(n, isRoot); break;
+    case OP_GT:  ret = instsGt(n, isRoot); break;
+    case OP_GEQ: ret = instsGeq(n, isRoot); break;
+    case OP_EQ:  ret = instsEq(n, isRoot); break;
+    case OP_NEQ: ret = instsNeq(n, isRoot); break;
+    case OP_DSHL: ret = instsDshl(n, isRoot); break;
+    case OP_DSHR: ret = instsDshr(n, isRoot); break;
+    case OP_AND: ret = instsAnd(n, isRoot); break;
+    case OP_OR:  ret = instsOr(n, isRoot); break;
+    case OP_XOR: ret = instsXor(n, isRoot); break;
+    case OP_CAT: ret = instsCat(n, isRoot); break;
+    case OP_ASUINT: ret = instsAsUInt(n, isRoot); break;
+    case OP_ASSINT: ret = instsAsSInt(n, isRoot); break;
+    case OP_ASCLOCK: ret = instsAsClock(n, isRoot); break;
+    case OP_ASASYNCRESET: ret = instsAsSyncReset(n, isRoot); break;
+    case OP_CVT: ret = instsCvt(n, isRoot); break;
+    case OP_NEG: ret = instsNeg(n, isRoot); break;
+    case OP_NOT: ret = instsNot(n, isRoot); break;
+    case OP_ANDR: ret = instsAndr(n, isRoot); break;
+    case OP_ORR: ret = instsOrr(n, isRoot); break;
+    case OP_XORR: ret = instsXorr(n, isRoot); break;
+    case OP_PAD: ret = instsPad(n, isRoot); break;
+    case OP_SHL: ret = instsShl(n, isRoot); break;
+    case OP_SHR: ret = instsShr(n, isRoot); break;
+    case OP_HEAD: ret = instsHead(n, isRoot); break;
+    case OP_TAIL: ret = instsTail(n, isRoot); break;
+    case OP_BITS: ret = instsBits(n, isRoot); break;
+    case OP_INDEX_INT: ret = instsIndexInt(n, isRoot); break;
+    case OP_INDEX: ret = instsIndex(n, isRoot); break;
+    case OP_MUX: ret = instsMux(n, isRoot); break;
+    case OP_WHEN: ret = instsWhen(n, isRoot); break;
+    case OP_INT: ret = instsInt(n, isRoot); break;
     case OP_PRINTF: ret = instsPrintf(); break;
     case OP_ASSERT: ret = instsAssert(); break;
     default:
@@ -988,7 +1074,7 @@ valInfo* Node::compute() {
     return computeInfo;
   }
   Assert(valTree && valTree->getRoot(), "empty valTree in node %s", name.c_str());
-  valInfo* ret = valTree->getRoot()->compute(this)->dup();
+  valInfo* ret = valTree->getRoot()->compute(this, true)->dup();
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
   } else {
@@ -1013,7 +1099,6 @@ valInfo* Node:: computeArray() {
     if (tree->getlval()) {
       lindex = tree->getlval()->compute(this, false);
       insts.push_back(format("%s = %s;", lindex ? lindex->valStr.c_str() : "", info->valStr.c_str()));
-      std::cout << name << " ]= " << format("%s = %s;", lindex ? lindex->valStr.c_str() : "", info->valStr.c_str()) << std::endl;
     } else {
       TODO();
     }
@@ -1024,6 +1109,8 @@ valInfo* Node:: computeArray() {
 void graph::instsGenerator() {
   for (SuperNode* super : sortedSuper) {
     localTmpNum = 0;
+    mpzTmpNum = 0;
+    maxTmp = MAX(maxTmp, mpzTmpNum);
     for (Node* n : super->member) {
       if (n->dimension.size() != 0) {
         n->computeArray();
@@ -1031,16 +1118,15 @@ void graph::instsGenerator() {
         if (!n->valTree) continue;
         n->compute();
         valInfo* assignInfo = n->valTree->getRoot()->computeInfo;
-        if (n->width <= BASIC_WIDTH) {
-          if (assignInfo->status == VAL_VALID) {
-            if (assignInfo->opNum < 0) {
+        if (assignInfo->status == VAL_VALID) {
+          if (assignInfo->opNum < 0) {
               n->insts.push_back(assignInfo->valStr);
-            } else if (assignInfo->opNum > 0 || assignInfo->valStr != n->name) {
+          } else if (assignInfo->opNum > 0 || assignInfo->valStr != n->name) {
+            if (n->width <= BASIC_WIDTH)
               n->insts.push_back(n->name + " = " + assignInfo->valStr + ";");
-            }
+            else
+              n->insts.push_back(format("mpz_set(%s, %s);", n->name.c_str(), assignInfo->valStr.c_str()));
           }
-        } else {
-          TODO();
         }
       }
     }
