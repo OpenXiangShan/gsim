@@ -3,9 +3,11 @@
 #include <map>
 
 void Node::updateConnect() {
-  if (!valTree) return;
   std::queue<ENode*> q;
-  q.push(valTree->getRoot());
+  if (valTree) q.push(valTree->getRoot());
+  if (isArray()) {
+    for (ExpTree* tree : arrayVal) q.push(tree->getRoot());
+  }
   while (!q.empty()) {
     ENode* top = q.front();
     q.pop();
