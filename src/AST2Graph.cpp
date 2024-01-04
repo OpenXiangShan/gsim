@@ -647,6 +647,7 @@ void visitMemory(graph* g, PNode* mem) {
   visitRUW(mem->getChild(4));
 
   prefix_append(SEP_MODULE, mem->name);
+  moduleInstances.insert(topPrefix());
   for (int i = 5; i < mem->getChildNum(); i ++) {
     PNode* port = mem->getChild(i);
     Node* portNode = nullptr;
