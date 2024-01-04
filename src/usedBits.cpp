@@ -76,8 +76,8 @@ void ENode::passWidthToChild() {
     if (!child[i]) continue;
     int realBits = MIN(child[i]->width, childBits[i]);
     Assert(child[i]->usedBit == -1 || child[i]->usedBit == realBits,
-        "child[%ld]->usedBits %d realBits %d op %d child->width %d childBits %d",
-          i, child[i]->usedBit, realBits, opType, child[i]->width, childBits[i]);
+        "child[%ld]->usedBits %d realBits %d op %d child->width %d childBits %d usedBits %d",
+          i, child[i]->usedBit, realBits, opType, child[i]->width, childBits[i], usedBit);
     if (child[i]->usedBit != realBits) {
       child[i]->usedBit = realBits;
       child[i]->passWidthToChild();
@@ -89,7 +89,7 @@ void ENode::passWidthToChild() {
 /* the with of node->next may be updated, thus node should also re-compute */
 void Node::passWidthToPrev() {
   if (!valTree) return;
-
+  Assert(usedBit >= 0, "invalid usedBit %d in node %s", usedBit, name.c_str());
   if (usedBit != valTree->getRoot()->usedBit) {
     valTree->getRoot()->usedBit = usedBit;
     valTree->getRoot()->passWidthToChild();
@@ -135,6 +135,8 @@ re_check:
 
   for (Node* reg : regsrc) {
     Assert(reg->usedBit <= reg->getDst()->usedBit, "usedBit reg %d regDst %d", reg->usedBit, reg->getDst()->usedBit);
+    /* for register that not used in supersrc (used in printf/assert or deadNodes) */
+    if (reg->usedBit == -1) reg->usedBit = reg->getDst()->usedBit;
     if (reg->usedBit != reg->getDst()->usedBit) {
       checkNodes.push_back(reg->getDst());
       reg->getDst()->usedBit = reg->usedBit;
