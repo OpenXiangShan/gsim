@@ -957,6 +957,14 @@ valInfo* ENode::instsInt(Node* node, std::string lvalue, bool isRoot) {
   return ret;
 }
 
+valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
+  valInfo* ret = new valInfo();
+  Assert(node->type == NODE_MEM_MEMBER, "invalid type %d", node->type);
+  ret->valStr = node->parent->parent->name + "[" + node->parent->get_member(READER_ADDR)->name + "]";
+  ret->opNum = 0;
+  return ret;
+}
+
 valInfo* ENode::instsPrintf() {
   valInfo* ret = new valInfo();
   ret->status = VAL_FINISH;

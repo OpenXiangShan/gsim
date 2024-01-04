@@ -57,6 +57,8 @@ enum OPType {
   OP_ASSERT,
 /* leaf non-node enode */
   OP_INT,
+/* special nodes for memory */
+  OP_READ_MEM,
 };
 
 class ENode {

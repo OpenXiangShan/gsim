@@ -1137,6 +1137,16 @@ graph* AST2Graph(PNode* root) {
     reg->getDst()->valTree = reg->getSrc()->valTree;
     reg->getSrc()->valTree = NULL;
   }
+  for (Node* memory : g->memory) {
+    if (memory->rlatency != 0) continue;
+    for (Node* port : memory->member) {
+      if (port->type == NODE_WRITER) continue;
+      if (port->type == NODE_READWRITER) TODO();
+      ENode* enode = new ENode(OP_READ_MEM);
+
+      port->get_member(READER_DATA)->valTree = new ExpTree(enode);
+    }
+  }
 
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     updatePrevNext(it->second);

@@ -125,6 +125,7 @@ void ENode::inferWidth() {
         break;
       case OP_INDEX_INT:
       case OP_INDEX:
+      case OP_READ_MEM:
         break;
       default:
         Panic();
