@@ -109,7 +109,7 @@ Node* Node::dup(NodeType _type, std::string _name) {
   duplicate->width = width;
   duplicate->sign = sign;
   for (int dim : dimension) duplicate->dimension.push_back(dim);
-  // duplicate->valTree = new ExpTree();
+
   return duplicate;
 }
 
@@ -142,9 +142,14 @@ void TypeInfo::newParent(std::string name) {
 void Node::addReset() {
   Assert(type == NODE_REG_SRC, "%s(%d) is not regsrc", name.c_str(), type);
   ENode* regTop = new ENode(OP_WHEN);
-  regTop->setWidth(valTree->getRoot()->width, valTree->getRoot()->sign);
+
   regTop->addChild(resetCond->getRoot());
   regTop->addChild(resetVal->getRoot());
-  regTop->addChild(valTree->getRoot());
-  valTree->setRoot(regTop);
+  if (valTree) {
+    regTop->addChild(valTree->getRoot());
+    valTree->setRoot(regTop);
+  } else {
+    regTop->addChild(nullptr);
+    valTree = new ExpTree(regTop);
+  }
 }
