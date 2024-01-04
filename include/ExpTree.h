@@ -159,6 +159,8 @@ public:
   valInfo* compute(Node* n, bool isRoot);
   void passWidthToChild();
   void updateWidth();
+  std::pair<int, int> getIdx(Node* n);
+  Node* getConnectNode();
 };
 
 /* 

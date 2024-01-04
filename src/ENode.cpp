@@ -1,8 +1,5 @@
 #include "common.h"
-
-static inline void requireChildSign2() {
-  
-}
+#include <tuple>
 
 #define w0 getChild(0)->width
 #define w1 getChild(1)->width
@@ -140,4 +137,46 @@ void ENode::updateWidth() {
   if (childENode) childENode->updateWidth();
  }
  width = usedBit;
+}
+/*
+return the index of lvalue(required to be array)
+if the lvalue is also an array(e.g. a[1], a defined as a[2][2]), return the range of index
+*/
+std::pair<int, int> ENode::getIdx(Node* node) {
+  Assert(node->isArray(), "%s is not array", node->name.c_str());
+  std::vector<int>index;
+
+  for (ENode* indexENode : child) {
+    if (indexENode->opType != OP_INDEX_INT) return std::make_pair(-1, -1);
+    index.push_back(indexENode->values[0]);
+  }
+  Assert(index.size() <= node->dimension.size(), "invalid index");
+  int num = 1;
+  for (int i = (int)node->dimension.size() - 1; i >= (int)index.size(); i --) {
+    num *= node->dimension[i];
+  }
+  int base = 0;
+  for (size_t i = 0; i < index.size(); i ++) {
+    base = base * node->dimension[i] + index[i];
+  }
+  return std::make_pair(base * num, base * (num + 1) - 1);
+}
+/*
+return right value of connected node
+* for normal nodes and array nodes that are not splitted, return themselves
+* for splitted array, return the corresponding member nodes if it represents a single member
+                    or return the array itself if the index is not determined or it represent multiple members
+*/
+Node* ENode::getConnectNode() {
+  /* not array */
+  if (!nodePtr || !nodePtr->isArray()) {
+    return nodePtr;
+  }
+  /* un-splitted array */
+  if (!nodePtr->arraySplitted()) return nodePtr;
+  /* splitted array */
+  int begin, end;
+  std::tie(begin, end) = getIdx(nodePtr);
+  if (begin < 0 || begin != end) return nodePtr;
+  return nodePtr->getArrayMember(begin);
 }

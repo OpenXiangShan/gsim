@@ -106,12 +106,15 @@ class Node {
   int wlatency;
   int depth;
   std::vector<Node*> member;
-  Node* parent = nullptr;  // also used in arrayMember
+  Node* parent = nullptr;
 /* used for registers */
   Node* regNext;
   bool regSplit = true;
 /* used for instGerator */
   valInfo* computeInfo = nullptr;
+/* used for splitted array */
+  std::vector<Node*>arrayMember;
+  Node* arrayParent = nullptr;
 /* used for visitWhen in AST2Graph */
 
   std::vector<std::string> insts;
@@ -165,8 +168,15 @@ class Node {
   bool isArray() {
     return dimension.size() != 0;
   }
+  bool arraySplitted() {
+    return arrayMember.size() != 0;
+  }
   void addArrayVal(ExpTree* val) {
     arrayVal.push_back(val);
+  }
+  Node* getArrayMember(int idx) {
+    Assert(idx < (int)arrayMember.size(), "idx %d out of bound [0, %ld)", idx, arrayMember.size());
+    return arrayMember[idx];
   }
   void set_super(SuperNode* _super) {
     super = _super;
@@ -182,6 +192,8 @@ class Node {
   valInfo* compute(); // compute node
   valInfo* computeArray();
   void passWidthToPrev();
+  void splitArray();
+  std::string arrayMemberName(int idx);
 };
 
 class SuperNode {

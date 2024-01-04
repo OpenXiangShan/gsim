@@ -40,6 +40,7 @@ class graph {
   void cppEmitter();
   void usedBits();
   void traversal();
+  void splitArray();
 };
 
 #endif
