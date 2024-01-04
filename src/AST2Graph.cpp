@@ -586,7 +586,7 @@ static inline Node* visitWriter(PNode* writer, int width, int depth, bool sign) 
 
   Node* ret = allocNode(NODE_WRITER, topPrefix());
 
-  for (int i = 0; i < READER_MEMBER_NUM; i ++) {
+  for (int i = 0; i < WRITER_MEMBER_NUM; i ++) {
     ret->add_member(nullptr);
   }
 
