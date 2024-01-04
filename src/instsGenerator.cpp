@@ -560,7 +560,7 @@ valInfo* ENode::instsAsUInt(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH;
   bool enodeBaisc = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
@@ -581,7 +581,7 @@ valInfo* ENode::instsAsSInt(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH;
   bool enodeBaisc = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
@@ -603,7 +603,7 @@ valInfo* ENode::instsAsClock(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH;
   bool enodeBaisc = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
@@ -628,7 +628,7 @@ valInfo* ENode::instsCvt(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH;
   bool enodeBaisc = width <= BASIC_WIDTH;
 
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
@@ -649,7 +649,7 @@ valInfo* ENode::instsNeg(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH;
   bool enodeBaisc = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
@@ -672,7 +672,7 @@ valInfo* ENode::instsNot(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH;
   bool enodeBaisc = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
@@ -693,7 +693,7 @@ valInfo* ENode::instsAndr(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH;
   bool enodeBaisc = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
@@ -714,7 +714,7 @@ valInfo* ENode::instsOrr(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = getChild(0)->width <= BASIC_WIDTH || getChild(1)->width <= BASIC_WIDTH;
+  bool childBasic = getChild(0)->width <= BASIC_WIDTH;
   bool enodeBaisc = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
@@ -735,7 +735,7 @@ valInfo* ENode::instsXorr(Node* node, bool isRoot) {
   valInfo* ret = new valInfo();
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = Child(0, width) <= BASIC_WIDTH && Child(1, width) <= BASIC_WIDTH;
+  bool childBasic = Child(0, width) <= BASIC_WIDTH;
   bool enodeBaisc = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
