@@ -1007,7 +1007,8 @@ valInfo* ENode::compute(Node* n, bool isRoot) {
     if (child.size() != 0) {
       valInfo* indexInfo = computeInfo->dup();
       computeInfo = indexInfo;
-      computeInfo->valStr += child[0]->computeInfo->valStr;
+      for (ENode* childENode : child)
+        computeInfo->valStr += childENode->computeInfo->valStr;
     }
     return computeInfo;
   }
