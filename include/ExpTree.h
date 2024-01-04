@@ -61,44 +61,45 @@ enum OPType {
 
 class ENode {
 
-  valInfo* instsMux(Node* n, bool isRoot);
-  valInfo* instsAdd(Node* n, bool isRoot);
-  valInfo* instsSub(Node* n, bool isRoot);
-  valInfo* instsMul(Node* n, bool isRoot);
-  valInfo* instsDIv(Node* n, bool isRoot);
-  valInfo* instsRem(Node* n, bool isRoot);
-  valInfo* instsLt(Node* n, bool isRoot);
-  valInfo* instsLeq(Node* n, bool isRoot);
-  valInfo* instsGt(Node* n, bool isRoot);
-  valInfo* instsGeq(Node* n, bool isRoot);
-  valInfo* instsEq(Node* n, bool isRoot);
-  valInfo* instsNeq(Node* n, bool isRoot);
-  valInfo* instsDshl(Node* n, bool isRoot);
-  valInfo* instsDshr(Node* n, bool isRoot);
-  valInfo* instsAnd(Node* n, bool isRoot);
-  valInfo* instsOr(Node* n, bool isRoot);
-  valInfo* instsXor(Node* n, bool isRoot);
-  valInfo* instsCat(Node* n, bool isRoot);
-  valInfo* instsAsUInt(Node* n, bool isRoot);
-  valInfo* instsAsSInt(Node* n, bool isRoot);
-  valInfo* instsAsClock(Node* n, bool isRoot);
-  valInfo* instsAsSyncReset(Node* n, bool isRoot);
-  valInfo* instsCvt(Node* n, bool isRoot);
-  valInfo* instsNeg(Node* n, bool isRoot);
-  valInfo* instsNot(Node* n, bool isRoot);
-  valInfo* instsAndr(Node* n, bool isRoot);
-  valInfo* instsOrr(Node* n, bool isRoot);
-  valInfo* instsXorr(Node* n, bool isRoot);
-  valInfo* instsPad(Node* n, bool isRoot);
-  valInfo* instsShl(Node* n, bool isRoot);
-  valInfo* instsShr(Node* n, bool isRoot);
-  valInfo* instsHead(Node* n, bool isRoot);
-  valInfo* instsTail(Node* n, bool isRoot);
-  valInfo* instsBits(Node* n, bool isRoot);
-  valInfo* instsWhen(Node* node, bool isRoot);
-  valInfo* instsIndexInt(Node* n, bool isRoot);
-  valInfo* instsIndex(Node* n, bool isRoot);
-  valInfo* instsInt(Node* n, bool isRoot);
+  valInfo* instsMux(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsAdd(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsSub(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsMul(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsDIv(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsRem(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsLt(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsLeq(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsGt(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsGeq(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsEq(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsNeq(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsDshl(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsDshr(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsAnd(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsOr(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsXor(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsCat(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsAsUInt(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsAsSInt(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsAsClock(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsAsSyncReset(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsCvt(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsNeg(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsNot(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsAndr(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsOrr(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsXorr(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsPad(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsShl(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsShr(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsHead(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsTail(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsBits(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsWhen(Node* node, std::string lvalue, bool isRoot);
+  valInfo* instsIndexInt(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsIndex(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsInt(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsReadMem(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsPrintf();
   valInfo* instsAssert();
   /* used in usedBits */
@@ -156,7 +157,7 @@ public:
     sign = _sign;
   }
   void inferWidth();
-  valInfo* compute(Node* n, bool isRoot);
+  valInfo* compute(Node* n, std::string lvalue, bool isRoot);
   void passWidthToChild();
   void updateWidth();
   std::pair<int, int> getIdx(Node* n);
@@ -175,7 +176,7 @@ class ExpTree {
   ENode* lvalue;
   void setOrAllocRoot(ENode* node) {
     if (node) root = node;
-      else root = new ENode();
+    else root = new ENode();
   }
 public:
     ExpTree(ENode* root) {

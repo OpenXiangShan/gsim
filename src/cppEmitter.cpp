@@ -155,7 +155,7 @@ static void activateNext(FILE* fp, Node* node, std::string oldName) {
     fprintf(fp, "if (%s != %s) {\n", node->name.c_str(), oldName.c_str());
   }
   for (Node* next : node->next) {
-    Assert(validSuper.find(next->super) != validSuper.end(), "next %s is not find in node %s\n", next->name.c_str(), node->name.c_str());
+    Assert(validSuper.find(next->super) != validSuper.end(), "next %s(super %d) is not find in node %s\n", next->name.c_str(), next->super->id, node->name.c_str());
     fprintf(fp, "activeFlags[%d] = true;\n", validSuper[next->super]);
   }
   fprintf(fp, "}\n");

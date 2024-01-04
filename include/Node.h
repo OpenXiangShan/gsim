@@ -78,6 +78,7 @@ public:
 };
 
 class Node {
+  void finialConnect(std::string lvalue, valInfo* info);
  public:
 
   Node(NodeType _type = NODE_OTHERS) {
