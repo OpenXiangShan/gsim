@@ -240,10 +240,10 @@ void graph::genStep(FILE* fp) {
   /* TODO: if latency == 0, read & write will happen in step function */
   /* writer affects other nodes through reader, no need to activate in writer */
   for (Node* mem : memory) {
-    Assert(mem->rlatency == 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
+    Assert(mem->rlatency <= 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
     if (mem->width > BASIC_WIDTH) TODO();
     for (Node* port : mem->member) {
-      if (port->type == NODE_READER) {
+      if (port->type == NODE_READER && mem->rlatency == 1) {
         fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->name.c_str());
         activateUncondNext(fp, port->member[READER_DATA]);
       } else if (port->type == NODE_WRITER) {
