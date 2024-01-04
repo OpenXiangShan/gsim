@@ -112,6 +112,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   } else {
     fprintf(fp, "mpz_t %s", node->name.c_str());
   }
+  if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", node->depth);
   for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
   fprintf(fp, ";\n");
 }
