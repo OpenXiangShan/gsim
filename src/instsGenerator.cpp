@@ -1106,6 +1106,11 @@ valInfo* Node::compute() {
 void Node::finialConnect(std::string lvalue, valInfo* info) {
   if (info->opNum < 0) {
     insts.push_back(info->valStr);
+  } else if (isSubArray(lvalue, this)) {
+    if (width <= BASIC_WIDTH)
+      insts.push_back(format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), info->valStr.c_str(), lvalue.c_str()));
+    else
+      TODO();
   } else {
     if (width <= BASIC_WIDTH)
       insts.push_back(format("%s = %s;", lvalue.c_str(), info->valStr.c_str()));
