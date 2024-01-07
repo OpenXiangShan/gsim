@@ -598,8 +598,8 @@ valInfo* ENode::instsAsSInt(Node* node, std::string lvalue, bool isRoot) {
     s_asSInt(ret->consVal, ChildInfo(0, consVal), Child(0, width));
     ret->setConsStr();
   } else if (childBasic && enodeBaisc) {
-    std::string shiftStr = std::to_string(widthBits(width) - Child(0, width));
-    ret->valStr = "((" + Cast(width, true) + ChildInfo(0, valStr) + " << " + shiftStr + ") >> " + shiftStr + ")";
+    int shiftBits = widthBits(width) - Child(0, width);
+    ret->valStr = format("(%s(%s << %d) >> %d)", Cast(width, true).c_str(), ChildInfo(0, valStr).c_str(), shiftBits, shiftBits);
     ret->opNum = ChildInfo(0, opNum) + 1;
   } else {
     TODO();
