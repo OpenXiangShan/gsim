@@ -1136,6 +1136,8 @@ graph* AST2Graph(PNode* root) {
     reg->addReset();
     reg->getDst()->valTree = reg->getSrc()->valTree;
     reg->getSrc()->valTree = NULL;
+    reg->getDst()->arrayVal.insert(reg->getDst()->arrayVal.end(), reg->arrayVal.begin(), reg->arrayVal.end());
+    reg->arrayVal.clear();
   }
   for (Node* memory : g->memory) {
     if (memory->rlatency != 0) continue;
