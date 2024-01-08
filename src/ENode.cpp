@@ -73,7 +73,7 @@ void ENode::inferWidth() {
         break;
       case OP_CVT:
         Assert(getChildNum() == 1, "invalid child");
-        setWidth(w0 + s0, true);
+        setWidth(w0 + !s0, true);
         break;
       case OP_NEG:
         Assert(getChildNum() == 1, "invalid child");
