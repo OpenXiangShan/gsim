@@ -134,7 +134,7 @@ re_check:
   }
 
   for (Node* reg : regsrc) {
-    Assert(reg->usedBit <= reg->getDst()->usedBit, "usedBit reg %d regDst %d", reg->usedBit, reg->getDst()->usedBit);
+    Assert(reg->usedBit <= reg->getDst()->usedBit, "%s usedBit reg %d regDst %d", reg->name.c_str(), reg->usedBit, reg->getDst()->usedBit);
     /* for register that not used in supersrc (used in printf/assert or deadNodes) */
     if (reg->usedBit == -1) reg->usedBit = reg->getDst()->usedBit;
     if (reg->usedBit != reg->getDst()->usedBit) {
