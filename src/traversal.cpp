@@ -52,6 +52,7 @@ static std::map<OPType, const char*> OP2Name = {
 };
 
 void ExpTree::display() {
+  if (!getRoot()) return;
   std::stack<std::pair<ENode*, int>> enodes;
   enodes.push(std::make_pair(getRoot(), 1));
 
@@ -60,8 +61,9 @@ void ExpTree::display() {
     int depth;
     std::tie(top, depth) = enodes.top();
     enodes.pop();
-    printf("%s(%d %s) %s [width=%d]\n", std::string(depth * 2, ' ').c_str(), top->opType, OP2Name[top->opType], (top->nodePtr) ? top->nodePtr->name.c_str(): "", top->width);
-    for (ENode* childENode : top->child) {
+    printf("%s(%d %s %p) %s [width=%d]\n", std::string(depth * 2, ' ').c_str(), top->opType, OP2Name[top->opType], top, (top->nodePtr) ? top->nodePtr->name.c_str(): "", top->width);
+    for (int i = top->child.size() - 1; i >= 0; i --) {
+      ENode* childENode = top->child[i];
       if (!childENode) continue;
       enodes.push(std::make_pair(childENode, depth + 1));
     }
