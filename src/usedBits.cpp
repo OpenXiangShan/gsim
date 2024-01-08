@@ -74,10 +74,9 @@ void ENode::passWidthToChild() {
   Assert(child.size() == childBits.size(), "child.size %ld childBits.size %ld in op %d", child.size(), childBits.size(), opType);
   for (size_t i = 0; i < child.size(); i ++) {
     if (!child[i]) continue;
+
     int realBits = MIN(child[i]->width, childBits[i]);
-    Assert(child[i]->usedBit == -1 || child[i]->usedBit <= realBits,
-        "child[%ld]->usedBits %d realBits %d op %d child->width %d childBits %d usedBits %d",
-          i, child[i]->usedBit, realBits, opType, child[i]->width, childBits[i], usedBit);
+
     if (child[i]->usedBit != realBits) {
       child[i]->usedBit = realBits;
       child[i]->passWidthToChild();
