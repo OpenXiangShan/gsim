@@ -300,7 +300,8 @@ ASTExpTree* visitMux(graph* g, PNode* expr) {
 
   ASTExpTree* ret = left->dupEmpty();
   ret->setOp(OP_MUX);
-  ret->addChildTree(3, cond, left, right);
+  ret->addChildSameTree(cond);
+  ret->addChildTree(2, left, right);
 
   delete cond;
   delete left;
