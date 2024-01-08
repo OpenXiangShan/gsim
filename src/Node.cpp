@@ -26,7 +26,7 @@ infer width of node and all ENodes in valTree
 inverse topological order or [infer all encountered nodes]
 */
 void Node::inferWidth() {
-  if (type == NODE_INVALID || type == NODE_SPECIAL) return;
+  if (type == NODE_INVALID) return;
   if (width != 0 && (!valTree || valTree->getRoot()->width != 0)) return;
   Assert(valTree && valTree->getRoot(), "can not infer width of %s through empty valTree", name.c_str());
   valTree->getRoot()->inferWidth();

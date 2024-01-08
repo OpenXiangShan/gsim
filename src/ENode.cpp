@@ -124,6 +124,8 @@ void ENode::inferWidth() {
         else if (getChild(1)) setWidth(w1, s1);
         else setWidth(w2, s2);
         break;
+      case OP_PRINTF:
+      case OP_ASSERT:
       case OP_INDEX_INT:
       case OP_INDEX:
       case OP_READ_MEM:
