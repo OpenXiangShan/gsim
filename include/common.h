@@ -101,8 +101,8 @@ class valInfo;
 #include "PNode.h"
 #include "ExpTree.h"
 #include "graph.h"
+#include "util.h"
 #include "valInfo.h"
 
-#include "util.h"
 
 #endif
