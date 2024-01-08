@@ -75,6 +75,10 @@ void graph::traversal() {
     for (Node* node : super->member) {
       printf("node %s[width %d]:\n", node->name.c_str(), node->width);
       if (node->valTree) node->valTree->display();
+      for (size_t i = 0; i < node->arrayVal.size(); i ++) {
+        printf("[array]\n");
+        node->arrayVal[i]->display();
+      }
     }
   }
 }
