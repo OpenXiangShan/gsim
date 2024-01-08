@@ -1134,8 +1134,17 @@ graph* AST2Graph(PNode* root) {
 
   for (Node* reg : g->regsrc) {
     reg->addReset();
+    /* set lvalue to regDst */
+    if (reg->getSrc()->valTree->getlval()) {
+      Assert(reg->getSrc()->valTree->getlval()->nodePtr, "lvalue in %s is not node", reg->name.c_str());
+      reg->getSrc()->valTree->getlval()->nodePtr = reg->getDst();
+    }
     reg->getDst()->valTree = reg->getSrc()->valTree;
     reg->getSrc()->valTree = NULL;
+    for (ExpTree* tree : reg->getSrc()->arrayVal) {
+      Assert(tree->getlval()->nodePtr, "lvalue in %s is not node", reg->name.c_str());
+      tree->getlval()->nodePtr = reg->getDst();
+    }
     reg->getDst()->arrayVal.insert(reg->getDst()->arrayVal.end(), reg->arrayVal.begin(), reg->arrayVal.end());
     reg->arrayVal.clear();
   }
