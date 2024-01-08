@@ -94,11 +94,11 @@ else
 	SIG_COMMAND = python3 scripts/genSigDiff.py
 endif
 
-$(GSIM_BUILD_DIR)/%.o: %.cpp $(PARSER_SRCS) $(HEADERS)
+$(GSIM_BUILD_DIR)/%.o: %.cpp $(PARSER_SRCS) $(HEADERS) Makefile
 	@mkdir -p $(dir $@) && echo + CXX $<
 	@$(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
 
-$(EMU_BUILD_DIR)/%.o: %.cpp $(VERI_HEADER)
+$(EMU_BUILD_DIR)/%.o: %.cpp $(VERI_HEADER) Makefile
 	@mkdir -p $(dir $@) && echo + CXX $<
 	$(CXX) $< $(GSIM_CFLAGS) -c -o $@
 
