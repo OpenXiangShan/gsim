@@ -119,7 +119,7 @@ TypeInfo* visitFields(graph* g, PNode* fields, NodeType parentType) {
     PNode* field = fields->getChild(i);
     TypeInfo* fieldInfo = visitField(g, field, parentType);
     if (!fieldInfo->isAggr()) { // The type of field is ground
-      Node* fieldNode = allocNode(NODE_OTHERS, prefixName(SEP_AGGR, field->name));
+      Node* fieldNode = allocNode(parentType, prefixName(SEP_AGGR, field->name));
       fieldNode->updateInfo(fieldInfo);
       info->add(fieldNode);
     } else { // The type of field is aggregate
