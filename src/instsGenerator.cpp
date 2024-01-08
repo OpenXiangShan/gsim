@@ -423,7 +423,7 @@ valInfo* ENode::instsDshr(Node* node, std::string lvalue, bool isRoot) {
     (sign ? s_dshr : u_dshr)(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
     ret->setConsStr();
   } else if (childBasic && enodeBaisc) {
-    ret->valStr = "(" + ChildInfo(0, valStr) + " >> " + ChildInfo(1, valStr) + ")";
+    ret->valStr = "(" + Cast(Child(0, width), Child(0, sign)) + ChildInfo(0, valStr) + " >> " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   } else {
     TODO();
