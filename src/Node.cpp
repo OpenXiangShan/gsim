@@ -30,7 +30,7 @@ void Node::inferWidth() {
   if (width != 0 && (!valTree || valTree->getRoot()->width != 0)) return;
   Assert(valTree && valTree->getRoot(), "can not infer width of %s through empty valTree", name.c_str());
   valTree->getRoot()->inferWidth();
-  setType(valTree->getRoot()->width, valTree->getRoot()->sign);
+  if (width == 0) setType(valTree->getRoot()->width, valTree->getRoot()->sign);
 }
 
 /* construct superNodes for all memory_member in the port the (member) belongs to */
