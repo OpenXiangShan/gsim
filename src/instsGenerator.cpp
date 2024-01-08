@@ -1104,6 +1104,7 @@ valInfo* Node::compute() {
 }
 
 void Node::finialConnect(std::string lvalue, valInfo* info) {
+  if (info->valStr.length() == 0) return; // empty, used for when statment with constant condition
   if (info->opNum < 0) {
     insts.push_back(info->valStr);
   } else if (isSubArray(lvalue, this)) {
