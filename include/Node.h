@@ -183,7 +183,7 @@ class Node {
     super = _super;
   }
   void update_usedBit(int bits) {
-    usedBit = MAX(bits, usedBit);
+    usedBit = MIN(width, MAX(bits, usedBit));
   }
   void updateConnect();
   void inferWidth();
