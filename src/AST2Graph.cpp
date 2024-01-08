@@ -806,19 +806,21 @@ newRoot:  when3
       cond3 a b
 replace oldRoot by newRoot
 */
-void growWhenTrace(ExpTree* valTree) {
-  ENode* oldParent;
-  int maxDepth;
-  std::tie(oldParent, maxDepth) = getDeepestWhen(valTree);
+ExpTree* growWhenTrace(ExpTree* valTree) {
+  ENode* oldParent = nullptr;
+  int maxDepth = 0;
+  if (valTree) std::tie(oldParent, maxDepth) = getDeepestWhen(valTree);
+  if (maxDepth == (int)whenTrace.size()) return valTree ? valTree : new ExpTree(nullptr);
 
-  if (maxDepth == (int)whenTrace.size()) return;
-
-  ENode* oldRoot = maxDepth == 0 ? nullptr : (whenTrace[maxDepth-1].first ? oldParent->getChild(1) : oldParent->getChild(2));
+  ENode* oldRoot = maxDepth == 0 ?
+                          (valTree ? valTree->getRoot() : nullptr)
+                        : (whenTrace[maxDepth-1].first ? oldParent->getChild(1) : oldParent->getChild(2));
   ENode* newRoot = nullptr; // latest whenNode
   
   for (int depth = whenTrace.size() - 1; depth >= maxDepth ; depth --) {
-    ENode* whenNode = newRoot = new ENode(OP_WHEN);
+    ENode* whenNode = new ENode(OP_WHEN);
     ENode* condNode = new ENode(whenTrace[depth].second);
+
     if (whenTrace[depth].first) {
       whenNode->addChild(condNode);
       whenNode->addChild(newRoot);
@@ -829,19 +831,22 @@ void growWhenTrace(ExpTree* valTree) {
       whenNode->addChild(newRoot);
     }
     newRoot = whenNode;
+
   }
   if (maxDepth == 0) {
-    Assert(valTree, "empty varTree");
-    valTree->setRoot(newRoot);
+    if (valTree) valTree->setRoot(newRoot);
+    else valTree = new ExpTree(newRoot);
+  } else {
+    oldParent->setChild(whenTrace[maxDepth-1].first ? 1 : 2, newRoot);
   }
-  else oldParent->setChild(whenTrace[maxDepth-1].first ? 1 : 2, newRoot);
+  return valTree;
 }
 
 ENode* getWhenEnode(ExpTree* valTree) {
   ENode* whenNode;
   int maxDepth;
   std::tie(whenNode, maxDepth) = getDeepestWhen(valTree);
-  Assert(maxDepth == (int)whenTrace.size(), "when not match");
+  Assert(maxDepth == (int)whenTrace.size(), "when not match %d %ld", maxDepth, whenTrace.size());
   return whenNode;
 }
 
@@ -857,8 +862,8 @@ void visitWhenConnect(graph* g, PNode* connect) {
   if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i++) {
       Node* node = ref->getAggr(i)->getNode();
-      ExpTree* valTree = node->valTree ? node->valTree : new ExpTree(nullptr, ref->getAggr(i));
-      growWhenTrace(valTree);
+      ExpTree* valTree = growWhenTrace(node->valTree);
+      valTree->setlval(ref->getAggr(i));
       ENode* whenNode = getWhenEnode(valTree);
       whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getAggr(i));
       if (node->isArray()) node->addArrayVal(valTree);
@@ -867,8 +872,8 @@ void visitWhenConnect(graph* g, PNode* connect) {
     
   } else {
     Node* node = ref->getExpRoot()->getNode();
-    ExpTree* valTree = node->valTree ? node->valTree : new ExpTree(nullptr, ref->getExpRoot());
-    growWhenTrace(valTree);
+    ExpTree* valTree = growWhenTrace(node->valTree);
+    valTree->setlval(ref->getExpRoot());
     ENode* whenNode = getWhenEnode(valTree);
     whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getExpRoot());
     if (node->isArray()) node->addArrayVal(valTree);

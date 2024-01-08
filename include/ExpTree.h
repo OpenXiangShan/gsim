@@ -201,6 +201,9 @@ public:
     ENode* getlval() {
       return lvalue;
     }
+    void setlval(ENode* _lvalue) {
+      lvalue = _lvalue;
+    }
     void display();
     
 };
