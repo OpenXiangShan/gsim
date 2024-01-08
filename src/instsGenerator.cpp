@@ -135,6 +135,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   if (childBasic && enodeBasic) {
     auto assignment = [lvalue, node](bool isStmt, std::string expr) {
       if (isStmt) return expr;
+      if (expr.length() == 0) return std::string("");
       else if (isSubArray(lvalue, node)) return format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), expr.c_str(), lvalue.c_str());
       return lvalue + " = " + expr + ";";
     };

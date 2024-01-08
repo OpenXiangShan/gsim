@@ -152,4 +152,11 @@ void Node::addReset() {
     regTop->addChild(nullptr);
     valTree = new ExpTree(regTop);
   }
+  for (ExpTree* tree : arrayVal) {
+    ENode* arrayWhenTop = new ENode(OP_WHEN);
+    arrayWhenTop->addChild(resetCond->getRoot());
+    arrayWhenTop->addChild(nullptr);
+    arrayWhenTop->addChild(tree->getRoot());
+    tree->setRoot(arrayWhenTop);
+  }
 }
