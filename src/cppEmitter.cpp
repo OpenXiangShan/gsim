@@ -259,6 +259,12 @@ void graph::genStep(FILE* fp) {
   /* TODO: if latency == 0, read & write will happen in step function */
   /* writer affects other nodes through reader, no need to activate in writer */
   for (Node* mem : memory) {
+    std::set<SuperNode*> readerL0;
+    if (mem->rlatency == 0) {
+      for (Node* port : mem->member) {
+        if (port->type == NODE_READER) readerL0.insert(port->get_member(READER_DATA)->super);
+      }
+    }
     Assert(mem->rlatency <= 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
     if (mem->width > BASIC_WIDTH) TODO();
     for (Node* port : mem->member) {
@@ -268,6 +274,10 @@ void graph::genStep(FILE* fp) {
       } else if (port->type == NODE_WRITER) {
         fprintf(fp, "if(%s && %s) {", port->member[WRITER_EN]->name.c_str(), port->member[WRITER_MASK]->name.c_str());
         fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->name.c_str(), port->member[WRITER_DATA]->name.c_str());
+        for (SuperNode* super : readerL0) {
+          Assert(validSuper.find(super) != validSuper.end(), "reader is not find in node %s\n", mem->name.c_str());
+          fprintf(fp, "activeFlags[%d] = true;\n", validSuper[super]);
+        }
         fprintf(fp, "}\n");
       } else if (port->type == NODE_READWRITER) {
         TODO();
