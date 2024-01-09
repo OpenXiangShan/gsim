@@ -600,7 +600,7 @@ static inline Node* visitWriter(PNode* writer, int width, int depth, bool sign) 
   add_member(ret, "en", WRITER_EN, 1, false);
   add_member(ret, "clk", WRITER_CLK, 1, false);
   add_member(ret, "data", WRITER_DATA, width, sign);
-  add_member(ret, "mask", WRITER_MASK, width, false);
+  add_member(ret, "mask", WRITER_MASK, 1, false);
 
   prefix_pop();
 
@@ -625,7 +625,7 @@ static inline Node* visitReadWriter(PNode* readWriter, int width, int depth, boo
   add_member(ret, "clk", READWRITER_CLK, 1, false);
   add_member(ret, "rdata", READWRITER_RDATA, width, sign);
   add_member(ret, "wdata", READWRITER_WDATA, width, sign);
-  add_member(ret, "wmask", READWRITER_WMASK, width, false);
+  add_member(ret, "wmask", READWRITER_WMASK, 1, false);
   add_member(ret, "wmode", READWRITER_WMODE, 1, false);
 
   prefix_pop();
