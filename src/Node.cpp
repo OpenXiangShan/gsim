@@ -6,7 +6,12 @@ void Node::updateConnect() {
   std::queue<ENode*> q;
   if (valTree) q.push(valTree->getRoot());
   if (isArray()) {
-    for (ExpTree* tree : arrayVal) q.push(tree->getRoot());
+    for (ExpTree* tree : arrayVal) {
+      q.push(tree->getRoot());
+      if (tree->getlval()) {
+        for (int i = 0; i < tree->getlval()->getChildNum(); i ++) q.push(tree->getlval()->getChild(i));
+      }
+    }
   }
   while (!q.empty()) {
     ENode* top = q.front();
