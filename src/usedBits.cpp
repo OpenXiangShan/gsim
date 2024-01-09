@@ -92,6 +92,10 @@ void Node::passWidthToPrev() {
       tree->getRoot()->usedBit = usedBit;
       tree->getRoot()->passWidthToChild();
     }
+    if (tree->getlval() && tree->getlval()->usedBit != tree->getlval()->width) {
+      tree->getlval()->usedBit = tree->getlval()->width;
+      tree->getlval()->passWidthToChild();
+    }
   }
   if (!valTree) return;
   Assert(usedBit >= 0, "invalid usedBit %d in node %s", usedBit, name.c_str());
