@@ -55,7 +55,7 @@ void u_tail(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
     mpz_add(t2, t2, src);
     mpz_and(dst, t1, t2);
   } else {
-    mpz_and(dst, dst, src);
+    mpz_and(dst, t1, src);
   }
 }
 // expr1
