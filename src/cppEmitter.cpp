@@ -10,6 +10,10 @@
 #define oldMpz(node) std::string("oldValMpz")
 #define oldName(node) (node->width > BASIC_WIDTH ? oldMpz(node) : oldBasic(node))
 
+#ifdef DIFFTEST_PER_SIG
+FILE* sigFile = nullptr;
+#endif
+
 static std::map<SuperNode*, int> validSuper;
 static int superId = 1;
 
@@ -115,6 +119,14 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", node->depth);
   for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
   fprintf(fp, ";\n");
+#ifdef DIFFTEST_PER_SIG
+  std::string verilatorName = name + "__DOT__" + node->name;
+  size_t pos;
+  while ((pos = verilatorName.find("$")) != std::string::npos) {
+    verilatorName.replace(pos, 1, "__DOT__");
+  }
+  fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, node->name.c_str(), verilatorName.c_str());
+#endif
 }
 
 FILE* graph::genSrcStart(std::string name) {
@@ -283,6 +295,9 @@ void graph::cppEmitter() {
   FILE* header = genHeaderStart(name);
   FILE* src = genSrcStart(name);
   // header: node definition; src: node evaluation
+#ifdef DIFFTEST_PER_SIG
+  sigFile = fopen((std::string(OBJ_DIR) + "/" + name + "_sigs.txt").c_str(), "w");
+#endif
 
   for (SuperNode* super : sortedSuper) {
     // std::string insts;
@@ -311,4 +326,7 @@ void graph::cppEmitter() {
 
   fclose(header);
   fclose(src);
+#ifdef DIFFTEST_PER_SIG
+  fclose(sigFile);
+#endif
 }
