@@ -36,16 +36,17 @@ public:
   int width;
   bool sign;
   std::vector<int> dimension;
-  std::vector<Node*> aggrMember; // all members, if not empty, all other infos above are invalid
+  std::vector<std::pair<Node*, bool>> aggrMember; // all members, if not empty, all other infos above are invalid
   std::vector<AggrParentNode*> aggrParent; // the later the outer
 
-  void add(Node* node) { aggrMember.push_back(node); }
+  void add(Node* node, bool isFlip) { aggrMember.push_back(std::make_pair(node, isFlip)); }
   void set_width(int _width) { width = _width; }
   void set_sign(bool _sign) { sign = _sign; }
   void mergeInto(TypeInfo* info);
   bool isAggr() { return aggrParent.size() != 0; }
   void addDim(int num);
   void newParent(std::string name);
+  void flip();
 };
 
 /*
@@ -56,14 +57,14 @@ e.g. {{a, b}x, {c}y }z;
 class AggrParentNode {  // virtual type_aggregate node, used for aggregate connect
   public:
   std::string name;
-  std::vector<Node*> member;  // leaf member
+  std::vector<std::pair<Node*, bool>> member;  // leaf member
   std::vector<AggrParentNode*> parent; // non-leaf member (aggregate type), increasing partial order
   AggrParentNode(std::string _name, TypeInfo* info = nullptr);
   int size() {
     return member.size();
   }
-  void addMember(Node* _member) {
-    member.push_back(_member);
+  void addMember(Node* _member, bool isFlip) {
+    member.push_back(std::make_pair(_member, isFlip));
   }
   void addParent(AggrParentNode* _parent) {
     parent.push_back(_parent);

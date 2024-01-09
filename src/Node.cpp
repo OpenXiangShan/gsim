@@ -129,7 +129,7 @@ void TypeInfo::mergeInto(TypeInfo* info) {
 
 void TypeInfo::addDim(int num) {
   if (isAggr()) {
-    for (Node* node : aggrMember) node->dimension.push_back(num);
+    for (auto entry : aggrMember) entry.first->dimension.push_back(num);
   } else {
     dimension.push_back(num);
   }
@@ -137,6 +137,10 @@ void TypeInfo::addDim(int num) {
 
 void TypeInfo::newParent(std::string name) {
   aggrParent.push_back(new AggrParentNode(name, this));
+}
+
+void TypeInfo::flip() {
+  for (size_t i = 0; i < aggrMember.size(); i ++) aggrMember[i].second = !aggrMember[i].second;
 }
 
 void Node::addReset() {

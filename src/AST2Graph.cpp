@@ -103,6 +103,7 @@ TypeInfo* visitField(graph* g, PNode* field, NodeType parentType) {
                                               (parentType == NODE_OUT ? NODE_INP : fieldType);
   prefix_append(SEP_AGGR, field->name);
   TypeInfo* info = visitType(g, field->getChild(0), fieldType);
+  if (field->type == P_FLIP_FIELD) info->flip();
   prefix_pop();
   return info;
   
@@ -121,7 +122,7 @@ TypeInfo* visitFields(graph* g, PNode* fields, NodeType parentType) {
     if (!fieldInfo->isAggr()) { // The type of field is ground
       Node* fieldNode = allocNode(parentType, prefixName(SEP_AGGR, field->name));
       fieldNode->updateInfo(fieldInfo);
-      info->add(fieldNode);
+      info->add(fieldNode, field->type == P_FLIP_FIELD);
     } else { // The type of field is aggregate
       info->mergeInto(fieldInfo);
     }
@@ -182,7 +183,7 @@ TypeInfo* visitPort(graph* g, PNode* port, bool isTop) {
   if (!info->isAggr()) {
     Node* node = allocNode(type, topPrefix());
     node->updateInfo(info);
-    info->add(node);
+    info->add(node, false);
   }
   prefix_pop();
   return info;
@@ -198,7 +199,8 @@ void visitTopPorts(graph* g, PNode* ports) {
   for (int i = 0; i < ports->getChildNum(); i ++) {
     PNode* port = ports->getChild(i);
     TypeInfo* info = visitPort(g, port, true);
-    for (Node* node : info->aggrMember) {
+    for (auto entry : info->aggrMember) {
+      Node* node = entry.first;
       addSignal(node->name, node);
       if (node->type == NODE_INP) g->input.push_back(node);
       else if (node->type == NODE_OUT) g->output.push_back(node);
@@ -270,7 +272,8 @@ ASTExpTree* visitReference(graph* g, PNode* expr) {
     // point the root of aggrTree to parent member
     // the width of node may not be determined yet
     for (int i = 0; i < parent->size(); i++) {
-      ret->getAggr(i)->setNode(parent->member[i]);
+      ret->getAggr(i)->setNode(parent->member[i].first);
+      ret->setFlip(i, parent->member[i].second);
     }
   } else {
     ret = new ASTExpTree(false);
@@ -417,7 +420,8 @@ void visitModule(graph* g, PNode* module) {
   for (int i = 0; i < ports->getChildNum(); i ++) {
     TypeInfo* portInfo = visitPort(g, ports->getChild(i), false);
 
-    for (Node* node : portInfo->aggrMember) {
+    for (auto entry : portInfo->aggrMember) {
+      Node* node = entry.first;
       addSignal(node->name, node);
     }
     for (AggrParentNode* dummy : portInfo->aggrParent) {
@@ -438,9 +442,9 @@ void visitExtModule(graph* g, PNode* module) {
   for (int i = 0; i < ports->getChildNum(); i ++) {
     TypeInfo* portInfo = visitPort(g, ports->getChild(i), false);
 
-    for (Node* node : portInfo->aggrMember) {
-        addSignal(node->name, node);
-      }
+    for (auto entry : portInfo->aggrMember) {
+      addSignal(entry.first->name, entry.first);
+    }
     for (AggrParentNode* dummy : portInfo->aggrParent) {
       addDummy(dummy->name, dummy);
     }
@@ -457,7 +461,7 @@ void visitWireDef(graph* g, PNode* wire) {
 
   TypeInfo* info = visitType(g, wire->getChild(0), NODE_OTHERS);
 
-  for (Node* node : info->aggrMember) addSignal(node->name, node);
+  for (auto entry : info->aggrMember) addSignal(entry.first->name, entry.first);
   for (AggrParentNode* dummy : info->aggrParent) addDummy(dummy->name, dummy);
   if (!info->isAggr()) {
     Node* node = allocNode(NODE_OTHERS, topPrefix());
@@ -481,10 +485,11 @@ void visitRegDef(graph* g, PNode* reg) {
   if (!info->isAggr()) {
     Node* src = allocNode(NODE_REG_SRC, topPrefix());
     src->updateInfo(info);
-    info->add(src);
+    info->add(src, false);
   }
   // add reg_src and red_dst to all signals
-  for (Node* src : info->aggrMember) {
+  for (auto entry : info->aggrMember) {
+    Node* src = entry.first;
     g->addReg(src);
     Node* dst = src->dup();
     dst->type = NODE_REG_DST;
@@ -503,7 +508,7 @@ void visitRegDef(graph* g, PNode* reg) {
   Assert(!resetCond->isAggr(), "reg %s: reset cond can never be aggregate\n", reg->name.c_str());
   // all aggregate nodes share the same resetCond ExpRoot
   for (size_t i = 0; i < info->aggrMember.size(); i ++) {
-    Node* src = info->aggrMember[i];
+    Node* src = info->aggrMember[i].first;
     src->resetCond = new ExpTree(resetCond->getExpRoot(), src);
     if (info->isAggr())
       src->resetVal = new ExpTree(resetVal->getAggr(i), src);
@@ -691,21 +696,22 @@ AggrParentNode* allocNodeFromAggr(graph* g, AggrParentNode* parent) {
   AggrParentNode* ret = new AggrParentNode(topPrefix());
   std::string oldPrefix = parent->name;
   /* alloc all real nodes */
-  for (Node* member : parent->member) {
+  for (auto entry : parent->member) {
+    Node* member = entry.first;
     std::string name = replacePrefix(oldPrefix, topPrefix(), member->name);
     /* the type of parent can be registers, thus the node->type cannot set to member->type */
     Node* node = member->dup(NODE_OTHERS, name); // SEP_AGGR is already in name
   
     addSignal(node->name, node);
-    ret->addMember(node);
+    ret->addMember(node, entry.second);
   }
   /* alloc all dummy nodes, and connect them to real nodes stored in allSignals */
   for (AggrParentNode* aggrMember : parent->parent) {
     // create new aggr node
     AggrParentNode* aggrNode = new AggrParentNode(replacePrefix(oldPrefix, topPrefix(), aggrMember->name));
     // update member and parent in new aggrNode
-    for (Node* member : aggrMember->member) {
-      aggrNode->addMember(getSignal(replacePrefix(oldPrefix, topPrefix(), member->name)));
+    for (auto entry : aggrMember->member) {
+      aggrNode->addMember(getSignal(replacePrefix(oldPrefix, topPrefix(), entry.first->name)), entry.second);
     }
     // the children of aggrMember are earlier than it
     for (AggrParentNode* parent : aggrMember->parent) {
@@ -729,7 +735,7 @@ void visitNode(graph* g, PNode* node) {
     AggrParentNode* aggrNode = allocNodeFromAggr(g, exp->getParent());
     Assert(aggrNode->size() == exp->getAggrNum(), "aggrMember num %d tree num %d", aggrNode->size(), exp->getAggrNum());
     for (int i = 0; i < aggrNode->size(); i ++) {
-      aggrNode->member[i]->valTree = new ExpTree(exp->getAggr(i), aggrNode->member[i]);
+      aggrNode->member[i].first->valTree = new ExpTree(exp->getAggr(i), aggrNode->member[i].first);
     }
     addDummy(aggrNode->name, aggrNode);
   } else {
@@ -749,11 +755,18 @@ void visitConnect(graph* g, PNode* connect) {
   Assert(!(ref->isAggr() ^ exp->isAggr()), "type not match, ref aggr %d exp aggr %d", ref->isAggr(), exp->isAggr());
   if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i ++) {
-      Node* node = ref->getAggr(i)->getNode();
-      ExpTree* valTree = new ExpTree(exp->getAggr(i), ref->getAggr(i));
-      if (node->isArray()) node->addArrayVal(valTree);
-      else node->valTree = valTree;
-
+      if (exp->getFlip(i)) {
+        Node* node = exp->getAggr(i)->getNode();
+        if (!node) TODO(); // like a <= mux(cond, b, c)
+        if (node->isArray()) TODO();
+        ExpTree* valTree = new ExpTree(ref->getAggr(i), exp->getAggr(i));
+        node->valTree = valTree;
+      } else {
+        Node* node = ref->getAggr(i)->getNode();
+        ExpTree* valTree = new ExpTree(exp->getAggr(i), ref->getAggr(i));
+        if (node->isArray()) node->addArrayVal(valTree);
+        else node->valTree = valTree;
+      }
     }
   } else {
     Node* node = ref->getExpRoot()->getNode();
@@ -862,13 +875,23 @@ void visitWhenConnect(graph* g, PNode* connect) {
 
   if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i++) {
-      Node* node = ref->getAggr(i)->getNode();
-      ExpTree* valTree = growWhenTrace(node->valTree);
-      valTree->setlval(ref->getAggr(i));
-      ENode* whenNode = getWhenEnode(valTree);
-      whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getAggr(i));
-      if (node->isArray()) node->addArrayVal(valTree);
-      else node->valTree = valTree;
+      if (exp->getFlip(i)) {
+        Node* node = exp->getAggr(i)->getNode();
+        if (!node || node->isArray()) TODO();
+        ExpTree* valTree = growWhenTrace(node->valTree);
+        valTree->setlval(exp->getAggr(i));
+        ENode* whenNode = getWhenEnode(valTree);
+        whenNode->setChild(whenTrace.back().first ? 1 : 2, ref->getAggr(i));
+        node->valTree = valTree;
+      } else {
+        Node* node = ref->getAggr(i)->getNode();
+        ExpTree* valTree = growWhenTrace(node->valTree);
+        valTree->setlval(ref->getAggr(i));
+        ENode* whenNode = getWhenEnode(valTree);
+        whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getAggr(i));
+        if (node->isArray()) node->addArrayVal(valTree);
+        else node->valTree = valTree;
+      }
     }
     
   } else {

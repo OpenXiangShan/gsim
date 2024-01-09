@@ -208,18 +208,10 @@ public:
     
 };
 
-// class ASTENode {
-// public:
-//   AggrParentNode* nodePtr = nullptr;   // leafNodes: point to a real node; internals: nullptr
-//   std::vector<ASTENode*> child;
-//   OPType opType = OP_INVALID;
-//   bool islvalue = false;  // true for root and L_INDEX, otherwise false
-// };
-
 class ASTExpTree { // used in AST2Graph, support aggregate nodes
   ENode* expRoot = nullptr;
   // ASTENode* aggrRoot = nullptr;
-  std::vector<ENode*> aggrForest;
+  std::vector<std::pair<ENode*, bool>> aggrForest;
   // std::vector<std::string> name; // aggr member name, used for creating new nodes in visitNode
   AggrParentNode* anyParent; // any nodes, used for creating new nodes in visitNode
   
@@ -234,7 +226,7 @@ public:
   ASTExpTree(bool isAggr, int num = 0) {
     if (isAggr) {
       Assert(num != 0, "invalid aggr type\n");
-      for (int i = 0; i < num; i ++) aggrForest.push_back(new ENode());
+      for (int i = 0; i < num; i ++) aggrForest.push_back(std::make_pair(new ENode(), false));
     } //aggrRoot = new ASTENode();
     else expRoot = new ENode();
   }
@@ -242,7 +234,7 @@ public:
     validCheck();
     if (expRoot) expRoot->setOP(op);
     else {
-      for (ENode* root : aggrForest) root->setOP(op);
+      for (auto entry : aggrForest) entry.first->setOP(op);
     }
   }
   void addVal(int _value) {
@@ -279,7 +271,7 @@ public:
       ASTExpTree* childTree = va_arg(valist, ASTExpTree*);
       if (isAggr()) {
         for (size_t i = 0; i < aggrForest.size(); i++) {
-          aggrForest[i]->addChild(childTree->getAggr(i));
+          aggrForest[i].first->addChild(childTree->getAggr(i));
         }
       }
       else expRoot->addChild(childTree->getExpRoot());
@@ -290,14 +282,14 @@ public:
     Assert(!child->isAggr(), "require normal");
     if (isAggr()) {
         for (size_t i = 0; i < aggrForest.size(); i++) {
-          aggrForest[i]->addChild(child->getExpRoot());
+          aggrForest[i].first->addChild(child->getExpRoot());
         }
       }
       else expRoot->addChild(child->getExpRoot());
   }
   void addChild(ENode* child) {
     if (isAggr()) {
-      for (ENode* root : aggrForest) root->addChild(child);
+      for (auto entry : aggrForest) entry.first->addChild(child);
     } else {
       expRoot->addChild(child);
     }
@@ -313,7 +305,15 @@ public:
   }
   ENode* getAggr(int idx) {
     Assert((int)aggrForest.size() > idx, "idx %d is out of bound", idx);
-    return aggrForest[idx];
+    return aggrForest[idx].first;
+  }
+  bool getFlip(int idx) {
+    Assert((int)aggrForest.size() > idx, "idx %d is out of bound", idx);
+    return aggrForest[idx].second;
+  }
+  void setFlip(int idx, bool val) {
+    Assert((int)aggrForest.size() > idx, "idx %d is out of bound", idx);
+    aggrForest[idx].second = val;
   }
   // duplicated new ASTExpTree with the same name and new root
   ASTExpTree* dupEmpty() {
