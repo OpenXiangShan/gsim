@@ -10,6 +10,8 @@ public:
   valStatus status = VAL_VALID;
   std::vector<std::string> insts;
   mpz_t consVal;
+  int width = 0;
+  bool sign = 0;
 
   valInfo() {
     mpz_init(consVal);

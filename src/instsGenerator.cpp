@@ -133,15 +133,16 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   }
   // ret->opNum = ChildInfo(1, opNum) + ChildInfo(2, opNum) + 1;
   if (childBasic && enodeBasic) {
-    auto assignment = [lvalue, node](bool isStmt, std::string expr) {
+    auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign) {
       if (isStmt) return expr;
       if (expr.length() == 0) return std::string("");
       else if (isSubArray(lvalue, node)) return format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), expr.c_str(), lvalue.c_str());
+      else if (node->sign && node->width != width) return format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), expr.c_str());
       return lvalue + " = " + expr + ";";
     };
     std::string condStr = "if (" + ChildInfo(0, valStr) + ") ";
-    std::string trueStr = "{ " + (getChild(1) ? assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr)) : "") + " }";
-    std::string falseStr = "else { " + (getChild(2) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr)) : "") + " }";
+    std::string trueStr = "{ " + (getChild(1) ? assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), Child(1, width), Child(1, sign)) : "") + " }";
+    std::string falseStr = "else { " + (getChild(2) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), Child(2, width), Child(2, sign)) : "") + " }";
     ret->valStr = condStr + trueStr + falseStr;
     ret->opNum = -1; // assignment rather than expr
   } else {
@@ -1076,6 +1077,8 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     default:
       Panic();
   }
+  ret->width = width;
+  ret->sign = sign;
   computeInfo = ret;
   return ret;
 
@@ -1099,6 +1102,8 @@ valInfo* Node::compute() {
   } else {
     ret->valStr = name;
   }
+  ret->width = width;
+  ret->sign = sign;
   computeInfo = ret;
   for (std::string inst : valTree->getRoot()->computeInfo->insts) insts.push_back(inst);
   return ret;
@@ -1114,9 +1119,11 @@ void Node::finialConnect(std::string lvalue, valInfo* info) {
     else
       TODO();
   } else {
-    if (width <= BASIC_WIDTH)
-      insts.push_back(format("%s = %s;", lvalue.c_str(), info->valStr.c_str()));
-    else
+    if (width <= BASIC_WIDTH) {
+      if (sign && width != info->width) insts.push_back(format("%s = %s%s;", lvalue.c_str(), Cast(info->width, info->sign).c_str(), info->valStr.c_str()));
+      else insts.push_back(format("%s = %s;", lvalue.c_str(), info->valStr.c_str()));
+
+    } else
       TODO();
   }
 
