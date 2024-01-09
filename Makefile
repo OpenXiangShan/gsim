@@ -170,6 +170,6 @@ gendoc:
 # 	@clang-format -i --style=file $(SRCS) $(HEADERS)
 
 format-obj:
-	@clang-format -i --style=file obj/top.cpp
+	@clang-format -i --style=file obj/$(NAME).cpp
 
 .PHONY: compile clean emu difftest count makedir gendoc format-obj build-emu
