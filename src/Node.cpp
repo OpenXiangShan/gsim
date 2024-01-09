@@ -32,13 +32,15 @@ inverse topological order or [infer all encountered nodes]
 */
 void Node::inferWidth() {
   if (type == NODE_INVALID) return;
+  if (arrayVal.size() != 0 && arrayVal[0]->getRoot()->width == 0) {
+    for (ExpTree* arrayTree : arrayVal) {
+      arrayTree->getRoot()->inferWidth();
+      arrayTree->getlval()->inferWidth();
+    }
+  }
   if (width != 0 && (!valTree || valTree->getRoot()->width != 0)) return;
   Assert(valTree && valTree->getRoot(), "can not infer width of %s through empty valTree", name.c_str());
   valTree->getRoot()->inferWidth();
-  for (ExpTree* arrayTree : arrayVal) {
-    arrayTree->getRoot()->inferWidth();
-    arrayTree->getlval()->inferWidth();
-  }
   if (width == 0) setType(valTree->getRoot()->width, valTree->getRoot()->sign);
 }
 
