@@ -193,6 +193,13 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
       fprintf(fp, "std::cout << std::hex << +(uint64_t)%s%s << \" \";", member->name.c_str(), idxStr.c_str());
       fprintf(fp, "\n%s", bracket.c_str());
       fprintf(fp, "std::cout << std::endl;\n");
+    } else if (member->width > 128) {
+      fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\";\n", validSuper[node], member->name.c_str());
+      if (member->next.size() != 0) {
+        fprintf(fp, "mpz_out_str(stdout, 16, oldValMpz);\nstd::cout << \" -> \";\n");
+      }
+      fprintf(fp, "mpz_out_str(stdout, 16, %s);\n", member->name.c_str());
+      fprintf(fp, "std::cout << std::endl;\n");
     } else if (member->width > 64 && member->width <= 128) {
       if (member->next.size() != 0) // display old value and new value
         fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s  << \
