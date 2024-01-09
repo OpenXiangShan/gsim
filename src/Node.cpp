@@ -129,9 +129,9 @@ void TypeInfo::mergeInto(TypeInfo* info) {
 
 void TypeInfo::addDim(int num) {
   if (isAggr()) {
-    for (auto entry : aggrMember) entry.first->dimension.push_back(num);
+    for (auto entry : aggrMember) entry.first->dimension.insert(entry.first->dimension.begin(), num);
   } else {
-    dimension.push_back(num);
+    dimension.insert(dimension.begin(), num);
   }
 }
 
