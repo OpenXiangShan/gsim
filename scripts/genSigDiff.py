@@ -30,11 +30,11 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
       sign = int(line[0])
       width = int(line[1])
       name = line[2]
-      splitReg = line[4]
-      if len(name) > 5 and name[-5:] == "$prev":
-        name = name[0:len(name)-5]
-        if splitReg == '1':
-          name = name + "$next"
+      # splitReg = line[4]
+      # if len(name) > 5 and name[-5:] == "$prev":
+      #   name = name[0:len(name)-5]
+      #   if splitReg == '1':
+      #     name = name + "$next"
       idx = ref.find(" " + name + ";")
       modName = "mod->" + name
       refName = "ref->" + name
