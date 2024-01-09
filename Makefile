@@ -91,7 +91,7 @@ else
 	target = $(EMU_BUILD_DIR)/S$(NAME)_diff
 	CXXFLAGS += -DDIFFTEST_PER_SIG
 	GSIM_CFLAGS += -I$(REF_GSIM_DIR) -DREF_NAME=DiffNewTop
-	SIG_COMMAND = python3 scripts/genSigDiff.py
+	SIG_COMMAND = python3 scripts/genSigDiff.py $(NAME) $(DIFF_VERSION)
 endif
 
 $(GSIM_BUILD_DIR)/%.o: %.cpp $(PARSER_SRCS) $(HEADERS) Makefile

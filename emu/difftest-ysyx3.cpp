@@ -8,7 +8,7 @@
 #include <fstream>
 
 #if defined(GSIM)
-#include <top.h>
+#include <newtop.h>
 MOD_NAME* mod;
 #endif
 

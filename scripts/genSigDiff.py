@@ -35,7 +35,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
         name = name[0:len(name)-5]
         if splitReg == '1':
           name = name + "$next"
-      idx = ref.find(name + ";")
+      idx = ref.find(" " + name + ";")
       modName = "mod->" + name
       refName = "ref->" + name
       if idx != -1:
@@ -65,4 +65,4 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
 
 if __name__ == "__main__":
   sigFilter = SigFilter()
-  sigFilter.filter("obj/allSig.h", "emu/obj_2023_9_18/top_ref.h", "obj/checkSig.h")
+  sigFilter.filter("obj/" + sys.argv[1] + "_sigs.txt", "emu/obj_" + sys.argv[2] + "/top_ref.h", "obj/checkSig.h")
