@@ -21,6 +21,7 @@
 #include <cstdarg>
 
 // #define EMU_LOG
+// #define LOG_START 0
 
 #define LENGTH(a) (sizeof(a) / sizeof(a[0]))
 
