@@ -1184,7 +1184,6 @@ void graph::instsGenerator() {
   for (SuperNode* super : sortedSuper) {
     localTmpNum = 0;
     mpzTmpNum = 0;
-    maxTmp = MAX(maxTmp, mpzTmpNum);
     for (Node* n : super->member) {
       if (n->dimension.size() != 0) {
         n->computeArray();
@@ -1204,5 +1203,6 @@ void graph::instsGenerator() {
         }
       }
     }
+    maxTmp = MAX(maxTmp, mpzTmpNum);
   }
 }
