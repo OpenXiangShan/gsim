@@ -37,7 +37,11 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
       #     name = name + "$next"
       idx = ref.find(" " + name + ";")
       modName = "mod->" + name
-      refName = "ref->" + name
+      refSubName = name
+      if idx == -1:
+        refSubName = name.replace('_', '$')
+        idx = ref.find(" " + refSubName + ";")
+      refName = "ref->" + refSubName
       if idx != -1:
         if width <= 64:
           mask = hex((1 << width) - 1) if width <= 64 else "((__uint128_t)" + hex((1 << (width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
