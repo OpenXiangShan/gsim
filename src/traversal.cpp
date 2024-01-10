@@ -61,7 +61,7 @@ void ExpTree::display() {
     int depth;
     std::tie(top, depth) = enodes.top();
     enodes.pop();
-    printf("%s(%d %s %p) %s [width=%d]\n", std::string(depth * 2, ' ').c_str(), top->opType, OP2Name[top->opType], top, (top->nodePtr) ? top->nodePtr->name.c_str(): "", top->width);
+    printf("%s(%d %s %p) %s [width=%d, sign=%d]\n", std::string(depth * 2, ' ').c_str(), top->opType, OP2Name[top->opType], top, (top->nodePtr) ? top->nodePtr->name.c_str(): "", top->width, top->sign);
     for (int i = top->child.size() - 1; i >= 0; i --) {
       ENode* childENode = top->child[i];
       if (!childENode) continue;
@@ -75,7 +75,7 @@ void graph::traversal() {
   for (SuperNode* super : sortedSuper) {
     printf("----super %d----:\n", super->id);
     for (Node* node : super->member) {
-      printf("node %s[width %d]:\n", node->name.c_str(), node->width);
+      printf("node %s[width %d sign %d]:\n", node->name.c_str(), node->width, node->sign);
       if (node->valTree) node->valTree->display();
       for (size_t i = 0; i < node->arrayVal.size(); i ++) {
         printf("[array]\n");
@@ -88,6 +88,6 @@ void graph::traversal() {
 void SuperNode::display() {
    printf("----super %d----:\n", id);
   for (Node* node : member) {
-    printf("node %s[width %d]:\n", node->name.c_str(), node->width);
+    printf("node %s[width %d, sign %d]:\n", node->name.c_str(), node->width, node->sign);
   }
 }
