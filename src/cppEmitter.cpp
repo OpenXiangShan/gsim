@@ -93,6 +93,7 @@ void graph::genInterfaceInput(FILE* fp, Node* input) {
 }
 
 void graph::genInterfaceOutput(FILE* fp, Node* output) {
+  if (std::find(sortedSuper.begin(), sortedSuper.end(), output->super) == sortedSuper.end()) return;
   if (output->width > BASIC_WIDTH) {
     fprintf(fp, "std::string get_%s() {\n", output->name.c_str());
     fprintf(fp, "return std::string(\"0x\") + mpz_get_str(NULL, 16, %s);", output->name.c_str());
