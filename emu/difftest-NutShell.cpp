@@ -8,13 +8,18 @@
 #include <fstream>
 
 #if defined(GSIM)
-#include <top.h>
+#include <SimTop.h>
 MOD_NAME* mod;
 #endif
 
 #if defined(VERILATOR)
 #include "verilated.h"
 #include HEADER
+REF_NAME* ref;
+#endif
+
+#if defined(GSIM_DIFF)
+#include <top_ref.h>
 REF_NAME* ref;
 #endif
 
@@ -118,6 +123,7 @@ int main(int argc, char** argv) {
 #ifdef GSIM_DIFF
   ref = new REF_NAME();
   memcpy(&ref->mem$rdata_mem$mem, program, program_sz);
+  ref->set_io_uart_in_ch(-1);
   ref_reset();
   ref->step();
 #endif
@@ -159,15 +165,6 @@ int main(int argc, char** argv) {
 #endif
     if(dut_end) {
       clock_t dur = clock() - start;
-#if defined(GSIM)
-      // if(mod->cpu$regs$regs[0] == 0){
-#else
-      // if(ref->rootp->newtop__DOT__cpu__DOT__regs__DOT__regs_0 == 0) {
-#endif
-      //     printf("\33[1;32mCPU HIT GOOD TRAP after %d cycles (%d ms, %d per sec)\033[0m\n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
-      // }else{
-      //     printf("\33[1;31mCPU HIT BAD TRAP after %d cycles\033[0m\n", cycles);
-      // }
     }
   }
 }

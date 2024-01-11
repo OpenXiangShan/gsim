@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <fstream>
 
-#include <top.h>
+#include <SimTop.h>
 MOD_NAME* mod;
 
 #define MAX_PROGRAM_SIZE 0x8000000

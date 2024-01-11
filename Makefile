@@ -16,15 +16,17 @@ $(shell mkdir -p $(OBJ_DIR))
 
 # NAME ?= newtop
 # NAME ?= freechips.rocketchip.system.DefaultConfig
-NAME ?= Exp1AllTest
-# NAME ?= SimTop
+# NAME ?= Exp1AllTest
+NAME ?= SimTop
 # NAME ?= test
 
 # EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
-EMU_DIFFTEST = $(EMU_DIR)/emu.cpp
+EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
+# EMU_DIFFTEST = $(EMU_DIR)/emu.cpp
 
 MODE ?= 0
-DIFF_VERSION ?= 2023_10_11
+# DIFF_VERSION ?= 2023_10_11
+DIFF_VERSION ?= NutShell
 EVENT_DRIVEN ?= 0
 
 TEST_FILE = ready-to-run/$(NAME)
@@ -90,7 +92,7 @@ else
 	MODE_FLAGS += -DGSIM -DGSIM_DIFF
 	target = $(EMU_BUILD_DIR)/S$(NAME)_diff
 	CXXFLAGS += -DDIFFTEST_PER_SIG
-	GSIM_CFLAGS += -I$(REF_GSIM_DIR) -DREF_NAME=DiffNewTop
+	GSIM_CFLAGS += -I$(REF_GSIM_DIR) -DREF_NAME=Diff$(NAME)
 	SIG_COMMAND = python3 scripts/genSigDiff.py $(NAME) $(DIFF_VERSION)
 endif
 
