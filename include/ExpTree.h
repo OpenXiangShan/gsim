@@ -205,6 +205,7 @@ public:
       lvalue = _lvalue;
     }
     void display();
+    void replace(Node* oldNode, ENode* newSubTree);
     
 };
 

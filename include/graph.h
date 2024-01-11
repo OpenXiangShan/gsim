@@ -20,6 +20,7 @@ class graph {
   void genNodeStepEnd(FILE* fp, SuperNode* node);
   void genNodeInit(FILE* fp, Node* node);
   void reconnectSuper();
+  void updateSuper();
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;
@@ -44,6 +45,8 @@ class graph {
   void traversal();
   void splitArray();
   void removeDeadNodes();
+  void aliasAnalysis();
+
 };
 
 #endif

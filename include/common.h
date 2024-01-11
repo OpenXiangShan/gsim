@@ -93,6 +93,7 @@ class TypeInfo;
 class PNode;
 class Node;
 class AggrParentNode;
+class ENode;
 class ExpTree;
 class SuperNode;
 class valInfo;

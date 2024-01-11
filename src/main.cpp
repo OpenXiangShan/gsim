@@ -46,6 +46,8 @@ int main(int argc, char** argv) {
 
   g->removeDeadNodes();
 
+  g->aliasAnalysis();
+
   // g->traversal();
 
   g->instsGenerator();

@@ -196,6 +196,7 @@ class Node {
   void passWidthToPrev();
   void splitArray();
   std::string arrayMemberName(int idx);
+  ENode* isAlias();
 };
 
 class SuperNode {
