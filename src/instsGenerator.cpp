@@ -1093,6 +1093,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       for (ENode* childENode : child)
         computeInfo->valStr += childENode->computeInfo->valStr;
     }
+    width = computeInfo->width;
     return computeInfo;
   }
 
@@ -1158,6 +1159,8 @@ valInfo* Node::compute() {
   if (!valTree) {
     computeInfo = new valInfo();
     computeInfo->valStr = name;
+    computeInfo->width = width;
+    computeInfo->sign = sign;
     return computeInfo;
   }
   Assert(valTree && valTree->getRoot(), "empty valTree in node %s", name.c_str());
@@ -1198,6 +1201,8 @@ valInfo* Node:: computeArray() {
   if (computeInfo) return computeInfo;
   computeInfo = new valInfo();
   computeInfo->valStr = name;
+  computeInfo->width = width;
+  computeInfo->sign = sign;
 
   if (valTree) {
     std::string lvalue = name;

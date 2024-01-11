@@ -35,6 +35,8 @@ public:
     ret->valStr = valStr;
     ret->status = status;
     mpz_set(ret->consVal, consVal);
+    ret->width = width;
+    ret->sign = sign;
     return ret;
   }
 };
