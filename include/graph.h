@@ -19,6 +19,7 @@ class graph {
   void genNodeStepStart(FILE* fp, SuperNode* node);
   void genNodeStepEnd(FILE* fp, SuperNode* node);
   void genNodeInit(FILE* fp, Node* node);
+  void reconnectSuper();
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;
@@ -42,6 +43,7 @@ class graph {
   void usedBits();
   void traversal();
   void splitArray();
+  void removeDeadNodes();
 };
 
 #endif

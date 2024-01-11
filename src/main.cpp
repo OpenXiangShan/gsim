@@ -44,6 +44,8 @@ int main(int argc, char** argv) {
 
   g->topoSort();
 
+  g->removeDeadNodes();
+
   // g->traversal();
 
   g->instsGenerator();
