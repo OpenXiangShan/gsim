@@ -24,6 +24,10 @@ NAME ?= SimTop
 EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
 # EMU_DIFFTEST = $(EMU_DIR)/emu.cpp
 
+mainargs = ready-to-run/bin/linux-NutShell.bin
+# mainargs = ready-to-run/bin/bbl-hello.bin
+# mainargs = ysyx3-bin/rtthread.bin
+
 MODE ?= 0
 # DIFF_VERSION ?= 2023_10_11
 DIFF_VERSION ?= NutShell
@@ -67,10 +71,6 @@ REF_GSIM_SRCS = $(REF_GSIM_DIR)/top_ref.cpp
 REF_GSIM_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(REF_GSIM_SRCS:.cpp=.o))
 
 GSIM_CFLAGS = -O3 $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME) -DMOD_HEADER=\"$(NAME).h\"
-
-mainargs = ready-to-run/bin/linux-NutShell.bin
-# mainargs = ready-to-run/bin/bbl-hello.bin
-# mainargs = ysyx3-bin/rtthread.bin
 
 ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
