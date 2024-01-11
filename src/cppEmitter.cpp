@@ -32,6 +32,17 @@ static void inline declStep(FILE* fp) {
   fprintf(fp, "void step();\n");
 }
 
+void graph::genNodeInit(FILE* fp, Node* node) {
+  if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_init(%s);\n", node->name.c_str());
+  if (node->status == CONSTANT_NODE) {
+    if (node->width > BASIC_WIDTH) {
+      fprintf(fp, "mpz_set_str(%s, 16, %s);\n", node->name.c_str(), node->computeInfo->valStr.c_str());
+    } else {
+      fprintf(fp, "%s = %s;\n", node->name.c_str(), node->computeInfo->valStr.c_str());
+    }
+  }
+}
+
 FILE* graph::genHeaderStart(std::string headerFile) {
   FILE* header = std::fopen((std::string(OBJ_DIR) + "/" + headerFile + ".h").c_str(), "w");
 
@@ -61,6 +72,11 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   /* some initialization */
   fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags[i] = true;\n", superId);
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_init(MPZ_TMP$%d);\n", i);
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      genNodeInit(header, member);
+    }
+  }
   fprintf(header, "}\n");
 
   /* mpz variable used for intermidia values */

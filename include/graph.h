@@ -18,6 +18,7 @@ class graph {
   void genSrcEnd(FILE* fp);
   void genNodeStepStart(FILE* fp, SuperNode* node);
   void genNodeStepEnd(FILE* fp, SuperNode* node);
+  void genNodeInit(FILE* fp, Node* node);
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;
