@@ -92,8 +92,9 @@ int upperLog2(int x) {
   return (32 - __builtin_clz(x - 1));
 }
 
+static char buf[512];
+
 std::string format(const char *fmt, ...) {
-  char buf[256];
   va_list args;
   va_start(args, fmt);
   std::vsnprintf(buf, sizeof(buf), fmt, args);
