@@ -34,13 +34,6 @@ static void inline declStep(FILE* fp) {
 
 void graph::genNodeInit(FILE* fp, Node* node) {
   if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_init(%s);\n", node->name.c_str());
-  if (node->status == CONSTANT_NODE) {
-    if (node->width > BASIC_WIDTH) {
-      fprintf(fp, "mpz_set_str(%s, 16, %s);\n", node->name.c_str(), node->computeInfo->valStr.c_str());
-    } else {
-      fprintf(fp, "%s = %s;\n", node->name.c_str(), node->computeInfo->valStr.c_str());
-    }
-  }
 }
 
 FILE* graph::genHeaderStart(std::string headerFile) {
@@ -109,13 +102,16 @@ void graph::genInterfaceInput(FILE* fp, Node* input) {
 }
 
 void graph::genInterfaceOutput(FILE* fp, Node* output) {
+  /* TODO: fix constant output which is not exists in sortedsuper */
   if (std::find(sortedSuper.begin(), sortedSuper.end(), output->super) == sortedSuper.end()) return;
   if (output->width > BASIC_WIDTH) {
     fprintf(fp, "std::string get_%s() {\n", output->name.c_str());
-    fprintf(fp, "return std::string(\"0x\") + mpz_get_str(NULL, 16, %s);", output->name.c_str());
+    if (output->status == CONSTANT_NODE) fprintf(fp, "return \"0x%s\";\n", output->computeInfo->valStr.c_str());
+    else fprintf(fp, "return std::string(\"0x\") + mpz_get_str(NULL, 16, %s);\n", output->computeInfo->valStr.c_str());
   } else {
     fprintf(fp, "%s get_%s() {\n", widthUType(output->width).c_str(), output->name.c_str());
-    fprintf(fp, "return %s;\n", output->name.c_str());
+    if (output->status == CONSTANT_NODE) fprintf(fp, "return 0x%s;\n", output->computeInfo->valStr.c_str());
+    else fprintf(fp, "return %s;\n", output->computeInfo->valStr.c_str());
   }
   fprintf(fp, "}\n");
 }
@@ -265,17 +261,16 @@ void graph::genStep(FILE* fp) {
     if (node->regSplit && node->status == VALID_NODE) {
       if (node->dimension.size() == 0) {
         activateNext(fp, node, node->regNext->name);
-        if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_set(%s, %s);\n", node->name.c_str(), node->regNext->name.c_str());
-        else fprintf(fp, "%s = %s;\n", node->name.c_str(), node->regNext->name.c_str());
+        if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_set(%s, %s);\n", node->name.c_str(), node->regNext->computeInfo->valStr.c_str());
+        else fprintf(fp, "%s = %s;\n", node->name.c_str(), node->regNext->computeInfo->valStr.c_str());
       } else {
         activateUncondNext(fp, node);
         if (node->width > BASIC_WIDTH) TODO();
-        else fprintf(fp, "memcpy(%s, %s, sizeof(%s));\n", node->name.c_str(), node->regNext->name.c_str(), node->name.c_str());
+        else fprintf(fp, "memcpy(%s, %s, sizeof(%s));\n", node->name.c_str(), node->regNext->computeInfo->valStr.c_str(), node->name.c_str());
       }
     }
   }
   /* update memory*/
-  /* TODO: if latency == 0, read & write will happen in step function */
   /* writer affects other nodes through reader, no need to activate in writer */
   for (Node* mem : memory) {
     std::set<SuperNode*> readerL0;
@@ -288,11 +283,11 @@ void graph::genStep(FILE* fp) {
     if (mem->width > BASIC_WIDTH) TODO();
     for (Node* port : mem->member) {
       if (port->type == NODE_READER && mem->rlatency == 1) {
-        fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->name.c_str());
+        fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->computeInfo->valStr.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
         activateUncondNext(fp, port->member[READER_DATA]);
       } else if (port->type == NODE_WRITER) {
-        fprintf(fp, "if(%s && %s) {", port->member[WRITER_EN]->name.c_str(), port->member[WRITER_MASK]->name.c_str());
-        fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->name.c_str(), port->member[WRITER_DATA]->name.c_str());
+        fprintf(fp, "if(%s && %s) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str(), port->member[WRITER_MASK]->computeInfo->valStr.c_str());
+        fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
         for (SuperNode* super : readerL0) {
           Assert(validSuper.find(super) != validSuper.end(), "reader is not find in node %s\n", mem->name.c_str());
           fprintf(fp, "activeFlags[%d] = true;\n", validSuper[super]);
