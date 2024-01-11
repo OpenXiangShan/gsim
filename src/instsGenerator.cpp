@@ -992,8 +992,8 @@ valInfo* ENode::instsPrintf() {
   ret->status = VAL_FINISH;
   std::string printfInst = "if(" + ChildInfo(0, valStr) +  ") printf(" + strVal;
   for (int i = 1; i < getChildNum(); i ++) {
-    if (Child(i, width) > BASIC_WIDTH) TODO();
-    printfInst += ", " + ChildInfo(i, valStr);
+    if (Child(i, width) > BASIC_WIDTH) printfInst += ", mpz_get_ui(" + ChildInfo(i, valStr) + ")";
+    else printfInst += ", " + ChildInfo(i, valStr);
   }
   printfInst += ");";
 
