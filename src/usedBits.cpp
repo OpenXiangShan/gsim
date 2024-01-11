@@ -21,6 +21,12 @@ void ENode::passWidthToChild() {
       checkNodes.push_back(nodePtr);
     }
     nodePtr->update_usedBit(usedBit);
+    if (nodePtr->type == NODE_REG_SRC) {
+      if (nodePtr->usedBit != nodePtr->getDst()->usedBit) {
+        checkNodes.push_back(nodePtr->getDst());
+        nodePtr->getDst()->usedBit = nodePtr->usedBit;
+      }
+    }
     return;
   }
   if (child.size() == 0) return;
@@ -134,25 +140,13 @@ void graph::usedBits() {
   for (Node* node: checkNodes) {
     node->usedBit = node->width;
   }
-re_check:
+
   while (!checkNodes.empty()) {
     Node* top = checkNodes.back();
     visitedNodes.insert(top);
     checkNodes.pop_back();
     top->passWidthToPrev();
   }
-
-  for (Node* reg : regsrc) {
-    Assert(reg->usedBit <= reg->getDst()->usedBit, "%s usedBit reg %d regDst %d", reg->name.c_str(), reg->usedBit, reg->getDst()->usedBit);
-    /* for register that not used in supersrc (used in printf/assert or deadNodes) */
-    if (reg->usedBit == -1) reg->usedBit = reg->getDst()->usedBit;
-    if (reg->usedBit != reg->getDst()->usedBit) {
-      checkNodes.push_back(reg->getDst());
-      reg->getDst()->usedBit = reg->usedBit;
-    }
-  }
-
-  if (!checkNodes.empty()) goto re_check;
 
 /* NOTE: reset cond & reset val tree*/
 
