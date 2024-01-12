@@ -95,7 +95,7 @@ void graph::genInterfaceInput(FILE* fp, Node* input) {
     fprintf(fp, "activeFlags[%d] = true;\n", validSuper[input->super]);
   /* update next nodes*/
   for (Node* next : input->next) {
-    Assert (validSuper.find(next->super) != validSuper.end(), "next %s is not found in input %s\n", next->name.c_str(), input->name.c_str());
+    if (validSuper.find(next->super) == validSuper.end()) continue;
     fprintf(fp, "activeFlags[%d] = true;\n", validSuper[next->super]);
   }
   fprintf(fp, "}\n");

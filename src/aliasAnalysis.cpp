@@ -17,12 +17,17 @@ ENode* Node::isAlias() {
 }
 /* replace ENode points to oldnode to newSubTree*/
 void ExpTree::replace(Node* oldNode, ENode* newSubTree) {
+  Assert(!getlval() || getlval()->getNode() != oldNode, "invalid lvalue");
+
+  std::stack<ENode*> s;
+
   if(getRoot()->getNode() == oldNode) {
     setRoot(newSubTree);
-    return;
+  } else {
+    s.push(getRoot());
   }
-  std::stack<ENode*> s;
-  s.push(getRoot());
+  if (getlval()) s.push(getlval());
+
   while (!s.empty()) {
     ENode* top = s.top();
     s.pop();
