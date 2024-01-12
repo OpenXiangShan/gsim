@@ -44,11 +44,11 @@ int main(int argc, char** argv) {
 
   g->topoSort();
 
+  // g->traversal();
+
   g->removeDeadNodes();
 
   g->aliasAnalysis();
-
-  // g->traversal();
 
   g->instsGenerator();
   
