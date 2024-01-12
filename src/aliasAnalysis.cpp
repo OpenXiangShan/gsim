@@ -27,6 +27,7 @@ void ExpTree::replace(Node* oldNode, ENode* newSubTree) {
     ENode* top = s.top();
     s.pop();
     for (int i = 0; i < top->getChildNum(); i ++) {
+      if (!top->getChild(i)) continue;
       if (top->getChild(i)->getNode() == oldNode) {
         top->setChild(i, newSubTree);
       } else {
