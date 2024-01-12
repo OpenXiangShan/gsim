@@ -96,6 +96,11 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
     if (ChildInfo(0, valStr) == "0x0") return getChild(2)->computeInfo;
     else return getChild(1)->computeInfo;
   }
+  if (ChildInfo(1, status) == VAL_CONSTANT && ChildInfo(2, status) == VAL_CONSTANT) {
+    if (ChildInfo(1, valStr) == ChildInfo(2, valStr)) {
+      return getChild(1)->computeInfo;
+    }
+  }
   /* not constant */
   bool childBasic = Child(1, width) <= BASIC_WIDTH && Child(2, width) <= BASIC_WIDTH;
   bool enodeBasic = width <= BASIC_WIDTH;
@@ -123,6 +128,11 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   if (getChild(0)->computeInfo->status == VAL_CONSTANT) {
     if (ChildInfo(0, valStr) == "0x0") return getChild(2) ? Child(2, computeInfo) : new valInfo();
     else return getChild(1) ? getChild(1)->computeInfo : new valInfo();
+  }
+  if (getChild(1) && ChildInfo(1, status) == VAL_CONSTANT && getChild(2) && ChildInfo(2, status) == VAL_CONSTANT) {
+    if (ChildInfo(1, valStr) == ChildInfo(2, valStr)) {
+      return getChild(1)->computeInfo;
+    }
   }
   /* not constant */
   bool childBasic = (!getChild(1) || Child(1, width) <= BASIC_WIDTH) && (!getChild(2) || Child(2, width) <= BASIC_WIDTH);
