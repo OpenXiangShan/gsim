@@ -184,3 +184,15 @@ Node* ENode::getConnectNode() {
   if (begin < 0 || begin != end) return nodePtr;
   return nodePtr->getArrayMember(begin);
 }
+
+ENode* ENode::dup() {
+  ENode* ret = new ENode(opType);
+  ret->setNode(nodePtr);
+  ret->sign = sign;
+  ret->width = width;
+  ret->values.insert(ret->values.end(), values.begin(), values.end());
+  for (ENode* childNode : child) {
+    ret->addChild(childNode->dup());
+  }
+  return ret;
+}

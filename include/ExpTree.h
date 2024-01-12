@@ -164,6 +164,8 @@ public:
   void updateWidth();
   std::pair<int, int> getIdx(Node* n);
   Node* getConnectNode();
+  ENode* mergeSubTree(ENode* newSubTree);
+  ENode* dup();
 };
 
 /* 

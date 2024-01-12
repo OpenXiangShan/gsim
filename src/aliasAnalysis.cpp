@@ -8,13 +8,25 @@
 /* TODO: array alias */
 /* TODO: A = B[idx] */
 ENode* Node::isAlias() {
-  if (isArray()) return nullptr;
+  if (isArray()) {
+    if (arrayVal.size() == 1 && arrayVal[0]->getRoot()->getChildNum() == 0 && arrayVal[0]->getRoot()->getNode()) {
+      return arrayVal[0]->getRoot();
+    }
+    return nullptr;
+  }
   if (type != NODE_OTHERS) return nullptr;
   if (!valTree) return nullptr;
   if (!valTree->getRoot()->getNode()) return nullptr;
   if (prev.size() != 1) return nullptr;
   return valTree->getRoot();
 }
+
+ENode* ENode::mergeSubTree(ENode* newSubTree) {
+  ENode* ret = newSubTree->dup();
+  for (ENode* childENode : child) ret->addChild(childENode);
+  return ret;
+}
+
 /* replace ENode points to oldnode to newSubTree*/
 void ExpTree::replace(Node* oldNode, ENode* newSubTree) {
   Assert(!getlval() || getlval()->getNode() != oldNode, "invalid lvalue");
@@ -22,7 +34,7 @@ void ExpTree::replace(Node* oldNode, ENode* newSubTree) {
   std::stack<ENode*> s;
 
   if(getRoot()->getNode() == oldNode) {
-    setRoot(newSubTree);
+    setRoot(getRoot()->mergeSubTree(newSubTree));
   } else {
     s.push(getRoot());
   }
@@ -34,7 +46,7 @@ void ExpTree::replace(Node* oldNode, ENode* newSubTree) {
     for (int i = 0; i < top->getChildNum(); i ++) {
       if (!top->getChild(i)) continue;
       if (top->getChild(i)->getNode() == oldNode) {
-        top->setChild(i, newSubTree);
+        top->setChild(i, top->getChild(i)->mergeSubTree(newSubTree));
       } else {
         s.push(top->getChild(i));
       }
