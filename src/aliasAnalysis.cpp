@@ -6,11 +6,13 @@
 #include <stack>
 
 /* TODO: array alias */
+/* TODO: A = B[idx] */
 ENode* Node::isAlias() {
   if (isArray()) return nullptr;
   if (type != NODE_OTHERS) return nullptr;
   if (!valTree) return nullptr;
   if (!valTree->getRoot()->getNode()) return nullptr;
+  if (prev.size() != 1) return nullptr;
   return valTree->getRoot();
 }
 /* replace ENode points to oldnode to newSubTree*/
