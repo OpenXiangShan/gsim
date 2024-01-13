@@ -1168,7 +1168,11 @@ valInfo* Node::compute() {
 
   if (!valTree) {
     computeInfo = new valInfo();
-    computeInfo->valStr = name;
+    if (type == NODE_OTHERS) { // invalid nodes
+      computeInfo->setConstantByStr("0");
+    } else {
+      computeInfo->valStr = name;
+    }
     computeInfo->width = width;
     computeInfo->sign = sign;
     return computeInfo;
