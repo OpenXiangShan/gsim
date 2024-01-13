@@ -72,12 +72,17 @@ static std::string bitMask(int width) {
   return ret;
 }
 
-static std::string setMpz(std::string dstName, ENode* enode) {
+static std::string setMpz(std::string dstName, ENode* enode, valInfo* dstInfo) {
   std::string ret;
   if (enode->width > BASIC_WIDTH) {
     ret = format("mpz_set(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
   } else if (enode->width > 64) {
-    ret = format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
+    std::string localVal = enode->computeInfo->valStr;
+    if (enode->computeInfo->opNum > 0) {
+      localVal = newLocalTmp();
+      dstInfo->insts.push_back(format("%s %s = %s;", widthUType(enode->width).c_str(), localVal.c_str(), enode->computeInfo->valStr.c_str()));
+    }
+    ret = format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", dstName.c_str(), localVal.c_str());
   } else {
     ret = format("mpz_set_ui(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
   }
@@ -112,8 +117,8 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
     ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
   } else if (!childBasic && !enodeBasic) {
     std::string dstName = isRoot ? lvalue : newMpzTmp();
-    std::string trueAssign = setMpz(dstName, getChild(1));
-    std::string falseAssign = setMpz(dstName, getChild(2));
+    std::string trueAssign = setMpz(dstName, getChild(1), ret);
+    std::string falseAssign = setMpz(dstName, getChild(2), ret);
     ret->insts.push_back(format("if (%s) %s else %s", ChildInfo(0, valStr).c_str(), trueAssign.c_str(), falseAssign.c_str()));
     ret->valStr = dstName;
     ret->opNum = 0;
