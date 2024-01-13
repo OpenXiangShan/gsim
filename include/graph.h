@@ -52,6 +52,7 @@ class graph {
   size_t countNodes();
   void removeEmptySuper();
   void removeNodes(NodeStatus status);
+  bool inSrc(SuperNode* super);
 };
 
 #endif

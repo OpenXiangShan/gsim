@@ -8,7 +8,7 @@ void graph::mergeOut1() {
   for (int i = sortedSuper.size() - 1; i >= 0; i --) {
     SuperNode* super = sortedSuper[i];
     /* do not merge superNodes that contains reg src */
-    if (super->notMerge()) continue;
+    if (inSrc(super)) continue;
     if (super->next.size() == 1) {
       SuperNode* nextSuper = *(super->next.begin());
       /* move members in super to next super*/
@@ -37,7 +37,7 @@ void graph::mergeIn1() {
     SuperNode* super = sortedSuper[i];
     if (super->prev.size() == 1) {
       SuperNode* prevSuper = *(super->prev.begin());
-      if (prevSuper->notMerge()) continue;
+      if (inSrc(prevSuper)) continue;
       /* move members in super to prev super */
       for (Node* member : super->member) member->super = prevSuper;
       prevSuper->member.insert(prevSuper->member.end(), super->member.begin(), super->member.end());

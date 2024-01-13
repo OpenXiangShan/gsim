@@ -231,7 +231,6 @@ public:
   }
   bool instsEmpty();
   void display();
-  bool notMerge();
 };
 
 #endif
