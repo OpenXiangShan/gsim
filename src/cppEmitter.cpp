@@ -158,7 +158,7 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
   std::string ret;
   if (node->insts.size()) {
     /* save oldVal */
-    if (node->next.size() != 0 && node->dimension.size() == 0) {
+    if (node->anyExtEdge() && node->dimension.size() == 0) {
       if (node->width > BASIC_WIDTH) {
         fprintf(fp, "mpz_set(%s, %s);\n", oldMpz(node).c_str(), node->name.c_str());
       } else {
@@ -174,22 +174,26 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
 }
 
 static void activateNext(FILE* fp, Node* node, std::string oldName) {
-  if (node->next.size() == 0) return;
+  std::set<int> nextId;
+  for (Node* next : node->next) {
+    if (next->super == node->super || validSuper.find(next->super) == validSuper.end()) continue;
+    nextId.insert(validSuper[next->super]);
+  }
+  if (nextId.size() == 0) return;
   if (node->width > BASIC_WIDTH) {
     fprintf(fp, "if (mpz_cmp(%s, %s) != 0) {\n", node->name.c_str(), oldName.c_str());
   } else {
     fprintf(fp, "if (%s != %s) {\n", node->name.c_str(), oldName.c_str());
   }
-  for (Node* next : node->next) {
-    if (validSuper.find(next->super) == validSuper.end()) continue;
-    fprintf(fp, "activeFlags[%d] = true;\n", validSuper[next->super]);
+  for (int id : nextId) {
+    fprintf(fp, "activeFlags[%d] = true;\n", id);
   }
   fprintf(fp, "}\n");
 }
 
 static void activateUncondNext(FILE* fp, Node* node) {
   for (Node* next : node->next) {
-    if (validSuper.find(next->super) == validSuper.end()) continue;
+    if (validSuper.find(next->super) == validSuper.end() || next->super == node->super) continue;
     fprintf(fp, "activeFlags[%d] = true;\n", validSuper[next->super]);
   }
 }
@@ -221,13 +225,13 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
       fprintf(fp, "std::cout << std::endl;\n");
     } else if (member->width > 128) {
       fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\";\n", validSuper[node], member->name.c_str());
-      if (member->next.size() != 0) {
+      if (member->anyExtEdge()) {
         fprintf(fp, "mpz_out_str(stdout, 16, oldValMpz);\nstd::cout << \" -> \";\n");
       }
       fprintf(fp, "mpz_out_str(stdout, 16, %s);\n", member->name.c_str());
       fprintf(fp, "std::cout << std::endl;\n");
     } else if (member->width > 64 && member->width <= 128) {
-      if (member->next.size() != 0) // display old value and new value
+      if (member->anyExtEdge()) // display old value and new value
         fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s  << \
                     \" -> \" << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s << std::endl;\n",
                 validSuper[node], member->name.c_str(), oldName(member).c_str(), oldName(member).c_str(), member->name.c_str(), member->name.c_str());
@@ -236,7 +240,7 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
             validSuper[node], member->name.c_str(), member->name.c_str(), member->name.c_str());
       }
     } else {
-      if (member->next.size() != 0) // display old value and new value
+      if (member->anyExtEdge()) // display old value and new value
         fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << +%s << \" -> \" << +%s << std::endl;\n", validSuper[node], member->name.c_str(), oldName(member).c_str(), member->name.c_str());
       else if (member->type != NODE_SPECIAL) {
         fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << +%s << std::endl;\n", validSuper[node], member->name.c_str(), member->name.c_str());

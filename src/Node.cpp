@@ -175,3 +175,12 @@ void Node::addReset() {
     tree->setRoot(arrayWhenTop);
   }
 }
+
+bool Node::anyExtEdge() {
+  for (Node* nextNode : next) {
+    if (nextNode->super != super) {
+      return true;
+    }
+  }
+  return false;
+}

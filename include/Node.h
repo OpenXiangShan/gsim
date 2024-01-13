@@ -197,6 +197,7 @@ class Node {
   void splitArray();
   std::string arrayMemberName(int idx);
   ENode* isAlias();
+  bool anyExtEdge();
 };
 
 class SuperNode {
