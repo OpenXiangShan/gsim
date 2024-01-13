@@ -211,7 +211,7 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
   }
 #ifdef EMU_LOG
   for (Node* member : node->member) {
-    fprintf(fp, "if (cycles > %d) {\n", LOG_START);
+    fprintf(fp, "if (cycles >= %d) {\n", LOG_START);
     if (member->dimension.size() != 0) {
       fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" ;\n", validSuper[node], member->name.c_str());
       std::string idxStr, bracket;
