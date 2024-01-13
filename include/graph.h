@@ -51,6 +51,7 @@ class graph {
   void mergeNodes();
   size_t countNodes();
   void removeEmptySuper();
+  void removeNodes(NodeStatus status);
 };
 
 #endif

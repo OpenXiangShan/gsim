@@ -1265,4 +1265,12 @@ void graph::instsGenerator() {
     }
     maxTmp = MAX(maxTmp, mpzTmpNum);
   }
+  /* remove constant nodes */
+  size_t totalNodes = countNodes();
+  size_t totalSuper = sortedSuper.size();
+  removeNodes(CONSTANT_NODE);
+  size_t optimizeNodes = countNodes();
+  size_t optimizeSuper = sortedSuper.size();
+  printf("[instGenerator] remove %ld constantNodes (%ld -> %ld)\n", totalNodes - optimizeNodes, totalNodes, optimizeNodes);
+  printf("[instGenerator] remove %ld superNodes (%ld -> %ld)\n",  totalSuper - optimizeSuper, totalSuper, optimizeSuper);
 }

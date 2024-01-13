@@ -33,6 +33,18 @@ size_t graph::countNodes() {
   return ret;
 }
 
+void graph::removeNodes(NodeStatus status) {
+  for (SuperNode* super : sortedSuper) {
+    super->member.erase(
+      std::remove_if(super->member.begin(), super->member.end(), [status](const Node* n){ return n->status == status; }),
+      super->member.end()
+    );
+  }
+
+  removeEmptySuper();
+  reconnectSuper();
+}
+
 void graph::removeEmptySuper() {
   sortedSuper.erase(
     std::remove_if(sortedSuper.begin(), sortedSuper.end(), [](const SuperNode* super) {return super->member.size() == 0; }),
