@@ -26,3 +26,16 @@ void graph::updateSuper() {
 
   reconnectSuper();
 }
+
+size_t graph::countNodes() {
+  size_t ret = 0;
+  for (SuperNode* super : sortedSuper) ret += super->member.size();
+  return ret;
+}
+
+void graph::removeEmptySuper() {
+  sortedSuper.erase(
+    std::remove_if(sortedSuper.begin(), sortedSuper.end(), [](const SuperNode* super) {return super->member.size() == 0; }),
+    sortedSuper.end()
+  );
+}

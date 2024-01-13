@@ -20,6 +20,9 @@ class graph {
   void genNodeInit(FILE* fp, Node* node);
   void reconnectSuper();
   void updateSuper();
+  /* defined in mergeNodes */
+  void mergeOut1();
+  void mergeIn1();
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;
@@ -45,7 +48,9 @@ class graph {
   void splitArray();
   void removeDeadNodes();
   void aliasAnalysis();
-
+  void mergeNodes();
+  size_t countNodes();
+  void removeEmptySuper();
 };
 
 #endif

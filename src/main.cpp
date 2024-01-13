@@ -50,6 +50,8 @@ int main(int argc, char** argv) {
 
   g->aliasAnalysis();
 
+  g->mergeNodes();
+
   g->instsGenerator();
   
   g->cppEmitter();
