@@ -33,6 +33,7 @@ static void inline declStep(FILE* fp) {
 }
 
 void graph::genNodeInit(FILE* fp, Node* node) {
+  if (node->status != VALID_NODE) return;
   if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_init(%s);\n", node->name.c_str());
 }
 
@@ -123,7 +124,7 @@ void graph::genHeaderEnd(FILE* fp) {
 }
 
 void graph::genNodeDef(FILE* fp, Node* node) {
-  if (node->type == NODE_SPECIAL) return;
+  if (node->type == NODE_SPECIAL || node->status != VALID_NODE) return;
   if (node->width <= BASIC_WIDTH) {
     fprintf(fp, "%s %s", widthUType(node->width).c_str(), node->name.c_str());
   } else {
@@ -211,6 +212,7 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
   }
 #ifdef EMU_LOG
   for (Node* member : node->member) {
+    if (member->status != VALID_NODE) continue;
     fprintf(fp, "if (cycles >= %d) {\n", LOG_START);
     if (member->dimension.size() != 0) {
       fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" ;\n", validSuper[node], member->name.c_str());
@@ -293,7 +295,7 @@ void graph::genStep(FILE* fp) {
         fprintf(fp, "if(%s && %s) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str(), port->member[WRITER_MASK]->computeInfo->valStr.c_str());
         fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
         for (SuperNode* super : readerL0) {
-          Assert(validSuper.find(super) != validSuper.end(), "reader is not find in node %s\n", mem->name.c_str());
+          if (validSuper.find(super) == validSuper.end()) continue;
           fprintf(fp, "activeFlags[%d] = true;\n", validSuper[super]);
         }
         fprintf(fp, "}\n");

@@ -31,7 +31,7 @@ public:
   }
   valInfo* dup() {
     valInfo* ret = new valInfo();
-    ret->opNum = 0;
+    ret->opNum = opNum;
     ret->valStr = valStr;
     ret->status = status;
     mpz_set(ret->consVal, consVal);

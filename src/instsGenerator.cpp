@@ -1178,11 +1178,15 @@ valInfo* Node::compute() {
     return computeInfo;
   }
   Assert(valTree && valTree->getRoot(), "empty valTree in node %s", name.c_str());
-  valInfo* ret = valTree->getRoot()->compute(this, name, true)->dup();
+  bool isRoot = anyExtEdge() || next.size() != 1;
+  valInfo* ret = valTree->getRoot()->compute(this, name, isRoot)->dup();
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
-  } else {
+  } else if (isRoot || ret->opNum < 0){
     ret->valStr = name;
+    ret->opNum = 0;
+  } else {
+    status = MERGED_NODE;
   }
   ret->width = width;
   ret->sign = sign;
@@ -1254,6 +1258,7 @@ void graph::instsGenerator() {
       } else {
         if (!n->valTree) continue;
         n->compute();
+        if (n->status == MERGED_NODE) continue;
         valInfo* assignInfo = n->valTree->getRoot()->computeInfo;
         if (assignInfo->status == VAL_VALID) {
           if (assignInfo->opNum < 0) {
