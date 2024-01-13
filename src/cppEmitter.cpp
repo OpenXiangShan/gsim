@@ -264,7 +264,7 @@ void graph::genStep(FILE* fp) {
   for (Node* node : regsrc) {
     if (node->regSplit && node->status == VALID_NODE) {
       if (node->dimension.size() == 0) {
-        activateNext(fp, node, node->regNext->name);
+        activateNext(fp, node, node->regNext->computeInfo->valStr);
         if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_set(%s, %s);\n", node->name.c_str(), node->regNext->computeInfo->valStr.c_str());
         else fprintf(fp, "%s = %s;\n", node->name.c_str(), node->regNext->computeInfo->valStr.c_str());
       } else {
