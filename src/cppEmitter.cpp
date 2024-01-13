@@ -333,7 +333,6 @@ void graph::cppEmitter() {
       genNodeInsts(src, n);
     }
     genNodeStepEnd(src, super);
-    // genNodeStep(src, super, insts);
   }
   /* memory definition */
   for (Node* mem : memory) genNodeDef(header, mem);

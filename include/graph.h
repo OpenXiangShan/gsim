@@ -10,7 +10,6 @@ class graph {
   FILE* genSrcStart(std::string name);
   void genNodeDef(FILE* fp, Node* node);
   void genNodeInsts(FILE* fp, Node* node);
-  void genNodeStep(FILE* fp, SuperNode* node, std::string& insts);
   void genInterfaceInput(FILE* fp, Node* input);
   void genInterfaceOutput(FILE* fp, Node* output);
   void genStep(FILE* fp);
