@@ -1198,6 +1198,10 @@ valInfo* Node::compute() {
   valInfo* ret = valTree->getRoot()->compute(this, name, isRoot)->dup();
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
+    if (type == NODE_REG_DST) {
+      getSrc()->status = CONSTANT_NODE;
+      getSrc()->computeInfo = ret;
+    }
   } else if (isRoot || ret->opNum < 0){
     ret->valStr = name;
     ret->opNum = 0;
