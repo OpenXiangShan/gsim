@@ -21,7 +21,7 @@ public:
   }
   void setConsStr() {
     valStr = mpz_get_str(NULL, 16, consVal);
-    if (valStr.length() <= 16) valStr = "0x" + valStr;
+    if (valStr.length() <= 16) valStr = Cast(width, sign) + "0x" + valStr;
     else valStr = format("UINT128(0x%s, 0x%s)", valStr.substr(0, valStr.length() - 16).c_str(), valStr.substr(valStr.length()-16, 16).c_str());
     status = VAL_CONSTANT;
   }
