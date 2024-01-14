@@ -147,8 +147,8 @@ int main(int argc, char** argv) {
     cycles ++;
 #if defined(GSIM)
     mod->step();
-    if (mod->io_uart_out_valid) {
-      printf("%c", mod->io_uart_out_ch);
+    if (mod->get_io_uart_out_valid()) {
+      printf("%c", mod->get_io_uart_out_ch());
       fflush(stdout);
     }
     // dut_end = (mod->cpu$writeback$valid_r == 1) && (mod->cpu$writeback$inst_r == 0x6b);
