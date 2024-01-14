@@ -222,7 +222,11 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
         idxStr += "[i" + std::to_string(i) + "]";
         bracket += "}\n";
       }
-      fprintf(fp, "std::cout << std::hex << +(uint64_t)%s%s << \" \";", member->name.c_str(), idxStr.c_str());
+      std::string nameIdx = member->name + idxStr;
+      if (member->width > 64)
+        fprintf(fp, "std::cout << std::hex << +(uint64_t)(%s >> 64) << +(uint64_t)(%s) << \" \";", nameIdx.c_str(), nameIdx.c_str());
+      else
+        fprintf(fp, "std::cout << std::hex << +(uint64_t)%s << \" \";", nameIdx.c_str());
       fprintf(fp, "\n%s", bracket.c_str());
       fprintf(fp, "std::cout << std::endl;\n");
     } else if (member->width > 128) {
