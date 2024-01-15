@@ -59,6 +59,8 @@ enum OPType {
   OP_INT,
 /* special nodes for memory */
   OP_READ_MEM,
+/* special nodes for invalid node */
+  OP_INVALID,
 };
 
 class ENode {
@@ -102,6 +104,7 @@ class ENode {
   valInfo* instsIndex(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsInt(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsReadMem(Node* node, std::string lvalue, bool isRoot);
+  valInfo* instsInvalid(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsPrintf();
   valInfo* instsAssert();
   /* used in usedBits */

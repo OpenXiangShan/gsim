@@ -222,6 +222,16 @@ ASTExpTree* visitIntNoInit(graph* g, PNode* expr) {
   return ret;
 }
 /*
+  reference Is Invalid info
+*/
+ASTExpTree* visitInvalid(graph* g, PNode* expr) {
+  TYPE_CHECK(expr, 0, 0, P_INVALID);
+  ASTExpTree* ret = new ASTExpTree(false);
+  ret->setType(expr->width, expr->sign);
+  ret->setOp(OP_INVALID);
+  return ret;
+}
+/*
 | IntType width '(' INT ')' { $$ = newNode(P_EXPR_INT_INIT, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); $$->appendExtraInfo($4);}
 */
 ASTExpTree* visitIntInit(graph* g, PNode* expr) {
@@ -405,6 +415,7 @@ ASTExpTree* visitExpr(graph* g, PNode* expr) {
     case P_1EXPR: ret = visit1Expr(g, expr); break;
     case P_1EXPR1INT: ret = visit1Expr1Int(g, expr); break;
     case P_1EXPR2INT: ret = visit1Expr2Int(g, expr); break;
+    case P_INVALID: ret = visitInvalid(g, expr); break;
     default: printf("Invalid type %d\n", expr->type); Panic();
   }
   return ret;

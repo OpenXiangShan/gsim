@@ -148,6 +148,14 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       return computeInfo;
     }
   }
+  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID) {
+    if (getChild(2)) computeInfo = Child(2, computeInfo);
+    return computeInfo;
+  }
+  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID) {
+    if (getChild(1)) computeInfo = Child(1, computeInfo);
+    return computeInfo;
+  }
   /* not constant */
   bool childBasic = (!getChild(1) || Child(1, width) <= BASIC_WIDTH) && (!getChild(2) || Child(2, width) <= BASIC_WIDTH);
   bool enodeBasic = width <= BASIC_WIDTH;
@@ -1060,6 +1068,11 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   return ret;
 }
 
+valInfo* ENode::instsInvalid(Node* node, std::string lvalue, bool isRoot) {
+  computeInfo->status = VAL_INVALID;
+  return computeInfo;
+}
+
 valInfo* ENode::instsPrintf() {
   valInfo* ret = computeInfo;
   ret->status = VAL_FINISH;
@@ -1169,12 +1182,12 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     case OP_WHEN: instsWhen(n, lvalue, isRoot); break;
     case OP_INT: instsInt(n, lvalue, isRoot); break;
     case OP_READ_MEM: instsReadMem(n, lvalue, isRoot); break;
+    case OP_INVALID: instsInvalid(n, lvalue, isRoot); break;
     case OP_PRINTF: instsPrintf(); break;
     case OP_ASSERT: instsAssert(); break;
     default:
       Panic();
   }
-
   return computeInfo;
 
 }

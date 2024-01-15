@@ -65,6 +65,7 @@ enum PNodeType{
   P_CONS_INDEX,
   P_L_CONS_INDEX,
   P_L_INDEX,
+  P_INVALID,
 };
 
 enum PNodeState { VALID_PNODE, CONSTANT_PNODE };
