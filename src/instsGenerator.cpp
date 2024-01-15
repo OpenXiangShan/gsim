@@ -235,7 +235,7 @@ valInfo* ENode::instsMul(Node* node, std::string lvalue, bool isRoot) {
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   } else if (childBasic && !enodeBaisc) {
     std::string dstName = isRoot ? lvalue : newMpzTmp();
-    std::string lname = dstName;
+    std::string lname = newMpzTmp();
     std::string rname = newMpzTmp();
     /* assign left & right values to mpz variables */
     if (Child(0, width) > 64) {
@@ -472,8 +472,9 @@ valInfo* ENode::instsDshl(Node* node, std::string lvalue, bool isRoot) {
   } else if (childBasic && !enodeBasic) {
     std::string dstName = isRoot ? lvalue : newMpzTmp();
     if (Child(0, width) < 64 && Child(1, width) < 64) {
-      ret->insts.push_back(format("mpz_set_ui(%s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str()));
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %s);", dstName.c_str(), dstName.c_str(), ChildInfo(1, valStr).c_str()));
+      std::string midName = newMpzTmp();
+      ret->insts.push_back(format("mpz_set_ui(%s, %s);", midName.c_str(), ChildInfo(0, valStr).c_str()));
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
       ret->valStr = dstName;
       ret->opNum = 0;
     } else {
@@ -596,6 +597,7 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
   } else if (childBasic && !enodeBaisc) { // child <= 128, cur > 128
     Assert(ChildInfo(0, opNum) >= 0 && ChildInfo(1, opNum) >= 0, "invalid opNum (%d %s) (%d, %s)", ChildInfo(0, opNum), ChildInfo(0, valStr).c_str(), ChildInfo(1, opNum), ChildInfo(1, valStr).c_str());
     std::string dstName = isRoot ? lvalue : newMpzTmp();
+    std::string midName = newMpzTmp();
     /* set first value */
     if (Child(0, width) > 64) {
       std::string leftName = ChildInfo(0, valStr);
@@ -604,10 +606,10 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
         ret->insts.push_back(widthUType(Child(0, width)) + " " + leftName + " = " + ChildInfo(0, valStr) + ";");
       }
       /* import size = 2, least significant first, each 8B, host edian */
-      std::string setLeftInst = "mpz_import(" + dstName + ", 2, -1, 8, 0, 0, (mp_limb_t*)&" + leftName + ");";
+      std::string setLeftInst = "mpz_import(" + midName + ", 2, -1, 8, 0, 0, (mp_limb_t*)&" + leftName + ");";
       ret->insts.push_back(setLeftInst);
     } else {
-      ret->insts.push_back("mpz_set_ui(" + dstName + ", " + ChildInfo(0, valStr) + ");");
+      ret->insts.push_back("mpz_set_ui(" + midName + ", " + ChildInfo(0, valStr) + ");");
     }
     /* concat second value*/
     if (Child(1, width) > 64) {
@@ -616,20 +618,21 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
         rightName = newLocalTmp();
         ret->insts.push_back(format("%s %s = %s;", widthUType(Child(1, width)).c_str(), rightName.c_str(), ChildInfo(1, valStr).c_str()));
       }
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), dstName.c_str(), Child(1, width) - 64));
-      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s >> 64);", dstName.c_str(), dstName.c_str(), rightName.c_str()));
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, 64);", dstName.c_str(), dstName.c_str()));
-      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), dstName.c_str(), rightName.c_str()));
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), midName.c_str(), Child(1, width) - 64));
+      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s >> 64);", midName.c_str(), midName.c_str(), rightName.c_str()));
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, 64);", midName.c_str(), midName.c_str()));
+      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), midName.c_str(), rightName.c_str()));
     } else {
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), dstName.c_str(), Child(1, width)));
-      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), dstName.c_str(), ChildInfo(1, valStr).c_str()));
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), midName.c_str(), Child(1, width)));
+      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
     }
     ret->valStr = dstName;
     ret->opNum = 0;
   } else if (!childBasic && !enodeBaisc) { // child > 128, cur > 128
+    std::string midName = newMpzTmp();
     std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), ChildInfo(0, valStr).c_str(), Child(1, width)));
-    ret->insts.push_back(format("mpz_add(%s, %s, %s);", dstName.c_str(), dstName.c_str(), ChildInfo(1, valStr).c_str()));
+    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), ChildInfo(0, valStr).c_str(), Child(1, width)));
+    ret->insts.push_back(format("mpz_add(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
     ret->valStr = dstName;
     ret->opNum = 0;
   } else {
