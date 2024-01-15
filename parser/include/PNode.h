@@ -16,7 +16,7 @@ class Node;
 
 /* AST Node */
 enum PNodeType{
-  P_INVALID,
+  P_EMPTY,
   P_CIRCUIT,
   P_MOD,
   P_EXTMOD,

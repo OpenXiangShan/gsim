@@ -8,7 +8,7 @@
 #include <map>
 
 const char* pname[] = {
-  "P_INVALID", "P_CIRCUIT", "P_MOD", "P_EXTMOD", "P_INTMOD", "P_PORTS", "P_INPUT", 
+  "P_EMPTY", "P_CIRCUIT", "P_MOD", "P_EXTMOD", "P_INTMOD", "P_PORTS", "P_INPUT",
   "P_OUTPUT", "P_WIRE_DEF", "P_REG_DEF", "P_INST", "P_NODE", "P_CONNECT", 
   "P_PAR_CONNECT", "P_WHEN", "P_MEMORY", "P_READER", "P_WRITER", 
   "P_READWRITER", "P_RUW", "P_RLATENCT", "P_WLATENCT", "P_DATATYPE", "P_DEPTH", 

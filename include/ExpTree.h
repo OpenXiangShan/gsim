@@ -8,7 +8,7 @@ class Node;
 class valInfo;
 
 enum OPType {
-  OP_INVALID,
+  OP_EMPTY,
   OP_MUX,
 /* 2expr */
   OP_ADD,
@@ -112,7 +112,7 @@ class ENode {
 public:
   Node* nodePtr = nullptr;   // leafNodes: point to a real node; internals: nullptr
   std::vector<ENode*> child;
-  OPType opType = OP_INVALID;
+  OPType opType = OP_EMPTY;
   int width = 0;
   bool sign = false;
   int usedBit = -1;
@@ -122,7 +122,7 @@ public:
   std::string strVal;
   valInfo* computeInfo = nullptr;
 // potential: index
-  ENode(OPType type = OP_INVALID) {
+  ENode(OPType type = OP_EMPTY) {
     opType = type;
   }
   ENode(Node* _node) {
