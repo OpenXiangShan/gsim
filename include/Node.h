@@ -119,6 +119,9 @@ class Node {
   Node* arrayParent = nullptr;
 /* used for visitWhen in AST2Graph */
 
+/* used in cppEmitter */
+  std::set<int> nextActiveId;
+
   std::vector<std::string> insts;
   void set_id(int _id) {
     id     = _id;
@@ -199,6 +202,9 @@ class Node {
   std::string arrayMemberName(int idx);
   ENode* isAlias();
   bool anyExtEdge();
+  bool needActivate();
+  void updateActivate();
+  void removeConnection();
 };
 
 class SuperNode {
@@ -211,6 +217,7 @@ public:
   std::vector<Node*> member; // The order of member is neccessary
   int id;
   int order;
+  int cppId = -1;
   SuperNode() {
     id = counter ++;
   }
@@ -233,6 +240,12 @@ public:
   }
   bool instsEmpty();
   void display();
+  int findIndex(Node* node) {
+    for (size_t ret = 0; ret < member.size(); ret ++) {
+      if (member[ret] == node) return ret;
+    }
+    Panic();
+  }
 };
 
 #endif

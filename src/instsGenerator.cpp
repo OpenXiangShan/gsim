@@ -1205,7 +1205,7 @@ valInfo* Node::compute() {
       getSrc()->status = CONSTANT_NODE;
       getSrc()->computeInfo = ret;
       /* re-compute nodes depend on src */
-      for (Node* next : getSrc()->next) {
+      for (Node* next : (regSplit ? getSrc() : this)->next) {
         if (next->computeInfo)
           next->recompute();
       }
@@ -1239,6 +1239,7 @@ void ExpTree::clearInfo(){
 }
 
 void Node::recompute() {
+  if (!computeInfo) return;
   valInfo* prevVal = computeInfo;
   computeInfo = nullptr;
   for (ExpTree* tree : arrayVal) tree->clearInfo();
@@ -1336,6 +1337,11 @@ void graph::instsGenerator() {
   /* remove constant nodes */
   size_t totalNodes = countNodes();
   size_t totalSuper = sortedSuper.size();
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->status == CONSTANT_NODE) member->removeConnection();
+    }
+  }
   removeNodes(CONSTANT_NODE);
   size_t optimizeNodes = countNodes();
   size_t optimizeSuper = sortedSuper.size();

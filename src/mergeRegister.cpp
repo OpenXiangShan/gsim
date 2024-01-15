@@ -25,7 +25,9 @@ void graph::mergeRegister() {
   for (Node* reg : regsrc) {
     bool spilt = false;
     for (Node* next : reg->next) {
-      if (next != reg->getDst() && next->super->order >= reg->getDst()->super->order) {
+      bool outSuperLater = next->super->order > reg->getDst()->super->order;
+      bool inSuperLater = (next->super == reg->getDst()->super) && (next->super->findIndex(next) > reg->getDst()->super->findIndex(reg->getDst()));
+      if (outSuperLater || inSuperLater) {
         spilt = true;
         break;
       }
@@ -46,12 +48,17 @@ void graph::mergeRegister() {
         next->prev.insert(reg->getDst());
       }
       reg->getDst()->next.insert(reg->next.begin(), reg->next.end());
+      reg->prev.clear();
+      reg->next.clear();
       /* update superNode connection */
       for (Node* next : reg->next) {
         next->super->prev.erase(reg->super);
         next->super->prev.insert(reg->getDst()->super);
       }
       reg->getDst()->super->next.insert(reg->super->next.begin(), reg->super->next.end());
+
+      reg->getDst()->super->member.push_back(reg);
+      reg->super = reg->getDst()->super;
     }
   }
   /* remove reg from regsrc */

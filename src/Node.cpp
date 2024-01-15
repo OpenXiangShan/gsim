@@ -184,3 +184,25 @@ bool Node::anyExtEdge() {
   }
   return false;
 }
+
+bool Node::needActivate() {
+  return nextActiveId.size() != 0;
+}
+
+
+void Node::updateActivate() {
+  for (Node* nextNode : next) {
+    if (nextNode->super != super) {
+      if (nextNode->super->cppId != -1)
+        nextActiveId.insert(nextNode->super->cppId);
+    } else if (super->findIndex(this) >= super->findIndex(nextNode)) {
+      if (super->cppId != -1)
+        nextActiveId.insert(super->cppId);
+    }
+  }
+}
+
+void Node::removeConnection() {
+  for (Node* prevNode : prev) prevNode->next.erase(this);
+  for (Node* nextNode : next) nextNode->prev.erase(this);
+}
