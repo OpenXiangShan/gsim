@@ -25,7 +25,7 @@ void graph::mergeRegister() {
   for (Node* reg : regsrc) {
     bool spilt = false;
     for (Node* next : reg->next) {
-      if (next->super->order >= reg->getDst()->super->order) {
+      if (next != reg->getDst() && next->super->order >= reg->getDst()->super->order) {
         spilt = true;
         break;
       }
