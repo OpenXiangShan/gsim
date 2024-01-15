@@ -193,6 +193,7 @@ class Node {
   void constructSuperConnect(); // connect superNode
   valInfo* compute(); // compute node
   valInfo* computeArray();
+  void recompute();
   void passWidthToPrev();
   void splitArray();
   std::string arrayMemberName(int idx);

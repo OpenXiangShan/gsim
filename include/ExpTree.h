@@ -208,6 +208,8 @@ public:
     }
     void display();
     void replace(Node* oldNode, ENode* newSubTree);
+
+    void clearInfo();
     
 };
 

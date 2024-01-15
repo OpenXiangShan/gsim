@@ -1201,6 +1201,11 @@ valInfo* Node::compute() {
     if (type == NODE_REG_DST) {
       getSrc()->status = CONSTANT_NODE;
       getSrc()->computeInfo = ret;
+      /* re-compute nodes depend on src */
+      for (Node* next : getSrc()->next) {
+        if (next->computeInfo)
+          next->recompute();
+      }
     }
   } else if (isRoot || ret->opNum < 0){
     ret->valStr = name;
@@ -1213,8 +1218,32 @@ valInfo* Node::compute() {
   ret->sign = sign;
   computeInfo = ret;
   for (std::string inst : valTree->getRoot()->computeInfo->insts) insts.push_back(inst);
-
   return ret;
+}
+
+void ExpTree::clearInfo(){
+  std::stack<ENode*> s;
+  s.push(getRoot());
+  s.push(getlval());
+
+  while(!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    if (!top) continue;
+    top->computeInfo = nullptr;
+    for (ENode* child : top->child) s.push(child);
+  }
+}
+
+void Node::recompute() {
+  valInfo* prevVal = computeInfo;
+  computeInfo = nullptr;
+  for (ExpTree* tree : arrayVal) tree->clearInfo();
+  if (valTree) valTree->clearInfo();
+  compute();
+  if (prevVal->valStr != computeInfo->valStr) {
+    for (Node* nextNode : next) nextNode->recompute();
+  }
 }
 
 void Node::finialConnect(std::string lvalue, valInfo* info) {
@@ -1271,6 +1300,7 @@ valInfo* Node:: computeArray() {
 }
 
 void graph::instsGenerator() {
+  std::set<Node*>s;
   for (SuperNode* super : sortedSuper) {
     localTmpNum = 0;
     mpzTmpNum = 0;
@@ -1281,20 +1311,24 @@ void graph::instsGenerator() {
         if (!n->valTree) continue;
         n->compute();
         if (n->status == MERGED_NODE) continue;
-        valInfo* assignInfo = n->valTree->getRoot()->computeInfo;
-        if (assignInfo->status == VAL_VALID) {
-          if (assignInfo->opNum < 0) {
-              n->insts.push_back(assignInfo->valStr);
-          } else if (assignInfo->opNum > 0 || assignInfo->valStr != n->name) {
-            if (n->width <= BASIC_WIDTH)
-              n->insts.push_back(n->name + " = " + assignInfo->valStr + ";");
-            else
-              n->insts.push_back(format("mpz_set(%s, %s);", n->name.c_str(), assignInfo->valStr.c_str()));
-          }
-        }
+        s.insert(n);
       }
     }
     maxTmp = MAX(maxTmp, mpzTmpNum);
+  }
+  /* generate assignment instrs */
+  for (Node* n : s) {
+    valInfo* assignInfo = n->valTree->getRoot()->computeInfo;
+    if (assignInfo->status == VAL_VALID) {
+      if (assignInfo->opNum < 0) {
+          n->insts.push_back(assignInfo->valStr);
+      } else if (assignInfo->opNum > 0 || assignInfo->valStr != n->name) {
+        if (n->width <= BASIC_WIDTH)
+          n->insts.push_back(n->name + " = " + assignInfo->valStr + ";");
+        else
+          n->insts.push_back(format("mpz_set(%s, %s);", n->name.c_str(), assignInfo->valStr.c_str()));
+      }
+    }
   }
   /* remove constant nodes */
   size_t totalNodes = countNodes();
