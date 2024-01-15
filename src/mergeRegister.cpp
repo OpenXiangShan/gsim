@@ -26,7 +26,7 @@ void graph::mergeRegister() {
     bool spilt = false;
     for (Node* next : reg->next) {
       bool outSuperLater = next->super->order > reg->getDst()->super->order;
-      bool inSuperLater = (next->super == reg->getDst()->super) && (next->super->findIndex(next) > reg->getDst()->super->findIndex(reg->getDst()));
+      bool inSuperLater = (next->super == reg->getDst()->super) && (reg->dimension.size() != 0 || next->super->findIndex(next) > reg->getDst()->super->findIndex(reg->getDst()));
       if (outSuperLater || inSuperLater) {
         spilt = true;
         break;
