@@ -31,7 +31,9 @@ class graph {
   std::vector<Node*> sorted;
   std::vector<Node*> memory;
   std::vector<Node*> external;
+  /* used before toposort */
   std::set<SuperNode*> supersrc;
+  /* used after toposort */
   std::vector<SuperNode*> sortedSuper;
   std::string name;
   int maxTmp = 0;
@@ -53,6 +55,7 @@ class graph {
   void removeEmptySuper();
   void removeNodes(NodeStatus status);
   bool inSrc(SuperNode* super);
+  void mergeRegister();
 };
 
 #endif

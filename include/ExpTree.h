@@ -207,8 +207,10 @@ public:
       lvalue = _lvalue;
     }
     void display();
+    /* used in alias */
     void replace(Node* oldNode, ENode* newSubTree);
-
+    /* used in mergeRegister */
+    void replace(Node* oldNode, Node* newNode);
     void clearInfo();
     
 };

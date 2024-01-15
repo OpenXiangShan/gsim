@@ -21,7 +21,7 @@ enum NodeType{
   NODE_ARRAY_MEMBER,
 };
 
-enum NodeStatus{ VALID_NODE, DEAD_NODE, CONSTANT_NODE, MERGED_NODE };
+enum NodeStatus{ VALID_NODE, DEAD_NODE, CONSTANT_NODE, MERGED_NODE, DEAD_SRC };
 enum IndexType{ INDEX_INT, INDEX_NODE };
 
 enum ReaderMember { READER_ADDR = 0, READER_EN, READER_CLK, READER_DATA, READER_MEMBER_NUM};
@@ -210,6 +210,7 @@ public:
   std::set<SuperNode*> next;
   std::vector<Node*> member; // The order of member is neccessary
   int id;
+  int order;
   SuperNode() {
     id = counter ++;
   }

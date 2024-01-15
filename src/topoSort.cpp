@@ -21,5 +21,7 @@ void graph::topoSort() {
       if (times[next] == (int)next->prev.size()) s.push(next);
     }
   }
+  /* order sortedSuper */
+  for (size_t i = 0; i < sortedSuper.size(); i ++) sortedSuper[i]->order = i + 1;
 }
 
