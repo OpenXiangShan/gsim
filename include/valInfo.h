@@ -1,7 +1,7 @@
 #ifndef VALINFO_H
 #define VALINFO_H
 
-enum valStatus {VAL_INVALID, VAL_VALID = 0, VAL_CONSTANT, VAL_FINISH /* for printf/assert*/};
+enum valStatus {VAL_EMPTY = 0, VAL_VALID, VAL_CONSTANT, VAL_FINISH /* for printf/assert*/};
 
 class valInfo {
 public:
