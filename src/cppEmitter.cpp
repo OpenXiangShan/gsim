@@ -132,12 +132,29 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
   fprintf(fp, ";\n");
 #ifdef DIFFTEST_PER_SIG
+  #if defined(VERILATOR_DIFF)
+    if (node->type == NODE_REG_DST && !node->isArray()){
+      if (node->width <= BASIC_WIDTH) {
+        fprintf(fp, "%s %s%s;\n", widthUType(node->width).c_str(), node->getSrc()->name.c_str(), "$prev");
+      } else {
+        fprintf(fp, "mpz_t %s%s;\n", node->getSrc()->name.c_str(), "$prev");
+      }
+    }
+  #endif
+  #ifdef VERILATOR_DIFF
+  std::string verilatorName = name + "__DOT__" + (node->type == NODE_REG_DST? node->getSrc()->name : node->name);
+  #else
   std::string verilatorName = name + "__DOT__" + node->name;
+  #endif
   size_t pos;
   while ((pos = verilatorName.find("$")) != std::string::npos) {
     verilatorName.replace(pos, 1, "__DOT__");
   }
+  #ifdef VERILATOR_DIFF
+  if (node->type != NODE_REG_SRC) fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, node->type == NODE_REG_DST ? (node->getSrc()->name + "$prev").c_str() : node->name.c_str(), verilatorName.c_str());
+  #else
   fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, node->name.c_str(), verilatorName.c_str());
+  #endif
 #endif
 }
 
@@ -253,6 +270,18 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
 
 void graph::genStep(FILE* fp) {
   fprintf(fp, "void S%s::step() {\n", name.c_str());
+#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->type == NODE_REG_DST && !member->isArray() && member->status == VALID_NODE) {
+        if (member->width > BASIC_WIDTH)
+          fprintf(fp, "mpz_set(%s%s, %s);\n", member->getSrc()->name.c_str(), "$prev", member->name.c_str());
+        else
+          fprintf(fp, "%s%s = %s;\n", member->getSrc()->name.c_str(), "$prev", member->name.c_str());
+      }
+    }
+  }
+#endif
   /* TODO: may sth special for printf or printf always activate itself(or when cond is satisfied )*/
   for (int i = 1; i < superId; i ++) {
     fprintf(fp, "if(unlikely(activeFlags[%d])) step%d();\n", i, i);
