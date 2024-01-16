@@ -66,9 +66,9 @@ void load_program(char* filename){
 #ifdef VERILATOR
 void ref_cycle(int n) {
   while(n --){
-    ref->clock = 0;
-    ref->eval();
     ref->clock = 1;
+    ref->eval();
+    ref->clock = 0;
     ref->eval();
   }
 }
