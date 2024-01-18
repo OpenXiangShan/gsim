@@ -223,19 +223,18 @@ class ASTExpTree { // used in AST2Graph, support aggregate nodes
   // ASTENode* aggrRoot = nullptr;
   std::vector<std::pair<ENode*, bool>> aggrForest;
   // std::vector<std::string> name; // aggr member name, used for creating new nodes in visitNode
-  AggrParentNode* anyParent; // any nodes, used for creating new nodes in visitNode
+  AggrParentNode* anyParent = nullptr; // any nodes, used for creating new nodes in visitNode
   
   void validCheck() {
-    Assert((expRoot && aggrForest.size() == 0) || (!expRoot && aggrForest.size() != 0), "invalid ASTENode, expRoot %p aggrNum %ld", expRoot, aggrForest.size());
+    Assert((expRoot && !anyParent) || (!expRoot && anyParent), "invalid ASTENode, expRoot %p aggrNum %ld", expRoot, aggrForest.size());
   }
   void requreNormal() {
-    Assert(expRoot && aggrForest.size() == 0, "ASTENode is not a normal node");
+    Assert(expRoot && !anyParent, "ASTENode is not a normal node");
   }
 
 public:
   ASTExpTree(bool isAggr, int num = 0) {
     if (isAggr) {
-      Assert(num != 0, "invalid aggr type\n");
       for (int i = 0; i < num; i ++) aggrForest.push_back(std::make_pair(new ENode(), false));
     } //aggrRoot = new ASTENode();
     else expRoot = new ENode();
@@ -258,7 +257,7 @@ public:
   }
   bool isAggr() {
     validCheck();
-    return aggrForest.size() != 0;
+    return anyParent;
   }
   int getAggrNum() {
     return aggrForest.size();
