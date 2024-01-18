@@ -92,6 +92,7 @@ ALLID: ID {$$ = $1; }
     | Output { $$ = strdup("output"); }
     | Target { $$ = strdup("target"); }
     | Invalid { $$ = strdup("invalid"); }
+    | Mux { $$ = strdup("mux"); }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
