@@ -1003,6 +1003,7 @@ void visitWhenStmt(graph* g, PNode* stmt) {
     case P_WIRE_DEF: visitWireDef(g, stmt); break;
     case P_PRINTF: visitWhenPrintf(g, stmt); break;
     case P_ASSERT: visitWhenAssert(g, stmt); break;
+    case P_INST: visitInst(g, stmt); break;
     default: printf("Invalid type %d %d\n", stmt->type, stmt->lineno); Panic();
   }
 }
