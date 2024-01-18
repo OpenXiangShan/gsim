@@ -777,9 +777,10 @@ void visitConnect(graph* g, PNode* connect) {
       if (exp->getFlip(i)) {
         Node* node = exp->getAggr(i)->getNode();
         if (!node) TODO(); // like a <= mux(cond, b, c)
-        if (node->isArray()) TODO();
+
         ExpTree* valTree = new ExpTree(ref->getAggr(i), exp->getAggr(i));
-        node->valTree = valTree;
+        if (node->isArray()) node->arrayVal.push_back(valTree);
+        else node->valTree = valTree;
       } else {
         Node* node = ref->getAggr(i)->getNode();
         ExpTree* valTree = new ExpTree(exp->getAggr(i), ref->getAggr(i));
