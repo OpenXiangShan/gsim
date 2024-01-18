@@ -1113,7 +1113,9 @@ void visitStmt(graph* g, PNode* stmt) {
     case P_WHEN: visitWhen(g, stmt); break;
     case P_PRINTF: visitPrintf(g, stmt); break;
     case P_ASSERT: visitAssert(g, stmt); break;
-    default: Panic();
+    default:
+      printf("invalid stmt type %d in lineno %d\n", stmt->type, stmt->lineno);
+      Panic();
   }
 }
 
