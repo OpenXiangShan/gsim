@@ -85,9 +85,9 @@ else ifeq ($(MODE), 1)
 	VERI_CSRCS = $(EMU_DIFFTEST)
 else ifeq ($(MODE), 2)
 	MODE_FLAGS += -DGSIM -DVERILATOR
-	CXXFLAGS += -DDIFFTEST_PER_SIG
+	CXXFLAGS += -DDIFFTEST_PER_SIG -DVERILATOR_DIFF
 	target = ./obj_dir/V$(NAME)
-	SIG_COMMAND = python3 scripts/sigFilter.py
+	SIG_COMMAND = python3 scripts/sigFilter.py $(NAME)
 else
 	MODE_FLAGS += -DGSIM -DGSIM_DIFF
 	target = $(EMU_BUILD_DIR)/S$(NAME)_diff
