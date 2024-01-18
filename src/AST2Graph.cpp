@@ -763,8 +763,16 @@ void visitConnect(graph* g, PNode* connect) {
   TYPE_CHECK(connect, 2, 2, P_CONNECT);
   ASTExpTree* ref = visitReference(g, connect->getChild(0));
   ASTExpTree* exp = visitExpr(g, connect->getChild(1));
-  Assert(!(ref->isAggr() ^ exp->isAggr()), "type not match, ref aggr %d exp aggr %d", ref->isAggr(), exp->isAggr());
-  if (ref->isAggr()) {
+
+  Assert(!(ref->isAggr() ^ exp->isAggr()) || exp->isInvalid(), "lineno %d type not match, ref aggr %d exp aggr %d", connect->getChild(0)->lineno, ref->isAggr(), exp->isAggr());
+  if(ref->isAggr() && exp->isInvalid()) {
+    for (int i = 0; i < ref->getAggrNum(); i ++) {
+      if (ref->getFlip(i)) continue;
+      Node* node = ref->getAggr(i)->getNode();
+      ExpTree* valTree = new ExpTree(exp->getExpRoot(), ref->getAggr(i));
+      if (!node->isArray()) node->valTree = valTree;
+    }
+  } else if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i ++) {
       if (exp->getFlip(i)) {
         Node* node = exp->getAggr(i)->getNode();

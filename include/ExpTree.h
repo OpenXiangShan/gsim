@@ -336,6 +336,9 @@ public:
   AggrParentNode* getParent() {
     return anyParent;
   }
+  bool isInvalid() {
+    return !isAggr() && expRoot->opType == OP_INVALID;
+  }
 
 };
 
