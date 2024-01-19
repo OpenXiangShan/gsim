@@ -116,7 +116,7 @@ public:
   Node* nodePtr = nullptr;   // leafNodes: point to a real node; internals: nullptr
   std::vector<ENode*> child;
   OPType opType = OP_EMPTY;
-  int width = 0;
+  int width = -1;
   bool sign = false;
   int usedBit = -1;
   // bool islvalue = false;  // true for root and L_INDEX, otherwise false

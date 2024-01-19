@@ -9,7 +9,7 @@
 #define s2 getChild(2)->sign
 
 void ENode::inferWidth() {
-  if (width != 0) return;
+  if (width != -1) return;
   for (ENode* enode : child) {
     if (enode) enode->inferWidth();
   }

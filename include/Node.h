@@ -89,7 +89,7 @@ class Node {
   std::string name;  // concat the module name in order (member in structure / temp variable)
   int id = -1;
   NodeType type;
-  int width = 0;
+  int width = -1;
   bool sign = false;
   int usedBit = -1;
   NodeStatus status = VALID_NODE;

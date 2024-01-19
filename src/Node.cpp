@@ -32,20 +32,25 @@ inverse topological order or [infer all encountered nodes]
 */
 void Node::inferWidth() {
   if (type == NODE_INVALID) return;
-  if (arrayVal.size() != 0 && arrayVal[0]->getRoot()->width == 0) {
+  if (valTree && valTree->getRoot()->width == -1) {
+    valTree->getRoot()->inferWidth();
+    if (width == -1) setType(valTree->getRoot()->width, valTree->getRoot()->sign);
+
+  } else if (!valTree && width == -1) {
+    width = 0;
+  } else {
+    return;
+  }
+  if (arrayVal.size() != 0 && arrayVal[0]->getRoot()->width == -1) {
     for (ExpTree* arrayTree : arrayVal) {
       arrayTree->getRoot()->inferWidth();
       arrayTree->getlval()->inferWidth();
     }
   }
-  if (width != 0 && (!valTree || valTree->getRoot()->width != 0)) return;
-  Assert(valTree && valTree->getRoot(), "can not infer width of %s through empty valTree", name.c_str());
-  valTree->getRoot()->inferWidth();
-  if (width == 0) setType(valTree->getRoot()->width, valTree->getRoot()->sign);
 }
 
 /* construct superNodes for all memory_member in the port the (member) belongs to */
-static void inline memSuper(Node* member) {
+static void memSuper(Node* member) {
   Node* port = member->parent;
   Node* memory = port->parent;
   SuperNode* super = new SuperNode();
