@@ -10,7 +10,7 @@
 /* check the node type and children num */
 #define TYPE_CHECK(node, min, max,...) typeCheck(node, (const int[]){__VA_ARGS__}, sizeof((const int[]){__VA_ARGS__}) / sizeof(int), min, max)
 #define SEP_MODULE '$' // seperator for module
-#define SEP_AGGR '_'
+#define SEP_AGGR '$'
 
 int p_stoi(const char* str);
 TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType);
