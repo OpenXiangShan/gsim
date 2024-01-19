@@ -793,7 +793,7 @@ void visitMemory(graph* g, PNode* mem) {
     }
 
   } else {
-    Node* memNode = allocNode(NODE_MEMORY, prefixName(SEP_MODULE, mem->name));
+    Node* memNode = allocNode(NODE_MEMORY, topPrefix());
     g->memory.push_back(memNode);
     memNode->updateInfo(info);
 
