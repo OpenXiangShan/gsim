@@ -112,9 +112,9 @@ void ENode::inferWidth() {
         setWidth(w0-values[0], false);
         values[0] = w0 - values[0];
         break;
-      case OP_BITS:
+      case OP_BITS: // values[0] may exceeds w0 due to the shrink width of add
         Assert(getChildNum() == 1 && values.size() == 2, "invalid child");
-        Assert(w0 > values[0] && values[0] >= values[1], "invalid bits(%d, %d) with argument(%d) ", values[0], values[1], w0);
+        // Assert(w0 > values[0] && values[0] >= values[1], "invalid bits(%d, %d) with argument(%d) ", values[0], values[1], w0);
         setWidth(values[0]-values[1] + 1, false);
         break;
       case OP_MUX:
