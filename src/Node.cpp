@@ -35,10 +35,10 @@ void Node::inferWidth() {
   if (valTree && valTree->getRoot()->width == -1) {
     valTree->getRoot()->inferWidth();
     if (width == -1) setType(valTree->getRoot()->width, valTree->getRoot()->sign);
-
-  } else if (!valTree && width == -1) {
-    width = 0;
-  } else {
+    valTree->display();
+  } else if (width == -1) {
+    width = valTree ? valTree->getRoot()->width : 0;
+  } else  {
     return;
   }
   if (arrayVal.size() != 0 && arrayVal[0]->getRoot()->width == -1) {
