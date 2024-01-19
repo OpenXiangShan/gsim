@@ -96,6 +96,11 @@ static inline std::string replacePrefix(std::string oldPrefix, std::string newPr
   Assert(str.compare(0, oldPrefix.length(), oldPrefix) == 0, "member name %s does not start with %s", str.c_str(), oldPrefix.c_str());
   return newPrefix + str.substr(oldPrefix.length());
 }
+/* return the trailing string of the last $ */
+static inline std::string lastField(std::string s) {
+  size_t pos = s.find_last_of('$');
+  return pos == std::string::npos ? "" : s.substr(pos + 1);
+}
 
 /*
 field: ALLID ':' type { $$ = newNode(P_FIELD, synlineno(), $1, 1, $3); }
@@ -918,6 +923,46 @@ void visitConnect(graph* g, PNode* connect) {
   }
 }
 
+void visitPartialConnect(graph* g, PNode* connect) {
+  TYPE_CHECK(connect, 2, 2, P_PAR_CONNECT);
+  ASTExpTree* ref = visitReference(g, connect->getChild(0));
+  ASTExpTree* exp = visitExpr(g, connect->getChild(1));
+  Assert(ref->isAggr() && exp->isAggr(), "lineno %d type not match, ref aggr %d exp aggr %d", connect->getChild(0)->lineno, ref->isAggr(), exp->isAggr());
+
+  std::map<std::string, std::pair<ENode*, bool>> refName;
+  for (int i = 0; i < ref->getAggrNum(); i ++) {
+    std::string lastName = lastField(ref->getAggr(i)->getNode()->name);
+    Assert (refName.find(lastName) == refName.end(), "line %d : %s duplicated", connect->lineno, lastName.c_str());
+    refName[lastName] = std::make_pair(ref->getAggr(i), ref->getFlip(i));
+  }
+  std::map<std::string, ENode*> expName;
+  for (int i = 0; i < exp->getAggrNum(); i ++) {
+    if (!exp->getAggr(i)->getNode()) TODO(); // like a <- mux(cond, b, c)
+    std::string lastName = lastField(exp->getAggr(i)->getNode()->name);
+    Assert (expName.find(lastName) == expName.end(), "line %d : %s duplicated", connect->lineno, lastName.c_str());
+    expName[lastName] = exp->getAggr(i);
+  }
+  for (auto entry : refName) {
+    if (expName.find(entry.first) == expName.end()) continue;
+    ENode* refENode = entry.second.first;
+    ENode* expENode = expName[entry.first];
+    if (entry.second.second) { // isFlip
+      ExpTree* valTree = new ExpTree(refENode, expENode);
+      Node* expNode = expENode->getNode();
+      if(!expNode) TODO();
+      if (expNode->isArray()) expNode->arrayVal.push_back(valTree);
+      else expNode->valTree = valTree;
+    } else {
+      ExpTree* valTree = new ExpTree(expENode, refENode);
+      Node* refNode = refENode->getNode();
+      if(!refNode) TODO();
+      if (refNode->isArray()) refNode->arrayVal.push_back(valTree);
+      else refNode->valTree = valTree;
+    }
+  }
+
+}
+
 bool matchWhen(ENode* enode, int depth) {
   if (enode->opType != OP_WHEN) return false;
   Assert(enode->getChildNum() == 3, "invalid child num %d", enode->getChildNum());
@@ -1232,6 +1277,7 @@ void visitStmt(graph* g, PNode* stmt) {
     case P_MEMORY: visitMemory(g, stmt); break;
     case P_NODE: visitNode(g, stmt); break;
     case P_CONNECT: visitConnect(g, stmt); break;
+    case P_PAR_CONNECT: visitPartialConnect(g, stmt); break;
     case P_WHEN: visitWhen(g, stmt); break;
     case P_PRINTF: visitPrintf(g, stmt); break;
     case P_ASSERT: visitAssert(g, stmt); break;
