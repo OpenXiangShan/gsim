@@ -680,6 +680,7 @@ void memoryAlias(Node* origin, Node* alias) {
 }
 
 void addOriginMember(Node* originPort, PNode* port) {
+  for (Node* member : originPort->member) member->type = NODE_OTHERS;
   Node* originMember;
   switch(port->type) {
     case P_READER:
