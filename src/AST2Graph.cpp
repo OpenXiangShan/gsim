@@ -226,7 +226,7 @@ expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, synlineno(), $
 ASTExpTree* visitIntNoInit(graph* g, PNode* expr) {
   TYPE_CHECK(expr, 0, 0, P_EXPR_INT_NOINIT);
   ASTExpTree* ret = new ASTExpTree(false);
-  ret->addVal(0);
+  ret->getExpRoot()->strVal = "0";
   ret->setType(expr->width, expr->sign);
   ret->setOp(OP_INT);
   return ret;
