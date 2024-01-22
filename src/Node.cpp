@@ -7,6 +7,7 @@ void Node::updateConnect() {
   if (valTree) q.push(valTree->getRoot());
   if (isArray()) {
     for (ExpTree* tree : arrayVal) {
+      if (!tree) continue;
       q.push(tree->getRoot());
       if (tree->getlval()) {
         for (int i = 0; i < tree->getlval()->getChildNum(); i ++) q.push(tree->getlval()->getChild(i));
@@ -35,17 +36,15 @@ void Node::inferWidth() {
   if (valTree && valTree->getRoot()->width == -1) {
     valTree->getRoot()->inferWidth();
     if (width == -1) setType(valTree->getRoot()->width, valTree->getRoot()->sign);
-    valTree->display();
   } else if (width == -1) {
     width = valTree ? valTree->getRoot()->width : 0;
   } else  {
     return;
   }
-  if (arrayVal.size() != 0 && arrayVal[0]->getRoot()->width == -1) {
-    for (ExpTree* arrayTree : arrayVal) {
-      arrayTree->getRoot()->inferWidth();
-      arrayTree->getlval()->inferWidth();
-    }
+  for (ExpTree* arrayTree : arrayVal) {
+    if (!arrayTree) continue;
+    arrayTree->getRoot()->inferWidth();
+    arrayTree->getlval()->inferWidth();
   }
 }
 
@@ -112,6 +111,16 @@ void Node::constructSuperConnect() {
     super->add_next(n->super);
   }
 }
+/*
+the last element in each dimension represent the whole subArray
+e.g. A[4][5][6], element Array[1][2][6] represent A[1][2]; Array[4] represent the whole Array A
+*/
+void Node::allocArrayVal() {
+  Assert(arrayVal.size() == 0, "%s is already alloced (%ld)", name.c_str(), arrayVal.size());
+  int entryNum = 1;
+  for (int num : dimension) entryNum *= num + 1;
+  if (isArray()) arrayVal = std::vector<ExpTree*>(entryNum, 0);
+}
 
 void Node::updateInfo(TypeInfo* info) {
   width = info->width;
@@ -173,6 +182,7 @@ void Node::addReset() {
     valTree = new ExpTree(regTop);
   }
   for (ExpTree* tree : arrayVal) {
+    if (!tree) continue;
     ENode* arrayWhenTop = new ENode(OP_WHEN);
     arrayWhenTop->addChild(resetCond->getRoot());
     arrayWhenTop->addChild(nullptr);

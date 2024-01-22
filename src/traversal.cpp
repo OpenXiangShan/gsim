@@ -78,7 +78,8 @@ void graph::traversal() {
       printf("node %s[width %d sign %d]:\n", node->name.c_str(), node->width, node->sign);
       if (node->valTree) node->valTree->display();
       for (size_t i = 0; i < node->arrayVal.size(); i ++) {
-        printf("[array]\n");
+        if (!node->arrayVal[i]) continue;
+        printf("[array] %ld\n", i);
         node->arrayVal[i]->display();
       }
     }

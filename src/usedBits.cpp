@@ -94,6 +94,7 @@ void ENode::passWidthToChild() {
 /* the with of node->next may be updated, thus node should also re-compute */
 void Node::passWidthToPrev() {
   for (ExpTree* tree : arrayVal) {
+    if (!tree) continue;
     if (usedBit != tree->getRoot()->usedBit) {
       tree->getRoot()->usedBit = usedBit;
       tree->getRoot()->passWidthToChild();

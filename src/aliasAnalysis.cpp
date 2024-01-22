@@ -9,6 +9,7 @@
 /* TODO: A = B[idx] */
 ENode* Node::isAlias() {
   if (isArray()) {
+    // TODO(): fix
     if (arrayVal.size() == 1 && arrayVal[0]->getRoot()->getChildNum() == 0 && arrayVal[0]->getRoot()->getNode()) {
       return arrayVal[0]->getRoot();
     }

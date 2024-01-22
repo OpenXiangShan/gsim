@@ -1257,7 +1257,10 @@ void Node::recompute() {
   if (!computeInfo) return;
   valInfo* prevVal = computeInfo;
   computeInfo = nullptr;
-  for (ExpTree* tree : arrayVal) tree->clearInfo();
+  for (ExpTree* tree : arrayVal) {
+    if (tree)
+      tree->clearInfo();
+  }
   if (valTree) valTree->clearInfo();
   compute();
   if (prevVal->valStr != computeInfo->valStr) {
@@ -1305,6 +1308,7 @@ valInfo* Node:: computeArray() {
 
   if (width > BASIC_WIDTH) TODO();
   for (ExpTree* tree : arrayVal) {
+    if(!tree) continue;
     valInfo* lindex = nullptr;
     if (tree->getlval()) {
       lindex = tree->getlval()->compute(this, "INVALID_STR", false);

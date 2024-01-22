@@ -102,6 +102,33 @@ static inline std::string lastField(std::string s) {
   return pos == std::string::npos ? "" : s.substr(pos + 1);
 }
 
+/* the arrayVal */
+static int getInedxFromTree(Node* node, ExpTree* tree) {
+  ENode* lvalue = tree->getlval();
+  Assert(lvalue->nodePtr, "empty lvalue node");
+  Assert(lvalue->nodePtr == node, "lvalue not match %s != %s", lvalue->nodePtr->name.c_str(), node->name.c_str());
+  Assert(lvalue->child.size() <= node->dimension.size(), "%s index out of bound", node->name.c_str());
+  int idx = 0;
+  size_t fixNum = 0;
+
+  for (ENode* childENode : lvalue->child) {
+    if (childENode->opType == OP_INDEX_INT) {
+      idx = (idx * node->dimension[fixNum++] + 1) + childENode->values[0];
+    } else {
+      return idx;
+    }
+  }
+
+  if (fixNum < node->dimension.size()) {
+    idx = idx * (node->dimension[fixNum] + 1) + node->dimension[fixNum];
+    fixNum ++;
+  }
+
+  for ( ; fixNum < node->dimension.size(); fixNum ++) idx = idx * (node->dimension[fixNum] + 1);
+
+  return idx;
+}
+
 /*
 field: ALLID ':' type { $$ = newNode(P_FIELD, synlineno(), $1, 1, $3); }
     | Flip ALLID ':' type  { $$ = newNode(P_FLIP_FIELD, synlineno(), $2, 1, $4); }
@@ -212,6 +239,7 @@ void visitTopPorts(graph* g, PNode* ports) {
     for (auto entry : info->aggrMember) {
       Node* node = entry.first;
       addSignal(node->name, node);
+      node->allocArrayVal();
       if (node->type == NODE_INP) g->input.push_back(node);
       else if (node->type == NODE_OUT) g->output.push_back(node);
     }
@@ -247,7 +275,7 @@ ASTExpTree* visitInvalid(graph* g, PNode* expr) {
 ASTExpTree* visitIntInit(graph* g, PNode* expr) {
   TYPE_CHECK(expr, 0, 0, P_EXPR_INT_INIT);
   ASTExpTree* ret = new ASTExpTree(false);
-  ret->getExpRoot()->strVal= expr->getExtra(0);
+  ret->getExpRoot()->strVal = expr->getExtra(0);
   ret->setType(expr->width, expr->sign);
   ret->setOp(OP_INT);
   return ret;
@@ -450,6 +478,7 @@ void visitModule(graph* g, PNode* module) {
     for (auto entry : portInfo->aggrMember) {
       Node* node = entry.first;
       addSignal(node->name, node);
+      node->allocArrayVal();
     }
     for (AggrParentNode* dummy : portInfo->aggrParent) {
       addDummy(dummy->name, dummy);
@@ -471,6 +500,7 @@ void visitExtModule(graph* g, PNode* module) {
 
     for (auto entry : portInfo->aggrMember) {
       addSignal(entry.first->name, entry.first);
+      entry.first->allocArrayVal();
     }
     for (AggrParentNode* dummy : portInfo->aggrParent) {
       addDummy(dummy->name, dummy);
@@ -488,11 +518,15 @@ void visitWireDef(graph* g, PNode* wire) {
 
   TypeInfo* info = visitType(g, wire->getChild(0), NODE_OTHERS);
 
-  for (auto entry : info->aggrMember) addSignal(entry.first->name, entry.first);
+  for (auto entry : info->aggrMember) {
+    addSignal(entry.first->name, entry.first);
+    entry.first->allocArrayVal();
+  }
   for (AggrParentNode* dummy : info->aggrParent) addDummy(dummy->name, dummy);
   if (!info->isAggr()) {
     Node* node = allocNode(NODE_OTHERS, topPrefix());
     node->updateInfo(info);
+    node->allocArrayVal();
     addSignal(node->name, node);
   }
 
@@ -521,6 +555,8 @@ void visitRegDef(graph* g, PNode* reg) {
     Node* dst = src->dup();
     dst->type = NODE_REG_DST;
     dst->name += "$NEXT";
+    src->allocArrayVal();
+    dst->allocArrayVal();
     addSignal(src->name, src);
     addSignal(dst->name, dst);
     src->bindReg(dst);
@@ -848,6 +884,7 @@ AggrParentNode* allocNodeFromAggr(graph* g, AggrParentNode* parent) {
     Node* node = member->dup(NODE_OTHERS, name); // SEP_AGGR is already in name
   
     addSignal(node->name, node);
+    node->allocArrayVal();
     ret->addMember(node, entry.second);
   }
   /* alloc all dummy nodes, and connect them to real nodes stored in allSignals */
@@ -887,6 +924,7 @@ void visitNode(graph* g, PNode* node) {
     Node* n = allocNode(NODE_OTHERS, topPrefix());
     n->valTree = new ExpTree(exp->getExpRoot(), n);
     addSignal(n->name, n);
+    n->allocArrayVal();
   }
   prefix_pop();
 }
@@ -905,6 +943,7 @@ void visitConnect(graph* g, PNode* connect) {
       Node* node = ref->getAggr(i)->getNode();
       ExpTree* valTree = new ExpTree(exp->getExpRoot(), ref->getAggr(i));
       if (!node->isArray()) node->valTree = valTree;
+      else node->setArrayVal(getInedxFromTree(node, valTree), valTree);
     }
   } else if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i ++) {
@@ -913,19 +952,19 @@ void visitConnect(graph* g, PNode* connect) {
         if (!node) TODO(); // like a <= mux(cond, b, c)
 
         ExpTree* valTree = new ExpTree(ref->getAggr(i), exp->getAggr(i));
-        if (node->isArray()) node->arrayVal.push_back(valTree);
+        if (node->isArray()) node->setArrayVal(getInedxFromTree(node, valTree), valTree);
         else node->valTree = valTree;
       } else {
         Node* node = ref->getAggr(i)->getNode();
         ExpTree* valTree = new ExpTree(exp->getAggr(i), ref->getAggr(i));
-        if (node->isArray()) node->addArrayVal(valTree);
+        if (node->isArray()) node->setArrayVal(getInedxFromTree(node, valTree), valTree);
         else node->valTree = valTree;
       }
     }
   } else {
     Node* node = ref->getExpRoot()->getNode();
     ExpTree* valTree = new ExpTree(exp->getExpRoot(), ref->getExpRoot());
-    if (node->isArray()) node->addArrayVal(valTree);
+    if (node->isArray()) node->setArrayVal(getInedxFromTree(node, valTree), valTree);
     else node->valTree = valTree;
   }
 }
@@ -957,13 +996,13 @@ void visitPartialConnect(graph* g, PNode* connect) {
       ExpTree* valTree = new ExpTree(refENode, expENode);
       Node* expNode = expENode->getNode();
       if(!expNode) TODO();
-      if (expNode->isArray()) expNode->arrayVal.push_back(valTree);
+      if (expNode->isArray()) expNode->setArrayVal(getInedxFromTree(expNode, valTree), valTree);
       else expNode->valTree = valTree;
     } else {
       ExpTree* valTree = new ExpTree(expENode, refENode);
       Node* refNode = refENode->getNode();
       if(!refNode) TODO();
-      if (refNode->isArray()) refNode->arrayVal.push_back(valTree);
+      if (refNode->isArray()) refNode->setArrayVal(getInedxFromTree(refNode, valTree), valTree);
       else refNode->valTree = valTree;
     }
   }
@@ -1083,7 +1122,7 @@ void visitWhenConnect(graph* g, PNode* connect) {
         valTree->setlval(ref->getAggr(i));
         ENode* whenNode = getWhenEnode(valTree);
         whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getAggr(i));
-        if (node->isArray()) node->addArrayVal(valTree);
+        if (node->isArray()) node->setArrayVal(getInedxFromTree(node, valTree), valTree);
         else node->valTree = valTree;
       }
     }
@@ -1094,7 +1133,7 @@ void visitWhenConnect(graph* g, PNode* connect) {
     valTree->setlval(ref->getExpRoot());
     ENode* whenNode = getWhenEnode(valTree);
     whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getExpRoot());
-    if (node->isArray()) node->addArrayVal(valTree);
+    if (node->isArray()) node->setArrayVal(getInedxFromTree(node, valTree), valTree);
     else node->valTree = valTree;
   }
 }
@@ -1362,19 +1401,23 @@ graph* AST2Graph(PNode* root) {
   for (Node* reg : g->regsrc) {
     reg->addReset();
     /* set lvalue to regDst */
-    if (reg->getSrc()->valTree->getlval()) {
+    if (reg->getSrc()->valTree && reg->getSrc()->valTree->getlval()) {
       Assert(reg->getSrc()->valTree->getlval()->nodePtr, "lvalue in %s is not node", reg->name.c_str());
       reg->getSrc()->valTree->getlval()->nodePtr = reg->getDst();
     }
     reg->getDst()->valTree = reg->getSrc()->valTree;
     reg->getSrc()->valTree = NULL;
     for (ExpTree* tree : reg->getSrc()->arrayVal) {
+      if (!tree) continue;
       Assert(tree->getlval()->nodePtr, "lvalue in %s is not node", reg->name.c_str());
       tree->getlval()->nodePtr = reg->getDst();
     }
-    reg->getDst()->arrayVal.insert(reg->getDst()->arrayVal.end(), reg->arrayVal.begin(), reg->arrayVal.end());
-    reg->arrayVal.clear();
+    for (size_t i = 0; i < reg->arrayVal.size(); i ++) {
+      reg->getDst()->arrayVal[i] = reg->arrayVal[i];
+      reg->arrayVal[i] = NULL;
+    }
   }
+
   for (Node* memory : g->memory) {
     if (memory->rlatency != 0) continue;
     for (Node* port : memory->member) {

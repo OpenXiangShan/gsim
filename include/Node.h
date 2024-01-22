@@ -176,8 +176,9 @@ class Node {
   bool arraySplitted() {
     return arrayMember.size() != 0;
   }
-  void addArrayVal(ExpTree* val) {
-    arrayVal.push_back(val);
+  void setArrayVal(size_t idx, ExpTree* val) {
+    Assert(idx < arrayVal.size(), "idx %ld is out of bound in %s(size=%ld, type=%d)\n", idx, name.c_str(), arrayVal.size(), type);
+    arrayVal[idx] = val;
   }
   Node* getArrayMember(int idx) {
     Assert(idx < (int)arrayMember.size(), "idx %d out of bound [0, %ld)", idx, arrayMember.size());
@@ -205,6 +206,7 @@ class Node {
   bool needActivate();
   void updateActivate();
   void removeConnection();
+  void allocArrayVal();
 };
 
 class SuperNode {
