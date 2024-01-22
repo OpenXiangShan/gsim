@@ -615,15 +615,16 @@ static inline void visitRUW(PNode* ruw) {
   Assert(ruw->name == "undefined", "IMPLEMENT ME");
 }
 
-static inline void add_member(Node* parent, std::string name, int idx, int width, int sign) {
+static inline Node* add_member(Node* parent, std::string name, int idx, int width, int sign) {
   Node* member = allocNode(NODE_MEM_MEMBER, prefixName(SEP_AGGR, name));
   member->setType(width, sign);
   parent->set_member(idx, member);
+  return member;
 }
 /*
 mem_reader Reader "=>" ALLID  { $$ = $1; $$->append(newNode(P_READER, synlineno(), $4, 0));}
 */
-static inline Node* visitReader(PNode* reader, int width, int depth, bool sign, std::string suffix) {
+static inline Node* visitReader(PNode* reader, int width, int depth, bool sign, std::string suffix, Node* node) {
   TYPE_CHECK(reader, 0, 0, P_READER);
 
   prefix_append(SEP_MODULE, reader->name);
@@ -637,9 +638,11 @@ static inline Node* visitReader(PNode* reader, int width, int depth, bool sign, 
   add_member(ret, "addr" + suffix, READER_ADDR, upperLog2(depth), false);
   add_member(ret, "en" + suffix, READER_EN, 1, false);
   add_member(ret, "clk" + suffix, READER_CLK, 1, false);
-  add_member(ret, "data" + suffix, READER_DATA, width, sign);
+  Node* data = add_member(ret, "data" + suffix, READER_DATA, width, sign);
+  if (node) {
+    data->dimension.insert(data->dimension.end(), node->dimension.begin(), node->dimension.end());
+  }
 
-  // addDummy(ret->name, ret); // reader is not needed, use superNode to combine input
   prefix_pop();
 
   return ret;
@@ -647,7 +650,7 @@ static inline Node* visitReader(PNode* reader, int width, int depth, bool sign, 
 /*
 mem_writer Writer "=>" ALLID    { $$ = $1; $$->append(newNode(P_WRITER, synlineno(), $4, 0));}
 */
-static inline Node* visitWriter(PNode* writer, int width, int depth, bool sign, std::string suffix) {
+static inline Node* visitWriter(PNode* writer, int width, int depth, bool sign, std::string suffix, Node* node) {
   TYPE_CHECK(writer, 0, 0, P_WRITER);
 
   prefix_append(SEP_MODULE, writer->name);
@@ -661,8 +664,12 @@ static inline Node* visitWriter(PNode* writer, int width, int depth, bool sign, 
   add_member(ret, "addr" + suffix, WRITER_ADDR, upperLog2(depth), false);
   add_member(ret, "en" + suffix, WRITER_EN, 1, false);
   add_member(ret, "clk" + suffix, WRITER_CLK, 1, false);
-  add_member(ret, "data" + suffix, WRITER_DATA, width, sign);
-  add_member(ret, "mask" + suffix, WRITER_MASK, 1, false);
+  Node* data = add_member(ret, "data" + suffix, WRITER_DATA, width, sign);
+  Node* mask = add_member(ret, "mask" + suffix, WRITER_MASK, 1, false);
+  if (node) {
+    data->dimension.insert(data->dimension.end(), node->dimension.begin(), node->dimension.end());
+    mask->dimension.insert(mask->dimension.end(), node->dimension.begin(), node->dimension.end());
+  }
 
   prefix_pop();
 
@@ -671,7 +678,7 @@ static inline Node* visitWriter(PNode* writer, int width, int depth, bool sign, 
 /*
 mem_readwriter Readwriter "=>" ALLID  { $$ = $1; $$->append(newNode(P_READWRITER, synlineno(), $4, 0));}
 */
-static inline Node* visitReadWriter(PNode* readWriter, int width, int depth, bool sign, std::string suffix) {
+static inline Node* visitReadWriter(PNode* readWriter, int width, int depth, bool sign, std::string suffix, Node* node) {
   TYPE_CHECK(readWriter, 0, 0, P_READWRITER);
 
   prefix_append(SEP_MODULE, readWriter->name);
@@ -685,22 +692,27 @@ static inline Node* visitReadWriter(PNode* readWriter, int width, int depth, boo
   add_member(ret, "addr" + suffix, READWRITER_ADDR, upperLog2(depth), false);
   add_member(ret, "en" + suffix, READWRITER_EN, 1, false);
   add_member(ret, "clk" + suffix, READWRITER_CLK, 1, false);
-  add_member(ret, "rdata" + suffix, READWRITER_RDATA, width, sign);
-  add_member(ret, "wdata" + suffix, READWRITER_WDATA, width, sign);
-  add_member(ret, "wmask" + suffix, READWRITER_WMASK, 1, false);
+  Node* rdata = add_member(ret, "rdata" + suffix, READWRITER_RDATA, width, sign);
+  Node* wdata = add_member(ret, "wdata" + suffix, READWRITER_WDATA, width, sign);
+  Node* wmask = add_member(ret, "wmask" + suffix, READWRITER_WMASK, 1, false);
   add_member(ret, "wmode" + suffix, READWRITER_WMODE, 1, false);
+  if (node) {
+    rdata->dimension.insert(rdata->dimension.end(), node->dimension.begin(), node->dimension.end());
+    wdata->dimension.insert(wdata->dimension.end(), node->dimension.begin(), node->dimension.end());
+    wmask->dimension.insert(wmask->dimension.end(), node->dimension.begin(), node->dimension.end());
+  }
 
   prefix_pop();
 
   return ret;
 }
 
-Node* visitMemPort(PNode* port, int depth, int width, bool sign, std::string suffix) {
+Node* visitMemPort(PNode* port, int depth, int width, bool sign, std::string suffix, Node* node) {
   Node* portNode = nullptr;
   switch(port->type) {
-    case P_READER: portNode = visitReader(port, width, depth, sign, suffix); break;
-    case P_WRITER: portNode = visitWriter(port, width, depth, sign, suffix); break;
-    case P_READWRITER: portNode = visitReadWriter(port, width, depth, sign, suffix); break;
+    case P_READER: portNode = visitReader(port, width, depth, sign, suffix, node); break;
+    case P_WRITER: portNode = visitWriter(port, width, depth, sign, suffix, node); break;
+    case P_READWRITER: portNode = visitReadWriter(port, width, depth, sign, suffix, node); break;
     default: Panic();
   }
   return portNode;
@@ -782,17 +794,20 @@ void visitMemory(graph* g, PNode* mem) {
     }
     for (int i = 5; i < mem->getChildNum(); i ++) {
       // AggrParentNode* parent = new AggrParentNode(prefixName(SEP_AGGR, mem->getChild(i)->name));
-      // printf("parent name %s\n", parent->name.c_str());
-      Node* originPort = visitMemPort(mem->getChild(i), depth, 0, 0, "");
+      /* data & mask is unused */
+      Node* originPort = visitMemPort(mem->getChild(i), depth, 0, 0, "", NULL);
       addOriginMember(originPort, mem->getChild(i));
       std::map<Node*, Node*>allSubPort;
       /* create all ports */
       for (auto node : allSubMem) {
         std::string suffix = replacePrefix(topPrefix(), "", node->name).c_str();
-        Node* portNode = visitMemPort(mem->getChild(i), depth, node->width, node->sign, suffix);
+        Node* portNode = visitMemPort(mem->getChild(i), depth, node->width, node->sign, suffix, node);
         node->add_member(portNode);
         allSubPort[node] = portNode;
-        for (Node* member : portNode->member) addSignal(member->name, member);
+        for (Node* member : portNode->member) {
+          addSignal(member->name, member);
+          member->allocArrayVal();
+        }
         /* create alias */
         memoryAlias(originPort, portNode);
       }
@@ -843,9 +858,12 @@ void visitMemory(graph* g, PNode* mem) {
 
     for (int i = 5; i < mem->getChildNum(); i ++) {
       PNode* port = mem->getChild(i);
-      Node* portNode = visitMemPort(port, depth, info->width, info->sign, "");
+      Node* portNode = visitMemPort(port, depth, info->width, info->sign, "", memNode);
       memNode->add_member(portNode);
-      for (Node* member : portNode->member) addSignal(member->name, member);
+      for (Node* member : portNode->member) {
+        addSignal(member->name, member);
+        member->allocArrayVal();
+      }
     }
 
 
