@@ -265,8 +265,14 @@ ENode* allocIntIndex(std::string intStr) {
 */
 ASTExpTree* allocIndex(graph* g, PNode* expr) {
   ASTExpTree* exprTree = visitExpr(g, expr);
-  ENode* index = new ENode(OP_INDEX);
-  exprTree->updateRoot(index);
+  if (exprTree->getExpRoot()->opType == OP_INT) {
+    ENode* index = new ENode(OP_INDEX_INT);
+    index->addVal(p_stoi(exprTree->getExpRoot()->strVal.c_str()));
+    exprTree->updateRoot(index);
+  } else {
+    ENode* index = new ENode(OP_INDEX);
+    exprTree->setRoot(index);
+  }
   return exprTree;
 }
 /*

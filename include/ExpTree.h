@@ -308,6 +308,10 @@ public:
     root->addChild(expRoot);
     expRoot = root;
   }
+  void setRoot(ENode* root) {
+    requreNormal();
+    expRoot = root;
+  }
   ENode* getExpRoot() {
     requreNormal();
     return expRoot;
