@@ -196,3 +196,28 @@ ENode* ENode::dup() {
   }
   return ret;
 }
+
+int ENode::getArrayIndex(Node* node) {
+  Assert(nodePtr, "empty  node");
+  Assert(nodePtr == node, "lvalue not match %s != %s", nodePtr->name.c_str(), node->name.c_str());
+  Assert(child.size() <= node->dimension.size(), "%s index out of bound", node->name.c_str());
+  int idx = 0;
+  size_t fixNum = 0;
+
+  for (ENode* childENode : child) {
+    if (childENode->opType == OP_INDEX_INT) {
+      idx = idx * (node->dimension[fixNum++] + 1) + childENode->values[0];
+    } else {
+      return idx;
+    }
+  }
+
+  if (fixNum < node->dimension.size()) {
+    idx = idx * (node->dimension[fixNum] + 1) + node->dimension[fixNum];
+    fixNum ++;
+  }
+
+  for ( ; fixNum < node->dimension.size(); fixNum ++) idx = idx * (node->dimension[fixNum] + 1);
+
+  return idx;
+}

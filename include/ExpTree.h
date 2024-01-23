@@ -169,6 +169,7 @@ public:
   Node* getConnectNode();
   ENode* mergeSubTree(ENode* newSubTree);
   ENode* dup();
+  int getArrayIndex(Node* node);
 };
 
 /* 

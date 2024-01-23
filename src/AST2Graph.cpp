@@ -105,28 +105,7 @@ static inline std::string lastField(std::string s) {
 /* the arrayVal */
 static int getInedxFromTree(Node* node, ExpTree* tree) {
   ENode* lvalue = tree->getlval();
-  Assert(lvalue->nodePtr, "empty lvalue node");
-  Assert(lvalue->nodePtr == node, "lvalue not match %s != %s", lvalue->nodePtr->name.c_str(), node->name.c_str());
-  Assert(lvalue->child.size() <= node->dimension.size(), "%s index out of bound", node->name.c_str());
-  int idx = 0;
-  size_t fixNum = 0;
-
-  for (ENode* childENode : lvalue->child) {
-    if (childENode->opType == OP_INDEX_INT) {
-      idx = (idx * node->dimension[fixNum++] + 1) + childENode->values[0];
-    } else {
-      return idx;
-    }
-  }
-
-  if (fixNum < node->dimension.size()) {
-    idx = idx * (node->dimension[fixNum] + 1) + node->dimension[fixNum];
-    fixNum ++;
-  }
-
-  for ( ; fixNum < node->dimension.size(); fixNum ++) idx = idx * (node->dimension[fixNum] + 1);
-
-  return idx;
+  return lvalue->getArrayIndex(node);
 }
 
 /*
