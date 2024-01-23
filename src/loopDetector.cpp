@@ -25,6 +25,8 @@ void graph::detectLoop() {
       states[top] = EXPANDED;
 
       for (SuperNode* next : top->next) {
+        /* enable self-loop for memory reader port with latency = 0 */
+        if (next == top) continue;
         if (states.find(next) == states.end()) {
           s.push(next);
           states[next] = NOT_VISIT;
