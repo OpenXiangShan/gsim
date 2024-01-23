@@ -38,6 +38,8 @@ int main(int argc, char** argv) {
 
   MUX_DEBUG(preorder_traversal(root));
 
+  g->splitArray();
+
   g->detectLoop();
   
   g->usedBits();

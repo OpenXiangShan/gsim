@@ -216,7 +216,10 @@ public:
     /* used in mergeRegister */
     void replace(Node* oldNode, Node* newNode);
     void clearInfo();
-    
+    bool isInvalid() {
+      Assert(getRoot(), "empty root");
+      return getRoot()->opType == OP_INVALID;
+    }
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes

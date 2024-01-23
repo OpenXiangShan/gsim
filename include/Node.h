@@ -200,7 +200,7 @@ class Node {
   void recompute();
   void passWidthToPrev();
   void splitArray();
-  std::string arrayMemberName(int idx);
+  Node* arrayMemberNode(int idx);
   ENode* isAlias();
   bool anyExtEdge();
   bool needActivate();

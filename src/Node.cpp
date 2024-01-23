@@ -19,8 +19,14 @@ void Node::updateConnect() {
     q.pop();
     Node* prevNode = top->getNode();
     if (prevNode) {
-      prev.insert(prevNode);
-      prevNode->next.insert(this);
+      if (prevNode->isArray() && prevNode->arraySplitted()) {
+        Node* arrayMember = prevNode->arrayMember[top->getArrayIndex(prevNode)];
+        prev.insert(arrayMember);
+        arrayMember->next.insert(this);
+      } else {
+        prev.insert(prevNode);
+        prevNode->next.insert(this);
+      }
     }
     for (int i = 0; i < top->getChildNum(); i ++) {
       if (top->getChild(i)) q.push(top->getChild(i));
@@ -90,7 +96,6 @@ void Node::constructSuperNode() {
     case NODE_READER:
     case NODE_WRITER:
     case NODE_READWRITER:
-    case NODE_ARRAY_MEMBER:
       Panic();
     case NODE_MEM_MEMBER:
       memSuper(this);

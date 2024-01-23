@@ -2,13 +2,14 @@
 #include <stack>
 #include <set>
 #include <map>
-static std::map<Node*, std::set<Node*>>prevArray;
-static std::set<Node*> allArrays;
+
+static std::set<Node*> fullyVisited;
+static std::set<Node*> partialVisited;
 
 void graph::splitArray() {
   std::map<Node*, int> times;
   std::stack<Node*> s;
-  // std::set<Node*>visited;
+
   for (SuperNode* super : supersrc) {
     for (Node* node : super->member) s.push(node);
   }
@@ -16,103 +17,98 @@ void graph::splitArray() {
   while(!s.empty()) {
     Node* top = s.top();
     s.pop();
-    if (top->isArray()) allArrays.insert(top);
+    fullyVisited.insert(top);
+
     for (Node* next : top->next) {
       if (times.find(next) == times.end()) {
-        // TODO: 如果构成环则不会被加入s中
         times[next] = 0;
+        partialVisited.insert(next);
       }
       times[next] ++;
-      if (top->isArray()) prevArray[next].insert(top);
-      prevArray[next].insert(prevArray[top].begin(), prevArray[top].end());
-      if (times[next] == (int)next->prev.size()) s.push(next);
+      if (times[next] == (int)next->prev.size()) {
+        s.push(next);
+        Assert(partialVisited.find(next) != partialVisited.end(), "%s not found in partialVisited", next->name.c_str());
+        partialVisited.erase(next);
+      }
+    }
+    while (s.size() == 0 && partialVisited.size() != 0) {
+      /* split arrays in partialVisited until s.size() != 0 */
+      for (Node* node : partialVisited) {
+        if (node->isArray()) { // split the first array
+          Assert(!node->arraySplitted(), "%s is already splitted", node->name.c_str());
+          printf("split array %s\n", node->name.c_str());
+          /* remove prev connection */
+          for (Node* prev : node->prev) prev->next.erase(node);
+          for (SuperNode* super : node->super->prev) super->next.erase(node->super);
+          for (Node* next : node->next) next->prev.erase(node);
+          for (SuperNode* super : node->super->next) super->prev.erase(node->super);
+          /* create new node */
+          for (size_t i = 0; i < node->arrayVal.size(); i ++) {
+            Node* member = node->arrayMemberNode(i);
+            Assert(!member->isArray() || !member->valTree, "%s implement me!", member->name.c_str());
+          }
+          /* construct connections */
+          for (Node* member : node->arrayMember) {
+            member->updateConnect();
+          }
+          for (Node* next : node->next) next->updateConnect();
+          /* clear node connection */
+          node->prev.clear();
+          node->next.clear();
+          node->super->prev.clear();
+          node->super->next.clear();
+
+          for (Node* member : node->arrayMember) member->constructSuperConnect();
+          /* add into s and visitedSet */
+          for (Node* member : node->arrayMember) {
+            if (!member->valTree) continue;
+            times[member] = 0;
+            for (Node* prev : member->prev) {
+              if (fullyVisited.find(prev) != fullyVisited.end()) {
+                times[member] ++;
+              }
+            }
+            if (times[member] == (int)member->prev.size()) {
+              s.push(member);
+            }
+            else partialVisited.insert(member);
+          }
+          /* erase array */
+          partialVisited.erase(node);
+          break;
+        }
+      }
     }
   }
-  for (auto iter : allArrays) {
-    printf("-----%s----\n", iter->name.c_str());
-    for (Node* node : prevArray[iter]) printf("  %s\n", node->name.c_str());
-  }
-
-  for (auto iter : allArrays) {
-    if (prevArray[iter].find(iter) != prevArray[iter].end()) { // self loop, need to split
-      iter->splitArray();
-    }
-  }
-
 }
 
-void Node::splitArray() {
-  Assert(isArray(), "%s is not array", name.c_str());
-  Assert(arrayMember.size() == 0, "%s is already splitted", name.c_str());
-  int num = 1;
-  for (size_t i = 0; i < dimension.size(); i ++) {
-    num *= dimension[i];
-  }
-  /* allocate member nodes */
-  for (int i = 0; i < num; i ++) {
-    Node* member = new Node(NODE_OTHERS);
-    member->arrayParent = this;
-    member->name = arrayMemberName(i);
-    member->constructSuperNode();
-    arrayMember.push_back(member);
-  }
-  /* distribute expTrees in arrayVal to each member */
-  for (ExpTree* tree : arrayVal) {
-    int begin, end;
-    std::tie(begin, end) = tree->getlval()->getIdx(this);
-    Assert(begin >= 0 && end >= 0, "invalid range [%d %d]", begin, end);
-    if (begin != end) TODO();
-    Assert(begin <= end && end < (int)arrayMember.size(), "invalid range [%d, %d] in node %s", begin, end, name.c_str());
-    getArrayMember(begin)->valTree = tree;
-  }
-  arrayVal.clear();
-  /* clear all connections of current array */
-  std::set<Node*> prevNodes(prev);
-  std::set<Node*> nextNodes(next);
-  prev.clear();
-  next.clear();
-  /* update node prev & next */
-  for (Node* node : prevNodes) {
-    node->next.erase(this);
-  }
-  for (Node* node : nextNodes) {
-    node->prev.erase(this);
-  }
-  /* don't need to update the connections of prevNodes, as their valTrees remain unchanged */
-  for (Node* node : arrayMember) node->updateConnect();
-  for (Node* node : nextNodes) node->updateConnect();
-
-  /* update super prev & next */
-  for (Node* node : prevNodes) node->super->next.erase(super);
-  for (Node* node : nextNodes) node->super->prev.erase(super);
-  constructSuperConnect();
-  for (Node* member : arrayMember) member->constructSuperConnect();
-
-  /* revise astTree in its previous nodes: (*not needed) */
-
-  /* add connection between member and array(member->array) to garentee assignment of member precede the usage of array */
-
-  for (Node* member : arrayMember) {
-    member->next.insert(this);
-    this->prev.insert(member);
-    this->super->add_prev(member->super);
-  }
-
-}
-
-std::string Node::arrayMemberName(int idx) {
+Node* Node::arrayMemberNode(int idx) {
   Assert(isArray(), "%s is not array", name.c_str());
   std::vector<int>index(dimension);
   int dividend = dimension.back();
   int divisor = idx;
 
   for (int i = (int)dimension.size() - 1; i >= 0; i --) {
-    dividend = dimension[i];
+    dividend = dimension[i] + 1;
     index[i] = divisor % dividend;
     divisor = divisor / dividend;
   }
+  std::string memberName = name;
+  size_t i;
+  for (i = 0; i < index.size(); i ++) {
+    if (index[i] == dimension[i]) break;
+    memberName += "__" + std::to_string(index[i]);
+  }
 
-  std::string ret = name;
-  for (size_t i = 0; i < index.size(); i ++) ret += "__" + std::to_string(index[i]);
-  return ret;
+  Node* member = new Node(NODE_ARRAY_MEMBER);
+  member->name = memberName;
+  arrayMember.push_back(member);
+  member->arrayParent = this;
+  member->setType(width, sign);
+  if (arrayVal[idx] && !arrayVal[idx]->isInvalid()) member->valTree = arrayVal[idx];
+  member->constructSuperNode();
+
+  for ( ; i < dimension.size(); i ++) member->dimension.push_back(dimension[i]);
+
+  return member;
 }
