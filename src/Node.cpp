@@ -109,10 +109,12 @@ void Node::constructSuperConnect() {
   Assert(this->super, "empty super for %s", name.c_str());
   for (Node* n : prev) {
     Assert(n->super, "empty super for prev %s", n->name.c_str());
+    if (n->super == this->super) continue;
     super->add_prev(n->super);
   }
   for (Node* n : next) {
     Assert(n->super, "empty super for next %s", n->name.c_str());
+    if (n->super == this->super) continue;
     super->add_next(n->super);
   }
 }
