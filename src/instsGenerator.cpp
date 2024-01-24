@@ -508,7 +508,14 @@ valInfo* ENode::instsDshr(Node* node, std::string lvalue, bool isRoot) {
   } else if (childBasic && enodeBasic) {
     ret->valStr = "(" + Cast(Child(0, width), Child(0, sign)) + ChildInfo(0, valStr) + " >> " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  } else if (!childBasic && !enodeBasic) {
+    if (Child(1, width) > 64) TODO();
+    std::string dstName = isRoot ? lvalue : newMpzTmp();
+    ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
+    ret->valStr = dstName;
+    ret->opNum = 0;
   } else {
+    printf("%d = %s(%d) >> %s(%d)\n", width, ChildInfo(0, valStr).c_str(), Child(0, width), ChildInfo(1, valStr).c_str(), Child(1, width));
     TODO();
   }
   return ret;
