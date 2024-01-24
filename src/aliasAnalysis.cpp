@@ -9,9 +9,13 @@
 /* TODO: A = B[idx] */
 ENode* Node::isAlias() {
   if (isArray()) {
-    // TODO(): fix
-    if (arrayVal.size() == 1 && arrayVal[0]->getRoot()->getChildNum() == 0 && arrayVal[0]->getRoot()->getNode()) {
-      return arrayVal[0]->getRoot();
+    /* alias array A to array B iff
+      A <= B (if idx = dim[0], A.arrayval[idx] = B, otherwise A.arrayval[idx] = null ) (Done)
+      A[i] <= B[i] for every i  (WIP)
+    */
+    if (std::count(arrayVal.begin(), arrayVal.end(), nullptr) == 1) {
+      ExpTree* tree = arrayVal[dimension[0]];
+      if (tree && tree->getRoot()->getChildNum() == 0) return tree->getRoot();
     }
     return nullptr;
   }
@@ -55,6 +59,16 @@ void ExpTree::replace(Node* oldNode, ENode* newSubTree) {
   }
 }
 
+Node* ENode::getLeafNode() {
+  if (!getNode()) return nullptr;
+  Node* node = getNode();
+  if (node->isArray() && node->arraySplitted()) {
+    int idx = getArrayIndex(node);
+    return node->arrayMember[idx];
+  }
+  return node;
+}
+
 /*
 A -> |         | -> E
      | C  -> D |
@@ -73,7 +87,7 @@ void graph::aliasAnalysis() {
       ENode* enode = member->isAlias();
       if (!enode) continue;
       aliasNum ++;
-      Node* origin = enode->getNode();
+      Node* origin = enode->getLeafNode();
 
       Assert(member->prev.size() == 1 && *(member->prev.begin()) == origin, "%s prev %s != %s",
               member->name.c_str(), (*(member->prev.begin()))->name.c_str(), origin->name.c_str());
@@ -87,7 +101,10 @@ void graph::aliasAnalysis() {
       }
       /* update valTree */
       for (Node* next : member->next) {
-        for (ExpTree* tree : next->arrayVal) tree->replace(member, enode);
+        for (ExpTree* tree : next->arrayVal) {
+          if (tree)
+            tree->replace(member, enode);
+        }
         if (next->valTree) next->valTree->replace(member, enode);
       }
       member->status = DEAD_NODE;

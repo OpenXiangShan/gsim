@@ -170,6 +170,7 @@ public:
   ENode* mergeSubTree(ENode* newSubTree);
   ENode* dup();
   int getArrayIndex(Node* node);
+  Node* getLeafNode();
 };
 
 /* 
