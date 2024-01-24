@@ -942,7 +942,13 @@ valInfo* ENode::instsShr(Node* node, std::string lvalue, bool isRoot) {
   } else if (childBasic && enodeBasic) {
     ret->valStr = "(" + ChildInfo(0, valStr) + " >> " + std::to_string(n) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
+  } else if (!childBasic && !enodeBasic) {
+    std::string dstName = isRoot ? lvalue : newMpzTmp();
+    ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", dstName.c_str(), ChildInfo(0, valStr).c_str(), n));
+    ret->valStr = dstName;
+    ret->opNum = 0;
   } else {
+    printf("%d = %s(%d) >> %d\n", width, ChildInfo(0, valStr).c_str(), Child(0, width), n);
     TODO();
   }
   return ret;
