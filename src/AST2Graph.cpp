@@ -1422,7 +1422,7 @@ graph* AST2Graph(PNode* root) {
       if (port->type == NODE_READWRITER) TODO();
       ENode* enode = new ENode(OP_READ_MEM);
       enode->addChild(new ENode(port->get_member(READER_ADDR)));
-      port->get_member(READER_DATA)->valTree = new ExpTree(enode, port->get_member(READER_DATA));
+      port->get_member(READER_DATA)->valTree = new ExpTree(enode);
     }
   }
 
