@@ -55,7 +55,7 @@ void ExpTree::display() {
   if (!getRoot()) return;
   std::stack<std::pair<ENode*, int>> enodes;
   enodes.push(std::make_pair(getRoot(), 1));
-
+  if (getlval()) enodes.push(std::make_pair(getlval(), 1));
   while (!enodes.empty()) {
     ENode* top;
     int depth;
