@@ -275,10 +275,10 @@ ASTExpTree* allocIndex(graph* g, PNode* expr) {
   if (exprTree->getExpRoot()->opType == OP_INT) {
     ENode* index = new ENode(OP_INDEX_INT);
     index->addVal(p_stoi(exprTree->getExpRoot()->strVal.c_str()));
-    exprTree->updateRoot(index);
+    exprTree->setRoot(index);
   } else {
     ENode* index = new ENode(OP_INDEX);
-    exprTree->setRoot(index);
+    exprTree->updateRoot(index);
   }
   return exprTree;
 }
