@@ -58,14 +58,19 @@ void ExpTree::replace(Node* oldNode, ENode* newSubTree) {
     }
   }
 }
-
-Node* ENode::getLeafNode() {
+/* TODO: array with index */
+Node* ENode::getLeafNode(std::set<Node*>& s) {
   if (!getNode()) return nullptr;
+
+  for (ENode* childENode : child) childENode->getLeafNode(s);
+
   Node* node = getNode();
   if (node->isArray() && node->arraySplitted()) {
     int idx = getArrayIndex(node);
+    if (s.size() != 0) TODO(); // splitted array accessed by variable index
+    s.insert(node->arrayMember[idx]);
     return node->arrayMember[idx];
-  }
+  } else s.insert(node);
   return node;
 }
 
@@ -87,17 +92,21 @@ void graph::aliasAnalysis() {
       ENode* enode = member->isAlias();
       if (!enode) continue;
       aliasNum ++;
-      Node* origin = enode->getLeafNode();
+      std::set<Node*> leafNodes;
+      Node* origin = enode->getLeafNode(leafNodes);
 
       Assert(member->prev.size() == 1 && *(member->prev.begin()) == origin, "%s prev %s != %s",
               member->name.c_str(), (*(member->prev.begin()))->name.c_str(), origin->name.c_str());
 
       /* update connection */
-      origin->next.insert(member->next.begin(), member->next.end());
-      origin->next.erase(member);
+      for (Node* leaf : leafNodes) {
+        leaf->next.insert(member->next.begin(), member->next.end());
+        leaf->next.erase(member);
+
+      }
       for (Node* next : member->next) {
         next->prev.erase(member);
-        next->prev.insert(origin);
+        next->prev.insert(leafNodes.begin(), leafNodes.end());
       }
       /* update valTree */
       for (Node* next : member->next) {
