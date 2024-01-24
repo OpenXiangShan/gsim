@@ -1441,7 +1441,6 @@ graph* AST2Graph(PNode* root) {
   /* find all sources: regsrc, memory rdata, input, constant node */
   for (Node* reg : g->regsrc) {
     g->supersrc.insert(reg->super);
-    // printf("reg %s super %d\n", reg->name.c_str(), reg->super->id);
   }
   for (Node* memory : g->memory) {
     if (memory->rlatency >= 1) {
