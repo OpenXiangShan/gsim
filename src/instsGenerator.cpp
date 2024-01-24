@@ -693,7 +693,24 @@ valInfo* ENode::instsAsSInt(Node* node, std::string lvalue, bool isRoot) {
     int shiftBits = widthBits(width) - Child(0, width);
     ret->valStr = format("(%s(%s << %d) >> %d)", Cast(width, true).c_str(), ChildInfo(0, valStr).c_str(), shiftBits, shiftBits);
     ret->opNum = ChildInfo(0, opNum) + 1;
+  } else if (!childBasic && !enodeBasic){
+    std::string dstName = isRoot ? lvalue : newMpzTmp();
+    std::string tmp = newMpzTmp();
+    ret->insts.push_back(format("if (mpz_tstbit(%s, %d)){\
+      mpz_set_ui(%s, 1); \
+      mpz_mul_2exp(%s, %s, %d); \
+      mpz_sub(%s, %s, %s); \
+    } else {\
+      mpz_set(%s, %s); \
+    }", ChildInfo(0, valStr).c_str(), width,
+        tmp.c_str(),
+        tmp.c_str(), tmp.c_str(), width,
+        dstName.c_str(), ChildInfo(0, valStr).c_str(), tmp.c_str(),
+        dstName.c_str(), ChildInfo(0, valStr).c_str()));
+    ret->valStr = dstName;
+    ret->opNum = 0;
   } else {
+    printf("node %s width %d\n", node->name.c_str(), width);
     TODO();
   }
   return ret;
