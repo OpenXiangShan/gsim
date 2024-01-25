@@ -31,6 +31,7 @@ void graph::splitArray() {
         partialVisited.erase(next);
       }
     }
+
     while (s.size() == 0 && partialVisited.size() != 0) {
       /* split arrays in partialVisited until s.size() != 0 */
       for (Node* node : partialVisited) {
@@ -42,6 +43,13 @@ void graph::splitArray() {
           for (SuperNode* super : node->super->prev) super->next.erase(node->super);
           for (Node* next : node->next) next->prev.erase(node);
           for (SuperNode* super : node->super->next) super->prev.erase(node->super);
+          node->super->prev.clear();
+          node->super->next.clear();
+
+          for (Node* memberInSuper : node->super->member) {
+            if (memberInSuper != node)
+              memberInSuper->constructSuperConnect();
+          }
           /* create new node */
           for (size_t i = 0; i < node->arrayVal.size(); i ++) {
             Node* member = node->arrayMemberNode(i);
@@ -52,11 +60,10 @@ void graph::splitArray() {
             member->updateConnect();
           }
           for (Node* next : node->next) next->updateConnect();
+
           /* clear node connection */
           node->prev.clear();
           node->next.clear();
-          node->super->prev.clear();
-          node->super->next.clear();
 
           for (Node* member : node->arrayMember) member->constructSuperConnect();
           /* add into s and visitedSet */
@@ -70,8 +77,9 @@ void graph::splitArray() {
             }
             if (times[member] == (int)member->prev.size()) {
               s.push(member);
+            } else {
+              partialVisited.insert(member);
             }
-            else partialVisited.insert(member);
           }
           /* erase array */
           partialVisited.erase(node);
