@@ -707,7 +707,10 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
     std::string midName = newMpzTmp();
     std::string dstName = isRoot ? lvalue : newMpzTmp();
     ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), ChildInfo(0, valStr).c_str(), Child(1, width)));
-    ret->insts.push_back(format("mpz_add(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
+    if (Child(1, width) <= 64)
+      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
+    else
+      ret->insts.push_back(format("mpz_add(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
     ret->valStr = dstName;
     ret->opNum = 0;
   } else {
