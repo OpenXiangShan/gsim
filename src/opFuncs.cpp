@@ -82,6 +82,7 @@ void s_asSInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
 }
 
 void u_asClock(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) { mpz_set(dst, src); }
+void u_asAsyncReset(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) { mpz_set(dst, src); }
 
 void u_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) { mpz_set(dst, src); }
 void s_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) { mpz_set(dst, src); }

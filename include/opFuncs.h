@@ -21,6 +21,7 @@ void invalidExpr1(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_asUInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void s_asSInt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_asClock(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
+void u_asAsyncReset(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void u_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void s_cvt(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);
 void s_neg(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt);

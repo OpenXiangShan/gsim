@@ -86,7 +86,7 @@ class ENode {
   valInfo* instsAsUInt(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsAsSInt(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsAsClock(Node* n, std::string lvalue, bool isRoot);
-  valInfo* instsAsSyncReset(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsAsAsyncReset(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsCvt(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsNeg(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsNot(Node* n, std::string lvalue, bool isRoot);
