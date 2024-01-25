@@ -89,6 +89,12 @@ static std::string setMpz(std::string dstName, ENode* enode, valInfo* dstInfo) {
   return ret;
 }
 
+static std::string get128(std::string name) {
+  return format("(mpz_size(%s) == 1 ? mpz_get_ui(%s) : \
+            ((__uint128_t)mpz_getlimbn(%s, 1) << 64 | mpz_get_ui(%s)))",
+              name.c_str(), name.c_str(), name.c_str(), name.c_str());
+}
+
 static bool isSubArray(std::string name, Node* node) {
   size_t count = std::count(name.begin(), name.end(), '[');
   Assert(count <= node->dimension.size(), "invalid array %s", name.c_str());
@@ -177,6 +183,20 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     std::string falseStr = "else { " + (getChild(2) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), Child(2, width), Child(2, sign)) : "") + " }";
     ret->valStr = condStr + trueStr + falseStr;
     ret->opNum = -1; // assignment rather than expr
+  } else if (!childBasic && !enodeBasic) { // can merge into childBasic && enodeBasic
+    auto assignmentMpz = [lvalue, node](bool isStmt, std::string expr, int width, bool sign) {
+      if (isStmt) return expr;
+      if (expr.length() == 0) return std::string("");
+      else if (isSubArray(lvalue, node)) TODO();
+      else if (width <= 64) return format(sign ? "mpz_set_si(%s);" : "mpz_set_ui(%s);", expr.c_str());
+      else if (width <= BASIC_WIDTH) return get128(expr);
+      return format("mpz_set(%s, %s);", lvalue.c_str(), expr.c_str());
+    };
+    std::string condStr = format("if(%s)", ChildInfo(0, valStr).c_str());
+    std::string trueStr = format("{ %s }", getChild(1) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), Child(1, width), Child(1, sign)) : "");
+    std::string falseStr = format("{ %s }", getChild(2) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), Child(2, width), Child(2, sign)) : "");
+    ret->valStr = condStr + trueStr + falseStr;
+    ret->opNum = -1;
   } else {
     TODO();
   }
