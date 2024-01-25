@@ -1105,32 +1105,52 @@ void visitWhenConnect(graph* g, PNode* connect) {
 
   if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i++) {
+      int idx = 0;
+      ExpTree* valTree = nullptr;
       if (exp->getFlip(i)) {
         Node* node = exp->getAggr(i)->getNode();
         if (!node || node->isArray()) TODO();
-        ExpTree* valTree = growWhenTrace(node->valTree);
+        if (node->isArray()) {
+          idx = exp->getAggr(i)->getArrayIndex(node);
+          valTree = growWhenTrace(node->arrayVal[idx]);
+        } else {
+          valTree = growWhenTrace(node->valTree);
+        }
         valTree->setlval(exp->getAggr(i));
         ENode* whenNode = getWhenEnode(valTree);
         whenNode->setChild(whenTrace.back().first ? 1 : 2, ref->getAggr(i));
-        node->valTree = valTree;
+        if (node->isArray()) node->setArrayVal(idx, valTree);
+        else node->valTree = valTree;
       } else {
         Node* node = ref->getAggr(i)->getNode();
-        ExpTree* valTree = growWhenTrace(node->valTree);
+        if (node->isArray()) {
+          idx = ref->getAggr(i)->getArrayIndex(node);
+          valTree = growWhenTrace(node->arrayVal[idx]);
+        } else {
+          valTree = growWhenTrace(node->valTree);
+        }
         valTree->setlval(ref->getAggr(i));
         ENode* whenNode = getWhenEnode(valTree);
         whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getAggr(i));
-        if (node->isArray()) node->setArrayVal(getInedxFromTree(node, valTree), valTree);
+        if (node->isArray()) node->setArrayVal(idx, valTree);
         else node->valTree = valTree;
       }
     }
-    
+
   } else {
     Node* node = ref->getExpRoot()->getNode();
-    ExpTree* valTree = growWhenTrace(node->valTree);
+    int idx = 0;
+    ExpTree* valTree;
+    if (node->isArray()) {
+      idx = ref->getExpRoot()->getArrayIndex(node);
+      valTree = growWhenTrace(node->arrayVal[idx]);
+    } else {
+      valTree = growWhenTrace(node->valTree);
+    }
     valTree->setlval(ref->getExpRoot());
     ENode* whenNode = getWhenEnode(valTree);
     whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getExpRoot());
-    if (node->isArray()) node->setArrayVal(getInedxFromTree(node, valTree), valTree);
+    if (node->isArray()) node->setArrayVal(idx, valTree);
     else node->valTree = valTree;
   }
 }
