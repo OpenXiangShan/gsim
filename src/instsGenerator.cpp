@@ -131,7 +131,16 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
     ret->insts.push_back(format("if (%s) %s else %s", ChildInfo(0, valStr).c_str(), trueAssign.c_str(), falseAssign.c_str()));
     ret->valStr = dstName;
     ret->opNum = 0;
+  } else if (enodeBasic && !childBasic) {
+    if (width <= 64) {
+      std::string lname = Child(1, width) <= 64 ? ChildInfo(1, valStr) : format("mpz_get_ui(%s)", ChildInfo(1, valStr).c_str());
+      std::string rname = Child(2, width) <= 64 ? ChildInfo(2, valStr) : format("mpz_get_ui(%s)", ChildInfo(2, valStr).c_str());
+      ret->valStr = format("(%s ? %s : %s)", ChildInfo(0, valStr).c_str(), lname.c_str(), rname.c_str());
+    } else {
+      TODO();
+    }
   } else {
+    printf("width %d = mux %s(%d) %s(%d)\n", width, ChildInfo(1, valStr).c_str(), Child(1, width), ChildInfo(2, valStr).c_str(), Child(2, width));
     TODO();
   }
   return ret;
