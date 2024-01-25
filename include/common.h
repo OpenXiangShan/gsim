@@ -98,6 +98,7 @@ class ExpTree;
 class SuperNode;
 class valInfo;
 
+#include "opFuncs.h"
 #include "debug.h"
 #include "Node.h"
 #include "PNode.h"

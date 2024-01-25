@@ -20,7 +20,14 @@ public:
     insts.insert(insts.end(), newInfo->insts.begin(), newInfo->insts.end());
   }
   void setConsStr() {
-    valStr = mpz_get_str(NULL, 16, consVal);
+    if (mpz_sgn(consVal) >= 0) {
+      valStr = mpz_get_str(NULL, 16, consVal);
+    } else {
+      mpz_t sintVal;
+      mpz_init(sintVal);
+      u_asUInt(sintVal, consVal, widthBits(width));
+      valStr = mpz_get_str(NULL, 16, sintVal);
+    }
     if (valStr.length() <= 16) valStr = Cast(width, sign) + "0x" + valStr;
     else valStr = format("UINT128(0x%s, 0x%s)", valStr.substr(0, valStr.length() - 16).c_str(), valStr.substr(valStr.length()-16, 16).c_str());
     status = VAL_CONSTANT;
