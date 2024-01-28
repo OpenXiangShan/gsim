@@ -1170,15 +1170,19 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
   } else if (!childBasic && enodeBasic) {
     std::string mpzTmp1 = newMpzTmp();
     std::string mpzTmp2 = newMpzTmp(); // mask
-    ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", mpzTmp1.c_str(), ChildInfo(0, valStr).c_str(), lo));
+    std::string shiftVal = mpzTmp1;
+    if (lo != 0) {
+      ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", mpzTmp1.c_str(), ChildInfo(0, valStr).c_str(), lo));
+      shiftVal = ChildInfo(0, valStr);
+    }
     if (w > 64) {
       ret->insts.push_back(format("mpz_set_ui(%s, 1);", mpzTmp2.c_str()));
       ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", mpzTmp2.c_str(), mpzTmp2.c_str(), w));
       ret->insts.push_back(format("mpz_sub_ui(%s, %s, 1);", mpzTmp2.c_str(), mpzTmp2.c_str()));
-      ret->insts.push_back(format("mpz_and(%s, %s, %s);", mpzTmp1.c_str(), mpzTmp1.c_str(), mpzTmp2.c_str()));
-      ret->valStr = get128(mpzTmp1);
+      ret->insts.push_back(format("mpz_and(%s, %s, %s);", mpzTmp2.c_str(), shiftVal.c_str(), mpzTmp2.c_str()));
+      ret->valStr = get128(mpzTmp2);
     } else {
-      ret->valStr = format("(mpz_get_ui(%s) & %s)", mpzTmp1.c_str(), bitMask(w).c_str());
+      ret->valStr = format("(mpz_get_ui(%s) & %s)", shiftVal.c_str(), bitMask(w).c_str());
     }
     ret->opNum = 1;
   } else {
