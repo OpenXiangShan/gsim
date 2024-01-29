@@ -935,6 +935,9 @@ void visitNode(graph* g, PNode* node) {
     Assert(aggrNode->size() == exp->getAggrNum(), "aggrMember num %d tree num %d", aggrNode->size(), exp->getAggrNum());
     for (int i = 0; i < aggrNode->size(); i ++) {
       aggrNode->member[i].first->valTree = new ExpTree(exp->getAggr(i), aggrNode->member[i].first);
+      aggrNode->member[i].first->dimension.clear();
+      std::vector<int> dims = exp->getAggr(i)->getDim();
+      aggrNode->member[i].first->dimension.insert(aggrNode->member[i].first->dimension.end(), dims.begin(), dims.end());
     }
     addDummy(aggrNode->name, aggrNode);
   } else {
