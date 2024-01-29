@@ -15,6 +15,7 @@ FILE* sigFile = nullptr;
 #endif
 
 static int superId = 1;
+static std::set<Node*> definedNode;
 
 static void inline includeLib(FILE* fp, std::string lib, bool isStd) {
   std::string format = isStd ? "#include <%s>\n" : "#include \"%s\"\n";
@@ -123,6 +124,9 @@ void graph::genHeaderEnd(FILE* fp) {
 
 void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_SPECIAL || node->status != VALID_NODE) return;
+  if (node->type == NODE_ARRAY_MEMBER) node = node->arrayParent;
+  if (definedNode.find(node) != definedNode.end()) return;
+  definedNode.insert(node);
   if (node->width <= BASIC_WIDTH) {
     fprintf(fp, "%s %s", widthUType(node->width).c_str(), node->name.c_str());
   } else {
