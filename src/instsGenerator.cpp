@@ -163,7 +163,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   }
   /* not constant */
   bool childBasic = (!getChild(1) || Child(1, width) <= BASIC_WIDTH) && (!getChild(2) || Child(2, width) <= BASIC_WIDTH);
-  bool enodeBasic = width <= BASIC_WIDTH;
+  bool enodeBasic = node->width <= BASIC_WIDTH;
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) {
     if (childNode) ret->mergeInsts(childNode->computeInfo);
@@ -196,6 +196,20 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     std::string condStr = format("if(%s)", ChildInfo(0, valStr).c_str());
     std::string trueStr = format("{ %s }", (getChild(1) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), Child(1, width), Child(1, sign), Child(1, computeInfo)) : "").c_str());
     std::string falseStr = format("else { %s }", (getChild(2) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), Child(2, width), Child(2, sign), Child(2, computeInfo)) : "").c_str());
+    ret->valStr = condStr + trueStr + falseStr;
+    ret->opNum = -1;
+  } else if (!enodeBasic && childBasic) {
+    auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign) {
+      if (isStmt) return expr;
+      if (expr.length() == 0) return std::string("");
+      else if (isSubArray(lvalue, node)) TODO();
+      else if (width <= 64) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
+      else if (width <= BASIC_WIDTH) TODO();
+      else TODO();
+    };
+    std::string condStr = format("if(%s)", ChildInfo(0, valStr).c_str());
+    std::string trueStr = format("{ %s }", (getChild(1) ? assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), Child(1, width), Child(1, sign)) : "").c_str());
+    std::string falseStr = format("else { %s }", (getChild(2) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), Child(2, width), Child(2, sign)) : "").c_str());
     ret->valStr = condStr + trueStr + falseStr;
     ret->opNum = -1;
   } else {
