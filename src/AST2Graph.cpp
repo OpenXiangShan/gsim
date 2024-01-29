@@ -45,6 +45,7 @@ static inline void addSignal(std::string s, Node* n) {
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
   Assert(allDummy.find(s) == allDummy.end(), "Signal %s is already in allDummy\n", s.c_str());
   allSignals[s] = n;
+  n->whenDepth = whenTrace.size();
   // printf("add signal %s\n", s.c_str());
 }
 
@@ -1015,22 +1016,22 @@ bool matchWhen(ENode* enode, int depth) {
 }
 
 /* find the latest matched when ENode and the number of matched */
-std::pair<ENode*, int> getDeepestWhen(ExpTree* valTree) {
-  if (!valTree) return std::make_pair(nullptr, 0);
+std::pair<ENode*, int> getDeepestWhen(ExpTree* valTree, int depth) {
+  if (!valTree) return std::make_pair(nullptr, depth);
   ENode* checkNode = valTree->getRoot();
   ENode* whenNode = nullptr;
-  int depth = 0;
+  int deep = depth;
 
-  for (size_t i = 0; i < whenTrace.size(); i ++) {
+  for (size_t i = depth; i < whenTrace.size(); i ++) {
     if (checkNode && matchWhen(checkNode, i)) {
       whenNode = checkNode;
-      depth = i + 1;
+      deep = i + 1;
       checkNode = whenTrace[i].first ? checkNode->getChild(1) : checkNode->getChild(2);
     } else {
       break;
     }
   }
-  return std::make_pair(whenNode, depth);
+  return std::make_pair(whenNode, deep);
 }
 
 /*
@@ -1050,13 +1051,13 @@ newRoot:  when3
       cond3 a b
 replace oldRoot by newRoot
 */
-ExpTree* growWhenTrace(ExpTree* valTree) {
+ExpTree* growWhenTrace(ExpTree* valTree, int depth) {
   ENode* oldParent = nullptr;
-  int maxDepth = 0;
-  if (valTree) std::tie(oldParent, maxDepth) = getDeepestWhen(valTree);
+  int maxDepth = depth;
+  if (valTree) std::tie(oldParent, maxDepth) = getDeepestWhen(valTree, depth);
   if (maxDepth == (int)whenTrace.size()) return valTree ? valTree : new ExpTree(nullptr);
 
-  ENode* oldRoot = maxDepth == 0 ?
+  ENode* oldRoot = maxDepth == depth ?
                           (valTree ? valTree->getRoot() : nullptr)
                         : (whenTrace[maxDepth-1].first ? oldParent->getChild(1) : oldParent->getChild(2));
   ENode* newRoot = nullptr; // latest whenNode
@@ -1077,7 +1078,7 @@ ExpTree* growWhenTrace(ExpTree* valTree) {
     newRoot = whenNode;
 
   }
-  if (maxDepth == 0) {
+  if (maxDepth == depth) {
     if (valTree) valTree->setRoot(newRoot);
     else valTree = new ExpTree(newRoot);
   } else {
@@ -1086,10 +1087,10 @@ ExpTree* growWhenTrace(ExpTree* valTree) {
   return valTree;
 }
 
-ENode* getWhenEnode(ExpTree* valTree) {
+ENode* getWhenEnode(ExpTree* valTree, int depth) {
   ENode* whenNode;
   int maxDepth;
-  std::tie(whenNode, maxDepth) = getDeepestWhen(valTree);
+  std::tie(whenNode, maxDepth) = getDeepestWhen(valTree, depth);
   Assert(maxDepth == (int)whenTrace.size(), "when not match %d %ld", maxDepth, whenTrace.size());
   return whenNode;
 }
@@ -1112,26 +1113,28 @@ void visitWhenConnect(graph* g, PNode* connect) {
         if (!node || node->isArray()) TODO();
         if (node->isArray()) {
           idx = exp->getAggr(i)->getArrayIndex(node);
-          valTree = growWhenTrace(node->arrayVal[idx]);
+          valTree = growWhenTrace(node->arrayVal[idx], node->whenDepth);
         } else {
-          valTree = growWhenTrace(node->valTree);
+          valTree = growWhenTrace(node->valTree, node->whenDepth);
         }
         valTree->setlval(exp->getAggr(i));
-        ENode* whenNode = getWhenEnode(valTree);
-        whenNode->setChild(whenTrace.back().first ? 1 : 2, ref->getAggr(i));
+        ENode* whenNode = getWhenEnode(valTree, node->whenDepth);
+        if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, ref->getAggr(i));
+        else valTree->setRoot(ref->getAggr(i));
         if (node->isArray()) node->setArrayVal(idx, valTree);
         else node->valTree = valTree;
       } else {
         Node* node = ref->getAggr(i)->getNode();
         if (node->isArray()) {
           idx = ref->getAggr(i)->getArrayIndex(node);
-          valTree = growWhenTrace(node->arrayVal[idx]);
+          valTree = growWhenTrace(node->arrayVal[idx], node->whenDepth);
         } else {
-          valTree = growWhenTrace(node->valTree);
+          valTree = growWhenTrace(node->valTree, node->whenDepth);
         }
         valTree->setlval(ref->getAggr(i));
-        ENode* whenNode = getWhenEnode(valTree);
-        whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getAggr(i));
+        ENode* whenNode = getWhenEnode(valTree, node->whenDepth);
+        if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getAggr(i));
+        else valTree->setRoot(exp->getAggr(i));
         if (node->isArray()) node->setArrayVal(idx, valTree);
         else node->valTree = valTree;
       }
@@ -1143,13 +1146,14 @@ void visitWhenConnect(graph* g, PNode* connect) {
     ExpTree* valTree;
     if (node->isArray()) {
       idx = ref->getExpRoot()->getArrayIndex(node);
-      valTree = growWhenTrace(node->arrayVal[idx]);
+      valTree = growWhenTrace(node->arrayVal[idx], node->whenDepth);
     } else {
-      valTree = growWhenTrace(node->valTree);
+      valTree = growWhenTrace(node->valTree, node->whenDepth);
     }
     valTree->setlval(ref->getExpRoot());
-    ENode* whenNode = getWhenEnode(valTree);
-    whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getExpRoot());
+    ENode* whenNode = getWhenEnode(valTree, node->whenDepth);
+    if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getExpRoot());
+    else valTree->setRoot(exp->getExpRoot());
     if (node->isArray()) node->setArrayVal(idx, valTree);
     else node->valTree = valTree;
   }

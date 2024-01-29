@@ -119,6 +119,8 @@ class Node {
   Node* arrayParent = nullptr;
 /* used for visitWhen in AST2Graph */
 
+  int whenDepth = 0;
+
 /* used in cppEmitter */
   std::set<int> nextActiveId;
 
