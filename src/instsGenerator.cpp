@@ -1423,6 +1423,7 @@ void Node::recompute() {
     if (tree)
       tree->clearInfo();
   }
+  insts.clear();
   if (valTree) valTree->clearInfo();
   compute();
   if (prevVal->valStr != computeInfo->valStr) {
