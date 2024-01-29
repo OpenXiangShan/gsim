@@ -207,8 +207,8 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       return format("mpz_set(%s, %s);", lvalue.c_str(), expr.c_str());
     };
     std::string condStr = format("if(%s)", ChildInfo(0, valStr).c_str());
-    std::string trueStr = format("{ %s }", getChild(1) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), Child(1, width), Child(1, sign)) : "");
-    std::string falseStr = format("{ %s }", getChild(2) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), Child(2, width), Child(2, sign)) : "");
+    std::string trueStr = format("{ %s }", (getChild(1) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), Child(1, width), Child(1, sign)) : "").c_str());
+    std::string falseStr = format("else { %s }", (getChild(2) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), Child(2, width), Child(2, sign)) : "").c_str());
     ret->valStr = condStr + trueStr + falseStr;
     ret->opNum = -1;
   } else {
