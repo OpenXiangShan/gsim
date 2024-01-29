@@ -1173,6 +1173,7 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
     std::string shiftVal = mpzTmp1;
     if (lo != 0) {
       ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", mpzTmp1.c_str(), ChildInfo(0, valStr).c_str(), lo));
+    } else {
       shiftVal = ChildInfo(0, valStr);
     }
     if (w > 64) {
