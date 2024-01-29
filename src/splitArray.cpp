@@ -105,7 +105,7 @@ Node* Node::arrayMemberNode(int idx) {
   size_t i;
   for (i = 0; i < index.size(); i ++) {
     if (index[i] == dimension[i]) break;
-    memberName += "__" + std::to_string(index[i]);
+    memberName += "[" + std::to_string(index[i]) + "]";
   }
 
   Node* member = new Node(NODE_ARRAY_MEMBER);

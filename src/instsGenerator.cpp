@@ -97,7 +97,7 @@ static std::string get128(std::string name) {
 
 static bool isSubArray(std::string name, Node* node) {
   size_t count = std::count(name.begin(), name.end(), '[');
-  Assert(count <= node->dimension.size(), "invalid array %s", name.c_str());
+  Assert(node->type == NODE_ARRAY_MEMBER || count <= node->dimension.size(), "invalid array %s", name.c_str());
   return node->dimension.size() != count;
 }
 
