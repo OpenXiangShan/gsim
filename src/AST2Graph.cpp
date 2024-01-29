@@ -904,6 +904,25 @@ AggrParentNode* allocNodeFromAggr(graph* g, AggrParentNode* parent) {
   return ret;
 }
 
+std::vector<int> ENode::getDim() {
+  std::vector<int> dims;
+  if (nodePtr) {
+    for (size_t i = getChildNum(); i < nodePtr->dimension.size(); i ++) dims.push_back(nodePtr->dimension[i]);
+    return dims;
+  }
+  switch (opType) {
+    case OP_MUX: return getChild(1)->getDim();
+    case OP_WHEN:
+      if (getChild(1)) return getChild(1)->getDim();
+      if (getChild(2)) return getChild(2)->getDim();
+      break;
+    default:
+      break;
+  }
+
+  return dims;
+}
+
 /*
 | Node ALLID '=' expr info { $$ = newNode(P_NODE, synlineno(), $5, $2, 1, $4); }
 */
@@ -920,6 +939,9 @@ void visitNode(graph* g, PNode* node) {
     addDummy(aggrNode->name, aggrNode);
   } else {
     Node* n = allocNode(NODE_OTHERS, topPrefix());
+    std::vector<int> dims = exp->getExpRoot()->getDim();
+    n->dimension.insert(n->dimension.end(), dims.begin(), dims.end());
+
     n->valTree = new ExpTree(exp->getExpRoot(), n);
     addSignal(n->name, n);
     n->allocArrayVal();

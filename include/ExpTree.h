@@ -171,6 +171,7 @@ public:
   ENode* dup();
   int getArrayIndex(Node* node);
   Node* getLeafNode(std::set<Node*>& s);
+  std::vector<int> getDim();
 };
 
 /* 
