@@ -493,7 +493,18 @@ valInfo* ENode::instsNeq(Node* node, std::string lvalue, bool isRoot) {
     ret->valStr = "(" + ChildInfo(0, valStr) + " != " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   } else if (!childBasic && enodeBasic) {
-    ret->valStr = format("(mpz_cmp(%s, %s) != 0)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
+    if (ChildInfo(0, status) == VAL_CONSTANT && ChildInfo(0, consLength) > 64) TODO();
+    if (ChildInfo(1, status) == VAL_CONSTANT && ChildInfo(1, consLength) > 64) TODO();
+    std::string lvalue = ChildInfo(0, valStr);
+    std::string rvalue = ChildInfo(1, valStr);
+    if (ChildInfo(0, status) == VAL_CONSTANT) {
+      rvalue = ChildInfo(0, valStr);
+      lvalue = ChildInfo(1, valStr);
+    }
+    bool halfConstant = ChildInfo(0, status) == VAL_CONSTANT || ChildInfo(1, status) == VAL_CONSTANT;
+    std::string formatStr = halfConstant ? (sign ? "(mpz_cmp_si(%s, %s) != 0)" : "(mpz_cmp_ui(%s, %s) != 0)")
+                                        : "(mpz_cmp(%s, %s) != 0)";
+    ret->valStr = format(formatStr.c_str(), lvalue.c_str(), rvalue.c_str());
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   } else {
     TODO();
@@ -623,9 +634,21 @@ valInfo* ENode::instsOr(Node* node, std::string lvalue, bool isRoot) {
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   } else if (!childBasic && !enodeBasic) {
     std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_ior(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
-    ret->valStr = dstName;
-    ret->opNum = 0;
+    valInfo* linfo = Child(0, computeInfo);
+    valInfo* rinfo = Child(1, computeInfo);
+    if (ChildInfo(0, status) == VAL_CONSTANT) {
+      rinfo = Child(0, computeInfo);
+      linfo = Child(1, computeInfo);
+    }
+    if(rinfo->status == VAL_CONSTANT) {
+      if (mpz_sgn(rinfo->consVal) != 0) TODO();
+      ret->valStr = linfo->valStr;
+      ret->opNum = linfo->opNum;
+    } else {
+      ret->insts.push_back(format("mpz_ior(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
+      ret->valStr = dstName;
+      ret->opNum = 0;
+    }
   } else {
     printf("%d = %s(%d) | %s(%d)\n", width, ChildInfo(0, valStr).c_str(), Child(0, width), ChildInfo(1, valStr).c_str(), Child(1, width));
     TODO();
