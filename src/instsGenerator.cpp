@@ -198,17 +198,19 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     ret->valStr = condStr + trueStr + falseStr;
     ret->opNum = -1; // assignment rather than expr
   } else if (!childBasic && !enodeBasic) { // can merge into childBasic && enodeBasic
-    auto assignmentMpz = [lvalue, node](bool isStmt, std::string expr, int width, bool sign) {
+    auto assignmentMpz = [lvalue, node](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
       if (isStmt) return expr;
       if (expr.length() == 0) return std::string("");
       else if (isSubArray(lvalue, node)) TODO();
       else if (width <= 64) return format(sign ? "mpz_set_si(%s);" : "mpz_set_ui(%s);", expr.c_str());
+      else if (info->status == VAL_CONSTANT && info->consLength <= 16) return format(sign ? "mpz_set_si(%s);" : "mpz_set_ui(%s);", expr.c_str());
+      else if (info->status == VAL_CONSTANT) TODO();
       else if (width <= BASIC_WIDTH) return get128(expr);
       return format("mpz_set(%s, %s);", lvalue.c_str(), expr.c_str());
     };
     std::string condStr = format("if(%s)", ChildInfo(0, valStr).c_str());
-    std::string trueStr = format("{ %s }", (getChild(1) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), Child(1, width), Child(1, sign)) : "").c_str());
-    std::string falseStr = format("else { %s }", (getChild(2) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), Child(2, width), Child(2, sign)) : "").c_str());
+    std::string trueStr = format("{ %s }", (getChild(1) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), Child(1, width), Child(1, sign), Child(1, computeInfo)) : "").c_str());
+    std::string falseStr = format("else { %s }", (getChild(2) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), Child(2, width), Child(2, sign), Child(2, computeInfo)) : "").c_str());
     ret->valStr = condStr + trueStr + falseStr;
     ret->opNum = -1;
   } else {

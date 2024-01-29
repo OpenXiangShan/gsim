@@ -12,6 +12,7 @@ public:
   mpz_t consVal;
   int width = 0;
   bool sign = 0;
+  int consLength = 0;
 
   valInfo() {
     mpz_init(consVal);
@@ -28,6 +29,7 @@ public:
       u_asUInt(sintVal, consVal, widthBits(width));
       valStr = mpz_get_str(NULL, 16, sintVal);
     }
+    consLength = valStr.length();
     if (valStr.length() <= 16) valStr = Cast(width, sign) + "0x" + valStr;
     else valStr = format("UINT128(0x%s, 0x%s)", valStr.substr(0, valStr.length() - 16).c_str(), valStr.substr(valStr.length()-16, 16).c_str());
     status = VAL_CONSTANT;
@@ -44,6 +46,7 @@ public:
     mpz_set(ret->consVal, consVal);
     ret->width = width;
     ret->sign = sign;
+    ret->consLength = consLength;
     return ret;
   }
 };
