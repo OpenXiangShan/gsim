@@ -95,6 +95,15 @@ static std::string get128(std::string name) {
               name.c_str(), name.c_str(), name.c_str(), name.c_str());
 }
 
+static std::string set128(std::string lvalue, valInfo* info, valInfo* ret) {
+  std::string localName = info->valStr;
+  if (info->opNum > 0) {
+    localName = newLocalTmp();
+    ret->insts.push_back(format("%s %s = %s;", widthUType(info->width).c_str(), localName.c_str(), info->valStr.c_str()));
+  }
+  return format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);\n", lvalue.c_str(), localName.c_str());
+}
+
 static bool isSubArray(std::string name, Node* node) {
   size_t count = std::count(name.begin(), name.end(), '[');
   Assert(node->type == NODE_ARRAY_MEMBER || count <= node->dimension.size(), "invalid array %s", name.c_str());
@@ -198,14 +207,14 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     ret->valStr = condStr + trueStr + falseStr;
     ret->opNum = -1; // assignment rather than expr
   } else if (!childBasic && !enodeBasic) { // can merge into childBasic && enodeBasic
-    auto assignmentMpz = [lvalue, node](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
+    auto assignmentMpz = [lvalue, node, ret](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
       if (isStmt) return expr;
       if (expr.length() == 0) return std::string("");
       else if (isSubArray(lvalue, node)) TODO();
-      else if (width <= 64) return format(sign ? "mpz_set_si(%s);" : "mpz_set_ui(%s);", expr.c_str());
-      else if (info->status == VAL_CONSTANT && info->consLength <= 16) return format(sign ? "mpz_set_si(%s);" : "mpz_set_ui(%s);", expr.c_str());
+      else if (width <= 64) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
+      else if (info->status == VAL_CONSTANT && info->consLength <= 16) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
       else if (info->status == VAL_CONSTANT) TODO();
-      else if (width <= BASIC_WIDTH) return get128(expr);
+      else if (width <= BASIC_WIDTH) return set128(lvalue, info, ret);
       return format("mpz_set(%s, %s);", lvalue.c_str(), expr.c_str());
     };
     std::string condStr = format("if(%s)", ChildInfo(0, valStr).c_str());
