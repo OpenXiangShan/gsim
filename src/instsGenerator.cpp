@@ -1376,6 +1376,7 @@ valInfo* Node::compute() {
   Assert(valTree && valTree->getRoot(), "empty valTree in node %s", name.c_str());
   bool isRoot = anyExtEdge() || next.size() != 1;
   valInfo* ret = valTree->getRoot()->compute(this, name, isRoot)->dup();
+  if (ret->status == VAL_INVALID) ret->setConstantByStr("0");
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
     if (type == NODE_REG_DST) {
