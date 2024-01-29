@@ -6,7 +6,7 @@
 
 #include <map>
 
-#define oldBasic(node) (node->name + "$old")
+#define oldBasic(node) (node->type == NODE_ARRAY_MEMBER ? arrayMemberOld(node) : (node->name + "$old"))
 #define oldMpz(node) std::string("oldValMpz")
 #define oldName(node) (node->width > BASIC_WIDTH ? oldMpz(node) : oldBasic(node))
 
@@ -26,6 +26,20 @@ static void inline newLine(FILE* fp) {
   fprintf(fp, "\n");
 }
 
+std::string strReplace(std::string s, std::string oldStr, std::string newStr) {
+  size_t pos;
+  while ((pos = s.find(oldStr)) != std::string::npos) {
+    s.replace(pos, oldStr.length(), newStr);
+  }
+  return s;
+}
+
+static std::string arrayMemberOld(Node* node) {
+  Assert(node->type == NODE_ARRAY_MEMBER, "invalid type %d %s", node->type, node->name.c_str());
+  std::string ret = strReplace(node->name, "[", "__");
+  ret = strReplace(ret, "]", "__") + "$old";
+  return ret;
+}
 
 static void inline declStep(FILE* fp) {
   for (int i = 1; i < superId; i ++) fprintf(fp, "void step%d();\n", i);
@@ -180,6 +194,7 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
     /* save oldVal */
     if (node->needActivate() && node->dimension.size() == 0) {
       if (node->width > BASIC_WIDTH) {
+        if (node->type == NODE_ARRAY_MEMBER) TODO();
         fprintf(fp, "mpz_set(%s, %s);\n", oldMpz(node).c_str(), node->name.c_str());
       } else {
         fprintf(fp, "%s %s = %s;\n", widthUType(node->width).c_str(), oldBasic(node).c_str(), node->name.c_str());
