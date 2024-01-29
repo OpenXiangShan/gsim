@@ -83,6 +83,7 @@ static std::string set128(std::string lvalue, valInfo* info, valInfo* ret) {
 static bool isSubArray(std::string name, Node* node) {
   size_t count = std::count(name.begin(), name.end(), '[');
   Assert(node->type == NODE_ARRAY_MEMBER || count <= node->dimension.size(), "invalid array %s", name.c_str());
+  if (node->type == NODE_ARRAY_MEMBER) return false;
   return node->dimension.size() != count;
 }
 
