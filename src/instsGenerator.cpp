@@ -632,7 +632,7 @@ valInfo* ENode::instsOr(Node* node, std::string lvalue, bool isRoot) {
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   } else if (!childBasic && !enodeBasic) {
     std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_orr(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
+    ret->insts.push_back(format("mpz_ior(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
     ret->valStr = dstName;
     ret->opNum = 0;
   } else {
