@@ -558,7 +558,7 @@ valInfo* ENode::instsDshr(Node* node, std::string lvalue, bool isRoot) {
     std::string tmp = newMpzTmp();
     ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %s);", tmp.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
     if (width <= 64) {
-      ret->valStr = format("(mpz_get_ui(%s) & %s)", tmp.c_str(), bitMask(width));
+      ret->valStr = format("(mpz_get_ui(%s) & %s)", tmp.c_str(), bitMask(width).c_str());
       ret->opNum = 1;
     } else TODO();
   } else {
