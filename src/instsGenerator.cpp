@@ -20,30 +20,6 @@
 static int localTmpNum = 0;
 static int mpzTmpNum = 0;
 
-static std::map<OPType, std::string> opMap = {
-  {OP_ADD, " + "},
-  {OP_SUB, " - "},
-  {OP_MUL, " * "},
-  {OP_DIV, " / "},
-  {OP_REM, " % "},
-  {OP_LT,  " < "},
-  {OP_LEQ, " <= "},
-  {OP_GT,  " > "},
-  {OP_GEQ, " >= "},
-  {OP_EQ,  " == "},
-  {OP_NEQ, " != "},
-  {OP_DSHL, " >> "},
-  {OP_AND, " & "},
-  {OP_OR,  " | "},
-  {OP_XOR, " ^ "},
-  {OP_ASCLOCK, "0 != "},
-  {OP_NEG, " - "},
-  {OP_CVT, ""},
-  {OP_ORR, "0 != "},
-  {OP_SHL, " << "},
-  {OP_SHR, " >> "},
-};
-
 /* return: 0 - same size, positive - the first is larger, negative - the second is larger  */
 static int typeCmp(int width1, int width2) {
   if (width1 <= 8 && width2 <= 8) return 0;
