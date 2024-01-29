@@ -333,11 +333,17 @@ void graph::genStep(FILE* fp) {
     if (mem->width > BASIC_WIDTH) TODO();
     for (Node* port : mem->member) {
       if (port->type == NODE_READER && mem->rlatency == 1) {
-        fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->computeInfo->valStr.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
+        if (port->member[READER_DATA]->dimension.size() != 0)
+          fprintf(fp, "memcpy(%s, %s[%s], sizeof(%s));\n", port->member[READER_DATA]->computeInfo->valStr.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str(), port->member[READER_DATA]->computeInfo->valStr.c_str());
+        else
+          fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->computeInfo->valStr.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
         activateUncondNext(fp, port->member[READER_DATA]);
       } else if (port->type == NODE_WRITER) {
         fprintf(fp, "if(%s && %s) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str(), port->member[WRITER_MASK]->computeInfo->valStr.c_str());
-        fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
+        if (port->member[WRITER_DATA]->dimension.size() != 0)
+          fprintf(fp, "memcpy(%s[%s], %s, sizeof(%s[0]));\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str(), mem->name.c_str());
+        else
+          fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
         for (SuperNode* super : readerL0) {
           if (super->cppId <= 0) continue;
           fprintf(fp, "activeFlags[%d] = true;\n", super->cppId);
