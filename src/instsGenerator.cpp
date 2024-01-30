@@ -984,7 +984,7 @@ valInfo* ENode::instsOrr(Node* node, std::string lvalue, bool isRoot) {
     ret->valStr = "(" + ChildInfo(0, valStr) + " != 0 )";
     ret->opNum = ChildInfo(0, opNum) + 1;
   } else if (!childBasic && enodeBasic) {
-    ret->valStr = format("(mpz_sgn(%s) == 0)", ChildInfo(0, valStr).c_str());
+    ret->valStr = format("(mpz_sgn(%s) != 0)", ChildInfo(0, valStr).c_str());
     ret->opNum = ChildInfo(0, opNum) + 1;
   } else {
     TODO();
