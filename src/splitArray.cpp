@@ -84,6 +84,9 @@ void graph::splitArray() {
           node->next.clear();
 
           for (Node* member : node->arrayMember) member->constructSuperConnect();
+          for (Node* member : node->arrayMember) {
+            if (member->super->prev.size() == 0) supersrc.insert(member->super);
+          }
           /* add into s and visitedSet */
           for (Node* member : node->arrayMember) {
             if (!member->valTree) continue;
