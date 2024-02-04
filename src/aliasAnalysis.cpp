@@ -13,9 +13,8 @@ ENode* Node::isAlias() {
       A <= B (if idx = dim[0], A.arrayval[idx] = B, otherwise A.arrayval[idx] = null ) (Done)
       A[i] <= B[i] for every i  (WIP)
     */
-    if (std::count(arrayVal.begin(), arrayVal.end(), nullptr) == 1) {
-      ExpTree* tree = arrayVal[dimension[0]];
-      if (tree && tree->getRoot()->getChildNum() == 0) return tree->getRoot();
+    if (arrayVal.size() == 1 && arrayVal[0]->getRoot()->getChildNum() == 0 && arrayVal[0]->getRoot()->getNode()) {
+      return arrayVal[0]->getRoot();
     }
     return nullptr;
   }

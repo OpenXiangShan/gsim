@@ -118,16 +118,6 @@ void Node::constructSuperConnect() {
     super->add_next(n->super);
   }
 }
-/*
-the last element in each dimension represent the whole subArray
-e.g. A[4][5][6], element Array[1][2][6] represent A[1][2]; Array[4] represent the whole Array A
-*/
-void Node::allocArrayVal() {
-  Assert(arrayVal.size() == 0, "%s is already alloced (%ld)", name.c_str(), arrayVal.size());
-  int entryNum = 1;
-  for (int num : dimension) entryNum *= num + 1;
-  if (isArray()) arrayVal = std::vector<ExpTree*>(entryNum, 0);
-}
 
 void Node::updateInfo(TypeInfo* info) {
   width = info->width;
@@ -227,4 +217,9 @@ void Node::updateActivate() {
 void Node::removeConnection() {
   for (Node* prevNode : prev) prevNode->next.erase(this);
   for (Node* nextNode : next) nextNode->prev.erase(this);
+}
+
+void Node::addArrayVal(ExpTree* val) {
+  if (val->getRoot()->opType == OP_INVALID) ;
+  else arrayVal.push_back(val);
 }

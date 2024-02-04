@@ -116,7 +116,6 @@ class Node {
   valInfo* computeInfo = nullptr;
 /* used for splitted array */
   std::vector<Node*>arrayMember;
-  std::vector<int> arrayOrder;
   Node* arrayParent = nullptr;
 /* used for visitWhen in AST2Graph */
 
@@ -179,13 +178,7 @@ class Node {
   bool arraySplitted() {
     return arrayMember.size() != 0;
   }
-  void setArrayVal(size_t idx, ExpTree* val) {
-    Assert(idx < arrayVal.size(), "idx %ld is out of bound in %s(size=%ld, type=%d)\n", idx, name.c_str(), arrayVal.size(), type);
-    arrayVal[idx] = val;
-    auto iter = std::find(arrayOrder.begin(), arrayOrder.end(), idx);
-    if (iter != arrayOrder.end()) arrayOrder.erase(iter);
-    arrayOrder.push_back(idx);
-  }
+  void addArrayVal(ExpTree* val);
   Node* getArrayMember(int idx) {
     Assert(idx < (int)arrayMember.size(), "idx %d out of bound [0, %ld)", idx, arrayMember.size());
     return arrayMember[idx];

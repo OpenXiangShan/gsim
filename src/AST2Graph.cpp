@@ -103,12 +103,6 @@ static inline std::string lastField(std::string s) {
   return pos == std::string::npos ? "" : s.substr(pos + 1);
 }
 
-/* the arrayVal */
-static int getInedxFromTree(Node* node, ExpTree* tree) {
-  ENode* lvalue = tree->getlval();
-  return lvalue->getArrayIndex(node);
-}
-
 /*
 field: ALLID ':' type { $$ = newNode(P_FIELD, synlineno(), $1, 1, $3); }
     | Flip ALLID ':' type  { $$ = newNode(P_FLIP_FIELD, synlineno(), $2, 1, $4); }
@@ -219,7 +213,6 @@ void visitTopPorts(graph* g, PNode* ports) {
     for (auto entry : info->aggrMember) {
       Node* node = entry.first;
       addSignal(node->name, node);
-      node->allocArrayVal();
       if (node->type == NODE_INP) g->input.push_back(node);
       else if (node->type == NODE_OUT) g->output.push_back(node);
     }
@@ -458,7 +451,6 @@ void visitModule(graph* g, PNode* module) {
     for (auto entry : portInfo->aggrMember) {
       Node* node = entry.first;
       addSignal(node->name, node);
-      node->allocArrayVal();
     }
     for (AggrParentNode* dummy : portInfo->aggrParent) {
       addDummy(dummy->name, dummy);
@@ -480,7 +472,6 @@ void visitExtModule(graph* g, PNode* module) {
 
     for (auto entry : portInfo->aggrMember) {
       addSignal(entry.first->name, entry.first);
-      entry.first->allocArrayVal();
     }
     for (AggrParentNode* dummy : portInfo->aggrParent) {
       addDummy(dummy->name, dummy);
@@ -500,13 +491,11 @@ void visitWireDef(graph* g, PNode* wire) {
 
   for (auto entry : info->aggrMember) {
     addSignal(entry.first->name, entry.first);
-    entry.first->allocArrayVal();
   }
   for (AggrParentNode* dummy : info->aggrParent) addDummy(dummy->name, dummy);
   if (!info->isAggr()) {
     Node* node = allocNode(NODE_OTHERS, topPrefix());
     node->updateInfo(info);
-    node->allocArrayVal();
     addSignal(node->name, node);
   }
 
@@ -535,8 +524,6 @@ void visitRegDef(graph* g, PNode* reg) {
     Node* dst = src->dup();
     dst->type = NODE_REG_DST;
     dst->name += "$NEXT";
-    src->allocArrayVal();
-    dst->allocArrayVal();
     addSignal(src->name, src);
     addSignal(dst->name, dst);
     src->bindReg(dst);
@@ -786,7 +773,6 @@ void visitMemory(graph* g, PNode* mem) {
         allSubPort[node] = portNode;
         for (Node* member : portNode->member) {
           addSignal(member->name, member);
-          member->allocArrayVal();
         }
         /* create alias */
         memoryAlias(originPort, portNode);
@@ -842,7 +828,6 @@ void visitMemory(graph* g, PNode* mem) {
       memNode->add_member(portNode);
       for (Node* member : portNode->member) {
         addSignal(member->name, member);
-        member->allocArrayVal();
       }
     }
 
@@ -882,7 +867,6 @@ AggrParentNode* allocNodeFromAggr(graph* g, AggrParentNode* parent) {
     Node* node = member->dup(NODE_OTHERS, name); // SEP_AGGR is already in name
   
     addSignal(node->name, node);
-    node->allocArrayVal();
     ret->addMember(node, entry.second);
   }
   /* alloc all dummy nodes, and connect them to real nodes stored in allSignals */
@@ -947,7 +931,6 @@ void visitNode(graph* g, PNode* node) {
 
     n->valTree = new ExpTree(exp->getExpRoot(), n);
     addSignal(n->name, n);
-    n->allocArrayVal();
   }
   prefix_pop();
 }
@@ -966,7 +949,7 @@ void visitConnect(graph* g, PNode* connect) {
       Node* node = ref->getAggr(i)->getNode();
       ExpTree* valTree = new ExpTree(exp->getExpRoot(), ref->getAggr(i));
       if (!node->isArray()) node->valTree = valTree;
-      else node->setArrayVal(getInedxFromTree(node, valTree), valTree);
+      else node->addArrayVal(valTree);
     }
   } else if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i ++) {
@@ -975,19 +958,19 @@ void visitConnect(graph* g, PNode* connect) {
         if (!node) TODO(); // like a <= mux(cond, b, c)
 
         ExpTree* valTree = new ExpTree(ref->getAggr(i), exp->getAggr(i));
-        if (node->isArray()) node->setArrayVal(getInedxFromTree(node, valTree), valTree);
+        if (node->isArray()) node->addArrayVal(valTree);
         else node->valTree = valTree;
       } else {
         Node* node = ref->getAggr(i)->getNode();
         ExpTree* valTree = new ExpTree(exp->getAggr(i), ref->getAggr(i));
-        if (node->isArray()) node->setArrayVal(getInedxFromTree(node, valTree), valTree);
+        if (node->isArray()) node->addArrayVal(valTree);
         else node->valTree = valTree;
       }
     }
   } else {
     Node* node = ref->getExpRoot()->getNode();
     ExpTree* valTree = new ExpTree(exp->getExpRoot(), ref->getExpRoot());
-    if (node->isArray()) node->setArrayVal(getInedxFromTree(node, valTree), valTree);
+    if (node->isArray()) node->addArrayVal(valTree);
     else node->valTree = valTree;
   }
 }
@@ -1019,13 +1002,13 @@ void visitPartialConnect(graph* g, PNode* connect) {
       ExpTree* valTree = new ExpTree(refENode, expENode);
       Node* expNode = expENode->getNode();
       if(!expNode) TODO();
-      if (expNode->isArray()) expNode->setArrayVal(getInedxFromTree(expNode, valTree), valTree);
+      if (expNode->isArray()) expNode->addArrayVal(valTree);
       else expNode->valTree = valTree;
     } else {
       ExpTree* valTree = new ExpTree(expENode, refENode);
       Node* refNode = refENode->getNode();
       if(!refNode) TODO();
-      if (refNode->isArray()) refNode->setArrayVal(getInedxFromTree(refNode, valTree), valTree);
+      if (refNode->isArray()) refNode->addArrayVal(valTree);
       else refNode->valTree = valTree;
     }
   }
@@ -1131,14 +1114,12 @@ void visitWhenConnect(graph* g, PNode* connect) {
 
   if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i++) {
-      int idx = 0;
       ExpTree* valTree = nullptr;
       if (exp->getFlip(i)) {
         Node* node = exp->getAggr(i)->getNode();
         if (!node || node->isArray()) TODO();
         if (node->isArray()) {
-          idx = exp->getAggr(i)->getArrayIndex(node);
-          valTree = growWhenTrace(node->arrayVal[idx], node->whenDepth);
+          valTree = growWhenTrace(nullptr, node->whenDepth);
         } else {
           valTree = growWhenTrace(node->valTree, node->whenDepth);
         }
@@ -1146,13 +1127,12 @@ void visitWhenConnect(graph* g, PNode* connect) {
         ENode* whenNode = getWhenEnode(valTree, node->whenDepth);
         if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, ref->getAggr(i));
         else valTree->setRoot(ref->getAggr(i));
-        if (node->isArray()) node->setArrayVal(idx, valTree);
+        if (node->isArray()) node->addArrayVal(valTree);
         else node->valTree = valTree;
       } else {
         Node* node = ref->getAggr(i)->getNode();
         if (node->isArray()) {
-          idx = ref->getAggr(i)->getArrayIndex(node);
-          valTree = growWhenTrace(node->arrayVal[idx], node->whenDepth);
+          valTree = growWhenTrace(nullptr, node->whenDepth);
         } else {
           valTree = growWhenTrace(node->valTree, node->whenDepth);
         }
@@ -1160,18 +1140,16 @@ void visitWhenConnect(graph* g, PNode* connect) {
         ENode* whenNode = getWhenEnode(valTree, node->whenDepth);
         if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getAggr(i));
         else valTree->setRoot(exp->getAggr(i));
-        if (node->isArray()) node->setArrayVal(idx, valTree);
+        if (node->isArray()) node->addArrayVal(valTree);
         else node->valTree = valTree;
       }
     }
 
   } else {
     Node* node = ref->getExpRoot()->getNode();
-    int idx = 0;
     ExpTree* valTree;
     if (node->isArray()) {
-      idx = ref->getExpRoot()->getArrayIndex(node);
-      valTree = growWhenTrace(node->arrayVal[idx], node->whenDepth);
+      valTree = growWhenTrace(nullptr, node->whenDepth);
     } else {
       valTree = growWhenTrace(node->valTree, node->whenDepth);
     }
@@ -1179,7 +1157,7 @@ void visitWhenConnect(graph* g, PNode* connect) {
     ENode* whenNode = getWhenEnode(valTree, node->whenDepth);
     if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getExpRoot());
     else valTree->setRoot(exp->getExpRoot());
-    if (node->isArray()) node->setArrayVal(idx, valTree);
+    if (node->isArray()) node->addArrayVal(valTree);
     else node->valTree = valTree;
   }
 }
@@ -1458,10 +1436,8 @@ graph* AST2Graph(PNode* root) {
       Assert(tree->getlval()->nodePtr, "lvalue in %s is not node", reg->name.c_str());
       tree->getlval()->nodePtr = reg->getDst();
     }
-    for (size_t i = 0; i < reg->arrayVal.size(); i ++) {
-      reg->getDst()->arrayVal[i] = reg->arrayVal[i];
-      reg->arrayVal[i] = NULL;
-    }
+    reg->getDst()->arrayVal.insert(reg->getDst()->arrayVal.end(), reg->arrayVal.begin(), reg->arrayVal.end());
+    reg->arrayVal.clear();
   }
 
   for (Node* memory : g->memory) {

@@ -6,6 +6,17 @@
 static std::set<Node*> fullyVisited;
 static std::set<Node*> partialVisited;
 
+Node* getSplitArray() {
+  /* array points to itself */
+  for (Node* node : partialVisited) {
+    if (node->isArray() && node->next.find(node) != node->next.end()) return node;
+  }
+  for (Node* node : partialVisited) {
+    if (node->isArray()) return node;
+  }
+  Panic();
+}
+
 void graph::splitArray() {
   std::map<Node*, int> times;
   std::stack<Node*> s;
@@ -51,9 +62,16 @@ void graph::splitArray() {
               memberInSuper->constructSuperConnect();
           }
           /* create new node */
-          for (size_t i = 0; i < node->arrayVal.size(); i ++) {
+          int entryNum = 1;
+          for (int num : node->dimension) entryNum *= num;
+
+          for (int i = 0; i < entryNum; i ++) {
             Node* member = node->arrayMemberNode(i);
             Assert(!member->isArray() || !member->valTree, "%s implement me!", member->name.c_str());
+          }
+          /* distribute arrayVal */
+          for (ExpTree* tree : node->arrayVal) {
+            node->arrayMember[tree->getlval()->getArrayIndex(node)]->valTree = tree;
           }
           /* construct connections */
           for (Node* member : node->arrayMember) {
@@ -97,14 +115,13 @@ Node* Node::arrayMemberNode(int idx) {
   int divisor = idx;
 
   for (int i = (int)dimension.size() - 1; i >= 0; i --) {
-    dividend = dimension[i] + 1;
+    dividend = dimension[i];
     index[i] = divisor % dividend;
     divisor = divisor / dividend;
   }
   std::string memberName = name;
   size_t i;
   for (i = 0; i < index.size(); i ++) {
-    if (index[i] == dimension[i]) break;
     memberName += "[" + std::to_string(index[i]) + "]";
   }
 
@@ -113,7 +130,6 @@ Node* Node::arrayMemberNode(int idx) {
   arrayMember.push_back(member);
   member->arrayParent = this;
   member->setType(width, sign);
-  if (arrayVal[idx] && !arrayVal[idx]->isInvalid()) member->valTree = arrayVal[idx];
   member->constructSuperNode();
 
   for ( ; i < dimension.size(); i ++) member->dimension.push_back(dimension[i]);
