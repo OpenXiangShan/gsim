@@ -208,6 +208,8 @@ int ENode::getArrayIndex(Node* node) {
     if (childENode->opType == OP_INDEX_INT) {
       idx = idx * (node->dimension[fixNum++] + 1) + childENode->values[0];
     } else {
+      idx = idx * (node->dimension[fixNum] + 1) + node->dimension[fixNum];
+      fixNum ++;
       return idx;
     }
   }
