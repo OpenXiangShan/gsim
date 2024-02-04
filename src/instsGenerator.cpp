@@ -1496,17 +1496,22 @@ valInfo* Node:: computeArray() {
   }
 
   if (width > BASIC_WIDTH) TODO();
-  for (ExpTree* tree : arrayVal) {
-    if(!tree) continue;
-    valInfo* lindex = nullptr;
-    if (tree->getlval()) {
-      lindex = tree->getlval()->compute(this, "INVALID_STR", false);
-      valInfo* info = tree->getRoot()->compute(this, lindex->valStr, false);
-      for (std::string inst : info->insts) insts.push_back(inst);
-      finialConnect(lindex->valStr, info);
-    } else {
-      TODO();
+  std::set<int> visitedArray;
+  for (size_t i = 0; i < arrayOrder.size(); i ++) {
+    int idx = arrayOrder[i];
+    if (visitedArray.find(idx) == visitedArray.end() && arrayVal[idx]) {
+      valInfo* lindex = nullptr;
+      ExpTree* tree = arrayVal[idx];
+      if (tree->getlval()) {
+        lindex = tree->getlval()->compute(this, "INVALID_STR", false);
+        valInfo* info = tree->getRoot()->compute(this, lindex->valStr, false);
+        for (std::string inst : info->insts) insts.push_back(inst);
+        finialConnect(lindex->valStr, info);
+      } else {
+        TODO();
+      }
     }
+    visitedArray.insert(idx);
   }
   return computeInfo;
 }
