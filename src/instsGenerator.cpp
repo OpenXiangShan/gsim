@@ -1316,12 +1316,17 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     if (childNode) childNode->compute(n, lvalue, false);
   }
   if (nodePtr) {
-    computeInfo = nodePtr->compute();
-    if (child.size() != 0) {
-      valInfo* indexInfo = computeInfo->dup();
-      computeInfo = indexInfo;
-      for (ENode* childENode : child)
-        computeInfo->valStr += childENode->computeInfo->valStr;
+    if (nodePtr->isArray() && nodePtr->arraySplitted()) {
+      int idx = getArrayIndex(nodePtr);
+      computeInfo = nodePtr->arrayMember[idx]->compute();
+    } else {
+      computeInfo = nodePtr->compute();
+      if (child.size() != 0) {
+        valInfo* indexInfo = computeInfo->dup();
+        computeInfo = indexInfo;
+        for (ENode* childENode : child)
+          computeInfo->valStr += childENode->computeInfo->valStr;
+      }
     }
     width = computeInfo->width;
     return computeInfo;
