@@ -33,19 +33,21 @@ void Node::updateConnect() {
     }
   }
 }
+static std::set<Node*>inferredNodes;
 /*
 infer width of node and all ENodes in valTree
 inverse topological order or [infer all encountered nodes]
 */
 void Node::inferWidth() {
+  if (inferredNodes.find(this) != inferredNodes.end()) return;
+  inferredNodes.insert(this);
   if (type == NODE_INVALID) return;
-  if (valTree && valTree->getRoot()->width == -1) {
+  if (valTree) {
     valTree->getRoot()->inferWidth();
-    if (width == -1) setType(valTree->getRoot()->width, valTree->getRoot()->sign);
-  } else if (width == -1) {
-    width = valTree ? valTree->getRoot()->width : 0;
-  } else  {
-    return;
+  }
+  if (width == -1) {
+    if (valTree) setType(valTree->getRoot()->width, valTree->getRoot()->sign);
+    else setType(0, false);
   }
   for (ExpTree* arrayTree : arrayVal) {
     if (!arrayTree) continue;
