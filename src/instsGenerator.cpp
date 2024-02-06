@@ -1189,7 +1189,7 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
   } else if (childBasic && enodeBasic) {
     std::string shift;
     if (Child(0, sign)) {
-      shift = "(" + Cast(width, sign) + ChildInfo(0, valStr) + " >> " + std::to_string(lo) + ")";
+      shift = "(" + Cast(Child(0, width), Child(0, sign)) + ChildInfo(0, valStr) + " >> " + std::to_string(lo) + ")";
     }  else {
       shift = "(" + ChildInfo(0, valStr) + " >> " + std::to_string(lo) + ")";
     }
