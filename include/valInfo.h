@@ -4,6 +4,8 @@
 enum valStatus {VAL_EMPTY = 0, VAL_VALID, VAL_CONSTANT, VAL_FINISH /* for printf/assert*/ , VAL_INVALID};
 
 class valInfo {
+private:
+  mpz_t mask;
 public:
   std::string valStr;
   int opNum = 0;
@@ -16,6 +18,7 @@ public:
 
   valInfo() {
     mpz_init(consVal);
+    mpz_init(mask);
   }
   void mergeInsts(valInfo* newInfo) {
     insts.insert(insts.end(), newInfo->insts.begin(), newInfo->insts.end());
@@ -34,9 +37,16 @@ public:
     else valStr = format("UINT128(0x%s, 0x%s)", valStr.substr(0, valStr.length() - 16).c_str(), valStr.substr(valStr.length()-16, 16).c_str());
     status = VAL_CONSTANT;
   }
+  void updateConsVal() {
+    mpz_set_ui(mask, 1);
+    mpz_mul_2exp(mask, mask, width);
+    mpz_sub_ui(mask, mask, 1);
+    mpz_and(consVal, consVal, mask);
+    setConsStr();
+  }
   void setConstantByStr(std::string str, int base = 16) {
     mpz_set_str(consVal, str.c_str(), base);
-    setConsStr();
+    updateConsVal();
   }
   valInfo* dup() {
     valInfo* ret = new valInfo();
