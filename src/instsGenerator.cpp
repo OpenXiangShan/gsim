@@ -1402,7 +1402,12 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
 valInfo* Node::compute() {
   if (computeInfo) return computeInfo;
   if (isArray()) return computeArray();
-
+  if (width == 0) {
+    computeInfo = new valInfo();
+    computeInfo->setConstantByStr("0");
+    status = CONSTANT_NODE;
+    return computeInfo;
+  }
   if (!valTree) {
     computeInfo = new valInfo();
     if (type == NODE_OTHERS) { // invalid nodes
@@ -1497,6 +1502,12 @@ void Node::finialConnect(std::string lvalue, valInfo* info) {
 
 valInfo* Node:: computeArray() {
   if (computeInfo) return computeInfo;
+  if (width == 0) {
+    computeInfo = new valInfo();
+    computeInfo->setConstantByStr("0");
+    status = CONSTANT_NODE;
+    return computeInfo;
+  }
   computeInfo = new valInfo();
   computeInfo->valStr = name;
   computeInfo->width = width;
