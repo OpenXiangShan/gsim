@@ -27,6 +27,11 @@ void ENode::passWidthToChild() {
         nodePtr->getDst()->usedBit = nodePtr->usedBit;
       }
     }
+    for (ENode* childENode : child) {
+      if (!childENode) continue;
+      childENode->usedBit = childENode->width;
+      childENode->passWidthToChild();
+    }
     return;
   }
   if (child.size() == 0) return;
