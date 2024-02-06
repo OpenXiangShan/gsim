@@ -1550,7 +1550,7 @@ void graph::instsGenerator() {
       } else {
         if (!n->valTree) continue;
         n->compute();
-        if (n->status == MERGED_NODE) continue;
+        if (n->status == MERGED_NODE || n->status == CONSTANT_NODE) continue;
         s.insert(n);
       }
     }
