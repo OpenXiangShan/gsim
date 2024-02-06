@@ -19,6 +19,8 @@
 #define newMpzTmp() ("MPZ_TMP$" + std::to_string(mpzTmpNum ++))
 static int localTmpNum = 0;
 static int mpzTmpNum = 0;
+#define INVALID_LVALUE "INVALID_STR"
+#define IS_INVALID_LVALUE(name) (name == INVALID_LVALUE)
 
 /* return: 0 - same size, positive - the first is larger, negative - the second is larger  */
 static int typeCmp(int width1, int width2) {
@@ -1312,21 +1314,30 @@ valInfo* ENode::instsAssert() {
 /* compute enode */
 valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
   if (computeInfo) return computeInfo;
+  if (width == 0 && !IS_INVALID_LVALUE(lvalue)) {
+    computeInfo = new valInfo();
+    computeInfo->setConstantByStr("0");
+    return computeInfo;
+  }
   for (ENode* childNode : child) {
     if (childNode) childNode->compute(n, lvalue, false);
   }
   if (nodePtr) {
     if (nodePtr->isArray() && nodePtr->arraySplitted()) {
       int idx = getArrayIndex(nodePtr);
-      computeInfo = nodePtr->arrayMember[idx]->compute();
+      computeInfo = nodePtr->arrayMember[idx]->compute()->dup();
     } else {
-      computeInfo = nodePtr->compute();
+      computeInfo = nodePtr->compute()->dup();
       if (child.size() != 0) {
         valInfo* indexInfo = computeInfo->dup();
         computeInfo = indexInfo;
         for (ENode* childENode : child)
           computeInfo->valStr += childENode->computeInfo->valStr;
       }
+    }
+    if (!IS_INVALID_LVALUE(lvalue) && computeInfo->width <= BASIC_WIDTH && computeInfo->width > width) {
+      if (computeInfo->status == VAL_CONSTANT) computeInfo->updateConsVal();
+      else computeInfo->valStr = format("(%s & %s)", computeInfo->valStr.c_str(), bitMask(width).c_str());
     }
     width = computeInfo->width;
     return computeInfo;
@@ -1422,6 +1433,7 @@ valInfo* Node::compute() {
     ret->valStr = name;
     ret->opNum = 0;
   } else {
+    if (ret->width > width) ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
     ret->valStr = upperCast(width, ret->width, sign) + ret->valStr;
     status = MERGED_NODE;
   }
@@ -1473,6 +1485,7 @@ void Node::finialConnect(std::string lvalue, valInfo* info) {
       TODO();
   } else {
     if (width <= BASIC_WIDTH) {
+      if (info->width > width) info->valStr = format("(%s & %s)", info->valStr.c_str(), bitMask(width).c_str());
       if (sign && width != info->width) insts.push_back(format("%s = %s%s;", lvalue.c_str(), Cast(info->width, info->sign).c_str(), info->valStr.c_str()));
       else insts.push_back(format("%s = %s;", lvalue.c_str(), info->valStr.c_str()));
 
@@ -1492,7 +1505,7 @@ valInfo* Node:: computeArray() {
   if (valTree) {
     std::string lvalue = name;
     if (valTree->getlval()) {
-      valInfo* lindex = valTree->getlval()->compute(this, "INVALID_STR", false);
+      valInfo* lindex = valTree->getlval()->compute(this, INVALID_LVALUE, false);
       lvalue = lindex->valStr;
     }
     valInfo* info = valTree->getRoot()->compute(this, lvalue, false);
@@ -1504,7 +1517,7 @@ valInfo* Node:: computeArray() {
   for (ExpTree* tree : arrayVal) {
       valInfo* lindex = nullptr;
       if (tree->getlval()) {
-        lindex = tree->getlval()->compute(this, "INVALID_STR", false);
+        lindex = tree->getlval()->compute(this, INVALID_LVALUE, false);
         valInfo* info = tree->getRoot()->compute(this, lindex->valStr, false);
         for (std::string inst : info->insts) insts.push_back(inst);
         finialConnect(lindex->valStr, info);
