@@ -139,11 +139,11 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   if (getChild(0)->computeInfo->status == VAL_CONSTANT) {
     if (mpz_cmp_ui(ChildInfo(0, consVal), 0) == 0) {
       if (getChild(2)) computeInfo = Child(2, computeInfo);
-      else computeInfo->status = VAL_INVALID;
+      else computeInfo->status = VAL_EMPTY;
     }
     else {
       if (getChild(1)) computeInfo = Child(1, computeInfo);
-      else computeInfo->status = VAL_INVALID;
+      else computeInfo->status = VAL_EMPTY;
     }
     return computeInfo;
   }
@@ -156,12 +156,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
 
   if (getChild(1) && ChildInfo(1, status) == VAL_INVALID) {
     if (getChild(2)) computeInfo = Child(2, computeInfo);
-    else computeInfo->status = VAL_INVALID;
+    else computeInfo->status = VAL_EMPTY;
     return computeInfo;
   }
   if (getChild(2) && ChildInfo(2, status) == VAL_INVALID) {
     if (getChild(1)) computeInfo = Child(1, computeInfo);
-    else computeInfo->status = VAL_INVALID;
+    else computeInfo->status = VAL_EMPTY;
     return computeInfo;
   }
   /* not constant */
