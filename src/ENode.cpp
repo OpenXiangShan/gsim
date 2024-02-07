@@ -52,7 +52,8 @@ void ENode::inferWidth() {
         break;
       case OP_AND: // the width is actually max, while the upper bits are zeros
         Assert(getChildNum() == 2 && s0 == s1, "invalid child");
-        setWidth(MIN(w0, w1), false);
+        if (getChild(0)->nodePtr && getChild(1)->nodePtr) setWidth(MIN(w0, w1), false);
+        else setWidth(MAX(w0, w1), false);
         break;
       case OP_OR: case OP_XOR:
         Assert(getChildNum() == 2 && s0 == s1, "invalid child");
