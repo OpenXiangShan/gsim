@@ -953,7 +953,7 @@ void visitConnect(graph* g, PNode* connect) {
     }
   } else if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i ++) {
-      if (exp->getFlip(i)) {
+      if (ref->getFlip(i)) {
         Node* node = exp->getAggr(i)->getNode();
         if (!node) TODO(); // like a <= mux(cond, b, c)
 
