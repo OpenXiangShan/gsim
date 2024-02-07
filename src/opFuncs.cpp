@@ -114,13 +114,13 @@ void invalidExpr2(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_
 void us_add(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) {
   mpz_add(dst, src1, src2);
 }
-void us_sub(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_t bitcnt2) {
+void us_sub(mpz_t& dst, mpz_t& src1, mpz_t& src2, mp_bitcnt_t dst_bitcnt) {
   if (mpz_sgn(src2) == 0) {
     mpz_set(dst, src1);
     return;
   }
   mpz_set_ui(t1, 1);
-  mpz_mul_2exp(t1, t1, bitcnt2);
+  mpz_mul_2exp(t1, t1, dst_bitcnt);
   mpz_sub(t1, t1, src2);
   mpz_add(dst, t1, src1);
 }
