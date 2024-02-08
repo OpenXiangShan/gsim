@@ -301,6 +301,20 @@ void graph::genStep(FILE* fp) {
     }
   }
 #endif
+  /* readMemory */
+  for (Node* mem : memory) {
+    Assert(mem->rlatency <= 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
+    if (mem->width > BASIC_WIDTH) TODO();
+    for (Node* port : mem->member) {
+      if (port->type == NODE_READER && mem->rlatency == 1) {
+        if (port->member[READER_DATA]->dimension.size() != 0)
+          fprintf(fp, "memcpy(%s, %s[%s], sizeof(%s));\n", port->member[READER_DATA]->computeInfo->valStr.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str(), port->member[READER_DATA]->computeInfo->valStr.c_str());
+        else
+          fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->computeInfo->valStr.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
+        activateUncondNext(fp, port->member[READER_DATA]);
+      }
+    }
+  }
   /* TODO: may sth special for printf or printf always activate itself(or when cond is satisfied )*/
   for (int i = 1; i < superId; i ++) {
     fprintf(fp, "if(unlikely(activeFlags[%d])) step%d();\n", i, i);
@@ -332,23 +346,30 @@ void graph::genStep(FILE* fp) {
     Assert(mem->rlatency <= 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
     if (mem->width > BASIC_WIDTH) TODO();
     for (Node* port : mem->member) {
-      if (port->type == NODE_READER && mem->rlatency == 1) {
-        if (port->member[READER_DATA]->dimension.size() != 0)
-          fprintf(fp, "memcpy(%s, %s[%s], sizeof(%s));\n", port->member[READER_DATA]->computeInfo->valStr.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str(), port->member[READER_DATA]->computeInfo->valStr.c_str());
-        else
-          fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->computeInfo->valStr.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
-        activateUncondNext(fp, port->member[READER_DATA]);
-      } else if (port->type == NODE_WRITER) {
-        fprintf(fp, "if(%s && %s) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str(), port->member[WRITER_MASK]->computeInfo->valStr.c_str());
-        if (port->member[WRITER_DATA]->dimension.size() != 0)
-          fprintf(fp, "memcpy(%s[%s], %s, sizeof(%s[0]));\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str(), mem->name.c_str());
-        else
+      if (port->type == NODE_WRITER) {
+        if (port->member[WRITER_DATA]->isArray() != 0) {
+          Node* writerData = port->member[WRITER_DATA];
+          fprintf(fp, "if(%s) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str());
+          std::string indexStr, bracket;
+          for (size_t i = 0; i < writerData->dimension.size(); i ++) {
+            fprintf(fp, "for (int i%ld = 0; i%ld < %d; i%ld ++) {", i, i, writerData->dimension[i], i);
+            indexStr += format("[i%ld]", i);
+            bracket += "}\n";
+          }
+          fprintf(fp, "if (%s%s) %s[%s]%s = %s%s;\n", port->member[WRITER_MASK]->computeInfo->valStr.c_str(), indexStr.c_str(),
+                                                  mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str(),
+                                                  port->member[WRITER_DATA]->computeInfo->valStr.c_str(), indexStr.c_str());
+          fprintf(fp, bracket.c_str());
+        } else {
+          fprintf(fp, "if(%s && %s) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str(), port->member[WRITER_MASK]->computeInfo->valStr.c_str());
           fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
+        }
         for (SuperNode* super : readerL0) {
           if (super->cppId <= 0) continue;
           fprintf(fp, "activeFlags[%d] = true;\n", super->cppId);
         }
         fprintf(fp, "}\n");
+
       } else if (port->type == NODE_READWRITER) {
         TODO();
       }
