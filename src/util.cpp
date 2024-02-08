@@ -85,7 +85,7 @@ OPType str2op_expr1int1(std::string name) {
 }
 
 int upperPower2(int x) {
-  return 1 << (32 - __builtin_clz(x - 1));
+  return x <= 1 ? x : (1 << (32 - __builtin_clz(x - 1)));
 }
 
 int upperLog2(int x) {
