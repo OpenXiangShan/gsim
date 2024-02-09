@@ -17,6 +17,22 @@ Node* getSplitArray() {
   Panic();
 }
 
+void fillEmptyWhen(ExpTree* newTree, ENode* oldNode) {
+  std::stack<ENode*> s;
+  s.push(newTree->getRoot());
+  while(!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    for (ENode* childENode : top->child) {
+      if (childENode) s.push(childENode);
+    }
+    if (top->opType == OP_WHEN) {
+      if (!top->getChild(1)) top->setChild(1, oldNode);
+      if (!top->getChild(2)) top->setChild(2, oldNode);
+    }
+  }
+}
+
 void graph::splitArray() {
   std::map<Node*, int> times;
   std::stack<Node*> s;
@@ -71,6 +87,12 @@ void graph::splitArray() {
           }
           /* distribute arrayVal */
           for (ExpTree* tree : node->arrayVal) {
+            int idx = tree->getlval()->getArrayIndex(node);
+            if (node->arrayMember[idx]->valTree) {
+              /* fill empty when body in tree with old valTree*/
+              ExpTree* oldTree = node->arrayMember[idx]->valTree;
+              fillEmptyWhen(tree, oldTree->getRoot());
+            }
             node->arrayMember[tree->getlval()->getArrayIndex(node)]->valTree = tree;
           }
           /* construct connections */
