@@ -165,6 +165,9 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   std::string verilatorName = name + "__DOT__" + node->name;
   #endif
   size_t pos;
+  while ((pos = verilatorName.find("$$")) != std::string::npos) {
+    verilatorName.replace(pos, 2, "_");
+  }
   while ((pos = verilatorName.find("$")) != std::string::npos) {
     verilatorName.replace(pos, 1, "__DOT__");
   }

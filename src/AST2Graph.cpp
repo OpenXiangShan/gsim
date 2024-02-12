@@ -9,8 +9,8 @@
 
 /* check the node type and children num */
 #define TYPE_CHECK(node, min, max,...) typeCheck(node, (const int[]){__VA_ARGS__}, sizeof((const int[]){__VA_ARGS__}) / sizeof(int), min, max)
-#define SEP_MODULE '$' // seperator for module
-#define SEP_AGGR '$'
+#define SEP_MODULE "$" // seperator for module
+#define SEP_AGGR "$$"
 
 int p_stoi(const char* str);
 TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType);
@@ -72,7 +72,7 @@ static inline bool isAggr(std::string s) {
   Assert(0, "%s is not added\n", s.c_str());
 }
 
-static inline std::string prefix(char ch) {
+static inline std::string prefix(std::string ch) {
   return prefixTrace.empty() ? "" : prefixTrace.top() + ch;
 }
 
@@ -81,11 +81,11 @@ static inline std::string topPrefix() {
   return prefixTrace.top();
 }
 
-static inline std::string prefixName(char ch, std::string name) {
+static inline std::string prefixName(std::string ch, std::string name) {
   return prefix(ch) + name;
 }
 
-static inline void prefix_append(char ch, std::string str) {
+static inline void prefix_append(std::string ch, std::string str) {
   prefixTrace.push(prefix(ch) + str);
 }
 
@@ -783,15 +783,15 @@ void visitMemory(graph* g, PNode* mem) {
         std::string suffix = replacePrefix(topPrefix(), "", parent->name);
         PNode* memPort = mem->getChild(i);
         if (memPort->type == P_READER) { // data only
-          AggrParentNode* portAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + "$data" + suffix));
+          AggrParentNode* portAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "data" + suffix));
           for (auto entry : parent->member) {
             portAggr->addMember(allSubPort[entry.first]->get_member(READER_DATA), entry.first);
           }
           addDummy(portAggr->name, portAggr);
 
         } else if (memPort->type == P_WRITER) {
-          AggrParentNode* maskAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + "$mask" + suffix));
-          AggrParentNode* dataAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + "$data" + suffix));
+          AggrParentNode* maskAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "mask" + suffix));
+          AggrParentNode* dataAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "data" + suffix));
           for (auto entry : parent->member) {
             maskAggr->addMember(allSubPort[entry.first]->get_member(WRITER_MASK), entry.first);
             dataAggr->addMember(allSubPort[entry.first]->get_member(WRITER_DATA), entry.first);
@@ -800,9 +800,9 @@ void visitMemory(graph* g, PNode* mem) {
           addDummy(dataAggr->name, dataAggr);
 
         } else if (memPort->type == P_READWRITER) {
-          AggrParentNode* wmaskAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + "$wmask" + suffix));
-          AggrParentNode* rdataAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + "$rdata" + suffix));
-          AggrParentNode* wdataAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + "$wdata" + suffix));
+          AggrParentNode* wmaskAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "wmask" + suffix));
+          AggrParentNode* rdataAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "rdata" + suffix));
+          AggrParentNode* wdataAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "wdata" + suffix));
           for (auto entry : parent->member) {
             wmaskAggr->addMember(allSubPort[entry.first]->get_member(READWRITER_WMASK), entry.first);
             rdataAggr->addMember(allSubPort[entry.first]->get_member(READWRITER_RDATA), entry.first);
