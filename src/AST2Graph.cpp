@@ -969,6 +969,9 @@ void visitConnect(graph* g, PNode* connect) {
     }
   } else {
     Node* node = ref->getExpRoot()->getNode();
+    if (exp->isInvalid()) {
+      if (!node->isArray() && node->valTree) return;
+    }
     ExpTree* valTree = new ExpTree(exp->getExpRoot(), ref->getExpRoot());
     if (node->isArray()) node->addArrayVal(valTree);
     else node->valTree = valTree;
