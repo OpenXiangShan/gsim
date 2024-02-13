@@ -50,7 +50,9 @@ void ExpTree::replace(Node* oldNode, ENode* newSubTree) {
     for (int i = 0; i < top->getChildNum(); i ++) {
       if (!top->getChild(i)) continue;
       if (top->getChild(i)->getNode() == oldNode) {
-        top->setChild(i, top->getChild(i)->mergeSubTree(newSubTree));
+        ENode* newChild = top->getChild(i)->mergeSubTree(newSubTree);
+        newChild->width = top->getChild(i)->width;
+        top->setChild(i, newChild);
       } else {
         s.push(top->getChild(i));
       }
