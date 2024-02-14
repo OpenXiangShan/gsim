@@ -1352,9 +1352,13 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->valStr += childENode->computeInfo->valStr;
       }
     }
+
     if (!IS_INVALID_LVALUE(lvalue) && computeInfo->width <= BASIC_WIDTH) {
       if (computeInfo->width > width) {
-        if (computeInfo->status == VAL_CONSTANT) computeInfo->updateConsVal();
+        if (computeInfo->status == VAL_CONSTANT) {
+          computeInfo->width = width;
+          computeInfo->updateConsVal();
+        }
         else computeInfo->valStr = format("(%s & %s)", computeInfo->valStr.c_str(), bitMask(width).c_str());
       }
       if (sign && computeInfo->width < width && computeInfo->status == VAL_VALID) { // sign extend
