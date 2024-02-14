@@ -24,9 +24,8 @@ static int mpzTmpNum = 0;
 
 /* return: 0 - same size, positive - the first is larger, negative - the second is larger  */
 static int typeCmp(int width1, int width2) {
-  if (width1 <= 8 && width2 <= 8) return 0;
-  int bits1 = upperLog2(width1);
-  int bits2 = upperLog2(width2);
+  int bits1 = widthBits(width1);
+  int bits2 = widthBits(width2);
   return bits1 - bits2;
 }
 

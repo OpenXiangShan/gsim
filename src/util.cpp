@@ -89,6 +89,7 @@ int upperPower2(int x) {
 }
 
 int upperLog2(int x) {
+  if (x <= 1) return x;
   return (32 - __builtin_clz(x - 1));
 }
 
