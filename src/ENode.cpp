@@ -119,6 +119,8 @@ void ENode::inferWidth() {
         setWidth(values[0]-values[1] + 1, false);
         break;
       case OP_MUX:
+        if (w1 > w2) getChild(2)->setWidth(w1, s2);
+        if (w2 > w1) getChild(1)->setWidth(w2, s1);
       case OP_WHEN:
         Assert(getChildNum() == 3 && (getChild(1) || getChild(2)), "invalid child");
         if (getChild(1) && getChild(2)) setWidth(MAX(w1, w2), s1);

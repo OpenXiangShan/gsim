@@ -1335,9 +1335,19 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->valStr += childENode->computeInfo->valStr;
       }
     }
-    if (!IS_INVALID_LVALUE(lvalue) && computeInfo->width <= BASIC_WIDTH && computeInfo->width > width) {
-      if (computeInfo->status == VAL_CONSTANT) computeInfo->updateConsVal();
-      else computeInfo->valStr = format("(%s & %s)", computeInfo->valStr.c_str(), bitMask(width).c_str());
+    if (!IS_INVALID_LVALUE(lvalue) && computeInfo->width <= BASIC_WIDTH) {
+      if (computeInfo->width > width) {
+        if (computeInfo->status == VAL_CONSTANT) computeInfo->updateConsVal();
+        else computeInfo->valStr = format("(%s & %s)", computeInfo->valStr.c_str(), bitMask(width).c_str());
+      }
+      if (sign && computeInfo->width < width && computeInfo->status == VAL_VALID) { // sign extend
+        int extendedWidth = widthBits(width);
+        int shiftBits = extendedWidth - computeInfo->width;
+        if (extendedWidth != width)
+          computeInfo->valStr = format("(((%s%s%s << %d) >> %d) & %s)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits, bitMask(width).c_str());
+        else
+          computeInfo->valStr = format("((%s%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
+      }
     }
     width = computeInfo->width;
     return computeInfo;
@@ -1484,9 +1494,11 @@ void Node::finialConnect(std::string lvalue, valInfo* info) {
   if (info->opNum < 0) {
     insts.push_back(info->valStr);
   } else if (isSubArray(lvalue, this)) {
-    if (width <= BASIC_WIDTH)
+    if (width <= BASIC_WIDTH && info->width <= width) {
       insts.push_back(format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), info->valStr.c_str(), lvalue.c_str()));
-    else
+    } else if (width < BASIC_WIDTH && info->width > width) {
+      TODO();
+    } else
       TODO();
   } else {
     if (width <= BASIC_WIDTH) {
