@@ -22,6 +22,11 @@ static int mpzTmpNum = 0;
 #define INVALID_LVALUE "INVALID_STR"
 #define IS_INVALID_LVALUE(name) (name == INVALID_LVALUE)
 
+static std::string getConsStr(mpz_t& val) {
+  std::string str = mpz_get_str(NULL, 16, val);
+  if (str.length() <= 16) return "0x" + str;
+  else return format("UINT128(0x%s, 0x%s)", str.substr(0, str.length() - 16).c_str(), str.substr(str.length()-16, 16).c_str());
+}
 /* return: 0 - same size, positive - the first is larger, negative - the second is larger  */
 static int typeCmp(int width1, int width2) {
   int bits1 = widthBits(width1);
@@ -700,9 +705,22 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
     u_cat(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
     ret->setConsStr();
   } else if (childBasic && enodeBasic) {
-    std::string hi = "(" + upperCast(width, Child(0, width), false) + ChildInfo(0, valStr) + " << " + std::to_string(Child(1, width)) + ")";
-    ret->valStr = "(" + hi + " | " + ChildInfo(1, valStr) + ")";
-    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    std::string hi;
+    if (ChildInfo(0, status) == VAL_CONSTANT) {
+      mpz_t cons_hi;
+      mpz_init(cons_hi);
+      u_shl(cons_hi, ChildInfo(0, consVal), Child(0, width), Child(1, width));
+      if (Child(0, sign)) TODO();
+      hi = getConsStr(cons_hi);
+    } else
+      hi = "(" + upperCast(width, Child(0, width), false) + ChildInfo(0, valStr) + " << " + std::to_string(Child(1, width)) + ")";
+    if (hi.length() == 0) { // hi is zero
+      ret->valStr =  ChildInfo(1, valStr);
+      ret->opNum = ChildInfo(1, opNum);
+    } else {
+      ret->valStr = "(" + hi + " | " + ChildInfo(1, valStr) + ")";
+      ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    }
   } else if (childBasic && !enodeBasic) { // child <= 128, cur > 128
     Assert(ChildInfo(0, opNum) >= 0 && ChildInfo(1, opNum) >= 0, "invalid opNum (%d %s) (%d, %s)", ChildInfo(0, opNum), ChildInfo(0, valStr).c_str(), ChildInfo(1, opNum), ChildInfo(1, valStr).c_str());
     std::string dstName = isRoot ? lvalue : newMpzTmp();
