@@ -163,6 +163,7 @@ void graph::usedBits() {
   for (Node* node : visitedNodes) {
     node->width = node->usedBit;
     if (node->valTree) node->valTree->getRoot()->updateWidth();
+    for (ExpTree* tree : node->arrayVal) tree->getRoot()->updateWidth();
   }
 
 }
