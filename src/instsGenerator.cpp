@@ -158,12 +158,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     }
   }
 
-  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID) {
+  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID && node->type == NODE_OTHERS) {
     if (getChild(2)) computeInfo = Child(2, computeInfo);
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
   }
-  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID) {
+  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID && node->type == NODE_OTHERS) {
     if (getChild(1)) computeInfo = Child(1, computeInfo);
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
