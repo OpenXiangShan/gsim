@@ -61,74 +61,71 @@ void graph::splitArray() {
 
     while (s.size() == 0 && partialVisited.size() != 0) {
       /* split arrays in partialVisited until s.size() != 0 */
-      for (Node* node : partialVisited) {
-        if (node->isArray()) { // split the first array
-          Assert(!node->arraySplitted(), "%s is already splitted", node->name.c_str());
-          printf("split array %s\n", node->name.c_str());
-          /* remove prev connection */
-          for (Node* prev : node->prev) prev->next.erase(node);
-          for (SuperNode* super : node->super->prev) super->next.erase(node->super);
-          for (Node* next : node->next) next->prev.erase(node);
-          for (SuperNode* super : node->super->next) super->prev.erase(node->super);
-          node->super->prev.clear();
-          node->super->next.clear();
+      Node* node = getSplitArray();
+      Assert(!node->arraySplitted(), "%s is already splitted", node->name.c_str());
+      printf("split array %s\n", node->name.c_str());
+      /* remove prev connection */
+      for (Node* prev : node->prev) prev->next.erase(node);
+      for (SuperNode* super : node->super->prev) super->next.erase(node->super);
+      for (Node* next : node->next) next->prev.erase(node);
+      for (SuperNode* super : node->super->next) super->prev.erase(node->super);
+      node->super->prev.clear();
+      node->super->next.clear();
 
-          for (Node* memberInSuper : node->super->member) {
-            if (memberInSuper != node)
-              memberInSuper->constructSuperConnect();
-          }
-          /* create new node */
-          int entryNum = 1;
-          for (int num : node->dimension) entryNum *= num;
+      for (Node* memberInSuper : node->super->member) {
+        if (memberInSuper != node)
+          memberInSuper->constructSuperConnect();
+      }
+      /* create new node */
+      int entryNum = 1;
+      for (int num : node->dimension) entryNum *= num;
 
-          for (int i = 0; i < entryNum; i ++) {
-            Node* member = node->arrayMemberNode(i);
-            Assert(!member->isArray() || !member->valTree, "%s implement me!", member->name.c_str());
-          }
-          /* distribute arrayVal */
-          for (ExpTree* tree : node->arrayVal) {
-            int idx = tree->getlval()->getArrayIndex(node);
-            if (node->arrayMember[idx]->valTree) {
-              /* fill empty when body in tree with old valTree*/
-              ExpTree* oldTree = node->arrayMember[idx]->valTree;
-              fillEmptyWhen(tree, oldTree->getRoot());
-            }
-            node->arrayMember[tree->getlval()->getArrayIndex(node)]->valTree = tree;
-          }
-          /* construct connections */
-          for (Node* member : node->arrayMember) {
-            member->updateConnect();
-          }
-          for (Node* next : node->next) next->updateConnect();
+      for (int i = 0; i < entryNum; i ++) {
+        Node* member = node->arrayMemberNode(i);
+        Assert(!member->isArray() || !member->valTree, "%s implement me!", member->name.c_str());
+      }
+      /* distribute arrayVal */
+      for (ExpTree* tree : node->arrayVal) {
+        int idx = tree->getlval()->getArrayIndex(node);
+        if (node->arrayMember[idx]->valTree) {
+          /* fill empty when body in tree with old valTree*/
+          ExpTree* oldTree = node->arrayMember[idx]->valTree;
+          fillEmptyWhen(tree, oldTree->getRoot());
+        }
+        node->arrayMember[tree->getlval()->getArrayIndex(node)]->valTree = tree;
+      }
+      /* construct connections */
+      for (Node* member : node->arrayMember) {
+        member->updateConnect();
+      }
+      for (Node* next : node->next) next->updateConnect();
 
-          /* clear node connection */
-          node->prev.clear();
-          node->next.clear();
+      /* clear node connection */
+      node->prev.clear();
+      node->next.clear();
 
-          for (Node* member : node->arrayMember) member->constructSuperConnect();
-          for (Node* member : node->arrayMember) {
-            if (member->super->prev.size() == 0) supersrc.insert(member->super);
+      for (Node* member : node->arrayMember) member->constructSuperConnect();
+      for (Node* member : node->arrayMember) {
+        if (member->super->prev.size() == 0) supersrc.insert(member->super);
+      }
+      /* add into s and visitedSet */
+      for (Node* member : node->arrayMember) {
+        if (!member->valTree) continue;
+        times[member] = 0;
+        for (Node* prev : member->prev) {
+          if (fullyVisited.find(prev) != fullyVisited.end()) {
+            times[member] ++;
           }
-          /* add into s and visitedSet */
-          for (Node* member : node->arrayMember) {
-            if (!member->valTree) continue;
-            times[member] = 0;
-            for (Node* prev : member->prev) {
-              if (fullyVisited.find(prev) != fullyVisited.end()) {
-                times[member] ++;
-              }
-            }
-            if (times[member] == (int)member->prev.size()) {
-              s.push(member);
-            } else {
-              partialVisited.insert(member);
-            }
-          }
-          /* erase array */
-          partialVisited.erase(node);
-          break;
+        }
+        if (times[member] == (int)member->prev.size()) {
+          s.push(member);
+        } else {
+          partialVisited.insert(member);
         }
       }
+      /* erase array */
+      partialVisited.erase(node);
+      break;
     }
   }
 }
