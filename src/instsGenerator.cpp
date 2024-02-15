@@ -1169,7 +1169,7 @@ valInfo* ENode::instsTail(Node* node, std::string lvalue, bool isRoot) {
   bool childBasic = Child(0, width) <= BASIC_WIDTH;
   bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
-  int n = values[0];
+  int n = MIN(width, values[0]);
 
   if (isConstant) {
     if (sign) TODO();
