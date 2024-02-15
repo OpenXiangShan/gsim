@@ -181,6 +181,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       if (isStmt) return expr;
       if (expr.length() == 0) return std::string("");
       else if (isSubArray(lvalue, node)) return format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), expr.c_str(), lvalue.c_str());
+      else if (node->width < width) return format("%s = (%s & %s);", lvalue.c_str(), expr.c_str(), bitMask(node->width).c_str());
       else if (node->sign && node->width != width) return format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), expr.c_str());
       return lvalue + " = " + expr + ";";
     };
