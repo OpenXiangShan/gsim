@@ -948,8 +948,8 @@ void visitConnect(graph* g, PNode* connect) {
       if (ref->getFlip(i)) continue;
       Node* node = ref->getAggr(i)->getNode();
       ExpTree* valTree = new ExpTree(exp->getExpRoot(), ref->getAggr(i));
-      if (!node->isArray()) node->valTree = valTree;
-      else node->addArrayVal(valTree);
+      if (node->isArray()) node->addArrayVal(valTree);
+      else if (!node->valTree) node->valTree = valTree;
     }
   } else if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i ++) {
