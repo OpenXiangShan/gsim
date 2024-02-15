@@ -70,7 +70,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
           "if(display || (" + modName + " & " + mask + ") != (" + refName + "&" + mask + ")){\n" + \
           "  ret = true;\n" + \
           "  std::cout << std::hex <<\"" + line[2] + ": \" << +" +  \
-          (modName if ref_width <= 64 else "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName) + " << \"  \" << +" + \
+          (modName if mod_width <= 64 else "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName) + " << \"  \" << +" + \
             (refName if ref_width <= 64 else "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName) + "<< std::endl;\n" + \
           "} \n")
     self.dstfp.writelines("return ret;\n")
