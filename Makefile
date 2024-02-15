@@ -15,22 +15,21 @@ OBJ_DIR = obj
 $(shell mkdir -p $(OBJ_DIR))
 
 # NAME ?= newtop
-# NAME ?= freechips.rocketchip.system.DefaultConfig
+NAME ?= TestHarness
 # NAME ?= Exp1AllTest
-NAME ?= SimTop
-# NAME ?= test
+# NAME ?= SimTop
 
 # EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
-EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
-# EMU_DIFFTEST = $(EMU_DIR)/emu.cpp
+# EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
+EMU_DIFFTEST = $(EMU_DIR)/difftest-rocketchip.cpp
 
-mainargs = ready-to-run/bin/linux-NutShell.bin
+# mainargs = ready-to-run/bin/linux-NutShell.bin
 # mainargs = ready-to-run/bin/bbl-hello.bin
-# mainargs = ysyx3-bin/rtthread.bin
+mainargs = ready-to-run/bin/hello-rocket.bin
 
 MODE ?= 0
-# DIFF_VERSION ?= 2023_10_11
-DIFF_VERSION ?= NutShell
+DIFF_VERSION ?= 2024_1_14
+# DIFF_VERSION ?= NutShell
 EVENT_DRIVEN ?= 0
 
 TEST_FILE = ready-to-run/$(NAME)
@@ -122,7 +121,7 @@ clean-obj:
 	rm -rf obj_dir
 
 emu: obj/top.cpp $(EMU_SRC)
-	g++ $(EMU_SRC) obj/top.cpp -DMOD_NAME=S$(NAME) -Wl,-lgmp -Iobj -I$(EMU_SRC_DIR) -o $(GSIM_BUILD_DIR)/$(EMU_TARGET)
+	$(CXX) $(EMU_SRC) obj/top.cpp -DMOD_NAME=S$(NAME) -Wl,-lgmp -Iobj -I$(EMU_SRC_DIR) -o $(GSIM_BUILD_DIR)/$(EMU_TARGET)
 	$(GSIM_BUILD_DIR)/$(EMU_TARGET)
 
 # flex & bison
