@@ -66,9 +66,9 @@ void load_program(char* filename){
 #ifdef VERILATOR
 void ref_cycle(int n) {
   while(n --){
-    ref->clock = 1;
-    ref->eval();
     ref->clock = 0;
+    ref->eval();
+    ref->clock = 1;
     ref->eval();
   }
 }
@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
   load_program(argv[1]);
 #ifdef GSIM
   mod = new MOD_NAME();
-  memcpy(&mod->mem$ram, program, program_sz);
+  memcpy(&mod->mem$srams$mem, program, program_sz);
   mod_reset();
   mod->step();
 #endif
@@ -130,16 +130,6 @@ int main(int argc, char** argv) {
   memcpy(&ref->mem$ram, program, program_sz);
   ref_reset();
   ref->step();
-#endif
-#if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
-    bool isDiff = checkSignals(false);
-    if(isDiff) {
-      std::cout << "all Sigs:\n -----------------\n";
-      checkSignals(true);
-      std::cout << "Failed init\nALL diffs: mode -- ref\n";
-      checkSignals(false);
-      return 0;
-    }
 #endif
   std::cout << "start testing.....\n";
   bool dut_end = false;

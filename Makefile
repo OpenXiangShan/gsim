@@ -25,7 +25,7 @@ EMU_DIFFTEST = $(EMU_DIR)/difftest-rocketchip.cpp
 
 # mainargs = ready-to-run/bin/linux-NutShell.bin
 # mainargs = ready-to-run/bin/bbl-hello.bin
-mainargs = ready-to-run/bin/hello-rocket.bin
+mainargs = ready-to-run/bin/linux-rocket.bin
 
 MODE ?= 0
 DIFF_VERSION ?= 2024_1_14
