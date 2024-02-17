@@ -649,6 +649,12 @@ valInfo* ENode::instsOr(Node* node, std::string lvalue, bool isRoot) {
     if (sign) TODO();
     u_ior(ret->consVal, ChildInfo(0, consVal), Child(0, width), ChildInfo(1, consVal), Child(1, width));
     ret->setConsStr();
+  } else if (ChildInfo(0, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(0, consVal)) == 0) {
+    ret->valStr = ChildInfo(1, valStr);
+    ret->opNum = ChildInfo(1, opNum);
+  } else if (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0) {
+    ret->valStr = ChildInfo(0, valStr);
+    ret->opNum = ChildInfo(0, opNum);
   } else if (childBasic && enodeBasic) {
     ret->valStr = "(" + ChildInfo(0, valStr) + " | " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
