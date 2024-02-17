@@ -731,7 +731,7 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
       mpz_init(cons_hi);
       u_shl(cons_hi, ChildInfo(0, consVal), Child(0, width), Child(1, width));
       if (Child(0, sign)) TODO();
-      hi = getConsStr(cons_hi);
+      if (mpz_sgn(cons_hi)) hi = getConsStr(cons_hi);
     } else
       hi = "(" + upperCast(width, Child(0, width), false) + ChildInfo(0, valStr) + " << " + std::to_string(Child(1, width)) + ")";
     if (hi.length() == 0) { // hi is zero
