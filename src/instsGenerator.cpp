@@ -962,13 +962,13 @@ valInfo* ENode::instsNot(Node* node, std::string lvalue, bool isRoot) {
     u_not(ret->consVal, ChildInfo(0, consVal), Child(0, width));
     ret->setConsStr();
   } else if (childBasic && enodeBasic) {
-    ret->valStr = "(" + ChildInfo(0, valStr) + " ^ " + bitMask(Child(0, width)) + ")";
+    ret->valStr = "(" + ChildInfo(0, valStr) + " ^ " + bitMask(width) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
   } else if (!childBasic && !enodeBasic) {
     std::string tmpMpz = newMpzTmp();
     std::string dstName = isRoot ? lvalue : newMpzTmp();
     ret->insts.push_back(format("mpz_set_ui(%s, 1);", tmpMpz.c_str()));
-    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", tmpMpz.c_str(), tmpMpz.c_str(), Child(0, width)));
+    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", tmpMpz.c_str(), tmpMpz.c_str(), width));
     ret->insts.push_back(format("mpz_sub_ui(%s, %s, 1);", tmpMpz.c_str(), tmpMpz.c_str()));
     ret->insts.push_back(format("mpz_xor(%s, %s, %s);", dstName.c_str(), tmpMpz.c_str(), ChildInfo(0, valStr).c_str()));
     ret->valStr = dstName;
