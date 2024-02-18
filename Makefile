@@ -36,7 +36,7 @@ TEST_FILE = ready-to-run/$(NAME)
 
 CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror \
 	-DDST_NAME=\"$(NAME)\" -DEVENT_DRIVEN=$(EVENT_DRIVEN)
-CXX = g++
+CXX = clang++
 TARGET = GraphEmu
 
 FIRRTL_FILE = $(TEST_FILE).hi.fir
