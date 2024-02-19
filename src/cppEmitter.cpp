@@ -362,7 +362,7 @@ void graph::genStep(FILE* fp) {
           fprintf(fp, "if (%s%s) %s[%s]%s = %s%s;\n", port->member[WRITER_MASK]->computeInfo->valStr.c_str(), indexStr.c_str(),
                                                   mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str(),
                                                   port->member[WRITER_DATA]->computeInfo->valStr.c_str(), indexStr.c_str());
-          fprintf(fp, bracket.c_str());
+          fprintf(fp, "%s", bracket.c_str());
         } else {
           fprintf(fp, "if(%s && %s) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str(), port->member[WRITER_MASK]->computeInfo->valStr.c_str());
           fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
