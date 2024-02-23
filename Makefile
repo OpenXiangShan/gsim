@@ -14,25 +14,35 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 OBJ_DIR = obj
 $(shell mkdir -p $(OBJ_DIR))
 
-# NAME ?= newtop
-NAME ?= TestHarness
-# NAME ?= Exp1AllTest
-# NAME ?= SimTop
+dutName = boom
 
-# EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
-# EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
-EMU_DIFFTEST = $(EMU_DIR)/difftest-rocketchip.cpp
-
-# mainargs = ready-to-run/bin/linux-NutShell.bin
-# mainargs = ready-to-run/bin/bbl-hello.bin
-mainargs = ready-to-run/bin/linux-rocket.bin
+ifeq ($(dutName),ysyx3)
+	NAME ?= newtop
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
+	mainargs = ready-to-run/bin/bbl-hello.bin
+	TEST_FILE = ready-to-run/$(NAME)
+else ifeq ($(dutName),NutShell)
+	NAME ?= SimTop
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
+	mainargs = ready-to-run/bin/linux-NutShell.bin
+	TEST_FILE = ready-to-run/$(NAME)
+else ifeq ($(dutName),rocket)
+	NAME ?= TestHarness
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-rocketchip.cpp
+	mainargs = ready-to-run/bin/linux-rocket.bin
+	TEST_FILE = ready-to-run/$(NAME)
+else ifeq ($(dutName),boom)
+	NAME ?= TestHarness
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
+	mainargs = ready-to-run/bin/linux-rocket.bin
+	TEST_FILE = ready-to-run/$(NAME).SmallBoomConfig
+endif
 
 MODE ?= 0
 DIFF_VERSION ?= 2024_1_14
 # DIFF_VERSION ?= NutShell
 EVENT_DRIVEN ?= 0
 
-TEST_FILE = ready-to-run/$(NAME)
 
 CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror \
 	-DDST_NAME=\"$(NAME)\" -DEVENT_DRIVEN=$(EVENT_DRIVEN)
