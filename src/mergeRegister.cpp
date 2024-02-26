@@ -67,6 +67,6 @@ void graph::mergeRegister() {
   //   regsrc.end()
   // );
   /* remove superNodes and nodes */
-  // removeNodes(DEAD_NODE);
+  removeNodes(DEAD_SRC);
   printf("[mergeRegister] merge %d (total %ld) registers\n", num, regsrc.size());
 }
