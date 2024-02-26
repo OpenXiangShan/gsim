@@ -6,13 +6,71 @@
 static std::set<Node*> fullyVisited;
 static std::set<Node*> partialVisited;
 
+void partialDfs(std::set<Node*>&loop) {
+  enum nodeState{NOT_VISIT = 0, EXPANDED, VISITED};
+  std::map<Node*, nodeState> state;
+  for (Node* node : partialVisited) {
+    state[node] = NOT_VISIT;
+  }
+  std::stack<Node*>s;
+  for (Node* node : partialVisited) {
+    if (state[node] == VISITED) continue;
+    s.push(node);
+    while (!s.empty()) {
+      Node* top = s.top();
+      if (state[top] == NOT_VISIT) {
+        state[top] = EXPANDED;
+        for (Node* next : top->next) {
+          if (partialVisited.find(next) == partialVisited.end()) continue;
+          if (next == top) Panic();
+          if (state[next] == NOT_VISIT) s.push(next);
+          else if (state[next] == EXPANDED) {
+            while(!s.empty()) {
+              Node* nodeInLoop = s.top();
+              s.pop();
+              if (state[nodeInLoop] == EXPANDED) loop.insert(nodeInLoop);
+              if (nodeInLoop == next) break;
+            }
+            return;
+          }
+        }
+      } else if (state[top] == EXPANDED) {
+        state[top] = VISITED;
+        s.pop();
+      }
+
+    }
+  }
+}
+
+bool point2self(Node* node) {
+  std::set<Node*> nextNodes;
+  std::stack<Node*> s;
+  for (Node* next : node->next) {
+    s.push(next);
+    nextNodes.insert(next);
+    if (next == node) return true;
+  }
+  while(!s.empty()) {
+    Node* top = s.top();
+    s.pop();
+    for (Node* next : top->next) {
+      if (next == node) return true;
+      if (nextNodes.find(next) != nextNodes.end()) continue;
+      s.push(next);
+    }
+  }
+  return false;
+}
+
 Node* getSplitArray() {
   /* array points to itself */
   for (Node* node : partialVisited) {
     if (node->isArray() && node->next.find(node) != node->next.end()) return node;
   }
+
   for (Node* node : partialVisited) {
-    if (node->isArray()) return node;
+    if (node->isArray() && point2self(node)) return node;
   }
   Panic();
 }
