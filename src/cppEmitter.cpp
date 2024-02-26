@@ -324,9 +324,10 @@ void graph::genStep(FILE* fp) {
     for (Node* port : mem->member) {
       if (port->type == NODE_READER && mem->rlatency == 1) {
         if (port->member[READER_DATA]->dimension.size() != 0)
-          fprintf(fp, "memcpy(%s, %s[%s], sizeof(%s));\n", port->member[READER_DATA]->computeInfo->valStr.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str(), port->member[READER_DATA]->computeInfo->valStr.c_str());
-        else
-          fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->computeInfo->valStr.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
+          fprintf(fp, "memcpy(%s, %s[%s], sizeof(%s));\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str(), port->member[READER_DATA]->name.c_str());
+        else {
+          fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
+        }
         activateUncondNext(fp, port->member[READER_DATA]);
       }
     }
