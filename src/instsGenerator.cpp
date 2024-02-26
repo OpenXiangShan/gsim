@@ -219,7 +219,18 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     auto assignmentMpz = [lvalue, node, ret](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
       if (isStmt) return expr;
       if (expr.length() == 0) return std::string("");
-      else if (isSubArray(lvalue, node)) TODO();
+      else if (isSubArray(lvalue, node)) {
+        std::string ret;
+        std::string idxStr, bracket;
+        for (size_t i = countArrayIndex(lvalue); i < node->dimension.size(); i ++) {
+          ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
+          idxStr += "[i" + std::to_string(i) + "]";
+          bracket += "}\n";
+        }
+        ret += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), expr.c_str(), idxStr.c_str());
+        ret += bracket;
+        return ret;
+      }
       else if (width <= 64) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
       else if (info->status == VAL_CONSTANT && info->consLength <= 16) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
       else if (info->status == VAL_CONSTANT) TODO();
@@ -1572,8 +1583,9 @@ void Node::finialConnect(std::string lvalue, valInfo* info) {
       if (sign && width != info->width) insts.push_back(format("%s = %s%s;", lvalue.c_str(), Cast(info->width, info->sign).c_str(), info->valStr.c_str()));
       else insts.push_back(format("%s = %s;", lvalue.c_str(), info->valStr.c_str()));
 
-    } else
-      TODO();
+    } else {
+      insts.push_back(format("mpz_set(%s, %s);", lvalue.c_str(), info->valStr.c_str()));
+    }
   }
 
 }
@@ -1602,7 +1614,6 @@ valInfo* Node:: computeArray() {
     finialConnect(lvalue, info);
   }
 
-  if (width > BASIC_WIDTH) TODO();
   for (ExpTree* tree : arrayVal) {
       valInfo* lindex = nullptr;
       if (tree->getlval()) {
