@@ -419,8 +419,10 @@ void graph::cppEmitter() {
     if (!super->instsEmpty()) super->cppId = superId ++;
   }
   for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member)
-      member->updateActivate();
+    for (Node* member : super->member) {
+      if (member->status == VALID_NODE)
+        member->updateActivate();
+    }
   }
 
   FILE* header = genHeaderStart(name);
