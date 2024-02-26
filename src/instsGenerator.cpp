@@ -21,6 +21,7 @@ static int localTmpNum = 0;
 static int mpzTmpNum = 0;
 #define INVALID_LVALUE "INVALID_STR"
 #define IS_INVALID_LVALUE(name) (name == INVALID_LVALUE)
+#define MAX_U64 0xffffffffffffffff
 
 static std::string getConsStr(mpz_t& val) {
   std::string str = mpz_get_str(NULL, 16, val);
@@ -56,7 +57,10 @@ static std::string bitMask(int width) {
 
 static std::string setMpz(std::string dstName, ENode* enode, valInfo* dstInfo) {
   std::string ret;
-  if (enode->width > BASIC_WIDTH) {
+  if (enode->computeInfo->status == VAL_CONSTANT) {
+    if (mpz_cmp_ui(enode->computeInfo->consVal, MAX_U64) > 0) TODO();
+    else ret = format("mpz_set_ui(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
+  } else if (enode->width > BASIC_WIDTH) {
     ret = format("mpz_set(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
   } else if (enode->width > 64) {
     std::string localVal = enode->computeInfo->valStr;
@@ -814,7 +818,21 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
   } else if (!childBasic && !enodeBasic) { // child > 128, cur > 128
     std::string midName = newMpzTmp();
     std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), ChildInfo(0, valStr).c_str(), Child(1, width)));
+    std::string firstName = ChildInfo(0, valStr);
+    /* one of child is basic */
+    if (Child(0, width) <= 64) {
+      ret->insts.push_back(format("mpz_set_ui(%s, %s);", midName.c_str(), ChildInfo(0, valStr).c_str()));
+      firstName = midName;
+    } else if (Child(0, width) <= BASIC_WIDTH) {
+      std::string leftName = ChildInfo(0, valStr);
+      if (ChildInfo(0, opNum) > 0) {
+        leftName = newLocalTmp();
+        ret->insts.push_back(widthUType(Child(0, width)) + " " + leftName + " = " + ChildInfo(0, valStr) + ";");
+      }
+      ret->insts.push_back(format("mpz_import(%s,  2, -1, 8, 0, 0, (mp_limb_t*)&%s);", midName.c_str(), leftName.c_str()));
+      firstName = midName;
+    }
+    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width)));
     if (Child(1, width) <= 64)
       ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
     else
@@ -1584,7 +1602,11 @@ void Node::finalConnect(std::string lvalue, valInfo* info) {
       else insts.push_back(format("%s = %s;", lvalue.c_str(), info->valStr.c_str()));
 
     } else {
-      insts.push_back(format("mpz_set(%s, %s);", lvalue.c_str(), info->valStr.c_str()));
+      if (info->status == VAL_CONSTANT) {
+        if (mpz_cmp_ui(info->consVal, MAX_U64) > 0) TODO();
+        insts.push_back(format("mpz_set_ui(%s, %s);", lvalue.c_str(), info->valStr.c_str()));
+      } else
+        insts.push_back(format("mpz_set(%s, %s);", lvalue.c_str(), info->valStr.c_str()));
     }
   }
 
