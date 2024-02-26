@@ -1566,7 +1566,7 @@ void Node::recompute() {
   }
 }
 
-void Node::finialConnect(std::string lvalue, valInfo* info) {
+void Node::finalConnect(std::string lvalue, valInfo* info) {
   if (info->valStr.length() == 0) return; // empty, used for when statment with constant condition
   if (info->opNum < 0) {
     insts.push_back(info->valStr);
@@ -1611,7 +1611,7 @@ valInfo* Node:: computeArray() {
     }
     valInfo* info = valTree->getRoot()->compute(this, lvalue, false);
     for (std::string inst : info->insts) insts.push_back(inst);
-    finialConnect(lvalue, info);
+    finalConnect(lvalue, info);
   }
 
   for (ExpTree* tree : arrayVal) {
@@ -1620,7 +1620,7 @@ valInfo* Node:: computeArray() {
         lindex = tree->getlval()->compute(this, INVALID_LVALUE, false);
         valInfo* info = tree->getRoot()->compute(this, lindex->valStr, false);
         for (std::string inst : info->insts) insts.push_back(inst);
-        finialConnect(lindex->valStr, info);
+        finalConnect(lindex->valStr, info);
       } else {
         TODO();
       }
