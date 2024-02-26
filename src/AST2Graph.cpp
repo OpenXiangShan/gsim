@@ -785,7 +785,7 @@ void visitMemory(graph* g, PNode* mem) {
         if (memPort->type == P_READER) { // data only
           AggrParentNode* portAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "data" + suffix));
           for (auto entry : parent->member) {
-            portAggr->addMember(allSubPort[entry.first]->get_member(READER_DATA), entry.first);
+            portAggr->addMember(allSubPort[entry.first]->get_member(READER_DATA), entry.second);
           }
           addDummy(portAggr->name, portAggr);
 
@@ -793,8 +793,8 @@ void visitMemory(graph* g, PNode* mem) {
           AggrParentNode* maskAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "mask" + suffix));
           AggrParentNode* dataAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "data" + suffix));
           for (auto entry : parent->member) {
-            maskAggr->addMember(allSubPort[entry.first]->get_member(WRITER_MASK), entry.first);
-            dataAggr->addMember(allSubPort[entry.first]->get_member(WRITER_DATA), entry.first);
+            maskAggr->addMember(allSubPort[entry.first]->get_member(WRITER_MASK), entry.second);
+            dataAggr->addMember(allSubPort[entry.first]->get_member(WRITER_DATA), entry.second);
           }
           addDummy(maskAggr->name, maskAggr);
           addDummy(dataAggr->name, dataAggr);
@@ -804,9 +804,9 @@ void visitMemory(graph* g, PNode* mem) {
           AggrParentNode* rdataAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "rdata" + suffix));
           AggrParentNode* wdataAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "wdata" + suffix));
           for (auto entry : parent->member) {
-            wmaskAggr->addMember(allSubPort[entry.first]->get_member(READWRITER_WMASK), entry.first);
-            rdataAggr->addMember(allSubPort[entry.first]->get_member(READWRITER_RDATA), entry.first);
-            wdataAggr->addMember(allSubPort[entry.first]->get_member(READWRITER_RDATA), entry.first);
+            wmaskAggr->addMember(allSubPort[entry.first]->get_member(READWRITER_WMASK), entry.second);
+            rdataAggr->addMember(allSubPort[entry.first]->get_member(READWRITER_RDATA), entry.second);
+            wdataAggr->addMember(allSubPort[entry.first]->get_member(READWRITER_RDATA), entry.second);
           }
           addDummy(wmaskAggr->name, wmaskAggr);
           addDummy(rdataAggr->name, rdataAggr);
