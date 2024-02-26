@@ -48,7 +48,20 @@ static void inline declStep(FILE* fp) {
 
 void graph::genNodeInit(FILE* fp, Node* node) {
   if (node->status != VALID_NODE) return;
-  if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_init(%s);\n", node->name.c_str());
+  if (node->width > BASIC_WIDTH) {
+    if (node->isArray()) {
+      std::string idxStr, bracket;
+      for (size_t i = 0; i < node->dimension.size(); i ++) {
+        fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
+        idxStr += "[i" + std::to_string(i) + "]";
+        bracket += "}\n";
+      }
+      fprintf(fp, "mpz_init(%s%s);\n", node->name.c_str(), idxStr.c_str());
+      fprintf(fp, "%s", bracket.c_str());
+    }
+    else
+      fprintf(fp, "mpz_init(%s);\n", node->name.c_str());
+  }
 }
 
 FILE* graph::genHeaderStart(std::string headerFile) {
@@ -332,7 +345,16 @@ void graph::genStep(FILE* fp) {
         else fprintf(fp, "%s = %s;\n", node->name.c_str(), node->regNext->computeInfo->valStr.c_str());
       } else {
         activateUncondNext(fp, node);
-        if (node->width > BASIC_WIDTH) TODO();
+        if (node->width > BASIC_WIDTH) {
+          std::string idxStr, bracket;
+          for (size_t i = 0; i < node->dimension.size(); i ++) {
+            fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
+            idxStr += "[i" + std::to_string(i) + "]";
+            bracket += "}\n";
+          }
+          fprintf(fp, "mpz_set(%s%s, %s%s);\n", node->name.c_str(), idxStr.c_str(), node->regNext->computeInfo->valStr.c_str(), idxStr.c_str());
+          fprintf(fp, "%s", bracket.c_str());
+        }
         else fprintf(fp, "memcpy(%s, %s, sizeof(%s));\n", node->name.c_str(), node->regNext->computeInfo->valStr.c_str(), node->name.c_str());
       }
     }
