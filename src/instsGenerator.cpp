@@ -86,8 +86,33 @@ static std::string set128(std::string lvalue, valInfo* info, valInfo* ret) {
   return format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);\n", lvalue.c_str(), localName.c_str());
 }
 
+static int countArrayIndex(std::string name) {
+  int count = 0;
+  int idx = 0;
+  int midSquare = 0;
+  for(idx = 0; idx < name.length(); ) {
+    if (name[idx] == '[') {
+      idx ++;
+      while (idx < name.length()) {
+        if (name[idx] == '[') midSquare ++;
+        if (name[idx] == ']') {
+          if (midSquare == 0) {
+            count ++;
+            break;
+          } else {
+            midSquare --;
+          }
+        }
+        idx ++;
+      }
+    }
+    idx ++;
+  }
+  return count;
+}
+
 static bool isSubArray(std::string name, Node* node) {
-  size_t count = std::count(name.begin(), name.end(), '[');
+  size_t count = countArrayIndex(name);
   Assert(node->type == NODE_ARRAY_MEMBER || count <= node->dimension.size(), "invalid array %s", name.c_str());
   if (node->type == NODE_ARRAY_MEMBER) return false;
   return node->dimension.size() != count;
