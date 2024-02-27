@@ -267,7 +267,9 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
         bracket += "}\n";
       }
       std::string nameIdx = member->name + idxStr;
-      if (member->width > 64)
+      if (member->width > 128) {
+        fprintf(fp, "mpz_out_str(stdout, 16, %s);\n", nameIdx.c_str());
+      } else if (member->width > 64)
         fprintf(fp, "std::cout << std::hex << +(uint64_t)(%s >> 64) << +(uint64_t)(%s) << \" \";", nameIdx.c_str(), nameIdx.c_str());
       else
         fprintf(fp, "std::cout << std::hex << +(uint64_t)%s << \" \";", nameIdx.c_str());
