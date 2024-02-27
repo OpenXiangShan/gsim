@@ -101,7 +101,7 @@ void u_andr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set_ui(t1, 1);
   mpz_mul_2exp(t1, t1, bitcnt);
   mpz_sub_ui(t1, t1, 1);
-  mpz_set_ui(dst, mpz_cmp(dst, src) == 0);
+  mpz_set_ui(dst, mpz_cmp(t1, src) == 0);
 }
 void u_xorr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt) {
   mpz_set_ui(dst, mpz_popcount(src) & 1);  // not work for negtive src
