@@ -83,7 +83,8 @@ void ref_reset(){
 #ifdef GSIM
 void mod_reset() {
   mod->set_reset(1);
-  mod->step();
+  for (int i = 0; i < 10; i ++)
+    mod->step();
   mod->set_reset(0);
 }
 #endif
