@@ -71,7 +71,7 @@ VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Sy
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
 VERI_VSRCS += $(addprefix ready-to-run/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v DifftestMemInitializer.v)
-VERI_CSRCS = $(shell find $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIFFTEST) $(OBJ_DIR)/$(NAME).cpp
+VERI_CSRCS = $(shell find $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIFFTEST) $(shell find $(OBJ_DIR)/$(NAME) -name "*.cpp")
 VERI_HEADER = $(OBJ_DIR)/$(NAME).h
 VERI_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(VERI_CSRCS:.cpp=.o))
 
@@ -123,6 +123,9 @@ makedir:
 compile: $(TARGET)
 	$(GSIM_BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
 	$(SIG_COMMAND)
+	mkdir -p obj/$(NAME)
+	rm obj/$(NAME)/*
+	python ./scripts/partition.py obj/$(NAME).cpp obj/$(NAME)
 
 clean:
 	rm -rf obj parser/build obj_dir build
@@ -153,8 +156,8 @@ $(EMU_BUILD_DIR)/S$(NAME)_diff: $(VERI_OBJS) $(REF_GSIM_OBJS)
 	$(CXX) $^ $(GSIM_CFLAGS) -lgmp -o $@
 
 ./obj_dir/V$(NAME): $(VERI_CSRCS) $(VERI_VSRCS)
-	verilator $(VERI_VFLAGS) -O3 -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
-	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
+	/usr/bin/verilator $(VERI_VFLAGS) -O3 -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
+	make -s OPT_FAST="-O3" CXX=clang -j 15 -C ./obj_dir -f V$(NAME).mk V$(NAME)
 
 build-emu: $(target)
 

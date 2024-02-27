@@ -88,6 +88,7 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   newLine(header);
   /* class start*/
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
+  fprintf(header, "uint64_t cycles = 0;\n");
   /* constrcutor */
   fprintf(header, "S%s() {\n", name.c_str());
   /* some initialization */
@@ -195,7 +196,6 @@ void graph::genNodeDef(FILE* fp, Node* node) {
 FILE* graph::genSrcStart(std::string name) {
   FILE* src = std::fopen((std::string(OBJ_DIR) + "/" + name + ".cpp").c_str(), "w");
   includeLib(src, name + ".h", false);
-  fprintf(src, "uint64_t cycles = 0;\n");
 
   return src;
 }
