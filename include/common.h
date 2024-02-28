@@ -97,6 +97,7 @@ class ENode;
 class ExpTree;
 class SuperNode;
 class valInfo;
+class clockVal;
 
 #include "opFuncs.h"
 #include "debug.h"

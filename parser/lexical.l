@@ -84,7 +84,8 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>"@"     { BEGIN(info); }
 <normal>"<<"    { return token::DoubleLeft; }
 <normal>">>"    { return token::DoubleRight; }
-<normal>Clock|Reset|AsyncReset  { yylval->typeGround = strdup(yytext); return token::Clock; }
+<normal>Clock                   { yylval->typeGround = strdup(yytext); return token::Clock; }
+<normal>Reset|AsyncReset        { yylval->typeGround = strdup(yytext); return token::Reset; }
 <normal>UInt|SInt               { yylval->typeGround = strdup(yytext); return token::IntType; }
 <normal>Analog                  { yylval->typeGround = strdup(yytext); return token::anaType; }
 <normal>Fixed                   { yylval->typeGround = strdup(yytext); return token::FixedType; }

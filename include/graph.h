@@ -56,6 +56,7 @@ class graph {
   void removeNodes(NodeStatus status);
   bool inSrc(SuperNode* super);
   void mergeRegister();
+  void clockOptimize();
 };
 
 #endif

@@ -118,6 +118,7 @@ public:
   OPType opType = OP_EMPTY;
   int width = -1;
   bool sign = false;
+  bool isClock = false;
   int usedBit = -1;
   // bool islvalue = false;  // true for root and L_INDEX, otherwise false
   int id; // used to distinguish different whens
@@ -172,6 +173,7 @@ public:
   int getArrayIndex(Node* node);
   Node* getLeafNode(std::set<Node*>& s);
   std::vector<int> getDim();
+  clockVal* clockCompute();
 };
 
 /* 

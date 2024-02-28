@@ -46,7 +46,10 @@ void Node::inferWidth() {
     valTree->getRoot()->inferWidth();
   }
   if (width == -1) {
-    if (valTree) setType(valTree->getRoot()->width, valTree->getRoot()->sign);
+    if (valTree) {
+      setType(valTree->getRoot()->width, valTree->getRoot()->sign);
+      isClock = valTree->getRoot()->isClock;
+    }
     else setType(0, false);
   }
   for (ExpTree* arrayTree : arrayVal) {
@@ -125,6 +128,7 @@ void Node::updateInfo(TypeInfo* info) {
   width = info->width;
   sign = info->sign;
   dimension.insert(dimension.end(), info->dimension.begin(), info->dimension.end());
+  if (info->isClock()) isClock = true;
 }
 
 Node* Node::dup(NodeType _type, std::string _name) {
@@ -132,6 +136,7 @@ Node* Node::dup(NodeType _type, std::string _name) {
   duplicate->name = _name.empty() ? name : _name;
   duplicate->width = width;
   duplicate->sign = sign;
+  duplicate->isClock = isClock;
   for (int dim : dimension) duplicate->dimension.push_back(dim);
 
   return duplicate;

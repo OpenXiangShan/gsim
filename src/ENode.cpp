@@ -16,7 +16,9 @@ void ENode::inferWidth() {
   if (nodePtr) {
     nodePtr->inferWidth();
     setWidth(nodePtr->width, nodePtr->sign);
+    isClock = nodePtr->isClock;
   } else {
+    isClock = false;
     switch (opType) {
       case OP_ADD:  case OP_SUB:
         Assert(getChildNum() == 2 && s0 == s1, "invalid child");
@@ -68,6 +70,7 @@ void ENode::inferWidth() {
         setWidth(w0, true);
         break;
       case OP_ASCLOCK:
+        isClock = true;
       case OP_ASASYNCRESET:
         Assert(getChildNum() == 1, "invalid child");
         setWidth(1, false);

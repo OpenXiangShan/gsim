@@ -46,6 +46,8 @@ int main(int argc, char** argv) {
 
   g->topoSort();
 
+  g->clockOptimize();
+
   // g->traversal();
 
   g->removeDeadNodes();

@@ -158,6 +158,7 @@ TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType) {
     case P_Clock:
       info = new TypeInfo();
       info->set_sign(false); info->set_width(1);
+      info->set_clock(true);
       break;
     case P_INT_TYPE:
       info = new TypeInfo();
@@ -509,6 +510,10 @@ expr(1) must be clock
 void visitRegDef(graph* g, PNode* reg) {
   TYPE_CHECK(reg, 4, 4, P_REG_DEF);
   
+  ASTExpTree* clkExp = visitExpr(g, reg->getChild(1));
+  Assert(!clkExp->isAggr() && clkExp->getExpRoot()->getNode(), "unsupported clock in lineno %d", reg->lineno);
+  Node* clockNode = clkExp->getExpRoot()->getNode();
+
   prefix_append(SEP_MODULE, reg->name);
   TypeInfo* info = visitType(g, reg->getChild(0), NODE_REG_SRC);
   /* alloc node for basic nodes */
@@ -527,6 +532,7 @@ void visitRegDef(graph* g, PNode* reg) {
     addSignal(src->name, src);
     addSignal(dst->name, dst);
     src->bindReg(dst);
+    src->clock = dst->clock = clockNode;
   }
   // only src dummy nodes are in allDummy
   for (AggrParentNode* dummy : info->aggrParent) addDummy(dummy->name, dummy);
@@ -604,7 +610,8 @@ static inline Node* visitReader(PNode* reader, int width, int depth, bool sign, 
 
   add_member(ret, "addr" + suffix, READER_ADDR, upperLog2(depth), false);
   add_member(ret, "en" + suffix, READER_EN, 1, false);
-  add_member(ret, "clk" + suffix, READER_CLK, 1, false);
+  Node* clk = add_member(ret, "clk" + suffix, READER_CLK, 1, false);
+  clk->isClock = true;
   Node* data = add_member(ret, "data" + suffix, READER_DATA, width, sign);
   if (node) {
     data->dimension.insert(data->dimension.end(), node->dimension.begin(), node->dimension.end());
@@ -630,7 +637,8 @@ static inline Node* visitWriter(PNode* writer, int width, int depth, bool sign, 
 
   add_member(ret, "addr" + suffix, WRITER_ADDR, upperLog2(depth), false);
   add_member(ret, "en" + suffix, WRITER_EN, 1, false);
-  add_member(ret, "clk" + suffix, WRITER_CLK, 1, false);
+  Node* clk = add_member(ret, "clk" + suffix, WRITER_CLK, 1, false);
+  clk->isClock = true;
   Node* data = add_member(ret, "data" + suffix, WRITER_DATA, width, sign);
   Node* mask = add_member(ret, "mask" + suffix, WRITER_MASK, 1, false);
   if (node) {
@@ -658,7 +666,8 @@ static inline Node* visitReadWriter(PNode* readWriter, int width, int depth, boo
 
   add_member(ret, "addr" + suffix, READWRITER_ADDR, upperLog2(depth), false);
   add_member(ret, "en" + suffix, READWRITER_EN, 1, false);
-  add_member(ret, "clk" + suffix, READWRITER_CLK, 1, false);
+  Node* clk = add_member(ret, "clk" + suffix, READWRITER_CLK, 1, false);
+  clk->isClock = true;
   Node* rdata = add_member(ret, "rdata" + suffix, READWRITER_RDATA, width, sign);
   Node* wdata = add_member(ret, "wdata" + suffix, READWRITER_WDATA, width, sign);
   Node* wmask = add_member(ret, "wmask" + suffix, READWRITER_WMASK, 1, false);

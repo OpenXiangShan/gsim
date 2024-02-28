@@ -35,6 +35,7 @@ class TypeInfo {
 public:
   int width;
   bool sign;
+  bool clock = false;
   std::vector<int> dimension;
   std::vector<std::pair<Node*, bool>> aggrMember; // all members, if not empty, all other infos above are invalid
   std::vector<AggrParentNode*> aggrParent; // the later the outer
@@ -42,6 +43,8 @@ public:
   void add(Node* node, bool isFlip) { aggrMember.push_back(std::make_pair(node, isFlip)); }
   void set_width(int _width) { width = _width; }
   void set_sign(bool _sign) { sign = _sign; }
+  void set_clock(bool is_clock) { clock = is_clock; }
+  bool isClock() { return clock; }
   void mergeInto(TypeInfo* info);
   bool isAggr() { return aggrParent.size() != 0; }
   void addDim(int num);
@@ -117,6 +120,9 @@ class Node {
 /* used for splitted array */
   std::vector<Node*>arrayMember;
   Node* arrayParent = nullptr;
+/* used for reg & memory */
+  Node* clock;
+  bool isClock = false;
 /* used for visitWhen in AST2Graph */
 
   int whenDepth = 0;
@@ -206,6 +212,9 @@ class Node {
   void updateActivate();
   void removeConnection();
   void allocArrayVal();
+  Node* clockAlias();
+  clockVal* clockCompute();
+  void setConstantZero(int width);
 };
 
 class SuperNode {
