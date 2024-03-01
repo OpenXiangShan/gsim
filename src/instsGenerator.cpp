@@ -1345,7 +1345,11 @@ valInfo* ENode::instsInt(Node* node, std::string lvalue, bool isRoot) {
 valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   Assert(node->type == NODE_MEM_MEMBER, "invalid type %d", node->type);
-  ret->valStr = node->parent->parent->name + "[" + node->parent->get_member(READER_ADDR)->computeInfo->valStr + "]";
+  Node* memory = node->parent->parent;
+  ret->valStr = memory->name + "[" + node->parent->get_member(READER_ADDR)->computeInfo->valStr + "]";
+  if (memory->width > BASIC_WIDTH) TODO();
+  if (memory->width > width) ret->valStr += " & " + bitMask(width);
+  if (width < node->parent->parent->width)
   ret->opNum = 0;
   return ret;
 }
