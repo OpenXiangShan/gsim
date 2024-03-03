@@ -281,11 +281,11 @@ valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
     std::string lstr = ChildInfo(0, valStr);
     std::string rstr = ChildInfo(1, valStr);
     if (sign) { // signed extension
-      if(Child(0, width) < Child(1, width)) {
+      if(Child(0, width) < Child(1, width) && ChildInfo(0, status) != VAL_CONSTANT) {
         int extendedWidth = widthBits(Child(1, width));
         int shiftBits = extendedWidth - Child(0, width);
         lstr = format("((%s%s%s << %d) >> %d)", Cast(Child(1, width), true).c_str(), Cast(Child(0, width), true).c_str(), lstr.c_str(), shiftBits, shiftBits);
-      } else if (Child(0, width) > Child(1, width)) {
+      } else if (Child(0, width) > Child(1, width) && ChildInfo(1, status) != VAL_CONSTANT) {
         int extendedWidth = widthBits(Child(0, width));
         int shiftBits = extendedWidth - Child(1, width);
         rstr = format("((%s%s%s << %d) >> %d)", Cast(Child(0, width), true).c_str(), Cast(Child(1, width), true).c_str(), rstr.c_str(), shiftBits, shiftBits);
