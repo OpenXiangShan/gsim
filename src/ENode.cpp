@@ -173,7 +173,7 @@ std::pair<int, int> ENode::getIdx(Node* node) {
   for (size_t i = 0; i < index.size(); i ++) {
     base = base * node->dimension[i] + index[i];
   }
-  return std::make_pair(base * num, base * (num + 1) - 1);
+  return std::make_pair(base * num, (base + 1) * num - 1);
 }
 /*
 return right value of connected node
