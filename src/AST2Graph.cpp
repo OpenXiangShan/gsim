@@ -1466,7 +1466,6 @@ graph* AST2Graph(PNode* root) {
 
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     updatePrevNext(it->second);
-    it->second->inferWidth();
   }
 
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
@@ -1498,4 +1497,8 @@ graph* AST2Graph(PNode* root) {
     }
   }
   return g;
+}
+
+void inferAllWidth() {
+  for (auto it = allSignals.begin(); it != allSignals.end(); it ++) it->second->inferWidth();
 }

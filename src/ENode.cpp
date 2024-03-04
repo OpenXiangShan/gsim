@@ -14,9 +14,14 @@ void ENode::inferWidth() {
   }
   if (width != -1) return;
   if (nodePtr) {
-    nodePtr->inferWidth();
-    setWidth(nodePtr->width, nodePtr->sign);
-    isClock = nodePtr->isClock;
+    Node* realNode = nodePtr;
+    if(nodePtr->isArray() && nodePtr->arraySplitted()) {
+      ArrayMemberList* list = getArrayMember(nodePtr);
+      realNode = list->member[0];
+    }
+    realNode->inferWidth();
+    setWidth(realNode->width, realNode->sign);
+    isClock = realNode->isClock;
   } else {
     isClock = false;
     switch (opType) {

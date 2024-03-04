@@ -12,6 +12,7 @@
 
 void preorder_traversal(PNode* root);
 graph* AST2Graph(PNode* root);
+void inferAllWidth();
 
 extern PNode* root;
 
@@ -42,6 +43,8 @@ int main(int argc, char** argv) {
 
   g->detectLoop();
   
+  inferAllWidth();
+
   g->usedBits();
 
   g->topoSort();

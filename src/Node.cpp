@@ -54,6 +54,7 @@ void Node::inferWidth() {
     }
     else setType(0, false);
   }
+
   for (ExpTree* arrayTree : arrayVal) {
     if (!arrayTree) continue;
     arrayTree->getRoot()->inferWidth();
