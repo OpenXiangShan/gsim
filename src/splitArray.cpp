@@ -190,20 +190,21 @@ void graph::splitArray() {
           for (size_t i = 0; i < list->member.size(); i ++) {
             int idx = list->idx[i];
             /* compute index for all array operands in tree */
-            std::vector<int> subIdx;
+            std::vector<int> subIdx(node->dimension.size() - tree->getlval()->getChildNum());
             int tmp = idx;
-            for (size_t i = tree->getlval()->getChildNum(); i < node->dimension.size(); i ++) {
-              subIdx.push_back(tmp / node->dimension[i]);
-              tmp %= node->dimension[i];
+            for (int i = node->dimension.size() - 1; i >= tree->getlval()->getChildNum(); i --) {
+              subIdx[i - tree->getlval()->getChildNum()] = tmp % node->dimension[i];
+              tmp /= node->dimension[i];
             }
-            tree = dupTreeWithIdx(tree, subIdx);
+            ExpTree* newTree = dupTreeWithIdx(tree, subIdx);
             /* duplicate tree with idx */
             if (node->arrayMember[idx]->valTree) {
-              /* fill empty when body in tree with old valTree*/
+              /* fill empty when body in newTree with old valTree*/
               ExpTree* oldTree = node->arrayMember[idx]->valTree;
-              fillEmptyWhen(tree, oldTree->getRoot());
+              fillEmptyWhen(newTree, oldTree->getRoot());
             }
-            node->arrayMember[idx]->valTree = tree;
+            node->arrayMember[idx]->valTree = newTree;
+
           }
         }
       }
