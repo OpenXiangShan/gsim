@@ -76,8 +76,13 @@ void ExpTree::display() {
 /* traverse graph */
 void graph::traversal() {
   for (SuperNode* super : sortedSuper) {
-    printf("----super %d----:\n", super->id);
-    for (Node* node : super->member) {
+    super->display();
+  }
+}
+
+void SuperNode::display() {
+   printf("----super %d----:\n", id);
+    for (Node* node : member) {
       printf("node %s[width %d sign %d]:\n", node->name.c_str(), node->width, node->sign);
       if (node->valTree) node->valTree->display();
       for (size_t i = 0; i < node->arrayVal.size(); i ++) {
@@ -86,12 +91,4 @@ void graph::traversal() {
         node->arrayVal[i]->display();
       }
     }
-  }
-}
-
-void SuperNode::display() {
-   printf("----super %d----:\n", id);
-  for (Node* node : member) {
-    printf("node %s[width %d, sign %d]:\n", node->name.c_str(), node->width, node->sign);
-  }
 }
