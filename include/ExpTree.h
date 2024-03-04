@@ -174,6 +174,7 @@ public:
   Node* getLeafNode(std::set<Node*>& s);
   std::vector<int> getDim();
   clockVal* clockCompute();
+  ArrayMemberList* getArrayMember(Node* node);
 };
 
 /* 
@@ -361,6 +362,16 @@ public:
   void merge(NodeList* newList) {
     if (!newList) return;
     nodes.insert(nodes.end(), newList->nodes.begin(), newList->nodes.end());
+  }
+};
+
+class ArrayMemberList {
+public:
+  std::vector<Node*> member;
+  std::vector<int> idx;
+  void add_member(Node* n, int _idx) {
+    member.push_back(n);
+    idx.push_back(_idx);
   }
 };
 

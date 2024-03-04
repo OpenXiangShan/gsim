@@ -20,9 +20,11 @@ void Node::updateConnect() {
     Node* prevNode = top->getNode();
     if (prevNode) {
       if (prevNode->isArray() && prevNode->arraySplitted()) {
-        Node* arrayMember = prevNode->arrayMember[top->getArrayIndex(prevNode)];
-        prev.insert(arrayMember);
-        arrayMember->next.insert(this);
+        ArrayMemberList* list = top->getArrayMember(prevNode);
+        for (Node* arrayMember : list->member) {
+          prev.insert(arrayMember);
+          arrayMember->next.insert(this);
+        }
       } else {
         prev.insert(prevNode);
         prevNode->next.insert(this);

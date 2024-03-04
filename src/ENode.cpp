@@ -222,13 +222,25 @@ int ENode::getArrayIndex(Node* node) {
       return idx;
     }
   }
-
+  if (fixNum < node->dimension.size()) TODO();
   if (fixNum < node->dimension.size()) {
     idx = idx * (node->dimension[fixNum] + 1) + node->dimension[fixNum];
     fixNum ++;
   }
 
-  for ( ; fixNum < node->dimension.size(); fixNum ++) idx = idx * (node->dimension[fixNum] + 1);
-
   return idx;
+}
+
+ArrayMemberList* ENode::getArrayMember(Node* node) {
+  Assert(nodePtr, "empty  node");
+  Assert(nodePtr == node, "lvalue not match %s != %s", nodePtr->name.c_str(), node->name.c_str());
+  Assert(child.size() <= node->dimension.size(), "%s index out of bound", node->name.c_str());
+  ArrayMemberList* ret = new ArrayMemberList();
+  int begin, end;
+  std::tie(begin, end) = getIdx(nodePtr);
+  if (begin < 0) TODO();
+  for (int i = begin; i <= end; i ++) {
+    ret->add_member(node->getArrayMember(i), i);
+  }
+  return ret;
 }

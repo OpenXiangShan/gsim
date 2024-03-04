@@ -43,9 +43,39 @@ void partialDfs(std::set<Node*>&loop) {
   }
 }
 
+ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index) {
+  ENode* lvalue = tree->getlval()->dup();
+  for (int idx : index) {
+    ENode* idxNode = new ENode(OP_INDEX_INT);
+    idxNode->addVal(idx);
+    lvalue->addChild(idxNode);
+  }
+  ENode* rvalue = tree->getRoot()->dup();
+  std::stack<ENode*> s;
+  s.push(rvalue);
+  while(!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    for (int i = 0; i < top->getChildNum(); i ++) {
+      if (!top->getChild(i)) continue;
+    }
+    if (top->getNode()) {
+      Assert(top->getNode()->isArray(), "%s is not array", top->getNode()->name.c_str());
+      for (int idx : index) {
+        ENode* idxNode = new ENode(OP_INDEX_INT);
+        idxNode->addVal(idx);
+        top->addChild(idxNode);
+      }
+    }
+  }
+  ExpTree* ret = new ExpTree(rvalue, lvalue);
+  return ret;
+}
+
 bool point2self(Node* node) {
   std::set<Node*> nextNodes;
   std::stack<Node*> s;
+  std::set<Node*> visited;
   for (Node* next : node->next) {
     s.push(next);
     nextNodes.insert(next);
@@ -54,6 +84,8 @@ bool point2self(Node* node) {
   while(!s.empty()) {
     Node* top = s.top();
     s.pop();
+    if (visited.find(top) != visited.end()) continue;
+    visited.insert(top);
     for (Node* next : top->next) {
       if (next == node) return true;
       if (nextNodes.find(next) != nextNodes.end()) continue;
@@ -144,19 +176,45 @@ void graph::splitArray() {
       }
       /* distribute arrayVal */
       for (ExpTree* tree : node->arrayVal) {
-        int idx = tree->getlval()->getArrayIndex(node);
-        if (node->arrayMember[idx]->valTree) {
-          /* fill empty when body in tree with old valTree*/
-          ExpTree* oldTree = node->arrayMember[idx]->valTree;
-          fillEmptyWhen(tree, oldTree->getRoot());
+        ArrayMemberList* list = tree->getlval()->getArrayMember(node);
+
+        if (list->member.size() == 1) {
+          int idx = list->idx[0];
+          if (node->arrayMember[idx]->valTree) {
+            /* fill empty when body in tree with old valTree*/
+            ExpTree* oldTree = node->arrayMember[idx]->valTree;
+            fillEmptyWhen(tree, oldTree->getRoot());
+          }
+          node->arrayMember[idx]->valTree = tree;
+        } else {
+          for (size_t i = 0; i < list->member.size(); i ++) {
+            int idx = list->idx[i];
+            /* compute index for all array operands in tree */
+            std::vector<int> subIdx;
+            int tmp = idx;
+            for (size_t i = tree->getlval()->getChildNum(); i < node->dimension.size(); i ++) {
+              subIdx.push_back(tmp / node->dimension[i]);
+              tmp %= node->dimension[i];
+            }
+            tree = dupTreeWithIdx(tree, subIdx);
+            /* duplicate tree with idx */
+            if (node->arrayMember[idx]->valTree) {
+              /* fill empty when body in tree with old valTree*/
+              ExpTree* oldTree = node->arrayMember[idx]->valTree;
+              fillEmptyWhen(tree, oldTree->getRoot());
+            }
+            node->arrayMember[idx]->valTree = tree;
+          }
         }
-        node->arrayMember[tree->getlval()->getArrayIndex(node)]->valTree = tree;
       }
       /* construct connections */
       for (Node* member : node->arrayMember) {
         member->updateConnect();
       }
-      for (Node* next : node->next) next->updateConnect();
+      for (Node* next : node->next) {
+        if (next != node)
+          next->updateConnect();
+      }
 
       /* clear node connection */
       node->prev.clear();

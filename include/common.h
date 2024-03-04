@@ -98,6 +98,7 @@ class ExpTree;
 class SuperNode;
 class valInfo;
 class clockVal;
+class ArrayMemberList;
 
 #include "opFuncs.h"
 #include "debug.h"
