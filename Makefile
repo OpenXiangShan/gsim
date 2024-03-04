@@ -155,8 +155,8 @@ $(EMU_BUILD_DIR)/S$(NAME)_diff: $(VERI_OBJS) $(REF_GSIM_OBJS)
 	echo $(REF_GSIM_OBJS)
 	$(CXX) $^ $(GSIM_CFLAGS) -lgmp -o $@
 
-./obj_dir/V$(NAME): $(VERI_CSRCS) $(VERI_VSRCS)
-	/usr/bin/verilator $(VERI_VFLAGS) -O3 -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
+./obj_dir/V$(NAME): $(VERI_CSRCS) $(VERI_VSRCS) Makefile
+	verilator $(VERI_VFLAGS) -O3 -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
 	make -s OPT_FAST="-O3" CXX=clang -j 15 -C ./obj_dir -f V$(NAME).mk V$(NAME)
 
 build-emu: $(target)
