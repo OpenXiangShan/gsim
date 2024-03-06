@@ -20,6 +20,8 @@
 #include <gmp.h>
 #include <cstdarg>
 
+// #define MEM_CHECK
+
 // #define EMU_LOG
 // #define LOG_START 0
 

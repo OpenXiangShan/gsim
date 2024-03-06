@@ -61,6 +61,28 @@ void graph::genNodeInit(FILE* fp, Node* node) {
     }
     else
       fprintf(fp, "mpz_init(%s);\n", node->name.c_str());
+  } else {
+#ifdef MEM_CHECK
+    static std::set<Node*> initNodes;
+    if (node->type == NODE_ARRAY_MEMBER) node = node->arrayParent;
+    if (initNodes.find(node) != initNodes.end()) return;
+    initNodes.insert(node);
+    switch (node->type) {
+      case NODE_INVALID:
+      case NODE_SPECIAL:
+      case NODE_READER:
+      case NODE_WRITER:
+      case NODE_READWRITER:
+      case NODE_MEMORY:
+        break;
+      default:
+        if (node->isArray()) {
+          fprintf(fp, "memset(%s, 0, sizeof(%s));\n", node->name.c_str(), node->name.c_str());
+        } else {
+          fprintf(fp, "%s = 0;\n", node->name.c_str());
+        }
+    }
+#endif
   }
 }
 
@@ -99,6 +121,12 @@ FILE* graph::genHeaderStart(std::string headerFile) {
       genNodeInit(header, member);
     }
   }
+  fprintf(header, "mpz_init(oldValMpz);\n");
+#ifdef MEM_CHECK
+  for (Node* mem :memory) {
+    fprintf(header, "memset(%s, 0, sizeof(%s));\n", mem->name.c_str(), mem->name.c_str());
+  }
+#endif
   fprintf(header, "}\n");
 
   /* mpz variable used for intermidia values */
