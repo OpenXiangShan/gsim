@@ -194,6 +194,7 @@ class ExpTree {
 public:
     ExpTree(ENode* root) {
       setOrAllocRoot(root);
+      lvalue = nullptr;
     }
     ExpTree(ENode* node, ENode* _lvalue) {
       setOrAllocRoot(node);

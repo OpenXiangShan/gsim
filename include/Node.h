@@ -113,7 +113,7 @@ class Node {
   std::vector<Node*> member;
   Node* parent = nullptr;
 /* used for registers */
-  Node* regNext;
+  Node* regNext = nullptr;
   bool regSplit = true;
 /* used for instGerator */
   valInfo* computeInfo = nullptr;
