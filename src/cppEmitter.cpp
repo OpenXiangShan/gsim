@@ -236,12 +236,21 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
   std::string ret;
   if (node->insts.size()) {
     /* save oldVal */
-    if (node->needActivate() && node->dimension.size() == 0) {
-      if (node->width > BASIC_WIDTH) {
-        if (node->type == NODE_ARRAY_MEMBER) TODO();
-        fprintf(fp, "mpz_set(%s, %s);\n", oldMpz(node).c_str(), node->name.c_str());
-      } else {
-        fprintf(fp, "%s %s = %s;\n", widthUType(node->width).c_str(), oldBasic(node).c_str(), node->name.c_str());
+    if (node->needActivate()) {
+      if (!node->isArray()) {
+        if (node->width > BASIC_WIDTH) {
+          if (node->type == NODE_ARRAY_MEMBER) TODO();
+          fprintf(fp, "mpz_set(%s, %s);\n", oldMpz(node).c_str(), node->name.c_str());
+        } else {
+          fprintf(fp, "%s %s = %s;\n", widthUType(node->width).c_str(), oldBasic(node).c_str(), node->name.c_str());
+        }
+      } else if (node->isFakeArray()) {
+        if (node->width > BASIC_WIDTH) {
+          if (node->type == NODE_ARRAY_MEMBER) TODO();
+          fprintf(fp, "mpz_set(%s, %s[0]);\n", oldMpz(node).c_str(), node->name.c_str());
+        } else {
+          fprintf(fp, "%s %s = %s[0];\n", widthUType(node->width).c_str(), oldBasic(node).c_str(), node->name.c_str());
+        }
       }
     }
     /* display all insts */
@@ -252,12 +261,12 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
   }
 }
 
-static void activateNext(FILE* fp, Node* node, std::string oldName) {
+static void activateNext(FILE* fp, Node* node, std::string oldName, std::string suffix) {
   if (!node->needActivate()) return;
   if (node->width > BASIC_WIDTH) {
-    fprintf(fp, "if (mpz_cmp(%s, %s) != 0) {\n", node->name.c_str(), oldName.c_str());
+    fprintf(fp, "if (mpz_cmp(%s%s, %s) != 0) {\n", node->name.c_str(), suffix.c_str(), oldName.c_str());
   } else {
-    fprintf(fp, "if (%s != %s) {\n", node->name.c_str(), oldName.c_str());
+    fprintf(fp, "if (%s%s != %s) {\n", node->name.c_str(), suffix.c_str(), oldName.c_str());
   }
   for (int id : node->nextActiveId) {
     fprintf(fp, "activeFlags[%d] = true;\n", id);
@@ -279,7 +288,8 @@ void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
 
 void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
   for (Node* member : node->member) {
-    if(member->dimension.size() == 0) activateNext(fp, member, oldName(member));
+    if(member->dimension.size() == 0) activateNext(fp, member, oldName(member), "");
+    else if (member->isFakeArray()) activateNext(fp, member, oldName(member), "[0]");
     else activateUncondNext(fp, member);
   }
 #ifdef EMU_LOG
@@ -371,7 +381,7 @@ void graph::genStep(FILE* fp) {
   for (Node* node : regsrc) {
     if (node->regSplit && node->status == VALID_NODE) {
       if (node->dimension.size() == 0) {
-        activateNext(fp, node, node->regNext->computeInfo->valStr);
+        activateNext(fp, node, node->regNext->computeInfo->valStr, "");
         if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_set(%s, %s);\n", node->name.c_str(), node->regNext->computeInfo->valStr.c_str());
         else fprintf(fp, "%s = %s;\n", node->name.c_str(), node->regNext->computeInfo->valStr.c_str());
       } else {

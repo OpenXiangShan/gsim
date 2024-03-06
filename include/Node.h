@@ -215,6 +215,7 @@ class Node {
   Node* clockAlias();
   clockVal* clockCompute();
   void setConstantZero(int width);
+  bool isFakeArray() { return dimension.size() == 1 && dimension[0] == 1; }
 };
 
 class SuperNode {
