@@ -1098,8 +1098,13 @@ valInfo* ENode::instsXorr(Node* node, std::string lvalue, bool isRoot) {
     u_xorr(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
   } else if (childBasic && enodeBasic) {
-    ret->valStr = "(__builtin_parity(" + ChildInfo(0, valStr) + ") & 1)";
-    ret->opNum = ChildInfo(0, opNum) + 1;
+    if (Child(0, width) <= 64) {
+      ret->valStr = "(__builtin_parityl(" + ChildInfo(0, valStr) + ") & 1)";
+      ret->opNum = ChildInfo(0, opNum) + 1;
+    } else {
+      ret->valStr = format("(__builtin_parityl(%s) | __builtin_parityl(%s))", ChildInfo(0, valStr).c_str(), ChildInfo(0, valStr).c_str());
+      ret->opNum = ChildInfo(0, opNum) + 1;
+    }
   } else {
     TODO();
   }
