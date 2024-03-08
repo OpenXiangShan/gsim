@@ -62,12 +62,15 @@ void ExpTree::display() {
     int depth;
     std::tie(top, depth) = enodes.top();
     enodes.pop();
+    if (!top) {
+      printf("%s(EMPTY)\n",std::string(depth * 2, ' ').c_str());
+      continue;
+    }
     printf("%s(%d %s %p) %s [width=%d, sign=%d]", std::string(depth * 2, ' ').c_str(), top->opType, OP2Name[top->opType], top, (top->nodePtr) ? top->nodePtr->name.c_str(): "", top->width, top->sign);
     for (int val : top->values) printf(" %d", val);
     printf("\n");
     for (int i = top->child.size() - 1; i >= 0; i --) {
       ENode* childENode = top->child[i];
-      if (!childENode) continue;
       enodes.push(std::make_pair(childENode, depth + 1));
     }
   }
