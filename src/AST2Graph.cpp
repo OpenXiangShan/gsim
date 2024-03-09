@@ -130,8 +130,13 @@ TypeInfo* visitFields(graph* g, PNode* fields, NodeType parentType) {
   for (int i = 0; i < fields->getChildNum(); i ++) {
     PNode* field = fields->getChild(i);
     TypeInfo* fieldInfo = visitField(g, field, parentType);
+    NodeType curType = parentType;
+    if (field->type == P_FLIP_FIELD) {
+      if (parentType == NODE_INP) curType = NODE_OUT;
+      if (parentType == NODE_OUT) curType = NODE_INP;
+    }
     if (!fieldInfo->isAggr()) { // The type of field is ground
-      Node* fieldNode = allocNode(parentType, prefixName(SEP_AGGR, field->name));
+      Node* fieldNode = allocNode(curType, prefixName(SEP_AGGR, field->name));
       fieldNode->updateInfo(fieldInfo);
       info->add(fieldNode, field->type == P_FLIP_FIELD);
     } else { // The type of field is aggregate
