@@ -14,7 +14,7 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 OBJ_DIR = obj
 $(shell mkdir -p $(OBJ_DIR))
 
-dutName = boom
+dutName = xiangshan
 
 ifeq ($(dutName),ysyx3)
 	NAME ?= newtop
@@ -35,7 +35,12 @@ else ifeq ($(dutName),boom)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
-	TEST_FILE = ready-to-run/$(NAME).SmallBoomConfig
+	TEST_FILE = ready-to-run/$(NAME).LargeBoomConfig
+else ifeq ($(dutName),xiangshan)
+	NAME ?= SimTop
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
+	mainargs = ready-to-run/bin/linux-xiangshan.bin
+	TEST_FILE = ready-to-run/$(NAME)-xiangshan
 endif
 
 MODE ?= 0
