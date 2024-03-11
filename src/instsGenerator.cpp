@@ -21,7 +21,9 @@ static int localTmpNum = 0;
 static int mpzTmpNum = 0;
 #define INVALID_LVALUE "INVALID_STR"
 #define IS_INVALID_LVALUE(name) (name == INVALID_LVALUE)
-#define MAX_U64 0xffffffffffffffff
+
+static int countArrayIndex(std::string name);
+static bool isSubArray(std::string name, Node* node);
 
 static std::string getConsStr(mpz_t& val) {
   std::string str = mpz_get_str(NULL, 16, val);
@@ -55,11 +57,20 @@ static std::string bitMask(int width) {
   return ret;
 }
 
-static std::string setMpz(std::string dstName, ENode* enode, valInfo* dstInfo) {
+static std::string setMpz(std::string dstName, ENode* enode, valInfo* dstInfo, Node* node) {
   std::string ret;
   if (enode->computeInfo->status == VAL_CONSTANT) {
     if (mpz_cmp_ui(enode->computeInfo->consVal, MAX_U64) > 0) TODO();
     else ret = format("mpz_set_ui(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
+  } else if (isSubArray(dstName, node)) {
+    std::string idxStr, bracket;
+    for (size_t i = countArrayIndex(dstName); i < node->dimension.size(); i ++) {
+      ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
+      idxStr += "[i" + std::to_string(i) + "]";
+      bracket += "}\n";
+    }
+    ret += format("mpz_set(%s%s, %s%s);\n", dstName.c_str(), idxStr.c_str(), enode->computeInfo->valStr.c_str(), idxStr.c_str());
+    ret += bracket;
   } else if (enode->width > BASIC_WIDTH) {
     ret = format("mpz_set(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
   } else if (enode->width > 64) {
@@ -117,7 +128,7 @@ static int countArrayIndex(std::string name) {
 
 static bool isSubArray(std::string name, Node* node) {
   size_t count = countArrayIndex(name);
-  Assert(node->type == NODE_ARRAY_MEMBER || count <= node->dimension.size(), "invalid array %s", name.c_str());
+  Assert(node->type == NODE_ARRAY_MEMBER || count <= node->dimension.size(), "invalid array %s in %s", name.c_str(), node->name.c_str());
   if (node->type == NODE_ARRAY_MEMBER) return false;
   return node->dimension.size() != count;
 }
@@ -147,9 +158,9 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
     ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
   } else if (!childBasic && !enodeBasic) {
     std::string dstName = isRoot ? lvalue : newMpzTmp();
-    std::string trueAssign = setMpz(dstName, getChild(1), ret);
-    std::string falseAssign = setMpz(dstName, getChild(2), ret);
-    ret->insts.push_back(format("if (%s) %s else %s", ChildInfo(0, valStr).c_str(), trueAssign.c_str(), falseAssign.c_str()));
+    std::string trueAssign = setMpz(dstName, getChild(1), ret, node);
+    std::string falseAssign = setMpz(dstName, getChild(2), ret, node);
+    ret->insts.push_back(format("if (%s) { %s } else { %s }", ChildInfo(0, valStr).c_str(), trueAssign.c_str(), falseAssign.c_str()));
     ret->valStr = dstName;
     ret->opNum = 0;
   } else if (enodeBasic && !childBasic) {
