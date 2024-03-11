@@ -1134,7 +1134,10 @@ void visitWhenConnect(graph* g, PNode* connect) {
       ExpTree* valTree = nullptr;
       if (exp->getFlip(i)) {
         Node* node = exp->getAggr(i)->getNode();
-        if (!node || node->isArray()) TODO();
+        if (!node) {
+          printf("connect lineno %d\n", connect->lineno);
+          TODO();
+        }
         if (node->isArray()) {
           valTree = growWhenTrace(nullptr, node->whenDepth);
         } else {
