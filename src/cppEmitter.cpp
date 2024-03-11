@@ -360,15 +360,36 @@ void graph::genStep(FILE* fp) {
   /* readMemory */
   for (Node* mem : memory) {
     Assert(mem->rlatency <= 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
-    if (mem->width > BASIC_WIDTH) TODO();
-    for (Node* port : mem->member) {
-      if (port->type == NODE_READER && mem->rlatency == 1) {
-        if (port->member[READER_DATA]->dimension.size() != 0)
-          fprintf(fp, "memcpy(%s, %s[%s], sizeof(%s));\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str(), port->member[READER_DATA]->name.c_str());
-        else {
-          fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
+    if (mem->width > BASIC_WIDTH) {
+      for (Node* port : mem->member) {
+        if (port->type == NODE_READER && mem->rlatency == 1) {
+          if (port->member[READER_DATA]->dimension.size() != 0) {
+             std::string indexStr, bracket;
+            for (size_t i = 0; i < mem->dimension.size(); i ++) {
+              fprintf(fp, "for (int i%ld = 0; i%ld < %d; i%ld ++) {", i, i, mem->dimension[i], i);
+              indexStr += format("[i%ld]", i);
+              bracket += "}\n";
+            }
+            fprintf(fp, "mpz_set(%s%s, %s[%s]%s);\n", port->member[READER_DATA]->computeInfo->valStr.c_str(), indexStr.c_str(),
+                                mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str());
+
+            fprintf(fp, "%s", bracket.c_str());
+          } else {
+            fprintf(fp, "mpz_set(%s, %s[%s]);\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
+          }
+          activateUncondNext(fp, port->member[READER_DATA]);
         }
-        activateUncondNext(fp, port->member[READER_DATA]);
+      }
+    } else {
+      for (Node* port : mem->member) {
+        if (port->type == NODE_READER && mem->rlatency == 1) {
+          if (port->member[READER_DATA]->dimension.size() != 0)
+            fprintf(fp, "memcpy(%s, %s[%s], sizeof(%s));\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str(), port->member[READER_DATA]->name.c_str());
+          else {
+            fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
+          }
+          activateUncondNext(fp, port->member[READER_DATA]);
+        }
       }
     }
   }
@@ -410,7 +431,6 @@ void graph::genStep(FILE* fp) {
       }
     }
     Assert(mem->rlatency <= 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
-    if (mem->width > BASIC_WIDTH) TODO();
     for (Node* port : mem->member) {
       if (port->type == NODE_WRITER) {
         if (port->member[WRITER_DATA]->isArray() != 0) {
@@ -422,13 +442,28 @@ void graph::genStep(FILE* fp) {
             indexStr += format("[i%ld]", i);
             bracket += "}\n";
           }
-          fprintf(fp, "if (%s%s) %s[%s]%s = %s%s;\n", port->member[WRITER_MASK]->computeInfo->valStr.c_str(), indexStr.c_str(),
-                                                  mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str(),
-                                                  port->member[WRITER_DATA]->computeInfo->valStr.c_str(), indexStr.c_str());
+          if (mem->width > BASIC_WIDTH) {
+            fprintf(fp, "if (%s%s) mpz_set(%s[%s]%s, %s%s);\n", port->member[WRITER_MASK]->computeInfo->valStr.c_str(), indexStr.c_str(),
+                                          mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str(),
+                                          port->member[WRITER_DATA]->computeInfo->valStr.c_str(), indexStr.c_str());
+          } else {
+            fprintf(fp, "if (%s%s) %s[%s]%s = %s%s;\n", port->member[WRITER_MASK]->computeInfo->valStr.c_str(), indexStr.c_str(),
+                                                    mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str(),
+                                                    port->member[WRITER_DATA]->computeInfo->valStr.c_str(), indexStr.c_str());
+          }
           fprintf(fp, "%s", bracket.c_str());
         } else {
           fprintf(fp, "if(%s && %s) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str(), port->member[WRITER_MASK]->computeInfo->valStr.c_str());
-          fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
+          if (mem->width > BASIC_WIDTH) {
+            if (port->member[WRITER_DATA]->computeInfo->status == VAL_CONSTANT) {
+              if (mpz_cmp_ui(port->member[WRITER_DATA]->computeInfo->consVal, MAX_U64) > 0) TODO();
+              else fprintf(fp, "mpz_set_ui(%s[%s], %s);\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
+            } else {
+              fprintf(fp, "mpz_set(%s[%s], %s);\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
+            }
+          } else {
+            fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
+          }
         }
         for (SuperNode* super : readerL0) {
           if (super->cppId <= 0) continue;
