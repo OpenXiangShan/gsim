@@ -96,8 +96,8 @@ void graph::aliasAnalysis() {
       std::set<Node*> leafNodes;
       Node* origin = enode->getLeafNode(leafNodes);
 
-      Assert(member->prev.size() == 1 && *(member->prev.begin()) == origin, "%s prev %s != %s",
-              member->name.c_str(), (*(member->prev.begin()))->name.c_str(), origin->name.c_str());
+      Assert(member->prev.size() == 1 && *(member->prev.begin()) == origin, "%s (prev %ld) prev %s != %s",
+              member->name.c_str(), member->prev.size(), (*(member->prev.begin()))->name.c_str(), origin->name.c_str());
 
       /* update connection */
       for (Node* leaf : leafNodes) {
