@@ -1506,6 +1506,8 @@ graph* AST2Graph(PNode* root) {
   }
   for (Node* input : g->input) {
     g->supersrc.insert(input->super);
+    if (input->valTree) Assert(input->valTree->isInvalid(), "input %s not invalid", input->name.c_str());
+    input->valTree = nullptr;
   }
   for (auto it : allSignals) {
     if (it.second->type == NODE_OTHERS && it.second->super->prev.size() == 0) {
