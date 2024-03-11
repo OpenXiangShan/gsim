@@ -540,8 +540,34 @@ valInfo* ENode::instsEq(Node* node, std::string lvalue, bool isRoot) {
     if (ChildInfo(0, width) > BASIC_WIDTH && ChildInfo(1, width) > BASIC_WIDTH) {
       ret->valStr = format("(mpz_cmp(%s, %s) == 0)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
       ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-    } else {
-      TODO();
+    } else if (ChildInfo(0, width) > BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH){
+      std::string tmp = newMpzTmp();
+      if (ChildInfo(0, width) > 64) {
+        std::string val128 = ChildInfo(0, valStr);
+        if (ChildInfo(0, opNum) > 1) {
+          val128 = newLocalTmp();
+          computeInfo->insts.push_back(format("uint128_t %s = %s;", val128.c_str(), ChildInfo(0, valStr).c_str()));
+        }
+        computeInfo->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", tmp.c_str(), val128.c_str()));
+      } else {
+        computeInfo->insts.push_back(format("mpz_set_ui(%s, %s);", tmp.c_str(), ChildInfo(0, valStr).c_str()));
+      }
+      ret->valStr = format("(mpz_cmp(%s, %s) == 0)", tmp.c_str(), ChildInfo(1, valStr).c_str());
+      ret->opNum = 1;
+    } else if (ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) > BASIC_WIDTH){
+      std::string tmp = newMpzTmp();
+      if (ChildInfo(1, width) > 64) {
+        std::string val128 = ChildInfo(1, valStr);
+        if (ChildInfo(1, opNum) > 1) {
+          val128 = newLocalTmp();
+          computeInfo->insts.push_back(format("uint128_t %s = %s;", val128.c_str(), ChildInfo(1, valStr).c_str()));
+        }
+        computeInfo->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", tmp.c_str(), val128.c_str()));
+      } else {
+        computeInfo->insts.push_back(format("mpz_set_ui(%s, %s);", tmp.c_str(), ChildInfo(1, valStr).c_str()));
+      }
+      ret->valStr = format("(mpz_cmp(%s, %s) == 0)", tmp.c_str(), ChildInfo(0, valStr).c_str());
+      ret->opNum = 1;
     }
   } else {
     TODO();
@@ -609,6 +635,12 @@ valInfo* ENode::instsDshl(Node* node, std::string lvalue, bool isRoot) {
     } else {
       TODO();
     }
+  } else if (!childBasic && !enodeBasic) {
+    if (ChildInfo(1, width) > 64) TODO();
+    std::string dstName = isRoot ? lvalue : newMpzTmp();
+    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
+    ret->valStr = dstName;
+    ret->opNum = 0;
   } else {
     TODO();
   }
@@ -843,11 +875,18 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
       ret->insts.push_back(format("mpz_import(%s,  2, -1, 8, 0, 0, (mp_limb_t*)&%s);", midName.c_str(), leftName.c_str()));
       firstName = midName;
     }
-    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width)));
-    if (Child(1, width) <= 64)
+    if (Child(1, width) <= 64) {
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width)));
       ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
-    else
+    } else if (Child(1, width) <= BASIC_WIDTH) {
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width) - 64));
+      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s >> 64);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, 64);", midName.c_str(), firstName.c_str()));
+      ret->insts.push_back(format("mpz_add_ui(%s, %s, (uint64_t)%s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
+    } else {
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width)));
       ret->insts.push_back(format("mpz_add(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
+    }
     ret->valStr = dstName;
     ret->opNum = 0;
   } else {
@@ -1174,6 +1213,27 @@ valInfo* ENode::instsShl(Node* node, std::string lvalue, bool isRoot) {
   } else if (childBasic && enodeBasic) {
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + ChildInfo(0, valStr) + " << " + std::to_string(n) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
+  } else if (!childBasic && !enodeBasic) {
+    std::string dstName = isRoot ? lvalue : newMpzTmp();
+    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), ChildInfo(0, valStr).c_str(), n));
+    ret->valStr = dstName;
+    ret->opNum = 0;
+  } else if (childBasic && !enodeBasic){
+    std::string dstName = isRoot ? lvalue : newMpzTmp();
+    if (Child(0, width) <= 64) {
+      ret->insts.push_back(format("mpz_set_ui(%s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str()));
+    } else {
+      std::string val128 = ChildInfo(0, valStr);
+      if (ChildInfo(0, opNum) > 0) {
+        std::string localName = newLocalTmp();
+        computeInfo->insts.push_back(format("uint128_t %s = %s;", localName.c_str(), computeInfo->valStr.c_str()));
+        val128 = localName;
+      }
+      computeInfo->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", dstName.c_str(), val128.c_str()));
+    }
+    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), dstName.c_str(), n));
+    ret->valStr = dstName;
+    ret->opNum = 0;
   } else {
     TODO();
   }
@@ -1241,6 +1301,12 @@ valInfo* ENode::instsHead(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = "(" + ChildInfo(0, valStr) + " >> " + std::to_string(n) + ")";
     }
     ret->opNum = ChildInfo(0, opNum) + 1;
+  } else if (!childBasic && enodeBasic) {
+    std::string tmp = newMpzTmp();
+    ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", tmp.c_str(), ChildInfo(0, valStr).c_str(), n));
+    if (width > 64) ret->valStr = get128(tmp);
+    else ret->valStr = format("mpz_get_ui(%s)", tmp.c_str());
+    ret->opNum = 1;
   } else {
     TODO();
   }
@@ -1271,6 +1337,21 @@ valInfo* ENode::instsTail(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = "(" + ChildInfo(0, valStr) + " & " + bitMask(n) + ")";
     }
     ret->opNum = ChildInfo(0, opNum) + 1;
+  } else if (!childBasic && enodeBasic) {
+    if (width <= 64) {
+      ret->valStr = format("(mpz_get_ui(%s) & %s)", ChildInfo(0, valStr).c_str(), bitMask(n).c_str());
+    } else {
+      ret->valStr = format("(%s & %s)", get128(ChildInfo(0, valStr)).c_str(), bitMask(n).c_str());
+    }
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else if (!childBasic && !enodeBasic) {
+    std::string tmpMpz = newMpzTmp();
+    std::string dstName = isRoot ? lvalue : newMpzTmp();
+    ret->insts.push_back(format("mpz_set_ui(%s, 1);", tmpMpz.c_str()));
+    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", tmpMpz.c_str(), tmpMpz.c_str(), width));
+    ret->insts.push_back(format("mpz_sub_ui(%s, %s, 1);", tmpMpz.c_str(), tmpMpz.c_str()));
+    ret->insts.push_back(format("mpz_and(%s, %s, %s);", dstName.c_str(), tmpMpz.c_str(), ChildInfo(0, valStr).c_str()));
+    ret->valStr = dstName;
   } else {
     TODO();
   }
@@ -1323,6 +1404,21 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = format("(mpz_get_ui(%s) & %s)", shiftVal.c_str(), bitMask(w).c_str());
     }
     ret->opNum = 1;
+  } else if (!childBasic && !enodeBasic){
+    std::string mpzTmp1 = newMpzTmp();
+    std::string mpzTmp2 = newMpzTmp(); // mask
+    std::string shiftVal = mpzTmp1;
+    if (lo != 0) {
+      ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", mpzTmp1.c_str(), ChildInfo(0, valStr).c_str(), lo));
+    } else {
+      shiftVal = ChildInfo(0, valStr);
+    }
+    ret->insts.push_back(format("mpz_set_ui(%s, 1);", mpzTmp2.c_str()));
+    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", mpzTmp2.c_str(), mpzTmp2.c_str(), w));
+    ret->insts.push_back(format("mpz_sub_ui(%s, %s, 1);", mpzTmp2.c_str(), mpzTmp2.c_str()));
+    ret->insts.push_back(format("mpz_and(%s, %s, %s);", mpzTmp1.c_str(), shiftVal.c_str(), mpzTmp2.c_str()));
+    ret->valStr = mpzTmp1;
+    ret->opNum = 0;
   } else {
     TODO();
   }
@@ -1363,9 +1459,13 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   Assert(node->type == NODE_MEM_MEMBER, "invalid type %d", node->type);
   Node* memory = node->parent->parent;
   ret->valStr = memory->name + "[" + node->parent->get_member(READER_ADDR)->computeInfo->valStr + "]";
-  if (memory->width > BASIC_WIDTH) TODO();
-  if (memory->width > width) ret->valStr += " & " + bitMask(width);
-  if (width < node->parent->parent->width)
+  if (memory->width > width) {
+    if (memory->width > 128 && width < 64)
+      ret->valStr = format("(mpz_get_ui(%s) & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+    else if (memory->width < 128)
+      ret->valStr += " & " + bitMask(width);
+    else TODO();
+  }
   ret->opNum = 0;
   return ret;
 }
@@ -1435,8 +1535,18 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
   }
   if (nodePtr) {
     if (nodePtr->isArray() && nodePtr->arraySplitted()) {
-      int idx = getArrayIndex(nodePtr);
-      computeInfo = nodePtr->arrayMember[idx]->compute()->dup();
+      if (getChildNum() < nodePtr->dimension.size()) {
+        computeInfo = new valInfo();
+        computeInfo->width = nodePtr->width;
+        computeInfo->sign = nodePtr->sign;
+        computeInfo->valStr = nodePtr->name;
+        for (ENode* childENode : child)
+          computeInfo->valStr += childENode->computeInfo->valStr;
+        computeInfo->opNum = 0;
+      } else {
+        int idx = getArrayIndex(nodePtr);
+        computeInfo = nodePtr->getArrayMember(idx)->compute()->dup();
+      }
     } else {
       computeInfo = nodePtr->compute()->dup();
       if (child.size() != 0) {
@@ -1447,7 +1557,10 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       }
     }
 
-    if (!IS_INVALID_LVALUE(lvalue) && computeInfo->width <= BASIC_WIDTH) {
+    if (getChildNum() == nodePtr->dimension.size()) {
+      if (computeInfo->width > width) computeInfo->width = width;
+      /* do nothing */
+    } else if (!IS_INVALID_LVALUE(lvalue) && computeInfo->width <= BASIC_WIDTH) {
       if (computeInfo->width > width) {
         if (computeInfo->status == VAL_CONSTANT) {
           computeInfo->width = width;
@@ -1635,6 +1748,7 @@ void Node::recompute() {
 
 void Node::finalConnect(std::string lvalue, valInfo* info) {
   if (info->valStr.length() == 0) return; // empty, used for when statment with constant condition
+  if (info->valStr == name) return; // no need to connect
   if (info->opNum < 0) {
     insts.push_back(info->valStr);
   } else if (isSubArray(lvalue, this)) {
@@ -1642,8 +1756,17 @@ void Node::finalConnect(std::string lvalue, valInfo* info) {
       insts.push_back(format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), info->valStr.c_str(), lvalue.c_str()));
     } else if (width < BASIC_WIDTH && info->width > width) {
       TODO();
-    } else
-      TODO();
+    } else {
+      std::string idxStr, bracket, mpzInst;
+      for (size_t i = countArrayIndex(lvalue); i < dimension.size(); i ++) {
+        mpzInst += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, dimension[i], i);
+        idxStr += "[i" + std::to_string(i) + "]";
+        bracket += "}\n";
+      }
+      mpzInst += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), info->valStr.c_str(), idxStr.c_str());
+      mpzInst += bracket;
+      insts.push_back(mpzInst);
+    }
   } else {
     if (width <= BASIC_WIDTH) {
       if (info->width > width) info->valStr = format("(%s & %s)", info->valStr.c_str(), bitMask(width).c_str());
@@ -1680,7 +1803,7 @@ valInfo* Node:: computeArray() {
       valInfo* lindex = valTree->getlval()->compute(this, INVALID_LVALUE, false);
       lvalue = lindex->valStr;
     }
-    valInfo* info = valTree->getRoot()->compute(this, lvalue, false);
+    valInfo* info = valTree->getRoot()->compute(this, lvalue, anyExtEdge() || next.size() != 1);
     for (std::string inst : info->insts) insts.push_back(inst);
     finalConnect(lvalue, info);
   }
