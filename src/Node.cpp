@@ -44,6 +44,9 @@ void Node::inferWidth() {
   if (inferredNodes.find(this) != inferredNodes.end()) return;
   inferredNodes.insert(this);
   if (type == NODE_INVALID) return;
+  if (isArray() && arraySplitted()) {
+    for (Node* member : arrayMember) member->inferWidth();
+  }
   if (valTree) {
     valTree->getRoot()->inferWidth();
   }
