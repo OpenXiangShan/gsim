@@ -95,7 +95,7 @@ bool point2self(Node* node) {
   return false;
 }
 
-Node* getSplitArray() {
+Node* getSplitArray(graph* g) {
   /* array points to itself */
   for (Node* node : partialVisited) {
     if (node->isArray() && node->next.find(node) != node->next.end()) return node;
@@ -104,7 +104,16 @@ Node* getSplitArray() {
   for (Node* node : partialVisited) {
     if (node->isArray() && point2self(node)) return node;
   }
+
+  for (Node* node : g->halfConstantArray) {
+    if (fullyVisited.find(node) != fullyVisited.end() || node->arraySplitted()) continue;
+    if (point2self(node)) return node;
+  }
+  for (Node* node : partialVisited) {
+    printf("current %s\n", node->name.c_str());
+  }
   Panic();
+
 }
 
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode) {
@@ -128,13 +137,17 @@ void graph::splitArray() {
   std::stack<Node*> s;
 
   for (SuperNode* super : supersrc) {
-    for (Node* node : super->member) s.push(node);
+    for (Node* node : super->member) {
+      if (node->prev.size() == 0) {
+        s.push(node);
+        fullyVisited.insert(node);
+      }
+    }
   }
 
   while(!s.empty()) {
     Node* top = s.top();
     s.pop();
-    fullyVisited.insert(top);
 
     for (Node* next : top->next) {
       if (times.find(next) == times.end()) {
@@ -142,16 +155,19 @@ void graph::splitArray() {
         partialVisited.insert(next);
       }
       times[next] ++;
+
       if (times[next] == (int)next->prev.size()) {
         s.push(next);
         Assert(partialVisited.find(next) != partialVisited.end(), "%s not found in partialVisited", next->name.c_str());
         partialVisited.erase(next);
+        Assert(fullyVisited.find(next) == fullyVisited.end(), "%s is already in fullyVisited", next->name.c_str());
+        fullyVisited.insert(next);
       }
     }
 
     while (s.size() == 0 && partialVisited.size() != 0) {
       /* split arrays in partialVisited until s.size() != 0 */
-      Node* node = getSplitArray();
+      Node* node = getSplitArray(this);
       Assert(!node->arraySplitted(), "%s is already splitted", node->name.c_str());
       printf("split array %s\n", node->name.c_str());
       /* remove prev connection */
@@ -236,15 +252,16 @@ void graph::splitArray() {
         }
         if (times[member] == (int)member->prev.size()) {
           s.push(member);
+          fullyVisited.insert(member);
         } else {
           partialVisited.insert(member);
         }
       }
       /* erase array */
       partialVisited.erase(node);
-      break;
     }
   }
+  Assert(partialVisited.size() == 0, "partial is not empty!");
 }
 
 Node* Node::arrayMemberNode(int idx) {

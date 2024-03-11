@@ -226,6 +226,7 @@ public:
       Assert(getRoot(), "empty root");
       return getRoot()->opType == OP_INVALID;
     }
+    bool isConstant();
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes

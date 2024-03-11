@@ -1494,6 +1494,14 @@ graph* AST2Graph(PNode* root) {
           g->supersrc.insert(port->get_member(READER_DATA)->super);
         }
       }
+    } else if (memory->rlatency == 0) { // add all ports with constant en and addr
+      for (Node* port : memory->member) {
+        if (port->type == NODE_READER) {
+          if (port->get_member(READER_ADDR)->prev.size() == 0 && port->get_member(READER_EN)->prev.size() == 0) {
+            g->supersrc.insert(port->get_member(READER_DATA)->super);
+          }
+        }
+      }
     }
   }
   for (Node* input : g->input) {
@@ -1503,10 +1511,29 @@ graph* AST2Graph(PNode* root) {
     if (it.second->type == NODE_OTHERS && it.second->super->prev.size() == 0) {
       g->supersrc.insert(it.second->super);
     }
+    if (it.second->isArray()) {
+      for (ExpTree* tree : it.second->arrayVal) {
+        if(tree->isConstant()) g->halfConstantArray.insert(it.second);
+      }
+    }
   }
   return g;
 }
 
 void inferAllWidth() {
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) it->second->inferWidth();
+}
+
+bool ExpTree::isConstant() {
+  std::stack<ENode*> s;
+  s.push(getRoot());
+  while(!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    if (top->getNode()) return false;
+    for (ENode* childENode : top->child) {
+      if(childENode) s.push(childENode);
+    }
+  }
+  return true;
 }
