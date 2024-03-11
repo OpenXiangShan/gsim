@@ -228,10 +228,6 @@ int ENode::getArrayIndex(Node* node) {
     }
   }
   if (fixNum < node->dimension.size()) TODO();
-  if (fixNum < node->dimension.size()) {
-    idx = idx * (node->dimension[fixNum] + 1) + node->dimension[fixNum];
-    fixNum ++;
-  }
 
   return idx;
 }
