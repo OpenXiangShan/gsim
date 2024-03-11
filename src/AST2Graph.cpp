@@ -1403,7 +1403,7 @@ void updatePrevNext(Node* n) {
   switch (n->type) {
     case NODE_INP:
     case NODE_REG_SRC:
-      Assert(!n->valTree, "valTree of %s should be empty", n->name.c_str());
+      Assert(!n->valTree || n->valTree->isInvalid(), "valTree of %s should be empty", n->name.c_str());
       break;
     case NODE_REG_DST:
     case NODE_SPECIAL:
