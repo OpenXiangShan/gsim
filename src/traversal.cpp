@@ -86,12 +86,16 @@ void graph::traversal() {
 void SuperNode::display() {
    printf("----super %d----:\n", id);
     for (Node* node : member) {
-      printf("node %s[width %d sign %d]:\n", node->name.c_str(), node->width, node->sign);
-      if (node->valTree) node->valTree->display();
-      for (size_t i = 0; i < node->arrayVal.size(); i ++) {
-        if (!node->arrayVal[i]) continue;
-        printf("[array] %ld\n", i);
-        node->arrayVal[i]->display();
-      }
+      node->display();
     }
+}
+
+void Node::display() {
+  printf("node %s[width %d sign %d]:\n", name.c_str(), width, sign);
+  if (valTree) valTree->display();
+  for (size_t i = 0; i < arrayVal.size(); i ++) {
+    if (!arrayVal[i]) continue;
+    printf("[array] %ld\n", i);
+    arrayVal[i]->display();
+  }
 }
