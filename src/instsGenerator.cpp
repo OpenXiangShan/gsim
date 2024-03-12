@@ -557,7 +557,7 @@ valInfo* ENode::instsEq(Node* node, std::string lvalue, bool isRoot) {
     if (ChildInfo(0, width) > BASIC_WIDTH && ChildInfo(1, width) > BASIC_WIDTH) {
       ret->valStr = format("(mpz_cmp(%s, %s) == 0)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
       ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-    } else if (ChildInfo(0, width) > BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH){
+    } else if (ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) > BASIC_WIDTH){
       std::string tmp = newMpzTmp();
       if (ChildInfo(0, width) > 64) {
         std::string val128 = ChildInfo(0, valStr);
@@ -571,7 +571,7 @@ valInfo* ENode::instsEq(Node* node, std::string lvalue, bool isRoot) {
       }
       ret->valStr = format("(mpz_cmp(%s, %s) == 0)", tmp.c_str(), ChildInfo(1, valStr).c_str());
       ret->opNum = 1;
-    } else if (ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) > BASIC_WIDTH){
+    } else if (ChildInfo(0, width) > BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH){
       std::string tmp = newMpzTmp();
       if (ChildInfo(1, width) > 64) {
         std::string val128 = ChildInfo(1, valStr);
