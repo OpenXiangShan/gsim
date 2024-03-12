@@ -53,5 +53,5 @@ void graph::removeEmptySuper() {
 }
 
 bool graph::inSrc(SuperNode* super) {
-  return std::find(supersrc.begin(), supersrc.end(), super) != supersrc.end();
+  return supersrc.find(super) != supersrc.end();
 }
