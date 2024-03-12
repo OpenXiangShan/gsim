@@ -186,7 +186,7 @@ class Node {
   }
   void addArrayVal(ExpTree* val);
   Node* getArrayMember(int idx) {
-    Assert(idx < (int)arrayMember.size(), "idx %d out of bound [0, %ld)", idx, arrayMember.size());
+    Assert(idx < (int)arrayMember.size(), "idx %d out of bound [0, %ld) in %s", idx, arrayMember.size(), name.c_str());
     return arrayMember[idx];
   }
   void set_super(SuperNode* _super) {
