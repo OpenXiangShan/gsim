@@ -1594,7 +1594,8 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->width = width;
         }
       }
-      if (sign && computeInfo->width < width && computeInfo->status == VAL_VALID) { // sign extend
+      if (computeInfo->status == VAL_CONSTANT) ;
+      else if (sign && computeInfo->width < width && computeInfo->status == VAL_VALID) { // sign extend
         int extendedWidth = widthBits(width);
         int shiftBits = extendedWidth - computeInfo->width;
         if (extendedWidth != width)
@@ -1621,7 +1622,9 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
         computeInfo->valStr = mpz;
       }
     } else if (!IS_INVALID_LVALUE(lvalue)) { // info->width > BASIC_WIDTH
-      if (width <= 64) {
+      if (computeInfo->status == VAL_CONSTANT) {
+        /* do nothing */
+      } else if (width <= 64) {
         computeInfo->valStr = format("mpz_get_ui(%s)", computeInfo->valStr.c_str());
         computeInfo->width = width;
       } else if (width <= 128) {
