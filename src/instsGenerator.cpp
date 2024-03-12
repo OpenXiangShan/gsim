@@ -92,6 +92,23 @@ static std::string get128(std::string name) {
               name.c_str(), name.c_str(), name.c_str(), name.c_str());
 }
 
+static std::string set128_tmp(valInfo* info, valInfo* parent) {
+  std::string localName = info->valStr;
+  std::string ret = newMpzTmp();
+  if (info->opNum > 0) {
+    localName = newLocalTmp();
+    parent->insts.push_back(format("%s %s = %s;", widthUType(info->width).c_str(), localName.c_str(), info->valStr.c_str()));
+  }
+  parent->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);\n", ret.c_str(), localName.c_str()));
+  return ret;
+}
+static std::string set64_tmp(valInfo* info, valInfo* parent) {
+  std::string ret = newMpzTmp();
+  parent->insts.push_back(format("mpz_set_ui(%s, %s);\n", ret.c_str(), info->valStr.c_str()));
+  return ret;
+}
+
+
 static std::string set128(std::string lvalue, valInfo* info, valInfo* ret) {
   std::string localName = info->valStr;
   if (info->opNum > 0) {
@@ -754,7 +771,13 @@ valInfo* ENode::instsOr(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = linfo->valStr;
       ret->opNum = linfo->opNum;
     } else {
-      ret->insts.push_back(format("mpz_ior(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
+      std::string lname = ChildInfo(0, valStr).c_str();
+      std::string rname = ChildInfo(1, valStr).c_str();
+      if (ChildInfo(0, width) <= 64) lname = set64_tmp(Child(0, computeInfo), ret);
+      else if (ChildInfo(0, width) <= 128) lname = set128_tmp(Child(0, computeInfo), ret);
+      if (ChildInfo(1, width) <= 64) rname = set64_tmp(Child(1, computeInfo), ret);
+      else if (ChildInfo(1, width) <= 128) rname = set128_tmp(Child(1, computeInfo), ret);
+      ret->insts.push_back(format("mpz_ior(%s, %s, %s);", dstName.c_str(), lname.c_str(), rname.c_str()));
       ret->valStr = dstName;
       ret->opNum = 0;
     }
