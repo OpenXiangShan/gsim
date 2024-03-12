@@ -12,9 +12,12 @@ void graph::topoSort() {
   for (SuperNode* node : supersrc) s.push(node);
   /* next.size() == 0, place the registers at the end to benefit mergeRegisters */
   std::vector<SuperNode*> potentialRegs;
+  std::set<SuperNode*> visited;
   while(!s.empty()) {
     SuperNode* top = s.top();
     s.pop();
+    Assert(visited.find(top) == visited.end(), "superNode %d is already visited\n", top->id);
+    visited.insert(top);
     sortedSuper.push_back(top);
     for (SuperNode* next : top->next) {
       if (times.find(next) == times.end()) times[next] = 0;
