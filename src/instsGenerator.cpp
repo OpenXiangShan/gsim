@@ -1582,6 +1582,8 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
         computeInfo->width = nodePtr->width;
         computeInfo->sign = nodePtr->sign;
         computeInfo->valStr = nodePtr->name;
+        computeInfo->splittedArray = nodePtr;
+        std::tie(computeInfo->beg, computeInfo->end) = getIdx(nodePtr);
         for (ENode* childENode : child)
           computeInfo->valStr += childENode->computeInfo->valStr;
         computeInfo->opNum = 0;
@@ -1599,7 +1601,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       }
     }
 
-    if (getChildNum() == nodePtr->dimension.size()) {
+    if (getChildNum() < nodePtr->dimension.size()) {
       if (computeInfo->width > width) computeInfo->width = width;
       /* do nothing */
     } else if (!IS_INVALID_LVALUE(lvalue) && computeInfo->width <= BASIC_WIDTH) {

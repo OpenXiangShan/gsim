@@ -15,6 +15,9 @@ public:
   int width = 0;
   bool sign = 0;
   int consLength = 0;
+  Node* splittedArray = nullptr;
+  int beg = -1;
+  int end = -1;
 
   valInfo() {
     mpz_init(consVal);
