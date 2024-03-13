@@ -74,26 +74,26 @@ static void memSuper(Node* member) {
   if (port->type == NODE_READER) {
     /* merge addr & en & clk*/
     super->add_member(port->get_member(READER_ADDR));
+    super = new SuperNode();
     super->add_member(port->get_member(READER_EN));
-    super->add_member(port->get_member(READER_CLK));
     /* data */
-    if (memory->rlatency >= 1) {
-      /* split date from addr & en */
-      super = new SuperNode();
-    }
+    super = new SuperNode();
     super->add_member(port->get_member(READER_DATA));
+    super = new SuperNode();
+    super->add_member(port->get_member(READER_CLK));
   } else if (port->type == NODE_WRITER) {
     for (Node* n : port->member)
       super->add_member(n);
   } else if (port->type == NODE_READWRITER) {
     super->add_member(port->get_member(READWRITER_ADDR));
     super->add_member(port->get_member(READWRITER_EN));
-    super->add_member(port->get_member(READWRITER_CLK));
     super->add_member(port->get_member(READWRITER_WDATA));
     super->add_member(port->get_member(READWRITER_WMASK));
     super->add_member(port->get_member(READWRITER_WMODE));
     if (memory->rlatency >= 1) super = new SuperNode();
     super->add_member(port->get_member(READWRITER_RDATA));
+    super = new SuperNode();
+    super->add_member(port->get_member(READWRITER_CLK));
   } else {
     Panic();
   }

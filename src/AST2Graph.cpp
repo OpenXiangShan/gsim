@@ -1494,14 +1494,6 @@ graph* AST2Graph(PNode* root) {
           g->supersrc.insert(port->get_member(READER_DATA)->super);
         }
       }
-    } else if (memory->rlatency == 0) { // add all ports with constant en and addr
-      for (Node* port : memory->member) {
-        if (port->type == NODE_READER) {
-          if (port->get_member(READER_ADDR)->prev.size() == 0 && port->get_member(READER_EN)->prev.size() == 0) {
-            g->supersrc.insert(port->get_member(READER_DATA)->super);
-          }
-        }
-      }
     }
   }
   for (Node* input : g->input) {
@@ -1510,7 +1502,7 @@ graph* AST2Graph(PNode* root) {
     input->valTree = nullptr;
   }
   for (auto it : allSignals) {
-    if (it.second->type == NODE_OTHERS && it.second->super->prev.size() == 0) {
+    if ((it.second->type == NODE_OTHERS || it.second->type == NODE_MEM_MEMBER) && it.second->super->prev.size() == 0) {
       g->supersrc.insert(it.second->super);
     }
     if (it.second->isArray()) {
