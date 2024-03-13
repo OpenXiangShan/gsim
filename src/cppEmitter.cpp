@@ -46,6 +46,19 @@ static void inline declStep(FILE* fp) {
   fprintf(fp, "void step();\n");
 }
 
+void graph::genMemInit(FILE* fp, Node* node) {
+  if (node->width < BASIC_WIDTH) return;
+  std::string idxStr, bracket;
+  fprintf(fp, "for (int i = 0; i < %d; i ++) {\n", upperPower2(node->depth));
+  for (size_t i = 0; i < node->dimension.size(); i ++) {
+    fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
+    idxStr += "[i" + std::to_string(i) + "]";
+    bracket += "}\n";
+  }
+  fprintf(fp, "mpz_init(%s[i]%s);\n", node->name.c_str(), idxStr.c_str());
+  fprintf(fp, "%s\n}\n", bracket.c_str());
+}
+
 void graph::genNodeInit(FILE* fp, Node* node) {
   if (node->status != VALID_NODE) return;
   if (node->width > BASIC_WIDTH) {
@@ -120,6 +133,9 @@ FILE* graph::genHeaderStart(std::string headerFile) {
     for (Node* member : super->member) {
       genNodeInit(header, member);
     }
+  }
+  for (Node* mem : memory) {
+    genMemInit(header, mem);
   }
   fprintf(header, "mpz_init(oldValMpz);\n");
 #ifdef MEM_CHECK
