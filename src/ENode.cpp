@@ -140,6 +140,9 @@ void ENode::inferWidth() {
       case OP_READ_MEM:
         setWidth(getChild(0)->nodePtr->parent->parent->width, getChild(0)->nodePtr->parent->parent->sign);
         break;
+      case OP_INVALID:
+        setWidth(0, false);
+        break;
       case OP_PRINTF:
       case OP_ASSERT:
       case OP_INDEX_INT:

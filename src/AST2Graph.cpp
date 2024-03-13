@@ -244,7 +244,6 @@ ASTExpTree* visitIntNoInit(graph* g, PNode* expr) {
 ASTExpTree* visitInvalid(graph* g, PNode* expr) {
   TYPE_CHECK(expr, 0, 0, P_INVALID);
   ASTExpTree* ret = new ASTExpTree(false);
-  ret->setType(expr->width, expr->sign);
   ret->setOp(OP_INVALID);
   return ret;
 }
@@ -961,7 +960,7 @@ void visitConnect(graph* g, PNode* connect) {
     for (int i = 0; i < ref->getAggrNum(); i ++) {
       if (ref->getFlip(i)) continue;
       Node* node = ref->getAggr(i)->getNode();
-      ExpTree* valTree = new ExpTree(exp->getExpRoot(), ref->getAggr(i));
+      ExpTree* valTree = new ExpTree(exp->getExpRoot()->dup(), ref->getAggr(i));
       if (node->isArray()) node->addArrayVal(valTree);
       else if (!node->valTree) node->valTree = valTree;
     }
