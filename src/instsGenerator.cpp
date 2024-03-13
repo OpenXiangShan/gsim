@@ -1850,7 +1850,7 @@ valInfo* Node:: computeArray() {
       valInfo* lindex = valTree->getlval()->compute(this, INVALID_LVALUE, false);
       lvalue = lindex->valStr;
     }
-    valInfo* info = valTree->getRoot()->compute(this, lvalue, anyExtEdge() || next.size() != 1);
+    valInfo* info = valTree->getRoot()->compute(this, lvalue, true);
     for (std::string inst : info->insts) insts.push_back(inst);
     finalConnect(lvalue, info);
   }
