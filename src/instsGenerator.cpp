@@ -215,12 +215,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     }
   }
 
-  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_MEM_MEMBER)) {
+  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID && (node->type == NODE_OTHERS)) {
     if (getChild(2)) computeInfo = Child(2, computeInfo);
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
   }
-  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_MEM_MEMBER)) {
+  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID && (node->type == NODE_OTHERS)) {
     if (getChild(1)) computeInfo = Child(1, computeInfo);
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
@@ -234,17 +234,35 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   }
   // ret->opNum = ChildInfo(1, opNum) + ChildInfo(2, opNum) + 1;
   if (childBasic && enodeBasic) {
-    auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign) {
+    auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
       if (isStmt) return expr;
       if (expr.length() == 0) return std::string("");
-      else if (isSubArray(lvalue, node)) return format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), expr.c_str(), lvalue.c_str());
+      else if (isSubArray(lvalue, node)) {
+        if (info->splittedArray) {
+          std::string ret;
+          int num = info->end - info->beg + 1;
+          std::vector<std::string>suffix(num);
+          for (size_t i = countArrayIndex(lvalue); i < node->dimension.size(); i ++) {
+            int suffixIdx = 0;
+            for (int j = 0; j < node->dimension[i]; j ++) {
+              int suffixNum = num / node->dimension[i];
+              for (int k = 0; k < suffixNum; k ++) suffix[suffixIdx ++] += "[" + std::to_string(j) + "]";
+            }
+            num = num / node->dimension[i];
+          }
+          for (int i = info->beg; i <= info->end; i ++) ret += format("%s%s = %s;\n", lvalue.c_str(), suffix[i - info->beg].c_str(), info->splittedArray->arrayMember[i]->compute()->valStr.c_str());
+          return ret;
+        }
+        else
+          return format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), expr.c_str(), lvalue.c_str());
+      }
       else if (node->width < width) return format("%s = (%s & %s);", lvalue.c_str(), expr.c_str(), bitMask(node->width).c_str());
       else if (node->sign && node->width != width) return format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), expr.c_str());
       return lvalue + " = " + expr + ";";
     };
     std::string condStr = "if (" + ChildInfo(0, valStr) + ") ";
-    std::string trueStr = "{ " + (getChild(1) ? assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign)) : "") + " }";
-    std::string falseStr = "else { " + (getChild(2) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign)) : "") + " }";
+    std::string trueStr = "{ " + ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ? assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "") + " }";
+    std::string falseStr = "else { " + ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "") + " }";
     ret->valStr = condStr + trueStr + falseStr;
     ret->opNum = -1; // assignment rather than expr
   } else if (!childBasic && !enodeBasic) { // can merge into childBasic && enodeBasic
@@ -270,8 +288,8 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       return format("mpz_set(%s, %s);", lvalue.c_str(), expr.c_str());
     };
     std::string condStr = format("if(%s)", ChildInfo(0, valStr).c_str());
-    std::string trueStr = format("{ %s }", (getChild(1) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "").c_str());
-    std::string falseStr = format("else { %s }", (getChild(2) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "").c_str());
+    std::string trueStr = format("{ %s }", ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "").c_str());
+    std::string falseStr = format("else { %s }", ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "").c_str());
     ret->valStr = condStr + trueStr + falseStr;
     ret->opNum = -1;
   } else if (!enodeBasic && childBasic) {
@@ -282,10 +300,11 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       else if (width <= 64) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
       else if (width <= BASIC_WIDTH) TODO();
       else TODO();
+      return std::string("INALID");
     };
     std::string condStr = format("if(%s)", ChildInfo(0, valStr).c_str());
-    std::string trueStr = format("{ %s }", (getChild(1) ? assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign)) : "").c_str());
-    std::string falseStr = format("else { %s }", (getChild(2) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign)) : "").c_str());
+    std::string trueStr = format("{ %s }", ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ? assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign)) : "").c_str());
+    std::string falseStr = format("else { %s }", ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign)) : "").c_str());
     ret->valStr = condStr + trueStr + falseStr;
     ret->opNum = -1;
   } else {
