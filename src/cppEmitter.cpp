@@ -302,18 +302,14 @@ void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
   fprintf(fp, "activeFlags[%d] = false;\n", node->cppId);
 }
 
-void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
-  for (Node* member : node->member) {
-    if(member->dimension.size() == 0) activateNext(fp, member, oldName(member), "");
-    else if (member->isFakeArray()) activateNext(fp, member, oldName(member), "[0]");
-    else activateUncondNext(fp, member);
-  }
+void graph::nodeDisplay(FILE* fp, SuperNode* super) {
 #ifdef EMU_LOG
-  for (Node* member : node->member) {
+  fprintf(fp, "void S%s::display%d(){\n", name.c_str(), super->cppId);
+  for (Node* member : super->member) {
     if (member->status != VALID_NODE) continue;
     fprintf(fp, "if (cycles >= %d) {\n", LOG_START);
     if (member->dimension.size() != 0) {
-      fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" ;\n", node->cppId, member->name.c_str());
+      fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" ;\n", super->cppId, member->name.c_str());
       std::string idxStr, bracket;
       for (size_t i = 0; i < member->dimension.size(); i ++) {
         fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, member->dimension[i], i);
@@ -330,50 +326,47 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
       fprintf(fp, "\n%s", bracket.c_str());
       fprintf(fp, "std::cout << std::endl;\n");
     } else if (member->width > 128) {
-      fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\";\n", node->cppId, member->name.c_str());
-      if (member->needActivate()) {
-        fprintf(fp, "mpz_out_str(stdout, 16, oldValMpz);\nstd::cout << \" -> \";\n");
-      }
+      fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\";\n", super->cppId, member->name.c_str());
       fprintf(fp, "mpz_out_str(stdout, 16, %s);\n", member->name.c_str());
       fprintf(fp, "std::cout << std::endl;\n");
     } else if (member->width > 64 && member->width <= 128) {
       if (member->needActivate()) // display old value and new value
-        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s  << \
+        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex <<  \
                     \" -> \" << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s << std::endl;\n",
-                node->cppId, member->name.c_str(), oldName(member).c_str(), oldName(member).c_str(), member->name.c_str(), member->name.c_str());
+                super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
       else if (member->type != NODE_SPECIAL) {
         fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s << std::endl;\n",
-            node->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
+            super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
       }
     } else {
       if (member->needActivate()) // display old value and new value
-        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << +%s << \" -> \" << +%s << std::endl;\n", node->cppId, member->name.c_str(), oldName(member).c_str(), member->name.c_str());
+        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << +%s << std::endl;\n", super->cppId, member->name.c_str(), member->name.c_str());
       else if (member->type != NODE_SPECIAL) {
-        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << +%s << std::endl;\n", node->cppId, member->name.c_str(), member->name.c_str());
+        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << +%s << std::endl;\n", super->cppId, member->name.c_str(), member->name.c_str());
       }
     }
     fprintf(fp, "}\n");
   }
+  fprintf(fp, "}\n");
+#endif
+}
+
+void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
+  for (Node* member : node->member) {
+    if(member->dimension.size() == 0) activateNext(fp, member, oldName(member), "");
+    else if (member->isFakeArray()) activateNext(fp, member, oldName(member), "[0]");
+    else activateUncondNext(fp, member);
+  }
+#ifdef EMU_LOG
+  fprintf(fp, "display%d();\n", node->cppId);
 #endif
 
   fprintf(fp, "}\n");
+  nodeDisplay(fp, node);
 }
 
-void graph::genStep(FILE* fp) {
-  fprintf(fp, "void S%s::step() {\n", name.c_str());
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      if (member->type == NODE_REG_DST && !member->isArray() && member->status == VALID_NODE) {
-        if (member->width > BASIC_WIDTH)
-          fprintf(fp, "mpz_set(%s%s, %s);\n", member->getSrc()->name.c_str(), "$prev", member->name.c_str());
-        else
-          fprintf(fp, "%s%s = %s;\n", member->getSrc()->name.c_str(), "$prev", member->name.c_str());
-      }
-    }
-  }
-#endif
-  /* readMemory */
+void graph::genMemRead(FILE* fp) {
+  fprintf(fp, "void S%s::updateMem() {\n", name.c_str());
   for (Node* mem : memory) {
     Assert(mem->rlatency <= 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
     if (mem->width > BASIC_WIDTH) {
@@ -409,12 +402,24 @@ void graph::genStep(FILE* fp) {
       }
     }
   }
-  /* TODO: may sth special for printf or printf always activate itself(or when cond is satisfied )*/
-  for (int i = 1; i < superId; i ++) {
-    fprintf(fp, "if(unlikely(activeFlags[%d])) step%d();\n", i, i);
+  fprintf(fp, "}\n");
+}
+
+void graph::genActivate(FILE* fp) {
+  int idx = 1;
+  for (int i = 0; i < subStepNum; i ++) {
+    fprintf(fp, "void S%s::subStep%d(){\n", name.c_str(), i);
+    for (int i = 1; i < 10000 && idx < superId; i ++, idx ++) {
+      fprintf(fp, "if(unlikely(activeFlags[%d])) step%d();\n", idx, idx);
+    }
+    fprintf(fp, "}\n");
   }
+}
+
+void graph::genUpdateRegister(FILE* fp) {
   /* update registers */
   /* NOTE: register may need to update itself */
+  fprintf(fp, "void S%s::updateRegister() {\n", name.c_str());
   for (Node* node : regsrc) {
     if (node->regSplit && node->status == VALID_NODE) {
       if (node->dimension.size() == 0) {
@@ -437,8 +442,13 @@ void graph::genStep(FILE* fp) {
       }
     }
   }
+  fprintf(fp, "}\n");
+}
+
+void graph::genMemWrite(FILE* fp) {
   /* update memory*/
   /* writer affects other nodes through reader, no need to activate in writer */
+  fprintf(fp, "void S%s::writeMem(){\n", name.c_str());
   for (Node* mem : memory) {
     std::set<SuperNode*> readerL0;
     if (mem->rlatency == 0) {
@@ -492,6 +502,33 @@ void graph::genStep(FILE* fp) {
       }
     }
   }
+  fprintf(fp, "}\n");
+}
+
+void graph::genStep(FILE* fp) {
+  fprintf(fp, "void S%s::step() {\n", name.c_str());
+#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->type == NODE_REG_DST && !member->isArray() && member->status == VALID_NODE) {
+        if (member->width > BASIC_WIDTH)
+          fprintf(fp, "mpz_set(%s%s, %s);\n", member->getSrc()->name.c_str(), "$prev", member->name.c_str());
+        else
+          fprintf(fp, "%s%s = %s;\n", member->getSrc()->name.c_str(), "$prev", member->name.c_str());
+      }
+    }
+  }
+#endif
+  /* readMemory */
+  fprintf(fp, "updateMem();\n");
+
+  for (int i = 0; i < subStepNum; i ++) {
+    fprintf(fp, "subStep%d();\n", i);
+  }
+
+  fprintf(fp, "updateRegister();\n");
+  /* update memory*/
+  fprintf(fp, "writeMem();\n");
 
   fprintf(fp, "cycles ++;\n");
   fprintf(fp, "}\n");
@@ -509,6 +546,7 @@ void graph::cppEmitter() {
   for (SuperNode* super : sortedSuper) {
     if (!super->instsEmpty()) super->cppId = superId ++;
   }
+  subStepNum = (superId + 9999) / 10000;
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == VALID_NODE)
@@ -541,7 +579,23 @@ void graph::cppEmitter() {
   for (Node* node : output) genInterfaceOutput(header, node);
   /* declare step functions */
   declStep(header);
+#ifdef EMU_LOG
+  for (SuperNode* super : sortedSuper) {
+    if (super->cppId <= 0) continue;
+    fprintf(header, "void display%d();\n", super->cppId);
+  }
+#endif
+  for (int i = 0; i < subStepNum; i ++) {
+    fprintf(header, "void subStep%d();\n", i);
+  }
+  fprintf(header, "void updateMem();\n");
+  fprintf(header, "void updateRegister();\n");
+  fprintf(header, "void writeMem();\n");
   /* main evaluation loop (step)*/
+  genMemRead(src);
+  genActivate(src);
+  genUpdateRegister(src);
+  genMemWrite(src);
   genStep(src);
   
   genHeaderEnd(header);

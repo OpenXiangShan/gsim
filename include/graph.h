@@ -18,6 +18,12 @@ class graph {
   void genNodeStepStart(FILE* fp, SuperNode* node);
   void genNodeStepEnd(FILE* fp, SuperNode* node);
   void genNodeInit(FILE* fp, Node* node);
+  void genMemInit(FILE* fp, Node* node);
+  void nodeDisplay(FILE* fp, SuperNode* super);
+  void genMemRead(FILE* fp);
+  void genActivate(FILE* fp);
+  void genUpdateRegister(FILE* fp);
+  void genMemWrite(FILE* fp);
   void reconnectSuper();
   void updateSuper();
   /* defined in mergeNodes */
@@ -39,6 +45,7 @@ class graph {
   std::string name;
   int maxTmp = 0;
   int nodeNum = 0;
+  int subStepNum = -1;
   void addReg(Node* reg) {
     regsrc.push_back(reg);
   }
