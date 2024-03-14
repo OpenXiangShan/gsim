@@ -47,7 +47,7 @@ static void inline declStep(FILE* fp) {
 }
 
 void graph::genMemInit(FILE* fp, Node* node) {
-  if (node->width < BASIC_WIDTH) return;
+  if (node->width <= BASIC_WIDTH) return;
   std::string idxStr, bracket;
   fprintf(fp, "for (int i = 0; i < %d; i ++) {\n", upperPower2(node->depth));
   for (size_t i = 0; i < node->dimension.size(); i ++) {
