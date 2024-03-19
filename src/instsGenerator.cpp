@@ -232,7 +232,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   for (ENode* childNode : child) {
     if (childNode) ret->mergeInsts(childNode->computeInfo);
   }
-  // ret->opNum = ChildInfo(1, opNum) + ChildInfo(2, opNum) + 1;
+  std::string condStr, trueStr, falseStr;
   if (childBasic && enodeBasic) {
     auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
       if (isStmt) return expr;
@@ -260,11 +260,11 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       else if (node->sign && node->width != width) return format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), expr.c_str());
       return lvalue + " = " + expr + ";";
     };
-    std::string condStr = "if (" + ChildInfo(0, valStr) + ") ";
-    std::string trueStr = "{ " + ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ? assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "") + " }";
-    std::string falseStr = "else { " + ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "") + " }";
-    ret->valStr = condStr + trueStr + falseStr;
-    ret->opNum = -1; // assignment rather than expr
+    condStr = ChildInfo(0, valStr);
+    trueStr = ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ?
+                  assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "");
+    falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "");
+
   } else if (!childBasic && !enodeBasic) { // can merge into childBasic && enodeBasic
     auto assignmentMpz = [lvalue, node, ret](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
       if (isStmt) return expr;
@@ -287,11 +287,9 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       else if (width <= BASIC_WIDTH) return set128(lvalue, info, ret);
       return format("mpz_set(%s, %s);", lvalue.c_str(), expr.c_str());
     };
-    std::string condStr = format("if(%s)", ChildInfo(0, valStr).c_str());
-    std::string trueStr = format("{ %s }", ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "").c_str());
-    std::string falseStr = format("else { %s }", ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "").c_str());
-    ret->valStr = condStr + trueStr + falseStr;
-    ret->opNum = -1;
+    condStr = ChildInfo(0, valStr).c_str();
+    trueStr = ((getChild(1) && ChildInfo(1, status) != VAL_INVALID ) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "");
+    falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "");
   } else if (!enodeBasic && childBasic) {
     auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign) {
       if (isStmt) return expr;
@@ -302,14 +300,15 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       else TODO();
       return std::string("INALID");
     };
-    std::string condStr = format("if(%s)", ChildInfo(0, valStr).c_str());
-    std::string trueStr = format("{ %s }", ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ? assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign)) : "").c_str());
-    std::string falseStr = format("else { %s }", ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign)) : "").c_str());
-    ret->valStr = condStr + trueStr + falseStr;
-    ret->opNum = -1;
+    condStr = ChildInfo(0, valStr).c_str();
+    trueStr = ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ? assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign)) : "");
+    falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign)) : "");
+
   } else {
     TODO();
   }
+  ret->valStr = format("if(%s) { %s } else { %s }", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
+  ret->opNum = -1;
   return ret;
 }
 
