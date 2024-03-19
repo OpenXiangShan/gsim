@@ -49,7 +49,7 @@ static std::map<OPType, const char*> OP2Name = {
   {OP_NOT, "not"}, {OP_ANDR, "andr"}, {OP_ORR, "orr"}, {OP_XORR, "xorr"}, {OP_PAD, "pad"}, {OP_SHL, "shl"},
   {OP_SHR, "shr"}, {OP_HEAD, "head"}, {OP_TAIL, "tail"}, {OP_BITS, "bits"}, {OP_INDEX_INT, "index_int"},
   {OP_INDEX, "index"}, {OP_WHEN, "when"}, {OP_PRINTF, "printf"}, {OP_ASSERT, "assert"}, {OP_INT, "int"},
-  {OP_READ_MEM, "readMem"},
+  {OP_READ_MEM, "readMem"}, {OP_RESET, "reset"},
 };
 
 void ExpTree::display() {
@@ -91,11 +91,15 @@ void SuperNode::display() {
 }
 
 void Node::display() {
-  printf("node %s[width %d sign %d]:\n", name.c_str(), width, sign);
+  printf("node %s[width %d sign %d status %d type %d]:\n", name.c_str(), width, sign, status, type);
   if (valTree) valTree->display();
   for (size_t i = 0; i < arrayVal.size(); i ++) {
     if (!arrayVal[i]) continue;
     printf("[array] %ld\n", i);
     arrayVal[i]->display();
+  }
+  if (updateTree) {
+    printf("[updateTree]:\n");
+    updateTree->display();
   }
 }
