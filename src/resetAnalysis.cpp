@@ -60,7 +60,7 @@ void Node::addReset() {
       getDst()->valTree->setRoot(regTop);
     } else {
       regTop->addChild(nullptr);
-      getDst()->valTree = new ExpTree(regTop, this);
+      getDst()->valTree = new ExpTree(regTop, this->getDst());
     }
     for (ExpTree* tree : getDst()->arrayVal) {
       ENode* arrayWhenTop = new ENode(OP_WHEN);
@@ -81,7 +81,7 @@ void Node::addReset() {
     } else {
       valTree = new ExpTree(regTop, this);
     }
-    // if (getDst()->valTree) fillEmptyWhen(getDst()->valTree, new ENode(this));
+    if (getDst()->valTree) fillEmptyWhen(getDst()->valTree, new ENode(this));
   } else {
     Panic();
   }

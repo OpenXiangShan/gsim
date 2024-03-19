@@ -543,7 +543,6 @@ void visitRegDef(graph* g, PNode* reg) {
     addSignal(dst->name, dst);
     src->bindReg(dst);
     src->clock = dst->clock = clockNode;
-    src->valTree = new ExpTree(new ENode(src), src);
   }
   // only src dummy nodes are in allDummy
   for (AggrParentNode* dummy : info->aggrParent) addDummy(dummy->name, dummy);
