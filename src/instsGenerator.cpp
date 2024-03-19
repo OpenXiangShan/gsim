@@ -60,7 +60,7 @@ static std::string bitMask(int width) {
 static std::string setMpz(std::string dstName, ENode* enode, valInfo* dstInfo, Node* node) {
   std::string ret;
   if (enode->computeInfo->status == VAL_CONSTANT) {
-    if (mpz_cmp_ui(enode->computeInfo->consVal, MAX_U64) > 0) TODO();
+    if (mpz_cmp_ui(enode->computeInfo->consVal, MAX_U64) > 0) ret = format("mpz_set_str(%s, \"%s\", 16);", dstName.c_str(), mpz_get_str(NULL, 16, enode->computeInfo->consVal));
     else ret = format("mpz_set_ui(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
   } else if (isSubArray(dstName, node)) {
     std::string idxStr, bracket;
