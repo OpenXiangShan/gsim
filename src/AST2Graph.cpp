@@ -157,17 +157,23 @@ type_ground: Clock    { $$ = new PNode(P_Clock, synlineno()); }
 update width/sign/dimension/aggrtype
 */
 TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType) {
-  TYPE_CHECK(ptype, 0, INT32_MAX, P_AG_FIELDS, P_AG_TYPE, P_Clock, P_INT_TYPE);
+  TYPE_CHECK(ptype, 0, INT32_MAX, P_AG_FIELDS, P_AG_TYPE, P_Clock, P_INT_TYPE, P_ASYRESET);
   TypeInfo* info = NULL;
   switch (ptype->type) {
     case P_Clock:
       info = new TypeInfo();
       info->set_sign(false); info->set_width(1);
-      info->set_clock(true);
+      info->set_clock(true); info->set_reset(UINTRESET);
       break;
     case P_INT_TYPE:
       info = new TypeInfo();
       info->set_sign(ptype->sign); info->set_width(ptype->width);
+      info->set_reset(UINTRESET);
+      break;
+    case P_ASYRESET:
+      info = new TypeInfo();
+      info->set_sign(false); info->set_width(1);
+      info->set_reset(ASYRESET);
       break;
     case P_AG_FIELDS:
       info = visitFields(g, ptype, parentType);
@@ -537,6 +543,7 @@ void visitRegDef(graph* g, PNode* reg) {
     addSignal(dst->name, dst);
     src->bindReg(dst);
     src->clock = dst->clock = clockNode;
+    src->valTree = new ExpTree(new ENode(src), src);
   }
   // only src dummy nodes are in allDummy
   for (AggrParentNode* dummy : info->aggrParent) addDummy(dummy->name, dummy);
@@ -1401,9 +1408,9 @@ void visitTopModule(graph* g, PNode* topModule) {
 void updatePrevNext(Node* n) {
   switch (n->type) {
     case NODE_INP:
-    case NODE_REG_SRC:
       Assert(!n->valTree || n->valTree->isInvalid(), "valTree of %s should be empty", n->name.c_str());
       break;
+    case NODE_REG_SRC:
     case NODE_REG_DST:
     case NODE_SPECIAL:
     case NODE_OUT:
@@ -1443,7 +1450,6 @@ graph* AST2Graph(PNode* root) {
   visitTopModule(g, topModule);
 
   for (Node* reg : g->regsrc) {
-    reg->addReset();
     /* set lvalue to regDst */
     if (reg->getSrc()->valTree && reg->getSrc()->valTree->getlval()) {
       Assert(reg->getSrc()->valTree->getlval()->nodePtr, "lvalue in %s is not node", reg->name.c_str());
@@ -1458,6 +1464,8 @@ graph* AST2Graph(PNode* root) {
     }
     reg->getDst()->arrayVal.insert(reg->getDst()->arrayVal.end(), reg->arrayVal.begin(), reg->arrayVal.end());
     reg->arrayVal.clear();
+    reg->addReset();
+    reg->addUpdateTree();
   }
 
   for (Node* memory : g->memory) {
@@ -1467,7 +1475,7 @@ graph* AST2Graph(PNode* root) {
       if (port->type == NODE_READWRITER) TODO();
       ENode* enode = new ENode(OP_READ_MEM);
       enode->addChild(new ENode(port->get_member(READER_ADDR)));
-      port->get_member(READER_DATA)->valTree = new ExpTree(enode);
+      port->get_member(READER_DATA)->valTree = new ExpTree(enode, port->get_member(READER_DATA));
     }
   }
 
@@ -1484,7 +1492,8 @@ graph* AST2Graph(PNode* root) {
   }
   /* find all sources: regsrc, memory rdata, input, constant node */
   for (Node* reg : g->regsrc) {
-    g->supersrc.insert(reg->super);
+    if (reg->prev.size() == 0)
+      g->supersrc.insert(reg->super);
   }
   for (Node* memory : g->memory) {
     if (memory->rlatency >= 1) {

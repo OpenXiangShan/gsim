@@ -143,6 +143,9 @@ void ENode::inferWidth() {
       case OP_INVALID:
         setWidth(0, false);
         break;
+      case OP_RESET:
+        setWidth(1, false);
+        break;
       case OP_PRINTF:
       case OP_ASSERT:
       case OP_INDEX_INT:
@@ -209,6 +212,7 @@ ENode* ENode::dup() {
   ret->sign = sign;
   ret->width = width;
   ret->values.insert(ret->values.end(), values.begin(), values.end());
+  /* TODO : check isClock */
   for (ENode* childNode : child) {
     ret->addChild(childNode->dup());
   }

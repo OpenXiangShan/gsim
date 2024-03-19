@@ -29,13 +29,14 @@ enum WriterMember { WRITER_ADDR = 0, WRITER_EN, WRITER_CLK, WRITER_DATA, WRITER_
 enum ReadWriterMember { READWRITER_ADDR = 0, READWRITER_EN, READWRITER_CLK,
                       READWRITER_RDATA, READWRITER_WDATA, READWRITER_WMASK,
                       READWRITER_WMODE, READWRITER_MEMBER_NUM};
-
+enum ResetType { UNCERTAIN, ASYRESET, UINTRESET, ZERO_RESET };
 
 class TypeInfo {
 public:
   int width;
   bool sign;
   bool clock = false;
+  ResetType reset = UNCERTAIN;
   std::vector<int> dimension;
   std::vector<std::pair<Node*, bool>> aggrMember; // all members, if not empty, all other infos above are invalid
   std::vector<AggrParentNode*> aggrParent; // the later the outer
@@ -45,6 +46,8 @@ public:
   void set_sign(bool _sign) { sign = _sign; }
   void set_clock(bool is_clock) { clock = is_clock; }
   bool isClock() { return clock; }
+  void set_reset(ResetType type) { reset = type; }
+  ResetType getReset() { return reset; }
   void mergeInto(TypeInfo* info);
   bool isAggr() { return aggrParent.size() != 0; }
   void addDim(int num);
@@ -114,6 +117,7 @@ class Node {
   Node* parent = nullptr;
 /* used for registers */
   Node* regNext = nullptr;
+  ExpTree* updateTree = nullptr;
   bool regSplit = true;
 /* used for instGerator */
   valInfo* computeInfo = nullptr;
@@ -123,12 +127,14 @@ class Node {
 /* used for reg & memory */
   Node* clock;
   bool isClock = false;
+  ResetType reset = UNCERTAIN;
 /* used for visitWhen in AST2Graph */
 
   int whenDepth = 0;
 
 /* used in cppEmitter */
   std::set<int> nextActiveId;
+  std::set<int> regActivate;
 
   std::vector<std::string> insts;
   void set_id(int _id) {
@@ -198,6 +204,7 @@ class Node {
   void updateConnect();
   void inferWidth();
   void addReset();
+  void addUpdateTree();
   void constructSuperNode(); // alloc superNode for every node
   void constructSuperConnect(); // connect superNode
   valInfo* compute(); // compute node
@@ -209,11 +216,13 @@ class Node {
   ENode* isAlias();
   bool anyExtEdge();
   bool needActivate();
+  bool regNeedActivate();
   void updateActivate();
   void removeConnection();
   void allocArrayVal();
   Node* clockAlias();
   clockVal* clockCompute();
+  ResetType inferReset();
   void setConstantZero(int width);
   bool isFakeArray() { return dimension.size() == 1 && dimension[0] == 1; }
   void display();

@@ -49,7 +49,7 @@ int p_stoi(const char* str);
 %token <strVal> INT String
 %token DoubleLeft "<<"
 %token DoubleRight ">>"
-%token <typeGround> Clock Reset IntType anaType FixedType
+%token <typeGround> Clock Reset IntType anaType FixedType AsyReset
 /* %token <intVal> IntVal */
 
 %token <typeOP> E2OP E1OP E1I1OP E1I2OP  
@@ -111,6 +111,7 @@ binary_point:
     ;
 type_ground: Clock    { $$ = new PNode(P_Clock, synlineno()); }
     | Reset    { $$ = new PNode(P_INT_TYPE, synlineno()); $$->setWidth(1); $$->setSign(0);}
+    | AsyReset    { $$ = new PNode(P_ASYRESET, synlineno()); $$->setWidth(1); $$->setSign(0);}
     | IntType width   { $$ = newNode(P_INT_TYPE, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); }
     | anaType width   { TODO(); }
     | FixedType width binary_point  { TODO(); }

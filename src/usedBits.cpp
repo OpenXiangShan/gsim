@@ -81,6 +81,10 @@ void ENode::passWidthToChild() {
     case OP_READ_MEM:
       childBits.push_back(Child(0, width));
       break;
+    case OP_RESET:
+      childBits.push_back(1);
+      childBits.push_back(usedBit);
+      break;
     default:
       printf("invalid op %d\n", opType);
       Panic();
@@ -112,6 +116,14 @@ void Node::passWidthToPrev() {
       tree->getlval()->usedBit = tree->getlval()->width;
       tree->getlval()->passWidthToChild();
     }
+  }
+  if (resetVal) {
+    resetVal->getRoot()->usedBit = usedBit;
+    resetVal->getRoot()->passWidthToChild();
+  }
+  if (updateTree) {
+    updateTree->getRoot()->usedBit = usedBit;
+    updateTree->getRoot()->passWidthToChild();
   }
   if (!valTree) return;
   Assert(usedBit >= 0, "invalid usedBit %d in node %s", usedBit, name.c_str());
@@ -164,6 +176,8 @@ void graph::usedBits() {
     node->width = node->usedBit;
     if (node->valTree) node->valTree->getRoot()->updateWidth();
     for (ExpTree* tree : node->arrayVal) tree->getRoot()->updateWidth();
+    if (node->resetVal) node->resetVal->getRoot()->updateWidth();
+    if (node->updateTree) node->updateTree->getRoot()->updateWidth();
   }
 
 }

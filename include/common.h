@@ -17,6 +17,7 @@
 #include <string.h>
 #include <algorithm>
 #include <set>
+#include <map>
 #include <gmp.h>
 #include <cstdarg>
 

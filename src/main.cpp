@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
 
   g->mergeNodes();
 
-  g->mergeRegister();
+  // g->mergeRegister();
 
   g->instsGenerator();
   

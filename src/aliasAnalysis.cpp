@@ -4,6 +4,7 @@
 
 #include "common.h"
 #include <stack>
+#include <map>
 
 /* TODO: array alias */
 /* TODO: A = B[idx] */
@@ -27,7 +28,7 @@ ENode* Node::isAlias() {
 
 ENode* ENode::mergeSubTree(ENode* newSubTree) {
   ENode* ret = newSubTree->dup();
-  for (ENode* childENode : child) ret->addChild(childENode);
+  for (ENode* childENode : child) ret->addChild(childENode->dup());
   return ret;
 }
 
@@ -75,6 +76,30 @@ Node* ENode::getLeafNode(std::set<Node*>& s) {
   return node;
 }
 
+void ExpTree::replaceUpdateTree(std::map<Node*, ENode*>& aliasMap) {
+  std::stack<ENode*> s;
+
+  if(aliasMap.find(getRoot()->getNode()) != aliasMap.end()) {
+    setRoot(getRoot()->mergeSubTree(aliasMap[getRoot()->getNode()]));
+  } else {
+    s.push(getRoot());
+  }
+  if (getlval()) s.push(getlval());
+
+  while (!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    for (int i = 0; i < top->getChildNum(); i ++) {
+      if (!top->getChild(i)) continue;
+      if (aliasMap.find(top->getChild(i)->getNode()) != aliasMap.end()) {
+        ENode* newChild = top->getChild(i)->mergeSubTree(aliasMap[top->getChild(i)->getNode()]);
+        newChild->width = top->getChild(i)->width;
+        top->setChild(i, newChild);
+      }
+      s.push(top->getChild(i));
+    }
+  }
+}
 /*
 A -> |         | -> E
      | C  -> D |
@@ -86,7 +111,7 @@ void graph::aliasAnalysis() {
   size_t totalNodes = 0;
   size_t aliasNum = 0;
   size_t totalSuper = sortedSuper.size();
-
+  std::map<Node*, ENode*> aliasMap;
   for (SuperNode* super : sortedSuper) {
     totalNodes += super->member.size();
     for (Node* member : super->member) {
@@ -116,8 +141,15 @@ void graph::aliasAnalysis() {
             tree->replace(member, enode);
         }
         if (next->valTree) next->valTree->replace(member, enode);
+        if ((next->type == NODE_REG_DST || next->type == NODE_REG_SRC) && next->getSrc()->updateTree) next->getSrc()->updateTree->replace(member, enode);
       }
       member->status = DEAD_NODE;
+      aliasMap[member] = enode;
+    }
+  }
+  for (Node* reg : regsrc) {
+    if (reg->updateTree) {
+      reg->updateTree->replaceUpdateTree(aliasMap);
     }
   }
 

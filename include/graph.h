@@ -24,8 +24,11 @@ class graph {
   void genActivate(FILE* fp);
   void genUpdateRegister(FILE* fp);
   void genMemWrite(FILE* fp);
+  void saveDiffRegs(FILE* fp);
+  std::string saveOldVal(FILE* fp, Node* node);
   void reconnectSuper();
   void updateSuper();
+  void resetAnalysis();
   /* defined in mergeNodes */
   void mergeOut1();
   void mergeIn1();

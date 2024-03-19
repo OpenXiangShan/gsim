@@ -50,6 +50,7 @@ void Node::inferWidth() {
   if (valTree) {
     valTree->getRoot()->inferWidth();
   }
+  if (resetVal) resetVal->getRoot()->inferWidth();
   if (width == -1) {
     if (valTree) {
       setType(valTree->getRoot()->width, valTree->getRoot()->sign);
@@ -135,6 +136,7 @@ void Node::updateInfo(TypeInfo* info) {
   sign = info->sign;
   dimension.insert(dimension.end(), info->dimension.begin(), info->dimension.end());
   if (info->isClock()) isClock = true;
+  reset = info->getReset();
 }
 
 Node* Node::dup(NodeType _type, std::string _name) {
@@ -143,6 +145,7 @@ Node* Node::dup(NodeType _type, std::string _name) {
   duplicate->width = width;
   duplicate->sign = sign;
   duplicate->isClock = isClock;
+  duplicate->reset = reset;
   for (int dim : dimension) duplicate->dimension.push_back(dim);
 
   return duplicate;
@@ -178,27 +181,21 @@ void TypeInfo::flip() {
   for (size_t i = 0; i < aggrMember.size(); i ++) aggrMember[i].second = !aggrMember[i].second;
 }
 
-void Node::addReset() {
-  Assert(type == NODE_REG_SRC, "%s(%d) is not regsrc", name.c_str(), type);
-  ENode* regTop = new ENode(OP_WHEN);
-
-  regTop->addChild(resetCond->getRoot());
-  regTop->addChild(resetVal->getRoot());
-  if (valTree) {
-    regTop->addChild(valTree->getRoot());
-    valTree->setRoot(regTop);
+void Node::addUpdateTree() {
+  ENode* dstENode = new ENode(getDst());
+  dstENode->width = width;
+  if (resetCond->getRoot()->reset == UINTRESET || resetCond->getRoot()->reset == ZERO_RESET) {
+    updateTree = new ExpTree(dstENode, this);
+  } else if (resetCond->getRoot()->reset == ASYRESET) {
+    ENode* whenNode = new ENode(OP_WHEN);
+    whenNode->addChild(resetCond->getRoot());
+    whenNode->addChild(nullptr);
+    whenNode->addChild(dstENode);
+    updateTree = new ExpTree(whenNode, this);
   } else {
-    regTop->addChild(nullptr);
-    valTree = new ExpTree(regTop);
+    Panic();
   }
-  for (ExpTree* tree : arrayVal) {
-    if (!tree) continue;
-    ENode* arrayWhenTop = new ENode(OP_WHEN);
-    arrayWhenTop->addChild(resetCond->getRoot());
-    arrayWhenTop->addChild(nullptr);
-    arrayWhenTop->addChild(tree->getRoot());
-    tree->setRoot(arrayWhenTop);
-  }
+
 }
 
 bool Node::anyExtEdge() {
@@ -214,6 +211,9 @@ bool Node::needActivate() {
   return nextActiveId.size() != 0;
 }
 
+bool Node::regNeedActivate() {
+  return regActivate.size() != 0;
+}
 
 void Node::updateActivate() {
   for (Node* nextNode : next) {
@@ -224,6 +224,13 @@ void Node::updateActivate() {
       if (super->cppId != -1)
         nextActiveId.insert(super->cppId);
     }
+    if (nextNode->super->cppId != -1) regActivate.insert(nextNode->super->cppId);
+  }
+  if (type == NODE_REG_DST && getSrc()->status == VALID_NODE && getSrc()->super->cppId != -1) {
+    regActivate.insert(getSrc()->super->cppId);
+  }
+  if (type == NODE_REG_DST) {
+    regActivate.insert(getSrc()->nextActiveId.begin(), getSrc()->nextActiveId.end());
   }
 }
 

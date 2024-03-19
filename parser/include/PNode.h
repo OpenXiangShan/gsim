@@ -53,6 +53,7 @@ enum PNodeType{
   P_AG_TYPE,
   P_AG_FIELDS,
   P_Clock,
+  P_ASYRESET,
   P_INT_TYPE,
   P_EXPR_INT_NOINIT,
   P_EXPR_INT_INIT,

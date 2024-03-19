@@ -1564,6 +1564,52 @@ valInfo* ENode::instsAssert() {
   return ret;
 }
 
+valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
+  Assert(node->type == NODE_REG_SRC, "node %s is not reg_src\n", node->name.c_str());
+  Assert(node->resetVal, "empty reset val in node %s", node->name.c_str());
+
+  if (ChildInfo(0, status) == VAL_CONSTANT) {
+    if (mpz_sgn(ChildInfo(0, consVal)) == 0) {
+      computeInfo->status = VAL_EMPTY_SRC;
+      return computeInfo;
+    } else {
+      computeInfo = Child(1, computeInfo); //node->resetVal->getRoot()->compute(node, node->name, isRoot);
+    }
+    return computeInfo;
+  }
+
+  valInfo* resetVal = Child(1, computeInfo);//node->resetVal->getRoot()->compute(node, node->name, isRoot);
+  std::string ret;
+  if (node->isArray()) {
+    if (node->width > BASIC_WIDTH) {
+      std::string idxStr, bracket;
+      for (size_t i = 0; i < node->dimension.size(); i ++) {
+        ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
+        idxStr += "[i" + std::to_string(i) + "]";
+        bracket += "}\n";
+      }
+      ret += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), resetVal->valStr.c_str(), idxStr.c_str());
+      ret += bracket;
+    } else {
+      ret = format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), resetVal->valStr.c_str(), lvalue.c_str());
+    }
+  } else {
+    if (node->width > BASIC_WIDTH) {
+      if (resetVal->status == VAL_CONSTANT) {
+        if (mpz_cmp_ui(resetVal->consVal, MAX_U64) > 0) TODO();
+        ret = format("mpz_set_ui(%s, %s);", lvalue.c_str(), resetVal->valStr.c_str());
+      } else {
+        ret = format("mpz_set(%s, %s);", lvalue.c_str(), resetVal->valStr.c_str());
+      }
+    } else {
+      ret = format("%s = %s;", lvalue.c_str(), resetVal->valStr.c_str());
+    }
+  }
+  computeInfo->valStr = format("if(%s) { %s }", ChildInfo(0, valStr).c_str(), ret.c_str());
+  computeInfo->opNum = -1;
+  return computeInfo;
+}
+
 /* compute enode */
 valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
   if (computeInfo) return computeInfo;
@@ -1702,6 +1748,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     case OP_INT: instsInt(n, lvalue, isRoot); break;
     case OP_READ_MEM: instsReadMem(n, lvalue, isRoot); break;
     case OP_INVALID: instsInvalid(n, lvalue, isRoot); break;
+    case OP_RESET: instsReset(n, lvalue, isRoot); break;
     case OP_PRINTF: instsPrintf(); break;
     case OP_ASSERT: instsAssert(); break;
     default:
@@ -1737,20 +1784,25 @@ valInfo* Node::compute() {
   bool isRoot = anyExtEdge() || next.size() != 1;
   valInfo* ret = valTree->getRoot()->compute(this, name, isRoot)->dup();
   if (ret->status == VAL_INVALID) ret->setConstantByStr("0");
+  if (ret->status == VAL_EMPTY_SRC) status = DEAD_SRC;
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
     if (type == NODE_REG_DST) {
-      getSrc()->status = CONSTANT_NODE;
-      getSrc()->computeInfo = ret;
-      /* re-compute nodes depend on src */
-      for (Node* next : (regSplit ? getSrc() : this)->next) {
-        if (next->computeInfo)
-          next->recompute();
+      if (getSrc()->status == DEAD_SRC || !getSrc()->valTree || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, getSrc()->computeInfo->consVal) == 0)) {
+        getSrc()->status = CONSTANT_NODE;
+        getSrc()->computeInfo = ret;
+        /* re-compute nodes depend on src */
+        for (Node* next : (regSplit ? getSrc() : this)->next) {
+          if (next->computeInfo) {
+            next->recompute();
+          }
+        }
       }
     }
   } else if (isRoot || ret->opNum < 0){
     ret->valStr = name;
     ret->opNum = 0;
+    ret->status = VAL_VALID;
   } else {
     if (ret->width > width) ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
     ret->valStr = upperCast(width, ret->width, sign) + ret->valStr;
@@ -1885,6 +1937,16 @@ void graph::instsGenerator() {
       }
     }
     maxTmp = MAX(maxTmp, mpzTmpNum);
+  }
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->updateTree) member->updateTree->getRoot()->compute(member, member->name, true);
+      if (member->status == DEAD_SRC) {
+        if (member->type != NODE_REG_SRC) member->display();
+        Assert(member->type == NODE_REG_SRC, "%s is not reg_src %d", member->name.c_str(), member->type);
+        member->status = VALID_NODE;
+      }
+    }
   }
   /* generate assignment instrs */
   for (Node* n : s) {

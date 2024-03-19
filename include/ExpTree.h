@@ -61,6 +61,7 @@ enum OPType {
   OP_READ_MEM,
 /* special nodes for invalid node */
   OP_INVALID,
+  OP_RESET,
 };
 
 class ENode {
@@ -105,6 +106,7 @@ class ENode {
   valInfo* instsInt(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsReadMem(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsInvalid(Node* node, std::string lvalue, bool isRoot);
+  valInfo* instsReset(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsPrintf();
   valInfo* instsAssert();
   /* used in usedBits */
@@ -119,6 +121,7 @@ public:
   int width = -1;
   bool sign = false;
   bool isClock = false;
+  ResetType reset = UNCERTAIN;
   int usedBit = -1;
   // bool islvalue = false;  // true for root and L_INDEX, otherwise false
   int id; // used to distinguish different whens
@@ -174,6 +177,7 @@ public:
   Node* getLeafNode(std::set<Node*>& s);
   std::vector<int> getDim();
   clockVal* clockCompute();
+  ResetType inferReset();
   ArrayMemberList* getArrayMember(Node* node);
 };
 
@@ -221,6 +225,7 @@ public:
     void replace(Node* oldNode, ENode* newSubTree);
     /* used in mergeRegister */
     void replace(Node* oldNode, Node* newNode);
+    void replaceUpdateTree(std::map<Node*, ENode*>& aliasMap);
     void clearInfo();
     bool isInvalid() {
       Assert(getRoot(), "empty root");
