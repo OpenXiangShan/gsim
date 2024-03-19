@@ -340,7 +340,7 @@ void graph::nodeDisplay(FILE* fp, SuperNode* super) {
     if (member->status != VALID_NODE) continue;
     fprintf(fp, "if (cycles >= %d) {\n", LOG_START);
     if (member->dimension.size() != 0) {
-      fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" ;\n", super->cppId, member->name.c_str());
+      fprintf(fp, "printf(\"%%ld %d %s: \", cycles);\n", super->cppId, member->name.c_str());
       std::string idxStr, bracket;
       for (size_t i = 0; i < member->dimension.size(); i ++) {
         fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, member->dimension[i], i);
@@ -350,30 +350,28 @@ void graph::nodeDisplay(FILE* fp, SuperNode* super) {
       std::string nameIdx = member->name + idxStr;
       if (member->width > 128) {
         fprintf(fp, "mpz_out_str(stdout, 16, %s);\n", nameIdx.c_str());
-      } else if (member->width > 64)
-        fprintf(fp, "std::cout << std::hex << +(uint64_t)(%s >> 64) << +(uint64_t)(%s) << \" \";", nameIdx.c_str(), nameIdx.c_str());
-      else
-        fprintf(fp, "std::cout << std::hex << +(uint64_t)%s << \" \";", nameIdx.c_str());
+      } else if (member->width > 64) {
+        fprintf(fp, "printf(\"%%lx|%%lx \", (uint64_t)(%s >> 64), (uint64_t(%s)));", nameIdx.c_str(), nameIdx.c_str());
+      } else {
+        fprintf(fp, "printf(\"%%lx \", (uint64_t(%s)));", nameIdx.c_str());
+      }
       fprintf(fp, "\n%s", bracket.c_str());
-      fprintf(fp, "std::cout << std::endl;\n");
+      fprintf(fp, "printf(\"\\n\");\n");
     } else if (member->width > 128) {
-      fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\";\n", super->cppId, member->name.c_str());
+      fprintf(fp, "printf(\"%%ld %d %s: \", cycles);\n", super->cppId, member->name.c_str());
       fprintf(fp, "mpz_out_str(stdout, 16, %s);\n", member->name.c_str());
-      fprintf(fp, "std::cout << std::endl;\n");
+      fprintf(fp, "printf(\"\\n\");\n");
     } else if (member->width > 64 && member->width <= 128) {
-      if (member->needActivate()) // display old value and new value
-        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex <<  \
-                    \" -> \" << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s << std::endl;\n",
-                super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
-      else if (member->type != NODE_SPECIAL) {
-        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << (uint64_t)(%s >> 64) << \" \" << (uint64_t)%s << std::endl;\n",
-            super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
+      if (member->needActivate()) {// display old value and new value
+        fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t(%s)));", super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
+      } else if (member->type != NODE_SPECIAL) {
+        fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t(%s)));", super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
       }
     } else {
-      if (member->needActivate()) // display old value and new value
-        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << +%s << std::endl;\n", super->cppId, member->name.c_str(), member->name.c_str());
-      else if (member->type != NODE_SPECIAL) {
-        fprintf(fp, "std::cout << cycles << \" \" << %d << \" %s :\" << std::hex << +%s << std::endl;\n", super->cppId, member->name.c_str(), member->name.c_str());
+      if (member->needActivate()) {// display old value and new value
+        fprintf(fp, "printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t(%s)));", super->cppId, member->name.c_str(), member->name.c_str());
+      } else if (member->type != NODE_SPECIAL) {
+        fprintf(fp, "printf(\" %%ld %d %s %%lx \\n\", cycles, (uint64_t(%s)));", super->cppId, member->name.c_str(), member->name.c_str());
       }
     }
     fprintf(fp, "}\n");
