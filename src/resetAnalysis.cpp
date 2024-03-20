@@ -23,12 +23,17 @@ ResetType ENode::inferReset() {
     reset = nodePtr->inferReset(); 
     return reset;
   }
-
+  int base;
+  std::string str;
   switch (opType) {
     case OP_ASUINT:
     case OP_ASSINT:
-    case OP_INT:
       reset = UINTRESET;
+      break;
+    case OP_INT:
+      std::tie(base, str) = firStrBase(strVal);
+      if (str == "0") reset = ZERO_RESET;
+      else TODO();
       break;
     case OP_ASASYNCRESET:
       reset = ASYRESET;
@@ -41,17 +46,27 @@ ResetType ENode::inferReset() {
   return reset;
 }
 
+void fillOuterWhen(ExpTree* newTree, ENode* enode) {
+  ENode* whenNode = newTree->getRoot();
+  while (whenNode->opType == OP_WHEN) {
+    if (!whenNode->getChild(1)) whenNode->setChild(1, enode);
+    if (!whenNode->getChild(2)) whenNode->setChild(2, enode);
+    if (whenNode->getChild(1) && whenNode->getChild(2)) break;
+    else if (whenNode->getChild(1)) whenNode = whenNode->getChild(1);
+    else if (whenNode->getChild(2)) whenNode = whenNode->getChild(2);
+    else Assert(0, "emptyWhen");
+  }
+}
+
 void Node::addReset() {
   Assert(type == NODE_REG_SRC, "%s(%d) is not regsrc", name.c_str(), type);
 
   ResetType resetType = resetCond->getRoot()->inferReset();
   Assert(resetType != UNCERTAIN, "reset %s is uncertain", name.c_str());
 
-  // if (resetType == ZERO_RESET) {
-  //   if (getDst()->valTree) fillEmptyWhen(getDst()->valTree, new ENode(OP_CONSTANT_INVALID));
-  //   for (ExpTree* tree : getDst()->arrayVal) fillEmptyWhen(tree, new ENode(OP_CONSTANT_INVALID));
-  // } else 
-  if (resetType == UINTRESET) {
+  if (resetType == ZERO_RESET) {
+    /* do nothing */
+  } else if (resetType == UINTRESET) {
     ENode* regTop = new ENode(OP_WHEN);
     regTop->addChild(resetCond->getRoot());
     regTop->addChild(resetVal->getRoot());
