@@ -1493,6 +1493,8 @@ graph* AST2Graph(PNode* root) {
   for (Node* reg : g->regsrc) {
     if (reg->prev.size() == 0)
       g->supersrc.insert(reg->super);
+    if (reg->getDst()->prev.size() == 0)
+      g->supersrc.insert(reg->getDst()->super);
   }
   for (Node* memory : g->memory) {
     if (memory->rlatency >= 1) {
