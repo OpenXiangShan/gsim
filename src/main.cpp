@@ -45,8 +45,6 @@ int main(int argc, char** argv) {
   
   inferAllWidth();
 
-  g->usedBits();
-
   g->topoSort();
 
   g->clockOptimize();
@@ -56,6 +54,8 @@ int main(int argc, char** argv) {
   g->removeDeadNodes();
 
   g->aliasAnalysis();
+
+  g->usedBits();
 
   g->mergeNodes();
 
