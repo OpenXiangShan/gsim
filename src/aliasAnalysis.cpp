@@ -14,7 +14,8 @@ ENode* Node::isAlias() {
       A <= B (if idx = dim[0], A.arrayval[idx] = B, otherwise A.arrayval[idx] = null ) (Done)
       A[i] <= B[i] for every i  (WIP)
     */
-    if (prev.size() == 1 && arrayVal.size() == 1 && arrayVal[0]->getlval()->getChildNum() == 0 && arrayVal[0]->getRoot()->getNode()) {
+    if (prev.size() == 1 && arrayVal.size() == 1 && arrayVal[0]->getlval()->getChildNum() == 0 && arrayVal[0]->getRoot()->getNode()
+        && arrayVal[0]->getRoot()->getNode()->type == NODE_OTHERS) {
       return arrayVal[0]->getRoot();
     }
     return nullptr;

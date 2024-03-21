@@ -1851,7 +1851,10 @@ void Node::finalConnect(std::string lvalue, valInfo* info) {
     insts.push_back(info->valStr);
   } else if (isSubArray(lvalue, this)) {
     if (width <= BASIC_WIDTH && info->width <= width) {
-      insts.push_back(format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), info->valStr.c_str(), lvalue.c_str()));
+      if (info->status == VAL_CONSTANT)
+        insts.push_back(format("memset(%s, %s, sizeof(%s));", lvalue.c_str(), info->valStr.c_str(), lvalue.c_str()));
+      else
+        insts.push_back(format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), info->valStr.c_str(), lvalue.c_str()));
     } else if (width < BASIC_WIDTH && info->width > width) {
       TODO();
     } else {
