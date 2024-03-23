@@ -338,7 +338,7 @@ void graph::nodeDisplay(FILE* fp, SuperNode* super) {
   fprintf(fp, "void S%s::display%d(){\n", name.c_str(), super->cppId);
   for (Node* member : super->member) {
     if (member->status != VALID_NODE) continue;
-    fprintf(fp, "if (cycles >= %d) {\n", LOG_START);
+    fprintf(fp, "if (cycles >= %d && cycles <= %d) {\n", LOG_START, LOG_END);
     if (member->dimension.size() != 0) {
       fprintf(fp, "printf(\"%%ld %d %s: \", cycles);\n", super->cppId, member->name.c_str());
       std::string idxStr, bracket;
@@ -371,7 +371,7 @@ void graph::nodeDisplay(FILE* fp, SuperNode* super) {
       if (member->needActivate()) {// display old value and new value
         fprintf(fp, "printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t(%s)));", super->cppId, member->name.c_str(), member->name.c_str());
       } else if (member->type != NODE_SPECIAL) {
-        fprintf(fp, "printf(\" %%ld %d %s %%lx \\n\", cycles, (uint64_t(%s)));", super->cppId, member->name.c_str(), member->name.c_str());
+        fprintf(fp, "printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t(%s)));", super->cppId, member->name.c_str(), member->name.c_str());
       }
     }
     fprintf(fp, "}\n");
@@ -462,9 +462,9 @@ void graph::genUpdateRegister(FILE* fp) {
           else fprintf(fp, "%s = %s;\n", node->name.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
 #ifdef EMU_LOG
           if (node->width <= 32)
-            fprintf(fp, "if (cycles >= %d)\nprintf(\"%%ld reg %s = %%x\\n\", cycles, %s);\n", LOG_START, node->name.c_str(), node->name.c_str());
+            fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%x\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), node->name.c_str());
           else if (node->width <= 64)
-            fprintf(fp, "if (cycles >= %d)\nprintf(\"%%ld reg %s = %%lx\\n\", cycles, %s);\n", LOG_START, node->name.c_str(), node->name.c_str());
+            fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%lx\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), node->name.c_str());
 #endif
         if (node->regNeedActivate()) activateNext(fp, node, node->regActivate, regold, "");
       } else {
