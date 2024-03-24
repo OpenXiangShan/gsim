@@ -1,13 +1,15 @@
 import sys
 import os
+import re
+
 class SigFilter():
   def __init__(self):
     self.srcfp = None
     self.reffp = None
     self.dstfp = None
 
-  def width(self, idx, data):
-    endIdx = idx
+  def width(self, data):
+    endIdx = len(data) - 1
     while data[endIdx] != ':':
       endIdx -= 1
     startIdx = endIdx
@@ -19,7 +21,14 @@ class SigFilter():
     self.srcfp = open(srcFile, "r")
     self.reffp = open(refFile, "r")
     self.dstfp = open(dstFile, "w")
-    ref = self.reffp.read()
+    all_sigs = {}
+    for line in self.reffp.readlines():
+      match = re.search(r'/\*[0-9]*:[0-9]*\*/ ', line)
+      if match:
+        line = line.strip(" ;\n")
+        line = line.split(" ")
+        all_sigs[line[len(line) - 1]] = self.width(line[0])
+
     self.dstfp.writelines("bool ret = false;\n")
     self.dstfp.writelines("mpz_t tmp1;\nmpz_init(tmp1);\n \
 mpz_t tmp2;\nmpz_init(tmp2);\n \
@@ -27,11 +36,10 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
     for line in self.srcfp.readlines():
       line = line.strip("\n")
       line = line.split(" ")
-      idx = ref.find("/ " + line[3] + ";")
       sign = int(line[0])
       mod_width = int(line[1])
-      if idx != -1:
-        ref_width = self.width(idx, ref)
+      if line[3] in all_sigs:
+        ref_width = all_sigs[line[3]]
         refName = "ref->rootp->" + line[3]
         modName = "mod->" + line[2]
         if mod_width > 128:
