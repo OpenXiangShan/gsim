@@ -170,6 +170,7 @@ public:
   void passWidthToChild();
   void updateWidth();
   std::pair<int, int> getIdx(Node* n);
+  bool hasVarIdx(Node* node);
   Node* getConnectNode();
   ENode* mergeSubTree(ENode* newSubTree);
   ENode* dup();

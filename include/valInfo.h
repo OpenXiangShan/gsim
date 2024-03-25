@@ -18,10 +18,14 @@ public:
   Node* splittedArray = nullptr;
   int beg = -1;
   int end = -1;
+  std::vector<valInfo*> memberInfo;
+  bool sameConstant = false;
+  mpz_t assignmentCons;
 
   valInfo() {
     mpz_init(consVal);
     mpz_init(mask);
+    mpz_init(assignmentCons);
   }
   void mergeInsts(valInfo* newInfo) {
     insts.insert(insts.end(), newInfo->insts.begin(), newInfo->insts.end());
@@ -39,6 +43,8 @@ public:
     if (valStr.length() <= 16) valStr = Cast(width, sign) + "0x" + valStr;
     else valStr = format("UINT128(0x%s, 0x%s)", valStr.substr(0, valStr.length() - 16).c_str(), valStr.substr(valStr.length()-16, 16).c_str());
     status = VAL_CONSTANT;
+    mpz_set(assignmentCons, consVal);
+    sameConstant = true;
   }
   void updateConsVal() {
     mpz_set_ui(mask, 1);
@@ -61,6 +67,10 @@ public:
     ret->sign = sign;
     ret->consLength = consLength;
     return ret;
+  }
+  valInfo* getMemberInfo(size_t idx) {
+    if (idx >= memberInfo.size()) return nullptr;
+    return memberInfo[idx];
   }
 };
 

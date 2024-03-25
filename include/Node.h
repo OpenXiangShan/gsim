@@ -226,6 +226,7 @@ class Node {
   void setConstantZero(int width);
   bool isFakeArray() { return dimension.size() == 1 && dimension[0] == 1; }
   void display();
+  int arrayEntryNum() { int num = 1; for (int idx : dimension) num *= idx; return num; }
 };
 
 class SuperNode {

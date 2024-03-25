@@ -186,6 +186,13 @@ std::pair<int, int> ENode::getIdx(Node* node) {
   }
   return std::make_pair(base * num, (base + 1) * num - 1);
 }
+
+bool ENode::hasVarIdx(Node* node) {
+  int beg, end;
+  std::tie(beg, end) = getIdx(node);
+  if (beg < 0 || beg != end) return true;
+  return false;
+}
 /*
 return right value of connected node
 * for normal nodes and array nodes that are not splitted, return themselves

@@ -253,8 +253,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
           for (int i = info->beg; i <= info->end; i ++) ret += format("%s%s = %s;\n", lvalue.c_str(), suffix[i - info->beg].c_str(), info->splittedArray->arrayMember[i]->compute()->valStr.c_str());
           return ret;
         }
-        else
-          return format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), expr.c_str(), lvalue.c_str());
+        else {
+          if (info->status == VAL_CONSTANT)
+            return format("memset(%s, %s, sizeof(%s));", lvalue.c_str(), expr.c_str(), lvalue.c_str());
+          else
+            return format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), expr.c_str(), lvalue.c_str());
+        }
       }
       else if (node->width < width) return format("%s = (%s & %s);", lvalue.c_str(), expr.c_str(), bitMask(node->width).c_str());
       else if (node->sign && node->width != width) return format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), expr.c_str());
@@ -309,6 +313,23 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   }
   ret->valStr = format("if(%s) { %s } else { %s }", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
   ret->opNum = -1;
+
+  if (!getChild(1) && getChild(2)) {
+    if (ChildInfo(2, sameConstant)) {
+      ret->sameConstant = true;
+      mpz_set(ret->assignmentCons, ChildInfo(2, assignmentCons));
+    }
+  } else if (getChild(1) && !getChild(2)) {
+    if (ChildInfo(1, sameConstant)) {
+      ret->sameConstant = true;
+      mpz_set(ret->assignmentCons, ChildInfo(1, assignmentCons));
+    }
+  } else if (getChild(1) && getChild(2)) {
+    if (ChildInfo(1, sameConstant) && ChildInfo(2, sameConstant) && (mpz_cmp(ChildInfo(1, assignmentCons), ChildInfo(2, assignmentCons)) == 0)) {
+      ret->sameConstant = true;
+      mpz_set(ret->assignmentCons, ChildInfo(1, assignmentCons));
+    }
+  }
   return ret;
 }
 
@@ -1636,6 +1657,23 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
         int idx = getArrayIndex(nodePtr);
         computeInfo = nodePtr->getArrayMember(idx)->compute()->dup();
       }
+    } else if (nodePtr->isArray()) {
+      int beg, end;
+      std::tie(beg, end) = getIdx(nodePtr);
+      if (!isSubArray(lvalue, n) && beg >= 0 && beg == end) { /* n may be an array with only one member */
+        computeInfo = nodePtr->compute()->getMemberInfo(beg);
+      }
+      if (computeInfo && computeInfo->opNum >= 0) {
+        computeInfo = computeInfo->dup();
+      } else {
+        computeInfo = nodePtr->compute()->dup();
+        if (child.size() != 0 && computeInfo->status == VAL_VALID) { // TODO: constant array representation
+          valInfo* indexInfo = computeInfo->dup();  // TODO: no need
+          computeInfo = indexInfo;
+          for (ENode* childENode : child)
+            computeInfo->valStr += childENode->computeInfo->valStr;
+        }
+      }
     } else {
       computeInfo = nodePtr->compute()->dup();
       if (child.size() != 0) {
@@ -1798,6 +1836,19 @@ valInfo* Node::compute() {
         }
       }
     }
+  } else if (type == NODE_REG_DST && ret->sameConstant && !getSrc()->valTree) {
+    display();
+    printf("%s is constant ", name.c_str()); mpz_out_str(stdout, 16, ret->assignmentCons); printf("\n");
+    ret->status = VAL_CONSTANT;
+    mpz_set(ret->consVal, ret->assignmentCons);
+    status = CONSTANT_NODE;
+    getSrc()->status = CONSTANT_NODE;
+    getSrc()->computeInfo = ret;
+    for (Node* next : (regSplit ? getSrc() : this)->next) {
+      if (next->computeInfo) {
+        next->recompute();
+      }
+    }
   } else if (isRoot || ret->opNum < 0){
     ret->valStr = name;
     ret->opNum = 0;
@@ -1831,6 +1882,7 @@ void ExpTree::clearInfo(){
 void Node::recompute() {
   if (!computeInfo) return;
   valInfo* prevVal = computeInfo;
+  std::vector<valInfo*> prevArrayVal (computeInfo->memberInfo);
   computeInfo = nullptr;
   for (ExpTree* tree : arrayVal) {
     if (tree)
@@ -1839,7 +1891,21 @@ void Node::recompute() {
   insts.clear();
   if (valTree) valTree->clearInfo();
   compute();
+  bool recomputeNext = false;
   if (prevVal->valStr != computeInfo->valStr) {
+    recomputeNext = true;
+  }
+  for (size_t i = 0; i < prevArrayVal.size(); i ++) {
+    if ((!prevArrayVal[i] && computeInfo->memberInfo[i]) || (prevArrayVal[i] && !computeInfo->memberInfo[i])) {
+      recomputeNext = true;
+      break;
+    }
+    if (prevArrayVal[i] && computeInfo->memberInfo[i] && prevArrayVal[i]->valStr != computeInfo->memberInfo[i]->valStr) {
+      recomputeNext = true;
+      break;
+    }
+  }
+  if (recomputeNext) {
     for (Node* nextNode : next) nextNode->recompute();
   }
 }
@@ -1885,7 +1951,7 @@ void Node::finalConnect(std::string lvalue, valInfo* info) {
 
 }
 
-valInfo* Node:: computeArray() {
+valInfo* Node::computeArray() {
   if (computeInfo) return computeInfo;
   if (width == 0) {
     computeInfo = new valInfo();
@@ -1897,12 +1963,17 @@ valInfo* Node:: computeArray() {
   computeInfo->valStr = name;
   computeInfo->width = width;
   computeInfo->sign = sign;
-
+  bool anyVarIdx = false;
   if (valTree) {
     std::string lvalue = name;
     if (valTree->getlval()) {
       valInfo* lindex = valTree->getlval()->compute(this, INVALID_LVALUE, false);
       lvalue = lindex->valStr;
+      std::tie(lindex->beg, lindex->end) = valTree->getlval()->getIdx(this);
+      anyVarIdx |= isSubArray(lvalue, this) || (lindex->beg < 0 || lindex->beg != lindex->end); // TODO: array with one element
+    } else {
+      display();
+      TODO();
     }
     valInfo* info = valTree->getRoot()->compute(this, lvalue, true);
     for (std::string inst : info->insts) insts.push_back(inst);
@@ -1916,9 +1987,28 @@ valInfo* Node:: computeArray() {
         valInfo* info = tree->getRoot()->compute(this, lindex->valStr, false);
         for (std::string inst : info->insts) insts.push_back(inst);
         finalConnect(lindex->valStr, info);
+        std::tie(lindex->beg, lindex->end) = tree->getlval()->getIdx(this);
+        anyVarIdx |= (lindex->beg < 0 || lindex->beg != lindex->end);
       } else {
         TODO();
       }
+  }
+  if (!anyVarIdx) {
+    int num = arrayEntryNum();
+    computeInfo->memberInfo.resize(num, nullptr);
+    if (valTree) {
+      computeInfo->memberInfo[valTree->getlval()->computeInfo->beg] = valTree->getRoot()->computeInfo;
+    }
+    std::set<int> multipleAssign;
+    for (ExpTree* tree : arrayVal) {
+      int infoIdx = tree->getlval()->computeInfo->beg;
+      if (computeInfo->memberInfo[infoIdx] || isSubArray(tree->getlval()->computeInfo->valStr, this)) {
+        multipleAssign.insert(infoIdx);
+      } else {
+        computeInfo->memberInfo[infoIdx] = tree->getRoot()->computeInfo;
+      }
+    }
+    for (int idx : multipleAssign) computeInfo->memberInfo[idx] = nullptr;
   }
   return computeInfo;
 }
