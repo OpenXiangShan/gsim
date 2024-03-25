@@ -13,7 +13,10 @@
 #ifdef DIFFTEST_PER_SIG
 FILE* sigFile = nullptr;
 #endif
-
+#ifdef EMU_LOG
+static int displayNum = 0;
+static const int nodePerDisplay = 5000;
+#endif
 static int superId = 1;
 static std::set<Node*> definedNode;
 
@@ -335,8 +338,15 @@ void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
 
 void graph::nodeDisplay(FILE* fp, SuperNode* super) {
 #ifdef EMU_LOG
-  fprintf(fp, "void S%s::display%d(){\n", name.c_str(), super->cppId);
+  int nodeNum = 0;
+  fprintf(fp, "void S%s::display%d(){\n", name.c_str(), displayNum ++);
   for (Node* member : super->member) {
+    nodeNum ++;
+    if (nodeNum == nodePerDisplay) {
+      nodeNum = 0;
+      fprintf(fp, "}\n");
+      fprintf(fp, "void S%s::display%d(){\n", name.c_str(), displayNum ++);
+    }
     if (member->status != VALID_NODE) continue;
     fprintf(fp, "if (cycles >= %d && cycles <= %d) {\n", LOG_START, LOG_END);
     if (member->dimension.size() != 0) {
@@ -388,7 +398,10 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
     else activateUncondNext(fp, member, member->nextActiveId);
   }
 #ifdef EMU_LOG
-  fprintf(fp, "display%d();\n", node->cppId);
+  int num = (node->member.size() + nodePerDisplay - 1) / nodePerDisplay;
+  for (int i = 0; i < num; i ++) {
+    fprintf(fp, "display%d();\n", displayNum + i);
+  }
 #endif
 
   fprintf(fp, "}\n");
@@ -632,9 +645,8 @@ void graph::cppEmitter() {
   /* declare step functions */
   declStep(header);
 #ifdef EMU_LOG
-  for (SuperNode* super : sortedSuper) {
-    if (super->cppId <= 0) continue;
-    fprintf(header, "void display%d();\n", super->cppId);
+  for (int i = 0; i < displayNum; i ++) {
+    fprintf(header, "void display%d();\n", i);
   }
 #endif
   for (int i = 0; i < subStepNum; i ++) {
