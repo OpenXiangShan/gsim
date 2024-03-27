@@ -1349,12 +1349,12 @@ valInfo* ENode::instsHead(Node* node, std::string lvalue, bool isRoot) {
   bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
   bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
-  int n = Child(0, width) - values[0];
-  Assert(n > 0, "child width %d is less than current width %d", Child(0, width), values[0]);
+  int n = values[0];
+  Assert(n >= 0, "child width %d is less than current width %d", Child(0, width), values[0]);
 
   if (isConstant) {
     if (sign) TODO();
-    u_head(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), values[0]);
+    u_head(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), n);
     ret->setConsStr();
   } else if (childBasic && enodeBasic) {
     if (Child(0, sign)) {
