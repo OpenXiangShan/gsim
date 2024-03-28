@@ -107,6 +107,7 @@ class Node {
   ExpTree* resetCond = nullptr;  // valid in reg_src
   ExpTree* resetVal = nullptr;   // valid in reg_src
   std::vector<ExpTree*> arrayVal;
+  std::set<int> invalidIdx;
 
   SuperNode* super = nullptr;
 /* used for memory */
@@ -227,6 +228,8 @@ class Node {
   bool isFakeArray() { return dimension.size() == 1 && dimension[0] == 1; }
   void display();
   int arrayEntryNum() { int num = 1; for (int idx : dimension) num *= idx; return num; }
+  void invalidArrayOptimize();
+  void fillArrayInvalid(ExpTree* tree);
 };
 
 class SuperNode {

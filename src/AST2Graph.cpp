@@ -967,8 +967,15 @@ void visitConnect(graph* g, PNode* connect) {
       if (ref->getFlip(i)) continue;
       Node* node = ref->getAggr(i)->getNode();
       ExpTree* valTree = new ExpTree(exp->getExpRoot()->dup(), ref->getAggr(i));
-      if (node->isArray()) node->addArrayVal(valTree);
-      else if (!node->valTree) node->valTree = valTree;
+      if (node->isArray()) {
+        node->addArrayVal(valTree);
+        if (exp->isInvalid()) {
+          int beg, end;
+          std::tie(beg, end) = ref->getAggr(i)->getIdx(node);
+          if (beg < 0) TODO();
+          for (int i = beg; i <= end; i ++) node->invalidIdx.insert(i);
+        }
+      } else if (!node->valTree) node->valTree = valTree;
     }
   } else if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i ++) {
@@ -992,8 +999,15 @@ void visitConnect(graph* g, PNode* connect) {
       if (!node->isArray() && node->valTree) return;
     }
     ExpTree* valTree = new ExpTree(exp->getExpRoot(), ref->getExpRoot());
-    if (node->isArray()) node->addArrayVal(valTree);
-    else node->valTree = valTree;
+    if (node->isArray()) {
+      node->addArrayVal(valTree);
+      if (exp->isInvalid()) {
+        int beg, end;
+        std::tie(beg, end) = ref->getExpRoot()->getIdx(node);
+        if (beg < 0) TODO();
+        for (int i = beg; i <= end; i ++) node->invalidIdx.insert(i);
+      }
+    } else node->valTree = valTree;
   }
 }
 
@@ -1478,6 +1492,9 @@ graph* AST2Graph(PNode* root) {
     }
   }
 
+  for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
+    it->second->invalidArrayOptimize();
+  }
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     updatePrevNext(it->second);
   }
