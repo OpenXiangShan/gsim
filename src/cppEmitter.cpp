@@ -274,10 +274,10 @@ std::string graph::saveOldVal(FILE* fp, Node* node) {
     if (node->width > BASIC_WIDTH) {
       if (node->type == NODE_ARRAY_MEMBER) TODO();
       fprintf(fp, "mpz_set(%s, %s[0]);\n", oldMpz(node).c_str(), node->name.c_str());
-      ret = oldMpz(node) + "[0]";
+      ret = oldMpz(node);
     } else {
       fprintf(fp, "%s %s = %s[0];\n", widthUType(node->width).c_str(), oldBasic(node).c_str(), node->name.c_str());
-      ret = oldBasic(node) + "[0]";
+      ret = oldBasic(node);
     }
   }
   return ret;
@@ -313,10 +313,12 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
 }
 
 static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::string oldName, std::string suffix) {
+  std::string nodeName = node->name;
+  if (node->isArray() && node->arrayEntryNum() == 1) nodeName += "[0]";
   if (node->width > BASIC_WIDTH) {
-    fprintf(fp, "if (mpz_cmp(%s%s, %s) != 0) {\n", node->name.c_str(), suffix.c_str(), oldName.c_str());
+    fprintf(fp, "if (mpz_cmp(%s, %s) != 0) {\n", nodeName.c_str(), oldName.c_str());
   } else {
-    fprintf(fp, "if (%s%s != %s) {\n", node->name.c_str(), suffix.c_str(), oldName.c_str());
+    fprintf(fp, "if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
   }
   for (int id : nextNodeId) {
     fprintf(fp, "activeFlags[%d] = true;\n", id);
@@ -465,19 +467,20 @@ void graph::genUpdateRegister(FILE* fp) {
   fprintf(fp, "void S%s::updateRegister() {\n", name.c_str());
   for (Node* node : regsrc) {
     if (node->regSplit && node->status == VALID_NODE) {
-      if (node->dimension.size() == 0) {
+      if (node->dimension.size() == 0 || node->arrayEntryNum() == 1) {
           std::string regold;
           if (node->regNeedActivate()) regold = saveOldVal(fp, node);
           if (node->updateTree->getRoot()->computeInfo->opNum < 0) {
             fprintf(fp, "%s\n", node->updateTree->getRoot()->computeInfo->valStr.c_str());
           }
-          else if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_set(%s, %s);\n", node->name.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
-          else fprintf(fp, "%s = %s;\n", node->name.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
+          else if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_set(%s, %s);\n", node->updateTree->getlval()->computeInfo->valStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
+          else fprintf(fp, "%s = %s;\n", node->updateTree->getlval()->computeInfo->valStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
 #ifdef EMU_LOG
+          std::string nodeName = (node->isArray() && node->arrayEntryNum() == 1) ? (node->name + "[0]") : node->name;
           if (node->width <= 32)
-            fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%x\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), node->name.c_str());
+            fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%x\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), nodeName.c_str());
           else if (node->width <= 64)
-            fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%lx\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), node->name.c_str());
+            fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%lx\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), nodeName.c_str());
 #endif
         if (node->regNeedActivate()) activateNext(fp, node, node->regActivate, regold, "");
       } else {

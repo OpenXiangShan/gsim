@@ -66,6 +66,12 @@ public:
     ret->width = width;
     ret->sign = sign;
     ret->consLength = consLength;
+    for (valInfo* member : memberInfo) {
+      if (member)
+        ret->memberInfo.push_back(member->dup());
+      else
+        ret->memberInfo.push_back(nullptr);
+    }
     return ret;
   }
   valInfo* getMemberInfo(size_t idx) {

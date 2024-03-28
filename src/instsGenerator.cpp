@@ -195,6 +195,27 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
   return ret;
 }
 
+std::string idx2Str(Node* node, int idx) {
+  std::string ret;
+  for (int i = node->dimension.size() - 1; i >= 0; i --) {
+    ret = "[" + std::to_string(idx % node->dimension[i]) + "]" + ret;
+    idx /= node->dimension[i];
+  }
+  return ret;
+}
+
+std::string setCons(std::string lvalue, int width, valInfo* info) {
+  Assert(info->status == VAL_CONSTANT, "%s expect constant", lvalue.c_str());
+  std::string ret;
+  if (width > BASIC_WIDTH) {
+    if (mpz_cmp_ui(info->consVal, MAX_U64) > 0) ret = format("mpz_set_str(%s, \"%s\", 16);", lvalue.c_str(), mpz_get_str(NULL, 16, info->consVal));
+    else ret = format("mpz_set_ui(%s, %s);", lvalue.c_str(), info->valStr.c_str());
+  } else {
+    ret = format("%s = %s;\n", lvalue.c_str(), info->valStr.c_str());
+  }
+  return ret;
+}
+
 valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   /* cond is constant */
   if (getChild(0)->computeInfo->status == VAL_CONSTANT) {
@@ -225,10 +246,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
   }
+
   /* not constant */
   bool childBasic = (!getChild(1) || ChildInfo(1, width) <= BASIC_WIDTH) && (!getChild(2) || ChildInfo(2, width) <= BASIC_WIDTH);
   bool enodeBasic = node->width <= BASIC_WIDTH;
   valInfo* ret = computeInfo;
+
   for (ENode* childNode : child) {
     if (childNode) ret->mergeInsts(childNode->computeInfo);
   }
@@ -319,15 +342,53 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       ret->sameConstant = true;
       mpz_set(ret->assignmentCons, ChildInfo(2, assignmentCons));
     }
+    if (isSubArray(lvalue, node)) {
+      for (int i = ChildInfo(2, beg); i <= ChildInfo(2, end); i ++) {
+        if (ChildInfo(2, getMemberInfo(i)) && ChildInfo(2, getMemberInfo(i))->status == VAL_CONSTANT) {
+          valInfo* info = new valInfo();
+          info->sameConstant = true;
+          mpz_set(info->assignmentCons, ChildInfo(2, getMemberInfo(i))->consVal);
+          ret->memberInfo.push_back(info);
+        } else {
+          ret->memberInfo.push_back(nullptr);
+        }
+      }
+    }
   } else if (getChild(1) && !getChild(2)) {
     if (ChildInfo(1, sameConstant)) {
       ret->sameConstant = true;
       mpz_set(ret->assignmentCons, ChildInfo(1, assignmentCons));
     }
+    if (isSubArray(lvalue, node) && node->type == NODE_REG_DST) {
+      for (int i = ChildInfo(1, beg); i <= ChildInfo(1, end); i ++) {
+        if (ChildInfo(1, getMemberInfo(i)) && ChildInfo(1, getMemberInfo(i))->status == VAL_CONSTANT) {
+          valInfo* info = new valInfo();
+          info->sameConstant = true;
+          mpz_set(info->assignmentCons, ChildInfo(1, getMemberInfo(i))->consVal);
+          ret->memberInfo.push_back(info);
+        } else {
+          ret->memberInfo.push_back(nullptr);
+        }
+      }
+    }
   } else if (getChild(1) && getChild(2)) {
     if (ChildInfo(1, sameConstant) && ChildInfo(2, sameConstant) && (mpz_cmp(ChildInfo(1, assignmentCons), ChildInfo(2, assignmentCons)) == 0)) {
       ret->sameConstant = true;
       mpz_set(ret->assignmentCons, ChildInfo(1, assignmentCons));
+    }
+    if (isSubArray(lvalue, node) && node->type == NODE_REG_DST) {
+      for (int i = ChildInfo(1, beg); i <= ChildInfo(1, end); i ++) {
+        if (ChildInfo(1, getMemberInfo(i)) && ChildInfo(1, getMemberInfo(i))->status == VAL_CONSTANT &&
+          ChildInfo(2, getMemberInfo(i)) && ChildInfo(2, getMemberInfo(i))->status == VAL_CONSTANT &&
+          mpz_cmp(ChildInfo(1, getMemberInfo(i))->consVal, ChildInfo(2, getMemberInfo(i))->consVal) == 0){
+            valInfo* info = new valInfo();
+            info->sameConstant = true;
+            mpz_set(info->assignmentCons, ChildInfo(1, getMemberInfo(i))->consVal);
+            ret->memberInfo.push_back(info);
+        } else {
+          ret->memberInfo.push_back(nullptr);
+        }
+      }
     }
   }
   return ret;
@@ -1521,6 +1582,15 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   Assert(node->type == NODE_MEM_MEMBER, "invalid type %d", node->type);
   Node* memory = node->parent->parent;
   ret->valStr = memory->name + "[" + node->parent->get_member(READER_ADDR)->computeInfo->valStr + "]";
+  bool isZeroIdx = true;
+  std::string zeroIdxStr;
+  for (size_t i = 0; i < memory->dimension.size(); i ++) {
+    if (memory->dimension[i] == 1) zeroIdxStr += "[0]";
+    else isZeroIdx = false;
+  }
+  if (isZeroIdx) {
+    ret->valStr += zeroIdxStr;
+  }
   if (memory->width > width) {
     if (memory->width > 128 && width < 64)
       ret->valStr = format("(mpz_get_ui(%s) & %s)", ret->valStr.c_str(), bitMask(width).c_str());
@@ -1600,7 +1670,7 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
 
   valInfo* resetVal = Child(1, computeInfo);//node->resetVal->getRoot()->compute(node, node->name, isRoot);
   std::string ret;
-  if (node->isArray()) {
+  if (node->isArray() && isSubArray(lvalue, node)) {
     if (node->width > BASIC_WIDTH) {
       std::string idxStr, bracket;
       for (size_t i = 0; i < node->dimension.size(); i ++) {
@@ -1673,7 +1743,18 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           for (ENode* childENode : child)
             computeInfo->valStr += childENode->computeInfo->valStr;
         }
+        bool isZeroIdx = true;
+        std::string zeroIdxStr;
+        for (size_t i = getChildNum(); i < nodePtr->dimension.size(); i ++) {
+          if (nodePtr->dimension[i] == 1) zeroIdxStr += "[0]";
+          else isZeroIdx = false;
+        }
+        if (isSubArray(computeInfo->valStr, nodePtr) && isZeroIdx) {
+          computeInfo->valStr += zeroIdxStr;
+        }
       }
+      computeInfo->beg = beg;
+      computeInfo->end = end;
     } else {
       computeInfo = nodePtr->compute()->dup();
       if (child.size() != 0) {
@@ -1963,6 +2044,7 @@ valInfo* Node::computeArray() {
   computeInfo->valStr = name;
   computeInfo->width = width;
   computeInfo->sign = sign;
+  std::set<int> allIdx;
   bool anyVarIdx = false;
   if (valTree) {
     std::string lvalue = name;
@@ -1970,7 +2052,13 @@ valInfo* Node::computeArray() {
       valInfo* lindex = valTree->getlval()->compute(this, INVALID_LVALUE, false);
       lvalue = lindex->valStr;
       std::tie(lindex->beg, lindex->end) = valTree->getlval()->getIdx(this);
-      anyVarIdx |= isSubArray(lvalue, this) || (lindex->beg < 0 || lindex->beg != lindex->end); // TODO: array with one element
+      if (lindex->beg < 0) anyVarIdx = true;
+      else {
+        for (int i = lindex->beg; i <= lindex->end; i ++) {
+          if (allIdx.find(i) != allIdx.end()) anyVarIdx = true;
+          allIdx.insert(i);
+        }
+      }
     } else {
       display();
       TODO();
@@ -1984,11 +2072,18 @@ valInfo* Node::computeArray() {
       valInfo* lindex = nullptr;
       if (tree->getlval()) {
         lindex = tree->getlval()->compute(this, INVALID_LVALUE, false);
-        valInfo* info = tree->getRoot()->compute(this, lindex->valStr, false);
+        std::string lvalue = lindex->valStr;
+        valInfo* info = tree->getRoot()->compute(this, lvalue, false);
         for (std::string inst : info->insts) insts.push_back(inst);
         finalConnect(lindex->valStr, info);
         std::tie(lindex->beg, lindex->end) = tree->getlval()->getIdx(this);
-        anyVarIdx |= (lindex->beg < 0 || lindex->beg != lindex->end);
+        if (lindex->beg < 0) anyVarIdx = true;
+        else {
+          for (int i = lindex->beg; i <= lindex->end; i ++) {
+            if (allIdx.find(i) != allIdx.end()) anyVarIdx = true;
+            allIdx.insert(i);
+          }
+        }
       } else {
         TODO();
       }
@@ -1997,18 +2092,55 @@ valInfo* Node::computeArray() {
     int num = arrayEntryNum();
     computeInfo->memberInfo.resize(num, nullptr);
     if (valTree) {
-      computeInfo->memberInfo[valTree->getlval()->computeInfo->beg] = valTree->getRoot()->computeInfo;
-    }
-    std::set<int> multipleAssign;
-    for (ExpTree* tree : arrayVal) {
-      int infoIdx = tree->getlval()->computeInfo->beg;
-      if (computeInfo->memberInfo[infoIdx] || isSubArray(tree->getlval()->computeInfo->valStr, this)) {
-        multipleAssign.insert(infoIdx);
-      } else {
-        computeInfo->memberInfo[infoIdx] = tree->getRoot()->computeInfo;
+      int infoIdxBeg = valTree->getlval()->computeInfo->beg;
+      int infoIdxEnd = valTree->getlval()->computeInfo->end;
+      if (valTree->getRoot()->computeInfo->valStr.find("TMP$") == valTree->getRoot()->computeInfo->valStr.npos) {
+        if (infoIdxBeg == infoIdxEnd) {
+          computeInfo->memberInfo[infoIdxBeg] = valTree->getRoot()->computeInfo;
+        } else if (valTree->getRoot()->computeInfo->memberInfo.size() != 0) {
+          for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) {
+            computeInfo->memberInfo[infoIdxBeg + i] = valTree->getRoot()->computeInfo->getMemberInfo(i);
+          }
+        }
       }
     }
-    for (int idx : multipleAssign) computeInfo->memberInfo[idx] = nullptr;
+
+    for (ExpTree* tree : arrayVal) {
+      int infoIdxBeg = tree->getlval()->computeInfo->beg;
+      int infoIdxEnd = tree->getlval()->computeInfo->end;
+      if (tree->getRoot()->computeInfo->valStr.find("TMP$") == tree->getRoot()->computeInfo->valStr.npos) {
+        if (infoIdxBeg == infoIdxEnd) {
+          computeInfo->memberInfo[infoIdxBeg] = tree->getRoot()->computeInfo;
+
+        } else if (tree->getRoot()->computeInfo->memberInfo.size() != 0) {
+          for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) {
+            computeInfo->memberInfo[infoIdxBeg + i] = tree->getRoot()->computeInfo->getMemberInfo(i);
+          }
+        }
+
+      }
+    }
+
+    for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
+      if (computeInfo->memberInfo[i]) printf("idx %ld = %s\n", i, computeInfo->memberInfo[i]->valStr.c_str());
+    }
+    if (type == NODE_REG_DST && !getSrc()->valTree) {
+      for (int i = 0; i < num; i ++) {
+        if (computeInfo->memberInfo[i] && computeInfo->memberInfo[i]->sameConstant) {
+          computeInfo->memberInfo[i]->status = VAL_CONSTANT;
+          mpz_set(computeInfo->memberInfo[i]->consVal, computeInfo->memberInfo[i]->assignmentCons);
+          computeInfo->memberInfo[i]->setConsStr();
+          if (width > BASIC_WIDTH) {
+            if (mpz_cmp_ui(computeInfo->memberInfo[i]->consVal, MAX_U64) > 0)
+              insts.push_back(format("mpz_set_str(%s%s, \"%s\", 16);", name.c_str(), idx2Str(this, i).c_str(), mpz_get_str(NULL, 16, computeInfo->memberInfo[i]->consVal)));
+            else
+              insts.push_back(format("mpz_set_ui(%s%s, \"%s\", 16);", name.c_str(), idx2Str(this, i).c_str(), computeInfo->memberInfo[i]->valStr.c_str()));
+          } else {
+            insts.push_back(format("%s%s = %s;", name.c_str(), idx2Str(this, i).c_str(), computeInfo->memberInfo[i]->valStr.c_str()));
+          }
+        }
+      }
+    }
   }
   return computeInfo;
 }
@@ -2032,7 +2164,10 @@ void graph::instsGenerator() {
   }
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
-      if (member->updateTree) member->updateTree->getRoot()->compute(member, member->name, true);
+      if (member->updateTree) {
+        valInfo* info = member->updateTree->getlval()->compute(member, INVALID_LVALUE, false);
+        member->updateTree->getRoot()->compute(member, info->valStr, true);
+      }
       if (member->status == DEAD_SRC) {
         if (member->type != NODE_REG_SRC) member->display();
         Assert(member->type == NODE_REG_SRC, "%s is not reg_src %d", member->name.c_str(), member->type);
