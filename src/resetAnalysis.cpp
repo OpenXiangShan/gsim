@@ -97,6 +97,7 @@ void Node::addReset() {
       valTree = new ExpTree(regTop, this);
     }
     if (getDst()->valTree) fillEmptyWhen(getDst()->valTree, new ENode(this));
+    else getDst()->valTree = new ExpTree(new ENode(this), getDst());
   } else {
     Panic();
   }
