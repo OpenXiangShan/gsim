@@ -93,7 +93,7 @@ int upperLog2(int x) {
   return (32 - __builtin_clz(x - 1));
 }
 
-static char buf[0x100000];
+static char buf[0x1000000];
 
 std::string format(const char *fmt, ...) {
   va_list args;
@@ -101,6 +101,6 @@ std::string format(const char *fmt, ...) {
   std::vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
   std::string ret = buf;
-  Assert(ret.length() < sizeof(buf), "require larger buf");
+  Assert(ret.length() < sizeof(buf) - 1, "require larger buf");
   return ret;
 }
