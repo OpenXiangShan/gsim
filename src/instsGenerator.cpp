@@ -1002,8 +1002,8 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
       ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
     } else if (Child(1, width) <= BASIC_WIDTH) {
       ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width) - 64));
-      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s >> 64);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, 64);", midName.c_str(), firstName.c_str()));
+      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s >> 64);", midName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, 64);", midName.c_str(), midName.c_str()));
       ret->insts.push_back(format("mpz_add_ui(%s, %s, (uint64_t)%s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
     } else {
       ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width)));
