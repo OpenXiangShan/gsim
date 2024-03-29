@@ -1735,7 +1735,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       if (computeInfo && computeInfo->opNum >= 0) {
         computeInfo = computeInfo->dup();
       } else {
-        computeInfo = nodePtr->compute()->dup();
+        computeInfo = nodePtr->compute()->dup(beg, end);
         if (child.size() != 0 && computeInfo->status == VAL_VALID) { // TODO: constant array representation
           valInfo* indexInfo = computeInfo->dup();  // TODO: no need
           computeInfo = indexInfo;

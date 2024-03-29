@@ -57,7 +57,7 @@ public:
     mpz_set_str(consVal, str.c_str(), base);
     updateConsVal();
   }
-  valInfo* dup() {
+  valInfo* dup(int beg = -1, int end = -1) {
     valInfo* ret = new valInfo();
     ret->opNum = opNum;
     ret->valStr = valStr;
@@ -66,11 +66,13 @@ public:
     ret->width = width;
     ret->sign = sign;
     ret->consLength = consLength;
-    for (valInfo* member : memberInfo) {
-      if (member)
-        ret->memberInfo.push_back(member->dup());
-      else
-        ret->memberInfo.push_back(nullptr);
+    if (beg < 0) {
+      beg = 0;
+      end = memberInfo.size() - 1;
+    }
+    for (int i = beg; i <= end; i ++) {
+      if (getMemberInfo(i)) ret->memberInfo.push_back(getMemberInfo(i)->dup());
+      else ret->memberInfo.push_back(nullptr);
     }
     return ret;
   }
