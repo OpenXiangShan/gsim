@@ -87,8 +87,7 @@ static std::string setMpz(std::string dstName, ENode* enode, valInfo* dstInfo, N
 }
 
 static std::string get128(std::string name) {
-  return format("(mpz_size(%s) == 1 ? mpz_get_ui(%s) : \
-            ((__uint128_t)mpz_getlimbn(%s, 1) << 64 | mpz_get_ui(%s)))",
+  return format("(mpz_size(%s) == 1 ? mpz_get_ui(%s) : ((__uint128_t)mpz_getlimbn(%s, 1) << 64 | mpz_get_ui(%s)))",
               name.c_str(), name.c_str(), name.c_str(), name.c_str());
 }
 
