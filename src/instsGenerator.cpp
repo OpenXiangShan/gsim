@@ -2145,6 +2145,8 @@ valInfo* Node::computeArray() {
       }
     }
   }
+  /* to avoid update register using previous updated registers */
+  if (type == NODE_REG_DST) computeInfo->memberInfo.clear();
   return computeInfo;
 }
 
