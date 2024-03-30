@@ -57,6 +57,21 @@ static std::string bitMask(int width) {
   return ret;
 }
 
+static std::string arrayCopy(std::string lvalue, Node* node, std::string rvalue) {
+  std::string ret, idxStr, bracket;
+  for (int i = countArrayIndex(lvalue); i < node->dimension.size(); i ++) {
+    ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
+    idxStr += "[i" + std::to_string(i) + "]";
+    bracket += "}\n";
+  }
+  if (node->width > BASIC_WIDTH)
+    ret += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), rvalue.c_str(), idxStr.c_str());
+  else
+    ret += format("%s%s = %s%s;\n", lvalue.c_str(), idxStr.c_str(), rvalue.c_str(), idxStr.c_str());
+  ret += bracket;
+  return ret;
+}
+
 static std::string setMpz(std::string dstName, ENode* enode, valInfo* dstInfo, Node* node) {
   std::string ret;
   if (enode->computeInfo->status == VAL_CONSTANT) {
@@ -283,7 +298,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
           if (info->status == VAL_CONSTANT)
             return format("memset(%s, %s, sizeof(%s));", lvalue.c_str(), expr.c_str(), lvalue.c_str());
           else
-            return format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), expr.c_str(), lvalue.c_str());
+            return arrayCopy(lvalue, node, expr);
         }
       }
       else if (node->width < width) return format("%s = (%s & %s);", lvalue.c_str(), expr.c_str(), bitMask(node->width).c_str());
@@ -1684,7 +1699,7 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
       ret += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), resetVal->valStr.c_str(), idxStr.c_str());
       ret += bracket;
     } else {
-      ret = format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), resetVal->valStr.c_str(), lvalue.c_str());
+      ret = arrayCopy(lvalue, node, resetVal->valStr);
     }
   } else {
     if (node->width > BASIC_WIDTH) {
@@ -2003,8 +2018,9 @@ void Node::finalConnect(std::string lvalue, valInfo* info) {
     if (width <= BASIC_WIDTH && info->width <= width) {
       if (info->status == VAL_CONSTANT)
         insts.push_back(format("memset(%s, %s, sizeof(%s));", lvalue.c_str(), info->valStr.c_str(), lvalue.c_str()));
-      else
-        insts.push_back(format("memcpy(%s, %s, sizeof(%s));", lvalue.c_str(), info->valStr.c_str(), lvalue.c_str()));
+      else {
+        insts.push_back(arrayCopy(lvalue, this, info->valStr));
+      }
     } else if (width < BASIC_WIDTH && info->width > width) {
       TODO();
     } else {
