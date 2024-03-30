@@ -20,6 +20,8 @@ static const int nodePerDisplay = 5000;
 static int superId = 1;
 static std::set<Node*> definedNode;
 
+bool nameExist(std::string str);
+
 static void inline includeLib(FILE* fp, std::string lib, bool isStd) {
   std::string format = isStd ? "#include <%s>\n" : "#include \"%s\"\n";
   fprintf(fp, format.c_str(), lib.c_str());
@@ -218,12 +220,16 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   fprintf(fp, ";\n");
 #ifdef DIFFTEST_PER_SIG
   #if defined(VERILATOR_DIFF)
-    if (node->type == NODE_REG_SRC && (!node->isArray() || node->arrayEntryNum() == 1)){
+    if (node->type == NODE_REG_SRC){
       if (node->width <= BASIC_WIDTH) {
-        fprintf(fp, "%s %s%s;\n", widthUType(node->width).c_str(), node->name.c_str(), "$prev");
+        fprintf(fp, "%s %s%s", widthUType(node->width).c_str(), node->name.c_str(), "$prev");
       } else {
-        fprintf(fp, "mpz_t %s%s;\n", node->name.c_str(), "$prev");
+        fprintf(fp, "mpz_t %s%s", node->name.c_str(), "$prev");
       }
+      if (node->isArray() && node->arrayEntryNum() != 1) {
+        for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
+      }
+      fprintf(fp, ";\n");
     }
   #endif
   #ifdef VERILATOR_DIFF
@@ -239,14 +245,48 @@ void graph::genNodeDef(FILE* fp, Node* node) {
     verilatorName.replace(pos, 1, "__DOT__");
   }
   #ifdef VERILATOR_DIFF
+  std::map<std::string, std::string> allNames;
   std::string diffNodeName = node->type == NODE_REG_DST ? (node->getSrc()->name + "$prev") : node->name;
+  std::string originName = (node->type == NODE_REG_DST ? node->getSrc()->name : node->name);
   if (node->isArray() && node->arrayEntryNum() == 1) {
+    std::string verilatorSuffix, diffSuffix;
     for (size_t i = 0; i < node->dimension.size(); i ++) {
-      if (node->type != NODE_REG_DST) diffNodeName += "[0]";
-      verilatorName += "_0";
+      if (node->type != NODE_REG_DST) diffSuffix += "[0]";
+      verilatorSuffix += "_0";
     }
+    if (!nameExist(originName + verilatorSuffix))
+      allNames[diffNodeName + diffSuffix] = verilatorName + verilatorSuffix;
+  } else if (node->isArray()) {
+    int num = node->arrayEntryNum();
+    std::vector<std::string> suffix(num);
+    std::vector<std::string> verilatorSuffix(num);
+    int pairNum = 1;
+    for (size_t i = 0; i < node->dimension.size(); i ++) {
+      int suffixIdx = 0;
+      for (int l = 0; l < pairNum; l ++) {
+        for (int j = 0; j < node->dimension[i]; j ++) {
+          int suffixNum = num / node->dimension[i];
+          for (int k = 0; k < suffixNum; k ++) {
+            verilatorSuffix[suffixIdx] += "_" + std::to_string(j);
+            suffix[suffixIdx] += "[" + std::to_string(j) + "]";
+            suffixIdx ++;
+          }
+        }
+      }
+      num = num / node->dimension[i];
+      pairNum *= node->dimension[i];
+    }
+    for (size_t i = 0; i < suffix.size(); i ++) {
+      if (!nameExist(originName + verilatorSuffix[i]))
+        allNames[diffNodeName + suffix[i]] = verilatorName + verilatorSuffix[i];
+    }
+  } else {
+    allNames[diffNodeName] = verilatorName;
   }
-  if (node->type != NODE_REG_SRC) fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, diffNodeName.c_str(), verilatorName.c_str());
+  if (node->type != NODE_REG_SRC) {
+    for (auto iter : allNames)
+      fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, iter.first.c_str(), iter.second.c_str());
+    }
   #else
   fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, diffNodeName.c_str(), verilatorName.c_str());
   #endif
@@ -587,6 +627,19 @@ void graph::saveDiffRegs(FILE* fp) {
           fprintf(fp, "mpz_set(%s%s, %s);\n", member->getSrc()->name.c_str(), "$prev", memberName.c_str());
         else
           fprintf(fp, "%s%s = %s;\n", member->getSrc()->name.c_str(), "$prev", memberName.c_str());
+      } else if (member->type == NODE_REG_SRC && member->isArray() && member->status == VALID_NODE) {
+        std::string idxStr, bracket;
+        for (size_t i = 0; i < member->dimension.size(); i ++) {
+          fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, member->dimension[i], i);
+          idxStr += "[i" + std::to_string(i) + "]";
+          bracket += "}\n";
+        }
+        if (member->width > BASIC_WIDTH) {
+          fprintf(fp, "mpz_set(%s$prev%s, %s%s);\n", member->name.c_str(), idxStr.c_str(), member->name.c_str(), idxStr.c_str());
+        } else {
+          fprintf(fp, "%s$prev%s = %s%s;\n", member->name.c_str(), idxStr.c_str(), member->name.c_str(), idxStr.c_str());
+        }
+        fprintf(fp, "%s", bracket.c_str());
       }
     }
   }

@@ -1557,3 +1557,7 @@ bool ExpTree::isConstant() {
   }
   return true;
 }
+
+bool nameExist(std::string str) {
+  return allSignals.find(str) != allSignals.end();
+}
