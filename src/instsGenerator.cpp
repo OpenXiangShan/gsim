@@ -264,13 +264,17 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
           std::string ret;
           int num = info->end - info->beg + 1;
           std::vector<std::string>suffix(num);
+          int pairNum = 1;
           for (size_t i = countArrayIndex(lvalue); i < node->dimension.size(); i ++) {
             int suffixIdx = 0;
-            for (int j = 0; j < node->dimension[i]; j ++) {
-              int suffixNum = num / node->dimension[i];
-              for (int k = 0; k < suffixNum; k ++) suffix[suffixIdx ++] += "[" + std::to_string(j) + "]";
+            for (int l = 0; l < pairNum; l ++) {
+              for (int j = 0; j < node->dimension[i]; j ++) {
+                int suffixNum = num / node->dimension[i];
+                for (int k = 0; k < suffixNum; k ++) suffix[suffixIdx ++] += "[" + std::to_string(j) + "]";
+              }
             }
             num = num / node->dimension[i];
+            pairNum *= node->dimension[i];
           }
           for (int i = info->beg; i <= info->end; i ++) ret += format("%s%s = %s;\n", lvalue.c_str(), suffix[i - info->beg].c_str(), info->splittedArray->arrayMember[i]->compute()->valStr.c_str());
           return ret;
