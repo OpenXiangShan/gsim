@@ -461,7 +461,20 @@ valInfo* ENode::instsSub(Node* node, std::string lvalue, bool isRoot) {
     us_sub(ret->consVal, ChildInfo(0, consVal), ChildInfo(1, consVal), width);
     ret->setConsStr();
   } else if (childBasic && enodeBasic) {
-    ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + ChildInfo(0, valStr) + " - " + ChildInfo(1, valStr) + ")";
+    std::string lstr = ChildInfo(0, valStr);
+    std::string rstr = ChildInfo(1, valStr);
+    if (sign) {
+      if(ChildInfo(0, width) < ChildInfo(1, width) && ChildInfo(0, status) != VAL_CONSTANT) {
+        int extendedWidth = widthBits(ChildInfo(1, width));
+        int shiftBits = extendedWidth - ChildInfo(0, width);
+        lstr = format("((%s%s%s << %d) >> %d)", Cast(ChildInfo(1, width), true).c_str(), Cast(ChildInfo(0, width), true).c_str(), lstr.c_str(), shiftBits, shiftBits);
+      } else if (ChildInfo(0, width) > ChildInfo(1, width) && ChildInfo(1, status) != VAL_CONSTANT) {
+        int extendedWidth = widthBits(ChildInfo(0, width));
+        int shiftBits = extendedWidth - ChildInfo(1, width);
+        rstr = format("((%s%s%s << %d) >> %d)", Cast(ChildInfo(0, width), true).c_str(), Cast(ChildInfo(1, width), true).c_str(), rstr.c_str(), shiftBits, shiftBits);
+      }
+    }
+    ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " - " + rstr + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   } else {
     TODO();
