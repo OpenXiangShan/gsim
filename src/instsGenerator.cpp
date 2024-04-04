@@ -682,8 +682,14 @@ valInfo* ENode::instsEq(Node* node, std::string lvalue, bool isRoot) {
     us_eq(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
   } else if (childBasic && enodeBasic) {
-    ret->valStr = "(" + ChildInfo(0, valStr) + " == " + ChildInfo(1, valStr) + ")";
-    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    if (Child(0, sign)) {
+      ret->valStr = format("(%s%s == %s%s)", (ChildInfo(0, status) == VAL_CONSTANT ? "" : Cast(ChildInfo(0, width), ChildInfo(0, sign)).c_str()), ChildInfo(0, valStr).c_str(),
+                                             (ChildInfo(1, status) == VAL_CONSTANT ? "" : Cast(ChildInfo(1, width), ChildInfo(1, sign)).c_str()), ChildInfo(1, valStr).c_str());
+    } else {
+      ret->valStr = "(" + ChildInfo(0, valStr) + " == " + ChildInfo(1, valStr) + ")";
+      ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+
+    }
   } else if (!childBasic && enodeBasic) {
     if (ChildInfo(0, width) > BASIC_WIDTH && ChildInfo(1, width) > BASIC_WIDTH) {
       ret->valStr = format("(mpz_cmp(%s, %s) == 0)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
@@ -735,8 +741,13 @@ valInfo* ENode::instsNeq(Node* node, std::string lvalue, bool isRoot) {
     us_neq(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
   } else if (childBasic && enodeBasic) {
-    ret->valStr = "(" + ChildInfo(0, valStr) + " != " + ChildInfo(1, valStr) + ")";
-    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    if (Child(0, sign)) {
+      ret->valStr = format("(%s%s != %s%s)", (ChildInfo(0, status) == VAL_CONSTANT ? "" : Cast(ChildInfo(0, width), ChildInfo(0, sign)).c_str()), ChildInfo(0, valStr).c_str(),
+                                             (ChildInfo(1, status) == VAL_CONSTANT ? "" : Cast(ChildInfo(1, width), ChildInfo(1, sign)).c_str()), ChildInfo(1, valStr).c_str());
+    } else {
+      ret->valStr = "(" + ChildInfo(0, valStr) + " != " + ChildInfo(1, valStr) + ")";
+      ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    }
   } else if (!childBasic && enodeBasic) {
     if (ChildInfo(0, status) == VAL_CONSTANT && ChildInfo(0, consLength) > 64) TODO();
     if (ChildInfo(1, status) == VAL_CONSTANT && ChildInfo(1, consLength) > 64) TODO();
