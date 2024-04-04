@@ -22,6 +22,12 @@ static std::set<Node*> definedNode;
 
 bool nameExist(std::string str);
 
+std::string strRepeat(std::string str, int times) {
+  std::string ret;
+  for (int i = 0; i < times; i ++) ret += str;
+  return ret;
+}
+
 static void inline includeLib(FILE* fp, std::string lib, bool isStd) {
   std::string format = isStd ? "#include <%s>\n" : "#include \"%s\"\n";
   fprintf(fp, format.c_str(), lib.c_str());
@@ -317,51 +323,23 @@ std::string graph::saveOldVal(FILE* fp, Node* node) {
       fprintf(fp, "%s %s = %s;\n", widthUType(node->width).c_str(), oldBasic(node).c_str(), node->name.c_str());
       ret = oldBasic(node);
     }
-  } else if (node->isFakeArray()) {
+  } else if (node->arrayEntryNum() == 1) {
+    std::string suffix = strRepeat("[0]", node->dimension.size());
     if (node->width > BASIC_WIDTH) {
       if (node->type == NODE_ARRAY_MEMBER) TODO();
-      fprintf(fp, "mpz_set(%s, %s[0]);\n", oldMpz(node).c_str(), node->name.c_str());
+      fprintf(fp, "mpz_set(%s, %s%s);\n", oldMpz(node).c_str(), node->name.c_str(), suffix.c_str());
       ret = oldMpz(node);
     } else {
-      fprintf(fp, "%s %s = %s[0];\n", widthUType(node->width).c_str(), oldBasic(node).c_str(), node->name.c_str());
+      fprintf(fp, "%s %s = %s%s;\n", widthUType(node->width).c_str(), oldBasic(node).c_str(), node->name.c_str(), suffix.c_str());
       ret = oldBasic(node);
     }
   }
   return ret;
 }
 
-void graph::genNodeInsts(FILE* fp, Node* node) {
-  std::string ret;
-  if (node->insts.size()) {
-    /* save oldVal */
-    if (node->needActivate()) {
-      if (!node->isArray()) {
-        if (node->width > BASIC_WIDTH) {
-          if (node->type == NODE_ARRAY_MEMBER) TODO();
-          fprintf(fp, "mpz_set(%s, %s);\n", oldMpz(node).c_str(), node->name.c_str());
-        } else {
-          fprintf(fp, "%s %s = %s;\n", widthUType(node->width).c_str(), oldBasic(node).c_str(), node->name.c_str());
-        }
-      } else if (node->isFakeArray()) {
-        if (node->width > BASIC_WIDTH) {
-          if (node->type == NODE_ARRAY_MEMBER) TODO();
-          fprintf(fp, "mpz_set(%s, %s[0]);\n", oldMpz(node).c_str(), node->name.c_str());
-        } else {
-          fprintf(fp, "%s %s = %s[0];\n", widthUType(node->width).c_str(), oldBasic(node).c_str(), node->name.c_str());
-        }
-      }
-    }
-    /* display all insts */
-    for (std::string inst : node->insts) {
-      // ret += inst + "\n";
-      fprintf(fp, "%s\n", inst.c_str());
-    }
-  }
-}
-
 static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::string oldName, std::string suffix) {
   std::string nodeName = node->name;
-  if (node->isArray() && node->arrayEntryNum() == 1) nodeName += "[0]";
+  if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
   if (node->width > BASIC_WIDTH) {
     fprintf(fp, "if (mpz_cmp(%s, %s) != 0) {\n", nodeName.c_str(), oldName.c_str());
   } else {
@@ -377,6 +355,23 @@ static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId) {
   for (int id : activateId) {
     fprintf(fp, "activeFlags[%d] = true;\n", id);
   }
+}
+
+void graph::genNodeInsts(FILE* fp, Node* node) {
+  std::string oldnode;
+  if (node->insts.size()) {
+    /* save oldVal */
+    if (node->needActivate()) {
+      oldnode = saveOldVal(fp, node);
+    }
+    /* display all insts */
+    for (std::string inst : node->insts) {
+      fprintf(fp, "%s\n", inst.c_str());
+    }
+  }
+  if (!node->needActivate()) ;
+  else if(node->dimension.size() == 0 || node->arrayEntryNum() == 1) activateNext(fp, node, node->nextActiveId, oldnode, "");
+  else activateUncondNext(fp, node, node->nextActiveId);
 }
 
 void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
@@ -440,12 +435,6 @@ void graph::nodeDisplay(FILE* fp, SuperNode* super) {
 }
 
 void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
-  for (Node* member : node->member) {
-    if (!member->needActivate()) continue;
-    else if(member->dimension.size() == 0) activateNext(fp, member, member->nextActiveId, oldName(member), "");
-    else if (member->isFakeArray()) activateNext(fp, member, member->nextActiveId, oldName(member), "[0]");
-    else activateUncondNext(fp, member, member->nextActiveId);
-  }
 #ifdef EMU_LOG
   int num = (node->member.size() + nodePerDisplay - 1) / nodePerDisplay;
   for (int i = 0; i < num; i ++) {
@@ -523,7 +512,7 @@ void graph::genUpdateRegister(FILE* fp) {
           else if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_set(%s, %s);\n", node->updateTree->getlval()->computeInfo->valStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
           else fprintf(fp, "%s = %s;\n", node->updateTree->getlval()->computeInfo->valStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
 #ifdef EMU_LOG
-          std::string nodeName = (node->isArray() && node->arrayEntryNum() == 1) ? (node->name + "[0]") : node->name;
+          std::string nodeName = (node->isArray() && node->arrayEntryNum() == 1) ? (node->name + strRepeat("[0]", node->dimension.size())) : node->name;
           if (node->width <= 32)
             fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%x\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), nodeName.c_str());
           else if (node->width <= 64)
