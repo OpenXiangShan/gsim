@@ -1317,7 +1317,7 @@ valInfo* ENode::instsXorr(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = "(__builtin_parityl(" + ChildInfo(0, valStr) + ") & 1)";
       ret->opNum = ChildInfo(0, opNum) + 1;
     } else {
-      ret->valStr = format("(__builtin_parityl(%s) | __builtin_parityl(%s))", ChildInfo(0, valStr).c_str(), ChildInfo(0, valStr).c_str());
+      ret->valStr = format("(__builtin_parityl(%s >> 64) ^ __builtin_parityl(%s))", ChildInfo(0, valStr).c_str(), ChildInfo(0, valStr).c_str());
       ret->opNum = ChildInfo(0, opNum) + 1;
     }
   } else {
