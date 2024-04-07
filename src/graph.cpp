@@ -10,14 +10,18 @@ void graph::reconnectSuper() {
   }
 }
 
-void graph::updateSuper() {
-    /* remove deadNodes from superNodes */
+void graph::removeNodesNoConnect(NodeStatus status) {
   for (SuperNode* super : sortedSuper) {
     super->member.erase(
-      std::remove_if(super->member.begin(), super->member.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
+      std::remove_if(super->member.begin(), super->member.end(), [status](const Node* n){ return n->status == status; }),
       super->member.end()
     );
   }
+}
+
+void graph::updateSuper() {
+  /* remove deadNodes from superNodes */
+  removeNodesNoConnect(DEAD_NODE);
   /* remove empty superNodes */
   sortedSuper.erase(
     std::remove_if(sortedSuper.begin(), sortedSuper.end(), [](const SuperNode* sn) { return sn->member.size() == 0; }),
@@ -34,13 +38,7 @@ size_t graph::countNodes() {
 }
 
 void graph::removeNodes(NodeStatus status) {
-  for (SuperNode* super : sortedSuper) {
-    super->member.erase(
-      std::remove_if(super->member.begin(), super->member.end(), [status](const Node* n){ return n->status == status; }),
-      super->member.end()
-    );
-  }
-
+  removeNodesNoConnect(status);
   removeEmptySuper();
   reconnectSuper();
 }

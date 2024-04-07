@@ -223,10 +223,9 @@ public:
     }
     void display();
     /* used in alias */
-    void replace(Node* oldNode, ENode* newSubTree);
+    void replace(std::map<Node*, ENode*>& aliasMap);
     /* used in mergeRegister */
     void replace(Node* oldNode, Node* newNode);
-    void replaceUpdateTree(std::map<Node*, ENode*>& aliasMap);
     void clearInfo();
     bool isInvalid() {
       Assert(getRoot(), "empty root");

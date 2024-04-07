@@ -33,34 +33,6 @@ ENode* ENode::mergeSubTree(ENode* newSubTree) {
   return ret;
 }
 
-/* replace ENode points to oldnode to newSubTree*/
-void ExpTree::replace(Node* oldNode, ENode* newSubTree) {
-  Assert(!getlval() || getlval()->getNode() != oldNode, "invalid lvalue");
-
-  std::stack<ENode*> s;
-
-  if(getRoot()->getNode() == oldNode) {
-    setRoot(getRoot()->mergeSubTree(newSubTree));
-  } else {
-    s.push(getRoot());
-  }
-  if (getlval()) s.push(getlval());
-
-  while (!s.empty()) {
-    ENode* top = s.top();
-    s.pop();
-    for (int i = 0; i < top->getChildNum(); i ++) {
-      if (!top->getChild(i)) continue;
-      if (top->getChild(i)->getNode() == oldNode) {
-        ENode* newChild = top->getChild(i)->mergeSubTree(newSubTree);
-        newChild->width = top->getChild(i)->width;
-        top->setChild(i, newChild);
-      } else {
-        s.push(top->getChild(i));
-      }
-    }
-  }
-}
 /* TODO: array with index */
 Node* ENode::getLeafNode(std::set<Node*>& s) {
   if (!getNode()) return nullptr;
@@ -77,14 +49,14 @@ Node* ENode::getLeafNode(std::set<Node*>& s) {
   return node;
 }
 
-void ExpTree::replaceUpdateTree(std::map<Node*, ENode*>& aliasMap) {
+void ExpTree::replace(std::map<Node*, ENode*>& aliasMap) {
   std::stack<ENode*> s;
 
   if(aliasMap.find(getRoot()->getNode()) != aliasMap.end()) {
     setRoot(getRoot()->mergeSubTree(aliasMap[getRoot()->getNode()]));
-  } else {
-    s.push(getRoot());
   }
+  s.push(getRoot());
+
   if (getlval()) s.push(getlval());
 
   while (!s.empty()) {
@@ -119,41 +91,39 @@ void graph::aliasAnalysis() {
       ENode* enode = member->isAlias();
       if (!enode) continue;
       aliasNum ++;
-      std::set<Node*> leafNodes;
-      Node* origin = enode->getLeafNode(leafNodes);
 
-      Assert(member->prev.size() == 1 && *(member->prev.begin()) == origin, "%s (prev %ld) prev %s != %s",
-              member->name.c_str(), member->prev.size(), (*(member->prev.begin()))->name.c_str(), origin->name.c_str());
-
-      /* update connection */
-      for (Node* leaf : leafNodes) {
-        leaf->next.insert(member->next.begin(), member->next.end());
-        leaf->next.erase(member);
-
-      }
-      for (Node* next : member->next) {
-        next->prev.erase(member);
-        next->prev.insert(leafNodes.begin(), leafNodes.end());
-      }
-      /* update valTree */
-      for (Node* next : member->next) {
-        for (ExpTree* tree : next->arrayVal) {
-          if (tree)
-            tree->replace(member, enode);
-        }
-        if (next->valTree) next->valTree->replace(member, enode);
-        if ((next->type == NODE_REG_DST || next->type == NODE_REG_SRC) && next->getSrc()->updateTree) next->getSrc()->updateTree->replace(member, enode);
-      }
       member->status = DEAD_NODE;
-      aliasMap[member] = enode;
+      if (aliasMap.find(enode->getNode()) != aliasMap.end()) aliasMap[member] = enode->mergeSubTree(aliasMap[enode->getNode()]);
+      else aliasMap[member] = enode;
     }
   }
+  /* update valTree */
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      for (ExpTree* tree : member->arrayVal) {
+        if (tree) tree->replace(aliasMap);
+      }
+      if (member->valTree) member->valTree->replace(aliasMap);
+    }
+  }
+
   for (Node* reg : regsrc) {
     if (reg->updateTree) {
-      reg->updateTree->replaceUpdateTree(aliasMap);
+      reg->updateTree->replace(aliasMap);
     }
   }
-
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      member->prev.clear();
+      member->next.clear();
+    }
+  }
+  removeNodesNoConnect(DEAD_NODE);
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      member->updateConnect();
+    }
+  }
   updateSuper();
 
   printf("remove %ld alias (%ld -> %ld)\n", aliasNum, totalNodes, totalNodes - aliasNum);
