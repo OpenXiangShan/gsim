@@ -16,6 +16,14 @@ void inferAllWidth();
 
 extern PNode* root;
 
+#define FUNC_WRAPPER(func) \
+  do { \
+    clock_t start = clock(); \
+    func; \
+    clock_t end = clock(); \
+    printf("{" #func "} = %ld s\n", (end - start) / CLOCKS_PER_SEC); \
+  } while(0)
+
 /**
  * @brief main function.
  *
@@ -31,39 +39,40 @@ int main(int argc, char** argv) {
   Parser::Lexical lexical{infile, std::cout};
   Parser::Syntax syntax{&lexical};
 
-  syntax.parse();
+  FUNC_WRAPPER(syntax.parse());
 
   MUX_DEBUG(std::cout << "parser finished\n");
 
-  graph* g = AST2Graph(root);
+  graph* g;
+  FUNC_WRAPPER(g = AST2Graph(root));
 
   MUX_DEBUG(preorder_traversal(root));
 
-  g->splitArray();
+  FUNC_WRAPPER(g->splitArray());
 
-  g->detectLoop();
+  FUNC_WRAPPER(g->detectLoop());
   
-  inferAllWidth();
+  FUNC_WRAPPER(inferAllWidth());
 
-  g->topoSort();
+  FUNC_WRAPPER(g->topoSort());
 
-  g->clockOptimize();
+  FUNC_WRAPPER(g->clockOptimize());
 
-  // g->traversal();
+  // FUNC_WRAPPER(g->traversal());
 
-  g->removeDeadNodes();
+  FUNC_WRAPPER(g->removeDeadNodes());
 
-  g->aliasAnalysis();
+  FUNC_WRAPPER(g->aliasAnalysis());
 
-  g->usedBits();
+  FUNC_WRAPPER(g->usedBits());
 
-  g->mergeNodes();
+  FUNC_WRAPPER(g->mergeNodes());
 
   // g->mergeRegister();
 
-  g->instsGenerator();
+  FUNC_WRAPPER(g->instsGenerator());
   
-  g->cppEmitter();
+  FUNC_WRAPPER(g->cppEmitter());
 
   return 0;
 }
