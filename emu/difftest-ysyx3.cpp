@@ -97,8 +97,9 @@ void ref_reset() {
 
 #if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
 
+bool checkSig(bool display, REF_NAME* ref, MOD_NAME* mod);
 bool checkSignals(bool display) {
-  #include "../obj/checkSig.h"
+  return checkSig(display, ref, mod);
 }
 #endif
 

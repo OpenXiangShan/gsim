@@ -3,10 +3,32 @@ import os
 import re
 
 class SigFilter():
-  def __init__(self):
+  def __init__(self, name):
     self.srcfp = None
     self.reffp = None
     self.dstfp = None
+    self.name = name
+    self.numPerFile = 10000
+    self.fileIdx = 0
+    self.varNum = 0
+    self.dstFileName = "obj/" + name + "/" + name + "_checkSig"
+
+  def closeDstFile(self):
+    if self.dstfp is not None:
+      self.dstfp.writelines("return ret;\n}\n")
+      self.dstfp.close()
+
+  def newDstFile(self):
+    self.closeDstFile()
+    self.dstfp = open(self.dstFileName + str(self.fileIdx) + ".cpp", "w")
+    self.dstfp.writelines("#include <iostream>\n#include <gmp.h>\n#include <" + self.name + ".h>\n#include \"V" + self.name + "__Syms.h\"\n")
+    self.dstfp.writelines("bool checkSig" + str(self.fileIdx) + "(bool display, V" + self.name + "* ref, S" + self.name + "* mod) {\n")
+    self.dstfp.writelines("bool ret = false;\n")
+    self.dstfp.writelines("mpz_t tmp1;\nmpz_init(tmp1);\n \
+mpz_t tmp2;\nmpz_init(tmp2);\n \
+mpz_t tmp3;\nmpz_init(tmp3);\n")
+    self.fileIdx += 1
+    self.varNum = 0
 
   def width(self, data):
     endIdx = len(data) - 1
@@ -17,10 +39,10 @@ class SigFilter():
       startIdx -= 1
     return int(data[startIdx : endIdx]) + 1
 
-  def filter(self, srcFile, refFile, dstFile):
+  def filter(self, srcFile, refFile):
     self.srcfp = open(srcFile, "r")
     self.reffp = open(refFile, "r")
-    self.dstfp = open(dstFile, "w")
+    # self.dstfp = open(dstFile, "w")
     all_sigs = {}
     for line in self.reffp.readlines():
       match = re.search(r'/\*[0-9]*:[0-9]*\*/ ', line)
@@ -29,16 +51,17 @@ class SigFilter():
         line = line.split(" ")
         all_sigs[line[len(line) - 1]] = self.width(line[0])
 
-    self.dstfp.writelines("bool ret = false;\n")
-    self.dstfp.writelines("mpz_t tmp1;\nmpz_init(tmp1);\n \
-mpz_t tmp2;\nmpz_init(tmp2);\n \
-mpz_t tmp3;\nmpz_init(tmp3);\n")
+    self.newDstFile()
+
     for line in self.srcfp.readlines():
       line = line.strip("\n")
       line = line.split(" ")
       sign = int(line[0])
       mod_width = int(line[1])
       if line[3] in all_sigs:
+        if self.varNum == self.numPerFile:
+          self.newDstFile()
+        self.varNum += 1
         ref_width = all_sigs[line[3]]
         refName = "ref->rootp->" + line[3]
         modName = "mod->" + line[2]
@@ -81,11 +104,22 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
           (modName if mod_width <= 64 else "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName) + " << \"  \" << +" + \
             (refName if ref_width <= 64 else "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName) + "<< std::endl;\n" + \
           "} \n")
-    self.dstfp.writelines("return ret;\n")
+    # self.dstfp.writelines("return ret;\n")
     self.srcfp.close()
     self.reffp.close()
+    # self.dstfp.close()
+    self.closeDstFile()
+    self.dstfp = open(self.dstFileName + ".cpp", "w")
+    self.dstfp.writelines("#include <iostream>\n#include <gmp.h>\n#include <" + self.name + ".h>\n#include \"V" + self.name + "__Syms.h\"\n")
+    for i in range (self.fileIdx):
+      self.dstfp.writelines("bool checkSig" + str(i) + "(bool display, V" + self.name + "* ref, S" + self.name + "* mod);\n")
+    self.dstfp.writelines("bool checkSig" + "(bool display, V" + self.name + "* ref, S" + self.name + "* mod){\nbool ret;\n")
+    for i in range (self.fileIdx):
+      self.dstfp.writelines("ret |= checkSig" + str(i) + "(display, ref, mod);\n")
+    self.dstfp.writelines("return ret;\n}\n")
     self.dstfp.close()
 
+
 if __name__ == "__main__":
-  sigFilter = SigFilter()
-  sigFilter.filter("obj/" + sys.argv[1] + "_sigs.txt", "obj_dir/V" + sys.argv[1] + "___024root.h", "obj/checkSig.h")
+  sigFilter = SigFilter(sys.argv[1])
+  sigFilter.filter("obj/" + sys.argv[1] + "_sigs.txt", "obj_dir/V" + sys.argv[1] + "___024root.h")
