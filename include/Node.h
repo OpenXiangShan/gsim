@@ -103,6 +103,7 @@ class Node {
 
   std::set<Node*> next;
   std::set<Node*> prev;
+  std::vector <ExpTree*> assignTree;
   ExpTree* valTree = nullptr;
   ExpTree* resetCond = nullptr;  // valid in reg_src
   ExpTree* resetVal = nullptr;   // valid in reg_src

@@ -125,11 +125,17 @@ void Node::passWidthToPrev() {
     updateTree->getRoot()->usedBit = usedBit;
     updateTree->getRoot()->passWidthToChild();
   }
-  if (!valTree) return;
+  if (assignTree.size() == 0) return;
   Assert(usedBit >= 0, "invalid usedBit %d in node %s", usedBit, name.c_str());
-  if (usedBit != valTree->getRoot()->usedBit) {
-    valTree->getRoot()->usedBit = usedBit;
-    valTree->getRoot()->passWidthToChild();
+  for (ExpTree* tree : assignTree) {
+    if (usedBit != tree->getRoot()->usedBit) {
+      tree->getRoot()->usedBit = usedBit;
+      tree->getRoot()->passWidthToChild();
+    }
+    if (tree->getlval() && tree->getlval()->usedBit != tree->getlval()->width) {
+      tree->getlval()->usedBit = tree->getlval()->width;
+      tree->getlval()->passWidthToChild();
+    }
   }
   return;
 }
@@ -174,7 +180,7 @@ void graph::usedBits() {
 
   for (Node* node : visitedNodes) {
     node->width = node->usedBit;
-    if (node->valTree) node->valTree->getRoot()->updateWidth();
+    for (ExpTree* tree : node->assignTree) tree->getRoot()->updateWidth();
     for (ExpTree* tree : node->arrayVal) tree->getRoot()->updateWidth();
     if (node->resetVal) node->resetVal->getRoot()->updateWidth();
     if (node->updateTree) node->updateTree->getRoot()->updateWidth();

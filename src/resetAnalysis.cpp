@@ -8,9 +8,10 @@ std::map<Node*, clockVal*> resetMap;
 
 ResetType Node::inferReset() {
   if (reset != UNCERTAIN) return reset;
-  if (valTree) {
-    valTree->getRoot()->inferReset();
-    reset = valTree->getRoot()->reset;
+  if (assignTree.size() > 1) TODO();
+  if (assignTree.size() == 1) {
+    assignTree[0]->getRoot()->inferReset();
+    reset = assignTree[0]->getRoot()->reset;
   } else {
     reset = UINTRESET;
   }
@@ -63,19 +64,18 @@ void Node::addReset() {
 
   ResetType resetType = resetCond->getRoot()->inferReset();
   Assert(resetType != UNCERTAIN, "reset %s is uncertain", name.c_str());
-
   if (resetType == ZERO_RESET) {
     /* do nothing */
   } else if (resetType == UINTRESET) {
     ENode* regTop = new ENode(OP_WHEN);
     regTop->addChild(resetCond->getRoot());
     regTop->addChild(resetVal->getRoot());
-    if (getDst()->valTree) {
-      regTop->addChild(getDst()->valTree->getRoot());
-      getDst()->valTree->setRoot(regTop);
+    if (getDst()->assignTree.size() != 0) {
+      regTop->addChild(getDst()->assignTree.back()->getRoot());
+      getDst()->assignTree.back()->setRoot(regTop);
     } else {
       regTop->addChild(nullptr);
-      getDst()->valTree = new ExpTree(regTop, this->getDst());
+      getDst()->assignTree.push_back(new ExpTree(regTop, this->getDst()));
     }
     for (ExpTree* tree : getDst()->arrayVal) {
       ENode* arrayWhenTop = new ENode(OP_WHEN);
@@ -91,13 +91,13 @@ void Node::addReset() {
       regTop->addChild(resetVal->getRoot());
     else
       regTop->addChild(nullptr);
-    if (valTree) {
-      valTree->setRoot(regTop);
+    assignTree.clear();
+    assignTree.push_back(new ExpTree(regTop, this));
+    if (getDst()->assignTree.size() != 0) {
+      fillEmptyWhen(getDst()->assignTree[0], new ENode(this));
     } else {
-      valTree = new ExpTree(regTop, this);
+      getDst()->assignTree.push_back(new ExpTree(new ENode(this), getDst()));
     }
-    if (getDst()->valTree) fillEmptyWhen(getDst()->valTree, new ENode(this));
-    else getDst()->valTree = new ExpTree(new ENode(this), getDst());
   } else {
     Panic();
   }

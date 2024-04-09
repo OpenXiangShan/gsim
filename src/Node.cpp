@@ -4,7 +4,7 @@
 
 void Node::updateConnect() {
   std::queue<ENode*> q;
-  if (valTree) q.push(valTree->getRoot());
+  for (ExpTree* tree : assignTree) q.push(tree->getRoot());
   if (isArray()) {
     for (ExpTree* tree : arrayVal) {
       if (!tree) continue;
@@ -47,16 +47,20 @@ void Node::inferWidth() {
   if (isArray() && arraySplitted()) {
     for (Node* member : arrayMember) member->inferWidth();
   }
-  if (valTree) {
-    valTree->getRoot()->inferWidth();
-  }
+  for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();
+
   if (resetVal) resetVal->getRoot()->inferWidth();
   if (width == -1) {
-    if (valTree) {
-      setType(valTree->getRoot()->width, valTree->getRoot()->sign);
-      isClock = valTree->getRoot()->isClock;
+    int width = 0;
+    bool sign = false;
+    bool clock = false;
+    for (ExpTree* tree : assignTree) {
+      width = MAX(width, tree->getRoot()->width);
+      sign = tree->getRoot()->sign;
+      clock |= tree->getRoot()->isClock;
     }
-    else setType(0, false);
+    setType(width, sign);
+    isClock = clock;
   }
 
   for (ExpTree* arrayTree : arrayVal) {

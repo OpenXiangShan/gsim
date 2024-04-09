@@ -9,6 +9,7 @@
 /* TODO: array alias */
 /* TODO: A = B[idx] */
 ENode* Node::isAlias() {
+  if (type != NODE_OTHERS) return nullptr;
   if (isArray()) {
     /* alias array A to array B iff
       A <= B (if idx = dim[0], A.arrayval[idx] = B, otherwise A.arrayval[idx] = null ) (Done)
@@ -20,11 +21,10 @@ ENode* Node::isAlias() {
     }
     return nullptr;
   }
-  if (type != NODE_OTHERS) return nullptr;
-  if (!valTree) return nullptr;
-  if (!valTree->getRoot()->getNode()) return nullptr;
+  if (assignTree.size() != 1) return nullptr;
+  if (!assignTree[0]->getRoot()->getNode()) return nullptr;
   if (prev.size() != 1) return nullptr;
-  return valTree->getRoot();
+  return assignTree[0]->getRoot();
 }
 
 ENode* ENode::mergeSubTree(ENode* newSubTree) {
@@ -103,7 +103,7 @@ void graph::aliasAnalysis() {
       for (ExpTree* tree : member->arrayVal) {
         if (tree) tree->replace(aliasMap);
       }
-      if (member->valTree) member->valTree->replace(aliasMap);
+      for (ExpTree* tree : member->assignTree) tree->replace(aliasMap);
     }
   }
 

@@ -27,6 +27,8 @@ static std::map<std::string, AggrParentNode*> allDummy; // CHECK: any other dumm
 static std::vector<std::pair<bool, Node*>> whenTrace;
 static std::set<std::string> moduleInstances;
 
+static std::set<Node*> stmtsNodes;
+
 static inline void typeCheck(PNode* node, const int expect[], int size, int minChildNum, int maxChildNum) {
   const int* expectEnd = expect + size;
   Assert((size == 0) || (std::find(expect, expectEnd, node->type) != expectEnd),
@@ -1153,6 +1155,7 @@ void visitWhenConnect(graph* g, PNode* connect) {
       ExpTree* valTree = nullptr;
       if (exp->getFlip(i)) {
         Node* node = exp->getAggr(i)->getNode();
+        stmtsNodes.insert(node);
         if (!node) {
           printf("connect lineno %d\n", connect->lineno);
           TODO();
@@ -1170,6 +1173,7 @@ void visitWhenConnect(graph* g, PNode* connect) {
         else node->valTree = valTree;
       } else {
         Node* node = ref->getAggr(i)->getNode();
+        stmtsNodes.insert(node);
         if (node->isArray()) {
           valTree = growWhenTrace(nullptr, node->whenDepth);
         } else {
@@ -1186,6 +1190,7 @@ void visitWhenConnect(graph* g, PNode* connect) {
 
   } else {
     Node* node = ref->getExpRoot()->getNode();
+    stmtsNodes.insert(node);
     ExpTree* valTree;
     if (node->isArray()) {
       valTree = growWhenTrace(nullptr, node->whenDepth);
@@ -1361,6 +1366,15 @@ void visitAssert(graph* g, PNode* ass) {
   addSignal(n->name, n);
 }
 
+void saveWhenTree() {
+  for (Node* node : stmtsNodes) {
+    if (node->valTree) {
+      node->assignTree.push_back(node->valTree);
+      node->valTree = nullptr;
+    }
+  }
+}
+
 /*
 statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5, $2, 1, $4); }
     | Reg ALLID ':' type ',' expr RegWith INDENT RegReset '(' expr ',' expr ')' info DEDENT { $$ = newNode(P_REG_DEF, $4->lineno, $15, $2, 4, $4, $6, $11, $13); }
@@ -1380,6 +1394,7 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5
     | Skip info { $$ = NULL; }
 */
 void visitStmt(graph* g, PNode* stmt) {
+  stmtsNodes.clear();
   switch (stmt->type) {
     case P_WIRE_DEF: visitWireDef(g, stmt); break;
     case P_REG_DEF: visitRegDef(g, stmt); break;
@@ -1388,7 +1403,10 @@ void visitStmt(graph* g, PNode* stmt) {
     case P_NODE: visitNode(g, stmt); break;
     case P_CONNECT: visitConnect(g, stmt); break;
     case P_PAR_CONNECT: visitPartialConnect(g, stmt); break;
-    case P_WHEN: visitWhen(g, stmt); break;
+    case P_WHEN:
+      visitWhen(g, stmt);
+      saveWhenTree();
+      break;
     case P_PRINTF: visitPrintf(g, stmt); break;
     case P_ASSERT: visitAssert(g, stmt); break;
     default:
@@ -1462,14 +1480,25 @@ graph* AST2Graph(PNode* root) {
   Assert(topModule, "Top module can not be NULL\n");
   visitTopModule(g, topModule);
 
+  for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
+    Node* node = it->second;
+    if (node->valTree) {
+      node->assignTree.push_back(node->valTree);
+      node->valTree = nullptr;
+    }
+  }
+
   for (Node* reg : g->regsrc) {
     /* set lvalue to regDst */
-    if (reg->getSrc()->valTree && reg->getSrc()->valTree->getlval()) {
-      Assert(reg->getSrc()->valTree->getlval()->nodePtr, "lvalue in %s is not node", reg->name.c_str());
-      reg->getSrc()->valTree->getlval()->nodePtr = reg->getDst();
+    for (ExpTree* tree : reg->assignTree) {
+      if (tree->getlval()) {
+        Assert(tree->getlval()->nodePtr, "lvalue in %s is not node", reg->name.c_str());
+        tree->getlval()->nodePtr = reg->getDst();
+      }
     }
-    reg->getDst()->valTree = reg->getSrc()->valTree;
-    reg->getSrc()->valTree = NULL;
+    reg->getDst()->assignTree.insert(reg->getDst()->assignTree.end(), reg->assignTree.begin(), reg->assignTree.end());
+    reg->assignTree.clear();
+
     for (ExpTree* tree : reg->getSrc()->arrayVal) {
       if (!tree) continue;
       Assert(tree->getlval()->nodePtr, "lvalue in %s is not node", reg->name.c_str());
@@ -1488,7 +1517,7 @@ graph* AST2Graph(PNode* root) {
       if (port->type == NODE_READWRITER) TODO();
       ENode* enode = new ENode(OP_READ_MEM);
       enode->addChild(new ENode(port->get_member(READER_ADDR)));
-      port->get_member(READER_DATA)->valTree = new ExpTree(enode, port->get_member(READER_DATA));
+      port->get_member(READER_DATA)->assignTree.push_back(new ExpTree(enode, port->get_member(READER_DATA)));
     }
   }
 
@@ -1524,8 +1553,8 @@ graph* AST2Graph(PNode* root) {
   }
   for (Node* input : g->input) {
     g->supersrc.insert(input->super);
-    if (input->valTree) Assert(input->valTree->isInvalid(), "input %s not invalid", input->name.c_str());
-    input->valTree = nullptr;
+    for (ExpTree* tree : input->assignTree) Assert(tree->isInvalid(), "input %s not invalid", input->name.c_str());
+    input->assignTree.clear();
   }
   for (auto it : allSignals) {
     if ((it.second->type == NODE_OTHERS || it.second->type == NODE_MEM_MEMBER) && it.second->super->prev.size() == 0) {

@@ -24,6 +24,7 @@ static int mpzTmpNum = 0;
 
 static int countArrayIndex(std::string name);
 static bool isSubArray(std::string name, Node* node);
+void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
 static std::string getConsStr(mpz_t& val) {
   std::string str = mpz_get_str(NULL, 16, val);
@@ -1929,7 +1930,8 @@ valInfo* Node::compute() {
     status = CONSTANT_NODE;
     return computeInfo;
   }
-  if (!valTree) {
+
+  if (assignTree.size() == 0) {
     computeInfo = new valInfo();
     if (type == NODE_OTHERS) { // invalid nodes
       computeInfo->setConstantByStr("0");
@@ -1940,15 +1942,26 @@ valInfo* Node::compute() {
     computeInfo->sign = sign;
     return computeInfo;
   }
-  Assert(valTree && valTree->getRoot(), "empty valTree in node %s", name.c_str());
+
   bool isRoot = anyExtEdge() || next.size() != 1 || type == NODE_ARRAY_MEMBER;
-  valInfo* ret = valTree->getRoot()->compute(this, name, isRoot)->dup();
+  valInfo* ret = nullptr;
+  for (size_t i = 0; i < assignTree.size(); i ++) {
+    ExpTree* tree = assignTree[i];
+    valInfo* info = tree->getRoot()->compute(this, name, isRoot);
+    if (info->status == VAL_EMPTY || info->status == VAL_INVALID) continue;
+    ret = info->dup();
+    if ((ret->status == VAL_INVALID || ret->status == VAL_CONSTANT) && (i < assignTree.size() - 1) ) {
+      fillEmptyWhen(assignTree[i+1], tree->getRoot());
+    }
+  }
+  if (!ret) ret = assignTree.back()->getRoot()->compute(this, name, isRoot)->dup();
+  Assert(ret, "empty info in %s\n", name.c_str());
   if (ret->status == VAL_INVALID) ret->setConstantByStr("0");
   if (ret->status == VAL_EMPTY_SRC) status = DEAD_SRC;
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
     if (type == NODE_REG_DST) {
-      if (getSrc()->status == DEAD_SRC || !getSrc()->valTree || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, getSrc()->computeInfo->consVal) == 0)) {
+      if (getSrc()->status == DEAD_SRC || getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, getSrc()->computeInfo->consVal) == 0)) {
         getSrc()->status = CONSTANT_NODE;
         getSrc()->computeInfo = ret;
         /* re-compute nodes depend on src */
@@ -1959,9 +1972,7 @@ valInfo* Node::compute() {
         }
       }
     }
-  } else if (type == NODE_REG_DST && ret->sameConstant && !getSrc()->valTree) {
-    display();
-    printf("%s is constant ", name.c_str()); mpz_out_str(stdout, 16, ret->assignmentCons); printf("\n");
+  } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant && getSrc()->assignTree.size() == 0) {
     ret->status = VAL_CONSTANT;
     mpz_set(ret->consVal, ret->assignmentCons);
     status = CONSTANT_NODE;
@@ -1984,7 +1995,9 @@ valInfo* Node::compute() {
   ret->width = width;
   ret->sign = sign;
   computeInfo = ret;
-  for (std::string inst : valTree->getRoot()->computeInfo->insts) insts.push_back(inst);
+  for (ExpTree* tree : assignTree) {
+    for (std::string inst : tree->getRoot()->computeInfo->insts) insts.push_back(inst);
+  }
   return ret;
 }
 
@@ -2012,7 +2025,7 @@ void Node::recompute() {
       tree->clearInfo();
   }
   insts.clear();
-  if (valTree) valTree->clearInfo();
+  for (ExpTree* tree : assignTree) tree->clearInfo();
   compute();
   bool recomputeNext = false;
   if (prevVal->valStr != computeInfo->valStr) {
@@ -2089,12 +2102,12 @@ valInfo* Node::computeArray() {
   computeInfo->sign = sign;
   std::set<int> allIdx;
   bool anyVarIdx = false;
-  if (valTree) {
+  for (ExpTree* tree : assignTree) {
     std::string lvalue = name;
-    if (valTree->getlval()) {
-      valInfo* lindex = valTree->getlval()->compute(this, INVALID_LVALUE, false);
+    if (tree->getlval()) {
+      valInfo* lindex = tree->getlval()->compute(this, INVALID_LVALUE, false);
       lvalue = lindex->valStr;
-      std::tie(lindex->beg, lindex->end) = valTree->getlval()->getIdx(this);
+      std::tie(lindex->beg, lindex->end) = tree->getlval()->getIdx(this);
       if (lindex->beg < 0) anyVarIdx = true;
       else {
         for (int i = lindex->beg; i <= lindex->end; i ++) {
@@ -2106,7 +2119,7 @@ valInfo* Node::computeArray() {
       display();
       TODO();
     }
-    valInfo* info = valTree->getRoot()->compute(this, lvalue, true);
+    valInfo* info = tree->getRoot()->compute(this, lvalue, true);
     for (std::string inst : info->insts) insts.push_back(inst);
     finalConnect(lvalue, info);
   }
@@ -2134,15 +2147,15 @@ valInfo* Node::computeArray() {
   if (!anyVarIdx) {
     int num = arrayEntryNum();
     computeInfo->memberInfo.resize(num, nullptr);
-    if (valTree) {
-      int infoIdxBeg = valTree->getlval()->computeInfo->beg;
-      int infoIdxEnd = valTree->getlval()->computeInfo->end;
-      if (valTree->getRoot()->computeInfo->valStr.find("TMP$") == valTree->getRoot()->computeInfo->valStr.npos) {
+    for (ExpTree* tree : assignTree) {
+      int infoIdxBeg = tree->getlval()->computeInfo->beg;
+      int infoIdxEnd = tree->getlval()->computeInfo->end;
+      if (tree->getRoot()->computeInfo->valStr.find("TMP$") == tree->getRoot()->computeInfo->valStr.npos) {
         if (infoIdxBeg == infoIdxEnd) {
-          computeInfo->memberInfo[infoIdxBeg] = valTree->getRoot()->computeInfo;
-        } else if (valTree->getRoot()->computeInfo->memberInfo.size() != 0) {
+          computeInfo->memberInfo[infoIdxBeg] = tree->getRoot()->computeInfo;
+        } else if (tree->getRoot()->computeInfo->memberInfo.size() != 0) {
           for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) {
-            computeInfo->memberInfo[infoIdxBeg + i] = valTree->getRoot()->computeInfo->getMemberInfo(i);
+            computeInfo->memberInfo[infoIdxBeg + i] = tree->getRoot()->computeInfo->getMemberInfo(i);
           }
         }
       }
@@ -2164,10 +2177,7 @@ valInfo* Node::computeArray() {
       }
     }
 
-    for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
-      if (computeInfo->memberInfo[i]) printf("idx %ld = %s\n", i, computeInfo->memberInfo[i]->valStr.c_str());
-    }
-    if (type == NODE_REG_DST && !getSrc()->valTree) {
+    if (type == NODE_REG_DST && getSrc()->assignTree.size() == 0) {
       for (int i = 0; i < num; i ++) {
         if (computeInfo->memberInfo[i] && computeInfo->memberInfo[i]->sameConstant) {
           computeInfo->memberInfo[i]->status = VAL_CONSTANT;
@@ -2199,7 +2209,7 @@ void graph::instsGenerator() {
       if (n->dimension.size() != 0) {
         n->computeArray();
       } else {
-        if (!n->valTree) continue;
+        if (n->assignTree.size() == 0) continue;
         n->compute();
         if (n->status == MERGED_NODE || n->status == CONSTANT_NODE) continue;
         s.insert(n);
@@ -2214,7 +2224,6 @@ void graph::instsGenerator() {
         member->updateTree->getRoot()->compute(member, info->valStr, true);
       }
       if (member->status == DEAD_SRC) {
-        if (member->type != NODE_REG_SRC) member->display();
         Assert(member->type == NODE_REG_SRC, "%s is not reg_src %d", member->name.c_str(), member->type);
         member->status = VALID_NODE;
       }
@@ -2222,15 +2231,17 @@ void graph::instsGenerator() {
   }
   /* generate assignment instrs */
   for (Node* n : s) {
-    valInfo* assignInfo = n->valTree->getRoot()->computeInfo;
-    if (assignInfo->status == VAL_VALID) {
-      if (assignInfo->opNum < 0) {
-          n->insts.push_back(assignInfo->valStr);
-      } else if (assignInfo->opNum > 0 || assignInfo->valStr != n->name) {
-        if (n->width <= BASIC_WIDTH)
-          n->insts.push_back(n->name + " = " + assignInfo->valStr + ";");
-        else
-          n->insts.push_back(format("mpz_set(%s, %s);", n->name.c_str(), assignInfo->valStr.c_str()));
+    for (ExpTree* tree : n->assignTree) {
+      valInfo* assignInfo = tree->getRoot()->computeInfo;
+      if (assignInfo->status == VAL_VALID) {
+        if (assignInfo->opNum < 0) {
+            n->insts.push_back(assignInfo->valStr);
+        } else if (assignInfo->opNum > 0 || assignInfo->valStr != n->name) {
+          if (n->width <= BASIC_WIDTH)
+            n->insts.push_back(n->name + " = " + assignInfo->valStr + ";");
+          else
+            n->insts.push_back(format("mpz_set(%s, %s);", n->name.c_str(), assignInfo->valStr.c_str()));
+        }
       }
     }
   }

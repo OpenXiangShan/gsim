@@ -92,7 +92,10 @@ void SuperNode::display() {
 
 void Node::display() {
   printf("node %s[width %d sign %d status %d type %d]:\n", name.c_str(), width, sign, status, type);
-  if (valTree) valTree->display();
+  for (size_t i = 0; i < assignTree.size(); i ++) {
+    printf("[assign] %ld\n", i);
+    assignTree[i]->display();
+  }
   for (size_t i = 0; i < arrayVal.size(); i ++) {
     if (!arrayVal[i]) continue;
     printf("[array] %ld\n", i);

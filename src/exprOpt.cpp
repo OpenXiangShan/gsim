@@ -19,8 +19,8 @@ void Node::invalidArrayOptimize() {
   /* can compute in AST2Graph and pass using member variable */
   std::set<int> allIdx;
   int beg, end;
-  if (valTree) {
-    std::tie(beg, end) = valTree->getlval()->getIdx(this);
+  for (ExpTree* tree : assignTree) {
+    std::tie(beg, end) = tree->getlval()->getIdx(this);
     if (beg < 0) return;  // varialble index
     for (int i = beg; i <= end; i ++) {
       if (allIdx.find(i) != allIdx.end()) return; // multiple assignment
@@ -35,6 +35,6 @@ void Node::invalidArrayOptimize() {
       allIdx.insert(i);
     }
   }
-  if (valTree) fillArrayInvalid(valTree);
+  for (ExpTree* tree : assignTree) fillArrayInvalid(tree);
   for (ExpTree* tree : arrayVal) fillArrayInvalid(tree);    
 }

@@ -136,12 +136,14 @@ void distributeTree(Node* node, ExpTree* tree) {
   ArrayMemberList* list = tree->getlval()->getArrayMember(node);
   if (list->member.size() == 1) {
     int idx = list->idx[0];
-    if (node->arrayMember[idx]->valTree) {
+    if (node->arrayMember[idx]->assignTree.size() != 0) {
       /* fill empty when body in tree with old valTree*/
-      ExpTree* oldTree = node->arrayMember[idx]->valTree;
+      ExpTree* oldTree = node->arrayMember[idx]->assignTree[0];
       fillEmptyWhen(tree, oldTree->getRoot());
+      node->arrayMember[idx]->assignTree[0] = tree;
+    } else {
+      node->arrayMember[idx]->assignTree.push_back(tree);
     }
-    node->arrayMember[idx]->valTree = tree;
   } else {
     for (size_t i = 0; i < list->member.size(); i ++) {
       int idx = list->idx[i];
@@ -154,12 +156,14 @@ void distributeTree(Node* node, ExpTree* tree) {
       }
       ExpTree* newTree = dupTreeWithIdx(tree, subIdx);
       /* duplicate tree with idx */
-      if (node->arrayMember[idx]->valTree) {
+      if (node->arrayMember[idx]->assignTree.size() != 0) {
         /* fill empty when body in newTree with old valTree*/
-        ExpTree* oldTree = node->arrayMember[idx]->valTree;
+        ExpTree* oldTree = node->arrayMember[idx]->assignTree[0];
         fillEmptyWhen(newTree, oldTree->getRoot());
+        node->arrayMember[idx]->assignTree[0] = newTree;
+      } else {
+        node->arrayMember[idx]->assignTree.push_back(newTree);
       }
-      node->arrayMember[idx]->valTree = newTree;
 
     }
   }
@@ -220,14 +224,12 @@ void graph::splitArray() {
       for (int num : node->dimension) entryNum *= num;
 
       for (int i = 0; i < entryNum; i ++) {
-        Node* member = node->arrayMemberNode(i);
-        Assert(!member->isArray() || !member->valTree, "%s implement me!", member->name.c_str());
+        node->arrayMemberNode(i);
       }
       /* distribute arrayVal */
-      if (node->valTree) distributeTree(node, node->valTree);
-      for (ExpTree* tree : node->arrayVal) {
-        distributeTree(node, tree);
-      }
+      for (ExpTree* tree : node->assignTree) distributeTree(node, tree);
+      for (ExpTree* tree : node->arrayVal) distributeTree(node, tree);
+
       /* construct connections */
       for (Node* member : node->arrayMember) {
         member->updateConnect();

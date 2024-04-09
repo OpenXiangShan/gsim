@@ -69,8 +69,9 @@ clockVal* Node::clockCompute() {
     clockMap[this] = new clockVal(this);
     return clockMap[this];
   }
-  if (valTree) {
-    clockVal* ret = valTree->getRoot()->clockCompute();
+  Assert(assignTree.size() <= 1, "multiple clock assignment in %s", name.c_str());
+  if (assignTree.size() != 0) {
+    clockVal* ret = assignTree[0]->getRoot()->clockCompute();
     clockMap[this] = ret;
     return ret;
   }
@@ -80,12 +81,12 @@ clockVal* Node::clockCompute() {
 }
 
 Node* Node::clockAlias() {
-  if (!valTree) return nullptr;
+  if (assignTree.size() != 1) return nullptr;
 /* check if is when with invalid side */
-  if (!valTree->getRoot()->getNode()) return nullptr;
-  Assert(valTree->getRoot()->getChildNum() == 0, "alias clock %s to array %s\n", name.c_str(), valTree->getRoot()->getNode()->name.c_str());
+  if (!assignTree[0]->getRoot()->getNode()) return nullptr;
+  Assert(assignTree[0]->getRoot()->getChildNum() == 0, "alias clock %s to array %s\n", name.c_str(), assignTree[0]->getRoot()->getNode()->name.c_str());
   if (prev.size() != 1) return nullptr;
-  return valTree->getRoot()->getNode();
+  return assignTree[0]->getRoot()->getNode();
 }
 
 void Node::setConstantZero(int width) {
@@ -116,7 +117,7 @@ void graph::clockOptimize() {
           if (node->clock->type != NODE_INP) {
             ENode* clockENode = new ENode(val->node);
             clockENode->width = val->node->width;
-            node->clock->valTree->setRoot(clockENode);
+            node->clock->assignTree[0]->setRoot(clockENode);
           }
         } else {
           node->setConstantZero(node->width);
@@ -142,7 +143,7 @@ void graph::clockOptimize() {
           if (val->node) {
             ENode* clockENode = new ENode(val->node);
             clockENode->width = val->node->width;
-            clockMember->valTree->setRoot(clockENode);
+            clockMember->assignTree[0]->setRoot(clockENode);
           } else {
             for (Node* member : node->member)
               member->setConstantZero(member->width);
