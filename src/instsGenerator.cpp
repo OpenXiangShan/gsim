@@ -2121,6 +2121,7 @@ valInfo* Node::computeArray() {
     }
     valInfo* info = tree->getRoot()->compute(this, lvalue, true);
     for (std::string inst : info->insts) insts.push_back(inst);
+    info->insts.clear();
     finalConnect(lvalue, info);
   }
 
@@ -2131,6 +2132,7 @@ valInfo* Node::computeArray() {
         std::string lvalue = lindex->valStr;
         valInfo* info = tree->getRoot()->compute(this, lvalue, false);
         for (std::string inst : info->insts) insts.push_back(inst);
+        info->insts.clear();
         finalConnect(lindex->valStr, info);
         std::tie(lindex->beg, lindex->end) = tree->getlval()->getIdx(this);
         if (lindex->beg < 0) anyVarIdx = true;
