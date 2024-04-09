@@ -16,7 +16,7 @@ class Partition():
         self.topName = topName
         self.srcId = 0
         self.funcPerFile = 100
-        self.linePerFile = 10000
+        self.linePerFile = 50000
         self.funcNum = 0
         self.lineNum = 0
         self.bracketNum = 0

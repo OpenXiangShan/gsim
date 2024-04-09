@@ -110,10 +110,7 @@ class ENode {
   valInfo* instsPrintf();
   valInfo* instsAssert();
   /* used in usedBits */
-  // int getWidthFromChild();
-  // void passWidthToChild();
 
-  // valInfo* instsSimple2expr();
 public:
   Node* nodePtr = nullptr;   // leafNodes: point to a real node; internals: nullptr
   std::vector<ENode*> child;
