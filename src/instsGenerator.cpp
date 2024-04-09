@@ -58,17 +58,19 @@ static std::string bitMask(int width) {
   return ret;
 }
 
-static std::string arrayCopy(std::string lvalue, Node* node, std::string rvalue) {
-  std::string ret, idxStr, bracket;
+static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo) {
+  std::string ret;
+
+  std::string idxStr, bracket;
   for (int i = countArrayIndex(lvalue); i < node->dimension.size(); i ++) {
     ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
     idxStr += "[i" + std::to_string(i) + "]";
     bracket += "}\n";
   }
   if (node->width > BASIC_WIDTH)
-    ret += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), rvalue.c_str(), idxStr.c_str());
+    ret += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str(), idxStr.c_str());
   else
-    ret += format("%s%s = %s%s;\n", lvalue.c_str(), idxStr.c_str(), rvalue.c_str(), idxStr.c_str());
+    ret += format("%s%s = %s%s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str(), idxStr.c_str());
   ret += bracket;
   return ret;
 }
@@ -79,14 +81,7 @@ static std::string setMpz(std::string dstName, ENode* enode, valInfo* dstInfo, N
     if (mpz_cmp_ui(enode->computeInfo->consVal, MAX_U64) > 0) ret = format("mpz_set_str(%s, \"%s\", 16);", dstName.c_str(), mpz_get_str(NULL, 16, enode->computeInfo->consVal));
     else ret = format("mpz_set_ui(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
   } else if (isSubArray(dstName, node)) {
-    std::string idxStr, bracket;
-    for (size_t i = countArrayIndex(dstName); i < node->dimension.size(); i ++) {
-      ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
-      idxStr += "[i" + std::to_string(i) + "]";
-      bracket += "}\n";
-    }
-    ret += format("mpz_set(%s%s, %s%s);\n", dstName.c_str(), idxStr.c_str(), enode->computeInfo->valStr.c_str(), idxStr.c_str());
-    ret += bracket;
+    ret = arrayCopy(dstName, node, enode->computeInfo);
   } else if (enode->width > BASIC_WIDTH) {
     ret = format("mpz_set(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
   } else if (enode->width > 64) {
@@ -299,7 +294,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
           if (info->status == VAL_CONSTANT)
             return format("memset(%s, %s, sizeof(%s));", lvalue.c_str(), expr.c_str(), lvalue.c_str());
           else
-            return arrayCopy(lvalue, node, expr);
+            return arrayCopy(lvalue, node, info);
         }
       }
       else if (node->width < width) return format("%s = (%s & %s);", lvalue.c_str(), expr.c_str(), bitMask(node->width).c_str());
@@ -316,16 +311,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       if (isStmt) return expr;
       if (expr.length() == 0) return std::string("");
       else if (isSubArray(lvalue, node)) {
-        std::string ret;
-        std::string idxStr, bracket;
-        for (size_t i = countArrayIndex(lvalue); i < node->dimension.size(); i ++) {
-          ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
-          idxStr += "[i" + std::to_string(i) + "]";
-          bracket += "}\n";
-        }
-        ret += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), expr.c_str(), idxStr.c_str());
-        ret += bracket;
-        return ret;
+        return arrayCopy(lvalue, node, info);
       }
       else if (width <= 64) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
       else if (info->status == VAL_CONSTANT && info->consLength <= 16) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
@@ -1714,18 +1700,7 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
   valInfo* resetVal = Child(1, computeInfo);//node->resetVal->getRoot()->compute(node, node->name, isRoot);
   std::string ret;
   if (node->isArray() && isSubArray(lvalue, node)) {
-    if (node->width > BASIC_WIDTH) {
-      std::string idxStr, bracket;
-      for (size_t i = 0; i < node->dimension.size(); i ++) {
-        ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
-        idxStr += "[i" + std::to_string(i) + "]";
-        bracket += "}\n";
-      }
-      ret += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), resetVal->valStr.c_str(), idxStr.c_str());
-      ret += bracket;
-    } else {
-      ret = arrayCopy(lvalue, node, resetVal->valStr);
-    }
+      ret = arrayCopy(lvalue, node, resetVal);
   } else {
     if (node->width > BASIC_WIDTH) {
       if (resetVal->status == VAL_CONSTANT) {
@@ -2056,20 +2031,12 @@ void Node::finalConnect(std::string lvalue, valInfo* info) {
       if (info->status == VAL_CONSTANT)
         insts.push_back(format("memset(%s, %s, sizeof(%s));", lvalue.c_str(), info->valStr.c_str(), lvalue.c_str()));
       else {
-        insts.push_back(arrayCopy(lvalue, this, info->valStr));
+        insts.push_back(arrayCopy(lvalue, this, info));
       }
     } else if (width < BASIC_WIDTH && info->width > width) {
       TODO();
     } else {
-      std::string idxStr, bracket, mpzInst;
-      for (size_t i = countArrayIndex(lvalue); i < dimension.size(); i ++) {
-        mpzInst += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, dimension[i], i);
-        idxStr += "[i" + std::to_string(i) + "]";
-        bracket += "}\n";
-      }
-      mpzInst += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), info->valStr.c_str(), idxStr.c_str());
-      mpzInst += bracket;
-      insts.push_back(mpzInst);
+      insts.push_back(arrayCopy(lvalue, this, info));;
     }
   } else {
     if (width <= BASIC_WIDTH) {
