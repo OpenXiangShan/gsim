@@ -91,7 +91,6 @@ void graph::aliasAnalysis() {
       ENode* enode = member->isAlias();
       if (!enode) continue;
       aliasNum ++;
-
       member->status = DEAD_NODE;
       if (aliasMap.find(enode->getNode()) != aliasMap.end()) aliasMap[member] = enode->mergeSubTree(aliasMap[enode->getNode()]);
       else aliasMap[member] = enode;

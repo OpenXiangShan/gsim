@@ -33,6 +33,8 @@ class graph {
   /* defined in mergeNodes */
   void mergeOut1();
   void mergeIn1();
+  void splitArrayNode(Node* node);
+  void splitOptionalArray();
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;

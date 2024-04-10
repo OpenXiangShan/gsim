@@ -25,6 +25,7 @@ static int mpzTmpNum = 0;
 static int countArrayIndex(std::string name);
 static bool isSubArray(std::string name, Node* node);
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
+std::string idx2Str(Node* node, int idx, int dim);
 
 static std::string getConsStr(mpz_t& val) {
   std::string str = mpz_get_str(NULL, 16, val);
@@ -58,20 +59,51 @@ static std::string bitMask(int width) {
   return ret;
 }
 
+bool memberValid(valInfo* info, size_t num) {
+  if (info->memberInfo.size() != num) return false;
+  bool ret = true;
+  for (valInfo* member : info->memberInfo) {
+    if (!member) ret = false;
+  }
+  return ret;
+}
+
 static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo) {
   std::string ret;
+  int num = 1;
+  int dimIdx = countArrayIndex(lvalue);
+  for (size_t i = dimIdx; i < node->dimension.size(); i ++) num *= node->dimension[i];
+  if (memberValid(rinfo, num)) {
+    for (int i = 0; i < num; i ++) {
+      valInfo* assignInfo = rinfo->getMemberInfo(i);
+      if (node->width > BASIC_WIDTH) {
+        if (assignInfo->status == VAL_CONSTANT) {
+          if (mpz_cmp_ui(assignInfo->consVal, MAX_U64) > 0) {
+            ret += format("mpz_set_str(%s%s, \"%s\", 16);\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), mpz_get_str(NULL, 16, assignInfo->consVal));
+          } else {
+            ret += format("mpz_set_ui(%s%s, %s);\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
+          }
+        } else {
+          ret += format("mpz_set(%s%s, %s);\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
+        }
+      } else {
+        ret += format("%s%s = %s;\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
+      }
+    }
 
-  std::string idxStr, bracket;
-  for (int i = countArrayIndex(lvalue); i < node->dimension.size(); i ++) {
-    ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
-    idxStr += "[i" + std::to_string(i) + "]";
-    bracket += "}\n";
+  } else {
+    std::string idxStr, bracket;
+    for (int i = dimIdx; i < node->dimension.size(); i ++) {
+      ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
+      idxStr += "[i" + std::to_string(i) + "]";
+      bracket += "}\n";
+    }
+    if (node->width > BASIC_WIDTH)
+      ret += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str(), idxStr.c_str());
+    else
+      ret += format("%s%s = %s%s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str(), idxStr.c_str());
+    ret += bracket;
   }
-  if (node->width > BASIC_WIDTH)
-    ret += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str(), idxStr.c_str());
-  else
-    ret += format("%s%s = %s%s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str(), idxStr.c_str());
-  ret += bracket;
   return ret;
 }
 
@@ -128,6 +160,18 @@ static std::string set128(std::string lvalue, valInfo* info, valInfo* ret) {
   return format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);\n", lvalue.c_str(), localName.c_str());
 }
 
+static std::string getZeroIdx(ENode* enode, Node* node) {
+  std::string zeroIdxStr;
+  for (size_t i = enode->getChildNum(); i < node->dimension.size(); i ++) {
+    if (node->dimension[i] == 1) zeroIdxStr += "[0]";
+    else {
+      zeroIdxStr = "";
+      break;
+    }
+  }
+  return zeroIdxStr;
+}
+
 static int countArrayIndex(std::string name) {
   int count = 0;
   int idx = 0;
@@ -173,6 +217,7 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
       return computeInfo;
     }
   }
+  if (isSubArray(lvalue, node)) return instsWhen(node, lvalue, isRoot);
 
   /* not constant */
   bool childBasic = ChildInfo(1, width) <= BASIC_WIDTH && ChildInfo(2, width) <= BASIC_WIDTH;
@@ -205,9 +250,9 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
   return ret;
 }
 
-std::string idx2Str(Node* node, int idx) {
+std::string idx2Str(Node* node, int idx, int dim) {
   std::string ret;
-  for (int i = node->dimension.size() - 1; i >= 0; i --) {
+  for (int i = node->dimension.size() - 1; i >= dim; i --) {
     ret = "[" + std::to_string(idx % node->dimension[i]) + "]" + ret;
     idx /= node->dimension[i];
   }
@@ -1732,15 +1777,28 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
   if (nodePtr) {
     if (nodePtr->isArray() && nodePtr->arraySplitted()) {
       if (getChildNum() < nodePtr->dimension.size()) {
-        computeInfo = new valInfo();
-        computeInfo->width = nodePtr->width;
-        computeInfo->sign = nodePtr->sign;
-        computeInfo->valStr = nodePtr->name;
-        computeInfo->splittedArray = nodePtr;
-        std::tie(computeInfo->beg, computeInfo->end) = getIdx(nodePtr);
-        for (ENode* childENode : child)
-          computeInfo->valStr += childENode->computeInfo->valStr;
-        computeInfo->opNum = 0;
+        int beg, end;
+        std::tie(beg, end) = getIdx(nodePtr);
+        if (beg >= 0 && beg == end) {
+          computeInfo = nodePtr->getArrayMember(beg)->compute()->dup();
+        } else {
+          computeInfo = new valInfo();
+          computeInfo->beg = beg;
+          computeInfo->end = end;
+          computeInfo->width = nodePtr->width;
+          computeInfo->sign = nodePtr->sign;
+          computeInfo->valStr = nodePtr->name;
+          computeInfo->splittedArray = nodePtr;
+          for (ENode* childENode : child)
+            computeInfo->valStr += childENode->computeInfo->valStr;
+          computeInfo->valStr += getZeroIdx(this, nodePtr);
+          computeInfo->opNum = 0;
+          if (computeInfo->beg >= 0) {
+            for (int i = computeInfo->beg; i <= computeInfo->end; i ++) {
+              computeInfo->memberInfo.push_back(nodePtr->getArrayMember(i)->compute());
+            }
+          }
+        }
       } else {
         int idx = getArrayIndex(nodePtr);
         computeInfo = nodePtr->getArrayMember(idx)->compute()->dup();
@@ -1761,14 +1819,9 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           for (ENode* childENode : child)
             computeInfo->valStr += childENode->computeInfo->valStr;
         }
-        bool isZeroIdx = true;
-        std::string zeroIdxStr;
-        for (size_t i = getChildNum(); i < nodePtr->dimension.size(); i ++) {
-          if (nodePtr->dimension[i] == 1) zeroIdxStr += "[0]";
-          else isZeroIdx = false;
-        }
-        if (isSubArray(computeInfo->valStr, nodePtr) && isZeroIdx) {
-          computeInfo->valStr += zeroIdxStr;
+
+        if (isSubArray(computeInfo->valStr, nodePtr)) {
+          computeInfo->valStr += getZeroIdx(this, nodePtr);
         }
       }
       computeInfo->beg = beg;
@@ -2154,11 +2207,11 @@ valInfo* Node::computeArray() {
           computeInfo->memberInfo[i]->setConsStr();
           if (width > BASIC_WIDTH) {
             if (mpz_cmp_ui(computeInfo->memberInfo[i]->consVal, MAX_U64) > 0)
-              insts.push_back(format("mpz_set_str(%s%s, \"%s\", 16);", name.c_str(), idx2Str(this, i).c_str(), mpz_get_str(NULL, 16, computeInfo->memberInfo[i]->consVal)));
+              insts.push_back(format("mpz_set_str(%s%s, \"%s\", 16);", name.c_str(), idx2Str(this, i, 0).c_str(), mpz_get_str(NULL, 16, computeInfo->memberInfo[i]->consVal)));
             else
-              insts.push_back(format("mpz_set_ui(%s%s, \"%s\", 16);", name.c_str(), idx2Str(this, i).c_str(), computeInfo->memberInfo[i]->valStr.c_str()));
+              insts.push_back(format("mpz_set_ui(%s%s, %s);", name.c_str(), idx2Str(this, i, 0).c_str(), computeInfo->memberInfo[i]->valStr.c_str()));
           } else {
-            insts.push_back(format("%s%s = %s;", name.c_str(), idx2Str(this, i).c_str(), computeInfo->memberInfo[i]->valStr.c_str()));
+            insts.push_back(format("%s%s = %s;", name.c_str(), idx2Str(this, i, 0).c_str(), computeInfo->memberInfo[i]->valStr.c_str()));
           }
         }
       }

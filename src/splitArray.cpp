@@ -169,9 +169,54 @@ void distributeTree(Node* node, ExpTree* tree) {
   }
 }
 
+void graph::splitArrayNode(Node* node) {
+  /* remove prev connection */
+  for (Node* prev : node->prev) prev->next.erase(node);
+  for (SuperNode* super : node->super->prev) super->next.erase(node->super);
+  for (Node* next : node->next) next->prev.erase(node);
+  for (SuperNode* super : node->super->next) super->prev.erase(node->super);
+  node->super->prev.clear();
+  node->super->next.clear();
+
+  for (Node* memberInSuper : node->super->member) {
+    if (memberInSuper != node)
+      memberInSuper->constructSuperConnect();
+  }
+  /* create new node */
+  int entryNum = node->arrayEntryNum();
+
+  for (int i = 0; i < entryNum; i ++) {
+    node->arrayMemberNode(i);
+  }
+  /* distribute arrayVal */
+  for (ExpTree* tree : node->assignTree) distributeTree(node, tree);
+  for (ExpTree* tree : node->arrayVal) distributeTree(node, tree);
+
+  /* construct connections */
+  for (Node* member : node->arrayMember) {
+    member->updateConnect();
+  }
+  for (Node* next : node->next) {
+    if (next != node) {
+      next->prev.clear();
+      next->updateConnect();
+    }
+  }
+
+  /* clear node connection */
+  node->prev.clear();
+  node->next.clear();
+
+  for (Node* member : node->arrayMember) member->constructSuperConnect();
+  for (Node* member : node->arrayMember) {
+    if (member->super->prev.size() == 0) supersrc.insert(member->super);
+  }
+}
+
 void graph::splitArray() {
   std::map<Node*, int> times;
   std::stack<Node*> s;
+  int num = 0;
 
   for (SuperNode* super : supersrc) {
     for (Node* node : super->member) {
@@ -206,47 +251,9 @@ void graph::splitArray() {
       /* split arrays in partialVisited until s.size() != 0 */
       Node* node = getSplitArray(this);
       Assert(!node->arraySplitted(), "%s is already splitted", node->name.c_str());
-      printf("split array %s\n", node->name.c_str());
-      /* remove prev connection */
-      for (Node* prev : node->prev) prev->next.erase(node);
-      for (SuperNode* super : node->super->prev) super->next.erase(node->super);
-      for (Node* next : node->next) next->prev.erase(node);
-      for (SuperNode* super : node->super->next) super->prev.erase(node->super);
-      node->super->prev.clear();
-      node->super->next.clear();
-
-      for (Node* memberInSuper : node->super->member) {
-        if (memberInSuper != node)
-          memberInSuper->constructSuperConnect();
-      }
-      /* create new node */
-      int entryNum = 1;
-      for (int num : node->dimension) entryNum *= num;
-
-      for (int i = 0; i < entryNum; i ++) {
-        node->arrayMemberNode(i);
-      }
-      /* distribute arrayVal */
-      for (ExpTree* tree : node->assignTree) distributeTree(node, tree);
-      for (ExpTree* tree : node->arrayVal) distributeTree(node, tree);
-
-      /* construct connections */
-      for (Node* member : node->arrayMember) {
-        member->updateConnect();
-      }
-      for (Node* next : node->next) {
-        if (next != node)
-          next->updateConnect();
-      }
-
-      /* clear node connection */
-      node->prev.clear();
-      node->next.clear();
-
-      for (Node* member : node->arrayMember) member->constructSuperConnect();
-      for (Node* member : node->arrayMember) {
-        if (member->super->prev.size() == 0) supersrc.insert(member->super);
-      }
+      // printf("split array %s\n", node->name.c_str());
+      num ++;
+      splitArrayNode(node);
       /* add into s and visitedSet */
       for (Node* member : node->arrayMember) {
         // if (!member->valTree) continue;
@@ -268,6 +275,8 @@ void graph::splitArray() {
     }
   }
   Assert(partialVisited.size() == 0, "partial is not empty!");
+  printf("[splitArray] split %d arrays\n", num);
+  splitOptionalArray();
 }
 
 Node* Node::arrayMemberNode(int idx) {
@@ -297,4 +306,54 @@ Node* Node::arrayMemberNode(int idx) {
   for ( ; i < dimension.size(); i ++) member->dimension.push_back(dimension[i]);
 
   return member;
+}
+
+bool nextVarConnect(Node* node) {
+  for (Node* next : node->next) {
+    std::stack<std::pair<ENode*, bool>> s;
+    for (ExpTree* tree : next->assignTree) s.push(std::make_pair(tree->getRoot(), false));
+    for (ExpTree* tree : next->arrayVal) {
+      s.push(std::make_pair(tree->getRoot(), false));
+      s.push(std::make_pair(tree->getlval(), false));
+    }
+    while (!s.empty()) {
+      ENode* top;
+      bool anyMux;
+      std::tie(top, anyMux) = s.top();
+      s.pop();
+      if (top->getNode() == node) {
+        int beg, end;
+        std::tie(beg, end) = top->getIdx(node);
+        if (beg < 0) return true;
+      }
+      for (int i = 0; i < top->getChildNum(); i ++) {
+        if (top->getChild(i)) s.push(std::make_pair(top->getChild(i), anyMux || (top->opType == OP_MUX)));
+      }
+    }
+  }
+  return false;
+}
+/* after toposort */
+void graph::splitOptionalArray() {
+  int num = 0;
+  for (Node* node : fullyVisited) {
+    if (node->type != NODE_OTHERS || !node->isArray() || node->arrayEntryNum() <= 1) continue;
+    bool anyVarIdx = false;
+    int beg, end;
+    for (ExpTree* tree : node->assignTree) {
+      std::tie(beg, end) = tree->getlval()->getIdx(node);
+      if (beg < 0 || beg != end) anyVarIdx = true;
+    }
+    for (ExpTree* tree : node->arrayVal) {
+      std::tie(beg, end) = tree->getlval()->getIdx(node);
+      if (beg < 0 || beg != end) anyVarIdx = true;
+    }
+    if (!anyVarIdx && !nextVarConnect(node)) {
+      num ++;
+      node->status = DEAD_NODE;
+      splitArrayNode(node);
+    }
+  }
+
+  printf("[splitOptionalArray] split %d arrays\n", num);
 }

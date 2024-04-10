@@ -316,7 +316,6 @@ std::string graph::saveOldVal(FILE* fp, Node* node) {
 
   if (!node->isArray()) {
     if (node->width > BASIC_WIDTH) {
-      if (node->type == NODE_ARRAY_MEMBER) TODO();
       fprintf(fp, "mpz_set(%s, %s);\n", oldMpz(node).c_str(), node->name.c_str());
       ret = oldMpz(node);
     } else {
