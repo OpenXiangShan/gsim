@@ -245,5 +245,28 @@ void Node::removeConnection() {
 
 void Node::addArrayVal(ExpTree* val) {
   if (val->getRoot()->opType == OP_INVALID) ;
-  else arrayVal.push_back(val);
+  else if (val->getRoot()->opType == OP_WHEN) {
+    arrayVal.push_back(val);
+  } else {
+    bool replace = true;
+    int idx = -1;
+    int newBeg, newEnd;
+    std::tie(newBeg, newEnd) = val->getlval()->getIdx(this);
+    if (newBeg < 0) replace = false;
+    else {
+      for (size_t i = 0; i < arrayVal.size(); i ++) {
+        int beg, end;
+        std::tie(beg, end) = arrayVal[i]->getlval()->getIdx(this);
+        if (beg < 0 || ((!(newBeg > end || newEnd < beg)) && (newBeg != beg || newEnd != end))) { // overlap and not same
+          replace = false;
+          break;
+        } else if (newBeg == beg && newEnd == end) {
+          idx = i;
+          break;
+        }
+      }
+    }
+    if (replace && idx >= 0) arrayVal[idx] = val;
+    else arrayVal.push_back(val);
+  }
 }
