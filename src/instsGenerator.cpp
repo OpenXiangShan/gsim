@@ -291,12 +291,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     }
   }
 
-  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID && (node->type == NODE_OTHERS)) {
+  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_ARRAY_MEMBER)) {
     if (getChild(2)) computeInfo = Child(2, computeInfo);
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
   }
-  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID && (node->type == NODE_OTHERS)) {
+  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_ARRAY_MEMBER)) {
     if (getChild(1)) computeInfo = Child(1, computeInfo);
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
@@ -1961,7 +1961,7 @@ valInfo* Node::compute() {
 
   if (assignTree.size() == 0) {
     computeInfo = new valInfo();
-    if (type == NODE_OTHERS) { // invalid nodes
+    if (type == NODE_OTHERS || type == NODE_ARRAY_MEMBER) { // invalid nodes
       computeInfo->setConstantByStr("0");
     } else {
       computeInfo->valStr = name;
