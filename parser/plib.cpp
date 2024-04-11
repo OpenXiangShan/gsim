@@ -10,7 +10,7 @@ static inline int bit(char c, int base) {
     case 2:
     case 8:
     case 10: return c - '0';
-    case 16: return (c >= '0' && c <= '9') ? c - '0' : ((c >= 'A' && c <= 'Z') ? c - 'A' : c - 'a');
+    case 16: return (c >= '0' && c <= '9') ? c - '0' : ((c >= 'A' && c <= 'Z') ? c - 'A' : c - 'a') + 10;
     default: Assert("Invalid char %c with base %d\n", &c, base);
   }
   return -1;
