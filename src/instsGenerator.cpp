@@ -1669,7 +1669,7 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
     if (memory->width > 128 && width < 64)
       ret->valStr = format("(mpz_get_ui(%s) & %s)", ret->valStr.c_str(), bitMask(width).c_str());
     else if (memory->width < 128)
-      ret->valStr += " & " + bitMask(width);
+      ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
     else TODO();
   }
   ret->opNum = 0;
