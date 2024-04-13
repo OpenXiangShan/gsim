@@ -125,6 +125,7 @@ class Node {
   valInfo* computeInfo = nullptr;
 /* used for splitted array */
   std::vector<Node*>arrayMember;
+  int arrayIdx = -1;
   Node* arrayParent = nullptr;
 /* used for reg & memory */
   Node* clock;

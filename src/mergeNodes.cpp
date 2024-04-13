@@ -40,6 +40,7 @@ void graph::mergeIn1() {
       if (inSrc(prevSuper)) continue;
       /* move members in super to prev super */
       for (Node* member : super->member) member->super = prevSuper;
+      Assert(prevSuper->member.size() != 0, "empty prevSuper %d", prevSuper->id);
       prevSuper->member.insert(prevSuper->member.end(), super->member.begin(), super->member.end());
       /* update connection */
       prevSuper->next.erase(super);
@@ -51,11 +52,14 @@ void graph::mergeIn1() {
       super->member.clear();
     }
   }
+
   removeEmptySuper();
+  // reconnectSuper();
 }
 
 void graph::mergeNodes() {
   size_t totalSuper = sortedSuper.size();
+
   mergeOut1();
   mergeIn1();
 

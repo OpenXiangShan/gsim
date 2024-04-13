@@ -298,6 +298,7 @@ Node* Node::arrayMemberNode(int idx) {
 
   Node* member = new Node(NODE_ARRAY_MEMBER);
   member->name = memberName;
+  member->arrayIdx = idx;
   arrayMember.push_back(member);
   member->arrayParent = this;
   member->setType(width, sign);
@@ -333,7 +334,7 @@ bool nextVarConnect(Node* node) {
   }
   return false;
 }
-/* after toposort */
+/* splitted separately assigned, no variable index acceesing arrays */
 void graph::splitOptionalArray() {
   int num = 0;
   for (Node* node : fullyVisited) {

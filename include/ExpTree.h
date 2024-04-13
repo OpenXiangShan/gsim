@@ -220,7 +220,7 @@ public:
     }
     void display();
     /* used in alias */
-    void replace(std::map<Node*, ENode*>& aliasMap);
+    void replace(std::map<Node*, ENode*>& aliasMap, bool isArray);
     /* used in mergeRegister */
     void replace(Node* oldNode, Node* newNode);
     void clearInfo();

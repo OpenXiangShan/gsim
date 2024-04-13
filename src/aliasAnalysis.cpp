@@ -9,7 +9,7 @@
 /* TODO: array alias */
 /* TODO: A = B[idx] */
 ENode* Node::isAlias() {
-  if (type != NODE_OTHERS) return nullptr;
+  if (type != NODE_OTHERS && type != NODE_ARRAY_MEMBER) return nullptr;
   if (isArray()) {
     /* alias array A to array B iff
       A <= B (if idx = dim[0], A.arrayval[idx] = B, otherwise A.arrayval[idx] = null ) (Done)
@@ -24,6 +24,7 @@ ENode* Node::isAlias() {
   if (assignTree.size() != 1) return nullptr;
   if (!assignTree[0]->getRoot()->getNode()) return nullptr;
   if (prev.size() != 1) return nullptr;
+  if (type == NODE_ARRAY_MEMBER && assignTree[0]->getRoot()->getNode()->isArray() && !assignTree[0]->getRoot()->getNode()->arraySplitted()) return nullptr;
   return assignTree[0]->getRoot();
 }
 
@@ -33,27 +34,26 @@ ENode* ENode::mergeSubTree(ENode* newSubTree) {
   return ret;
 }
 
-/* TODO: array with index */
-Node* ENode::getLeafNode(std::set<Node*>& s) {
-  if (!getNode()) return nullptr;
-
-  for (ENode* childENode : child) childENode->getLeafNode(s);
-
-  Node* node = getNode();
+Node* getLeafNode(bool isArray, ENode* enode) {
+  if (!enode->getNode()) return nullptr;
+  Node* node = enode->getNode();
   if (node->isArray() && node->arraySplitted()) {
-    int idx = getArrayIndex(node);
-    if (s.size() != 0) TODO(); // splitted array accessed by variable index
-    s.insert(node->arrayMember[idx]);
-    return node->arrayMember[idx];
-  } else s.insert(node);
+    int beg, end;
+    std::tie(beg, end) = enode->getIdx(node);
+    if (beg < 0 || (isArray && enode->getChildNum() != node->dimension.size())) return node;
+    else return node->getArrayMember(beg);
+  }
   return node;
 }
 
-void ExpTree::replace(std::map<Node*, ENode*>& aliasMap) {
+void ExpTree::replace(std::map<Node*, ENode*>& aliasMap, bool isArray) {
   std::stack<ENode*> s;
-
-  if(aliasMap.find(getRoot()->getNode()) != aliasMap.end()) {
-    setRoot(getRoot()->mergeSubTree(aliasMap[getRoot()->getNode()]));
+  Node* leafNode = getLeafNode(isArray, getRoot());
+  if(aliasMap.find(leafNode) != aliasMap.end()) {
+    if (leafNode == getRoot()->getNode())
+      setRoot(getRoot()->mergeSubTree(aliasMap[leafNode]));
+    else
+      setRoot(aliasMap[leafNode]->dup());
   }
   s.push(getRoot());
 
@@ -64,12 +64,19 @@ void ExpTree::replace(std::map<Node*, ENode*>& aliasMap) {
     s.pop();
     for (int i = 0; i < top->getChildNum(); i ++) {
       if (!top->getChild(i)) continue;
-      if (aliasMap.find(top->getChild(i)->getNode()) != aliasMap.end()) {
-        ENode* newChild = top->getChild(i)->mergeSubTree(aliasMap[top->getChild(i)->getNode()]);
+      s.push(top->getChild(i));
+      if (!top->getChild(i)->getNode()) continue;
+      Node* replaceNode = getLeafNode(isArray, top->getChild(i));
+      if (aliasMap.find(replaceNode) != aliasMap.end()) {
+        ENode* newChild;
+        if (replaceNode != top->getChild(i)->getNode()) { // splitted array member
+          newChild = aliasMap[replaceNode]->dup();
+        } else {
+          newChild = top->getChild(i)->mergeSubTree(aliasMap[replaceNode]);
+        }
         newChild->width = top->getChild(i)->width;
         top->setChild(i, newChild);
       }
-      s.push(top->getChild(i));
     }
   }
 }
@@ -91,24 +98,40 @@ void graph::aliasAnalysis() {
       ENode* enode = member->isAlias();
       if (!enode) continue;
       aliasNum ++;
-      member->status = DEAD_NODE;
-      if (aliasMap.find(enode->getNode()) != aliasMap.end()) aliasMap[member] = enode->mergeSubTree(aliasMap[enode->getNode()]);
-      else aliasMap[member] = enode;
+      Node* interNode = getLeafNode(member->isArray(), enode);//->getNode();
+      ENode* aliasENode = enode;
+      if (aliasMap.find(interNode) != aliasMap.end()) {
+        if (interNode == enode->getNode()) aliasENode = enode->mergeSubTree(aliasMap[interNode]);
+        else aliasENode = aliasMap[interNode]->dup();
+      }
+      if (member->type == NODE_ARRAY_MEMBER && aliasENode->getNode()->isArray() && !aliasENode->getNode()->arraySplitted()) {
+        /* do not alias array member to */
+      } else {
+        member->status = DEAD_NODE;
+        aliasMap[member] = aliasENode;
+      }
     }
   }
   /* update valTree */
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
+      if (member->status == DEAD_NODE) continue;
       for (ExpTree* tree : member->arrayVal) {
-        if (tree) tree->replace(aliasMap);
+        if (tree) tree->replace(aliasMap, member->isArray());
       }
-      for (ExpTree* tree : member->assignTree) tree->replace(aliasMap);
+      for (ExpTree* tree : member->assignTree) tree->replace(aliasMap, member->isArray());
     }
   }
 
   for (Node* reg : regsrc) {
     if (reg->updateTree) {
-      reg->updateTree->replace(aliasMap);
+      reg->updateTree->replace(aliasMap, reg->isArray());
+    }
+  }
+  for (auto iter : aliasMap) {
+    if(iter.first->type == NODE_ARRAY_MEMBER) {
+      Node* parent = iter.first->arrayParent;
+      parent->arrayMember[iter.first->arrayIdx] = getLeafNode(false, iter.second);
     }
   }
   for (SuperNode* super : sortedSuper) {

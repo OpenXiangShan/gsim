@@ -1795,7 +1795,8 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->opNum = 0;
           if (computeInfo->beg >= 0) {
             for (int i = computeInfo->beg; i <= computeInfo->end; i ++) {
-              computeInfo->memberInfo.push_back(nodePtr->getArrayMember(i)->compute());
+              nodePtr->getArrayMember(i)->compute();
+              computeInfo->memberInfo.push_back(nodePtr->getArrayMember(i)->computeInfo);
             }
           }
         }
@@ -2219,6 +2220,9 @@ valInfo* Node::computeArray() {
   }
   /* to avoid update register using previous updated registers */
   if (type == NODE_REG_DST) computeInfo->memberInfo.clear();
+  for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
+    if (computeInfo->memberInfo[i] && computeInfo->memberInfo[i]->valStr.find("TMP$") != computeInfo->memberInfo[i]->valStr.npos) computeInfo->memberInfo[i] = nullptr;
+  }
   return computeInfo;
 }
 
