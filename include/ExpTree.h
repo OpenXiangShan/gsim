@@ -229,6 +229,7 @@ public:
       return getRoot()->opType == OP_INVALID;
     }
     bool isConstant();
+    void removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::set<ENode*>& visited);
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes

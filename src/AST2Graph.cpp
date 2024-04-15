@@ -17,6 +17,7 @@ TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType);
 ASTExpTree* visitExpr(graph* g, PNode* expr);
 void visitStmts(graph* g, PNode* stmts);
 void visitWhen(graph* g, PNode* when);
+void removeDummyDim(graph* g);
 
 /* map between module name and module pnode*/
 static std::map<std::string, PNode*> moduleMap;
@@ -1487,6 +1488,7 @@ graph* AST2Graph(PNode* root) {
       node->valTree = nullptr;
     }
   }
+  removeDummyDim(g);
 
   for (Node* reg : g->regsrc) {
     /* set lvalue to regDst */
@@ -1591,4 +1593,77 @@ bool ExpTree::isConstant() {
 
 bool nameExist(std::string str) {
   return allSignals.find(str) != allSignals.end();
+}
+
+void ExpTree::removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::set<ENode*>& visited) {
+  std::stack<ENode*> s;
+  s.push(getRoot());
+  if (getlval()) s.push(getlval());
+  while (!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    if (visited.find(top) != visited.end()) continue;
+    visited.insert(top);
+    if (top->getNode() && arrayMap.find(top->getNode()) != arrayMap.end()) {
+      std::vector<ENode*> childENode;
+      for (size_t i = 0; i < arrayMap[top->getNode()].size(); i ++) {
+        int validIdx = arrayMap[top->getNode()][i];
+        if (validIdx >= top->getChildNum()) break;
+        childENode.push_back(top->getChild(validIdx));
+      }
+      if (childENode.size() == top->getChildNum()) continue;
+      else {
+        top->child = std::vector<ENode*>(childENode);
+      }
+    }
+    for (ENode* child : top->child) {
+      if (child) s.push(child);
+    }
+  }
+}
+
+void removeDummyDim(graph* g) {
+  /* get all arrays with 1 dims */
+  std::map<Node*, std::vector<int>> arrayMap;
+  for (auto iter : allSignals) {
+    Node* node = iter.second;
+    if (!node->isArray()) continue;
+    std::vector<int> validIndex;
+    std::vector<int> validDim;
+    for (size_t i = 0; i < node->dimension.size(); i ++) {
+      if (node->dimension[i] != 1) {
+        validIndex.push_back(i);
+        validDim.push_back(node->dimension[i]);
+      }
+    }
+    if (validIndex.size() == node->dimension.size()) continue;
+    arrayMap[node] = std::vector<int>(validIndex);
+
+    /* array with only one element */
+    if (validIndex.size() == 0) {
+      node->dimension.clear();
+      for (ExpTree* tree : node->arrayVal) {
+        if (tree->getRoot()->opType != OP_WHEN) node->assignTree.clear();
+        node->assignTree.push_back(tree);
+      }
+    } else {
+      node->dimension = std::vector<int>(validDim);
+    }
+  }
+  std::set<ENode*> visited;
+  for (auto iter : allSignals) {
+    Node* node = iter.second;
+    for (ExpTree* tree : node->arrayVal) tree->removeDummyDim(arrayMap, visited);
+    for (ExpTree* tree : node->assignTree) tree->removeDummyDim(arrayMap, visited);
+  }
+  for (Node* mem : g->memory) {
+    std::vector<int> validDim;
+    for (size_t i = 0; i < mem->dimension.size(); i ++) {
+      if (mem->dimension[i] != 1) {
+        validDim.push_back((mem->dimension[i]));
+      }
+    }
+    if (validDim.size() == mem->dimension.size()) continue;
+    mem->dimension = std::vector<int>(validDim);
+  }
 }
