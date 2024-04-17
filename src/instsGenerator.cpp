@@ -2012,7 +2012,7 @@ valInfo* Node::compute() {
         next->recompute();
       }
     }
-  } else if (isRoot || ret->opNum < 0){
+  } else if (isRoot || assignTree.size() > 1 || ret->opNum < 0){
     ret->valStr = name;
     ret->opNum = 0;
     ret->status = VAL_VALID;

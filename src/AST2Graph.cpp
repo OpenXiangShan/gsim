@@ -1646,6 +1646,7 @@ void removeDummyDim(graph* g) {
         if (tree->getRoot()->opType != OP_WHEN) node->assignTree.clear();
         node->assignTree.push_back(tree);
       }
+      node->arrayVal.clear();
     } else {
       node->dimension = std::vector<int>(validDim);
     }
