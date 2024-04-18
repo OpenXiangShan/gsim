@@ -562,6 +562,8 @@ void graph::genMemWrite(FILE* fp) {
     Assert(mem->rlatency <= 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
     for (Node* port : mem->member) {
       if (port->type == NODE_WRITER) {
+        valInfo* info_en = port->member[WRITER_EN]->computeInfo;
+        if (info_en->status == VAL_CONSTANT && mpz_sgn(info_en->consVal) == 0) continue;
         if (port->member[WRITER_DATA]->isArray() != 0) {
           Node* writerData = port->member[WRITER_DATA];
           fprintf(fp, "if(%s) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str());

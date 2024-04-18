@@ -912,8 +912,13 @@ valInfo* ENode::instsAnd(Node* node, std::string lvalue, bool isRoot) {
     u_and(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
   } else if (childBasic && enodeBasic) {
-    ret->valStr = "(" + ChildInfo(0, valStr) + " & " + ChildInfo(1, valStr) + ")";
-    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    if ((ChildInfo(0, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(0, consVal)) == 0) ||
+        (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0)) {
+          ret->setConstantByStr("0");
+    } else {
+      ret->valStr = "(" + ChildInfo(0, valStr) + " & " + ChildInfo(1, valStr) + ")";
+      ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    }
   } else if (!childBasic && enodeBasic) {
     if (width <= 64) {
       std::string lname = ChildInfo(0, width) <= 64 ? ChildInfo(0, valStr) : format("mpz_get_ui(%s)", ChildInfo(0, valStr).c_str());
