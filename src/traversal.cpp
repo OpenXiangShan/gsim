@@ -49,7 +49,7 @@ static std::map<OPType, const char*> OP2Name = {
   {OP_NOT, "not"}, {OP_ANDR, "andr"}, {OP_ORR, "orr"}, {OP_XORR, "xorr"}, {OP_PAD, "pad"}, {OP_SHL, "shl"},
   {OP_SHR, "shr"}, {OP_HEAD, "head"}, {OP_TAIL, "tail"}, {OP_BITS, "bits"}, {OP_INDEX_INT, "index_int"},
   {OP_INDEX, "index"}, {OP_WHEN, "when"}, {OP_PRINTF, "printf"}, {OP_ASSERT, "assert"}, {OP_INT, "int"},
-  {OP_READ_MEM, "readMem"}, {OP_RESET, "reset"},
+  {OP_READ_MEM, "readMem"}, {OP_RESET, "reset"}, {OP_STMT, "stmts"}
 };
 
 void ExpTree::display() {

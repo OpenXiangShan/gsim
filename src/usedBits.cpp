@@ -78,6 +78,9 @@ void ENode::passWidthToChild() {
       childBits.push_back(usedBit);
       childBits.push_back(usedBit);
       break;
+    case OP_STMT:
+      for (int i = 0; i < getChildNum(); i ++) childBits.push_back(usedBit);
+      break;
     case OP_READ_MEM:
       childBits.push_back(Child(0, width));
       break;

@@ -444,6 +444,30 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   return ret;
 }
 
+valInfo* ENode::instsStmt(Node* node, std::string lvalue, bool isRoot) {
+  if (getChildNum() == 1) return getChild(0)->compute(node, lvalue, isRoot);
+  for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
+  for (ENode* childENode : child) {
+    if (childENode->computeInfo->status == VAL_INVALID || childENode->computeInfo->status == VAL_EMPTY) continue;
+    else if (childENode->computeInfo->opNum < 0) {
+      computeInfo->valStr += childENode->computeInfo->valStr;
+    } else if (width > BASIC_WIDTH){
+      computeInfo->valStr += setMpz(lvalue, childENode, computeInfo, node);
+    } else {
+      if (isSubArray(lvalue, node)) {
+        computeInfo->valStr += arrayCopy(lvalue, node, childENode->computeInfo);
+      } else if (node->width < width) {
+        computeInfo->valStr += format("%s = (%s & %s);", lvalue.c_str(), childENode->computeInfo->valStr.c_str(), bitMask(node->width).c_str());
+      } else if (node->sign && node->width != width) {
+        computeInfo->valStr += format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), childENode->computeInfo->valStr.c_str());
+      }
+      computeInfo->valStr += lvalue + " = " + childENode->computeInfo->valStr + ";";
+    }
+  }
+  computeInfo->opNum = -1;
+  return computeInfo;
+}
+
 valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
@@ -1935,6 +1959,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     case OP_INDEX: instsIndex(n, lvalue, isRoot); break;
     case OP_MUX: instsMux(n, lvalue, isRoot); break;
     case OP_WHEN: instsWhen(n, lvalue, isRoot); break;
+    case OP_STMT: instsStmt(n, lvalue, isRoot); break;
     case OP_INT: instsInt(n, lvalue, isRoot); break;
     case OP_READ_MEM: instsReadMem(n, lvalue, isRoot); break;
     case OP_INVALID: instsInvalid(n, lvalue, isRoot); break;

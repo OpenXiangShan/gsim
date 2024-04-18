@@ -122,8 +122,17 @@ void fillEmptyWhen(ExpTree* newTree, ENode* oldNode) {
   while(!s.empty()) {
     ENode* top = s.top();
     s.pop();
-    for (ENode* childENode : top->child) {
-      if (childENode) s.push(childENode);
+    if (top->opType == OP_STMT) { /* push the first child */
+      for (ENode* childENode : top->child) {
+        if (childENode) {
+          s.push(childENode);
+          break;
+        }
+      }
+    } else {
+      for (ENode* childENode : top->child) {
+        if (childENode) s.push(childENode);
+      }
     }
     if (top->opType == OP_WHEN) {
       if (!top->getChild(1)) top->setChild(1, oldNode);

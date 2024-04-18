@@ -6,6 +6,7 @@
 #include "common.h"
 #include <stack>
 #include <map>
+#include <utility>
 
 /* check the node type and children num */
 #define TYPE_CHECK(node, min, max,...) typeCheck(node, (const int[]){__VA_ARGS__}, sizeof((const int[]){__VA_ARGS__}) / sizeof(int), min, max)
@@ -18,6 +19,7 @@ ASTExpTree* visitExpr(graph* g, PNode* expr);
 void visitStmts(graph* g, PNode* stmts);
 void visitWhen(graph* g, PNode* when);
 void removeDummyDim(graph* g);
+ENode* getWhenEnode(ExpTree* valTree, int depth);
 
 /* map between module name and module pnode*/
 static std::map<std::string, PNode*> moduleMap;
@@ -1098,40 +1100,70 @@ newRoot:  when3
       cond3 a b
 replace oldRoot by newRoot
 */
-ExpTree* growWhenTrace(ExpTree* valTree, int depth) {
+std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, int depth) {
   ENode* oldParent = nullptr;
   int maxDepth = depth;
   if (valTree) std::tie(oldParent, maxDepth) = getDeepestWhen(valTree, depth);
-  if (maxDepth == (int)whenTrace.size()) return valTree ? valTree : new ExpTree(nullptr);
+  if (maxDepth == (int)whenTrace.size()) {
+    ExpTree* retTree = valTree ? valTree : new ExpTree(nullptr);
+    return std::make_pair(retTree, getWhenEnode(retTree, depth));
+  }
 
   ENode* oldRoot = maxDepth == depth ?
                           (valTree ? valTree->getRoot() : nullptr)
                         : (whenTrace[maxDepth-1].first ? oldParent->getChild(1) : oldParent->getChild(2));
+  ENode* childRoot = nullptr;
+  if (oldRoot) {
+    /* e.g. a <= 0
+            when cond:
+              a <= 1
+    */
+    if (oldRoot->opType != OP_WHEN && oldRoot->opType != OP_STMT) {
+      childRoot = oldRoot;
+      oldRoot = nullptr;
+    }
+  }
   ENode* newRoot = nullptr; // latest whenNode
-  
+  ENode* retENode = oldParent;
   for (int depth = whenTrace.size() - 1; depth >= maxDepth ; depth --) {
-    ENode* whenNode = new ENode(OP_WHEN);
+    ENode* whenNode = new ENode(OP_WHEN); // return the deepest whenNode
+    if (depth == whenTrace.size() - 1) retENode = whenNode;
     ENode* condNode = new ENode(whenTrace[depth].second);
 
     if (whenTrace[depth].first) {
       whenNode->addChild(condNode);
       whenNode->addChild(newRoot);
-      whenNode->addChild(oldRoot);
+      whenNode->addChild(childRoot);
     } else {
       whenNode->addChild(condNode);
-      whenNode->addChild(oldRoot);
+      whenNode->addChild(childRoot);
       whenNode->addChild(newRoot);
     }
     newRoot = whenNode;
-
   }
-  if (maxDepth == depth) {
-    if (valTree) valTree->setRoot(newRoot);
-    else valTree = new ExpTree(newRoot);
+  if (!oldRoot) {
+    if (maxDepth == depth) {
+      if (valTree) valTree->setRoot(newRoot);
+      else valTree = new ExpTree(newRoot);
+    } else {
+      oldParent->setChild(whenTrace[maxDepth-1].first ? 1 : 2, newRoot);
+    }
   } else {
-    oldParent->setChild(whenTrace[maxDepth-1].first ? 1 : 2, newRoot);
+    if (maxDepth == depth) {
+      TODO();
+    } else {
+      ENode* stmt = nullptr;
+      if (oldRoot->opType == OP_STMT) {
+        stmt = oldRoot;
+      } else {
+        stmt = new ENode(OP_STMT);
+        stmt->addChild(oldRoot);
+      }
+      stmt->addChild(newRoot);
+      oldParent->setChild(whenTrace[maxDepth-1].first ? 1 : 2, stmt);
+    }
   }
-  return valTree;
+  return std::make_pair(valTree, retENode);
 }
 
 ENode* getWhenEnode(ExpTree* valTree, int depth) {
@@ -1154,6 +1186,7 @@ void visitWhenConnect(graph* g, PNode* connect) {
   if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i++) {
       ExpTree* valTree = nullptr;
+      ENode* whenNode;
       if (exp->getFlip(i)) {
         Node* node = exp->getAggr(i)->getNode();
         stmtsNodes.insert(node);
@@ -1162,12 +1195,11 @@ void visitWhenConnect(graph* g, PNode* connect) {
           TODO();
         }
         if (node->isArray()) {
-          valTree = growWhenTrace(nullptr, node->whenDepth);
+          std::tie(valTree, whenNode) = growWhenTrace(nullptr, node->whenDepth);
         } else {
-          valTree = growWhenTrace(node->valTree, node->whenDepth);
+          std::tie(valTree, whenNode) = growWhenTrace(node->valTree, node->whenDepth);
         }
         valTree->setlval(exp->getAggr(i));
-        ENode* whenNode = getWhenEnode(valTree, node->whenDepth);
         if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, ref->getAggr(i));
         else valTree->setRoot(ref->getAggr(i));
         if (node->isArray()) node->addArrayVal(valTree);
@@ -1176,12 +1208,11 @@ void visitWhenConnect(graph* g, PNode* connect) {
         Node* node = ref->getAggr(i)->getNode();
         stmtsNodes.insert(node);
         if (node->isArray()) {
-          valTree = growWhenTrace(nullptr, node->whenDepth);
+          std::tie(valTree, whenNode) = growWhenTrace(nullptr, node->whenDepth);
         } else {
-          valTree = growWhenTrace(node->valTree, node->whenDepth);
+          std::tie(valTree, whenNode) = growWhenTrace(node->valTree, node->whenDepth);
         }
         valTree->setlval(ref->getAggr(i));
-        ENode* whenNode = getWhenEnode(valTree, node->whenDepth);
         if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getAggr(i));
         else valTree->setRoot(exp->getAggr(i));
         if (node->isArray()) node->addArrayVal(valTree);
@@ -1193,13 +1224,13 @@ void visitWhenConnect(graph* g, PNode* connect) {
     Node* node = ref->getExpRoot()->getNode();
     stmtsNodes.insert(node);
     ExpTree* valTree;
+    ENode* whenNode;
     if (node->isArray()) {
-      valTree = growWhenTrace(nullptr, node->whenDepth);
+      std::tie(valTree, whenNode) = growWhenTrace(nullptr, node->whenDepth);
     } else {
-      valTree = growWhenTrace(node->valTree, node->whenDepth);
+      std::tie(valTree, whenNode) = growWhenTrace(node->valTree, node->whenDepth);
     }
     valTree->setlval(ref->getExpRoot());
-    ENode* whenNode = getWhenEnode(valTree, node->whenDepth);
     if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getExpRoot());
     else valTree->setRoot(exp->getExpRoot());
     if (node->isArray()) node->addArrayVal(valTree);

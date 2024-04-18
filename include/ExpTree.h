@@ -52,6 +52,7 @@ enum OPType {
   OP_INDEX,
 /* when, may be replaced by mux */
   OP_WHEN,
+  OP_STMT,
 /* special */
   OP_PRINTF,
   OP_ASSERT,
@@ -101,6 +102,7 @@ class ENode {
   valInfo* instsTail(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsBits(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsWhen(Node* node, std::string lvalue, bool isRoot);
+  valInfo* instsStmt(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsIndexInt(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsIndex(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsInt(Node* n, std::string lvalue, bool isRoot);
