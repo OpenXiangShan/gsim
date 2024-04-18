@@ -501,46 +501,51 @@ void graph::genActivate(FILE* fp) {
 void graph::genUpdateRegister(FILE* fp) {
   /* update registers */
   /* NOTE: register may need to update itself */
-  fprintf(fp, "void S%s::updateRegister() {\n", name.c_str());
-  for (Node* node : regsrc) {
-    if (node->regSplit && node->status == VALID_NODE) {
-      if (node->dimension.size() == 0 || node->arrayEntryNum() == 1) {
-          std::string regold;
-          if (node->regNeedActivate()) regold = saveOldVal(fp, node);
+  size_t idx = 0;
+  for (int i = 0; i < updateRegNum; i ++) {
+    fprintf(fp, "void S%s::updateRegister%d() {\n", name.c_str(), i);
+    for (int j = 0; j < 10000 && idx < regsrc.size(); j ++) {
+      Node* node = regsrc[idx ++];
+      if (node->regSplit && node->status == VALID_NODE) {
+        if (node->dimension.size() == 0 || node->arrayEntryNum() == 1) {
+            std::string regold;
+            if (node->regNeedActivate()) regold = saveOldVal(fp, node);
+            if (node->updateTree->getRoot()->computeInfo->opNum < 0) {
+              fprintf(fp, "%s\n", node->updateTree->getRoot()->computeInfo->valStr.c_str());
+            }
+            else if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_set(%s, %s);\n", node->updateTree->getlval()->computeInfo->valStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
+            else fprintf(fp, "%s = %s;\n", node->updateTree->getlval()->computeInfo->valStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
+  #ifdef EMU_LOG
+            std::string nodeName = (node->isArray() && node->arrayEntryNum() == 1) ? (node->name + strRepeat("[0]", node->dimension.size())) : node->name;
+            if (node->width <= 32)
+              fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%x\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), nodeName.c_str());
+            else if (node->width <= 64)
+              fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%lx\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), nodeName.c_str());
+  #endif
+          if (node->regNeedActivate()) activateNext(fp, node, node->regActivate, regold, "");
+        } else {
+          // if (node->super->cppId < 0)
+            activateUncondNext(fp, node, node->regActivate);
           if (node->updateTree->getRoot()->computeInfo->opNum < 0) {
-            fprintf(fp, "%s\n", node->updateTree->getRoot()->computeInfo->valStr.c_str());
+              fprintf(fp, "%s\n", node->updateTree->getRoot()->computeInfo->valStr.c_str());
+          } else if (node->width > BASIC_WIDTH) {
+            std::string idxStr, bracket;
+            for (size_t i = 0; i < node->dimension.size(); i ++) {
+              fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
+              idxStr += "[i" + std::to_string(i) + "]";
+              bracket += "}\n";
+            }
+            fprintf(fp, "mpz_set(%s%s, %s%s);\n", node->name.c_str(), idxStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str(), idxStr.c_str());
+            fprintf(fp, "%s", bracket.c_str());
           }
-          else if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_set(%s, %s);\n", node->updateTree->getlval()->computeInfo->valStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
-          else fprintf(fp, "%s = %s;\n", node->updateTree->getlval()->computeInfo->valStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
-#ifdef EMU_LOG
-          std::string nodeName = (node->isArray() && node->arrayEntryNum() == 1) ? (node->name + strRepeat("[0]", node->dimension.size())) : node->name;
-          if (node->width <= 32)
-            fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%x\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), nodeName.c_str());
-          else if (node->width <= 64)
-            fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%lx\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), nodeName.c_str());
-#endif
-        if (node->regNeedActivate()) activateNext(fp, node, node->regActivate, regold, "");
-      } else {
-        // if (node->super->cppId < 0)
-          activateUncondNext(fp, node, node->regActivate);
-        if (node->updateTree->getRoot()->computeInfo->opNum < 0) {
-            fprintf(fp, "%s\n", node->updateTree->getRoot()->computeInfo->valStr.c_str());
-        } else if (node->width > BASIC_WIDTH) {
-          std::string idxStr, bracket;
-          for (size_t i = 0; i < node->dimension.size(); i ++) {
-            fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
-            idxStr += "[i" + std::to_string(i) + "]";
-            bracket += "}\n";
-          }
-          fprintf(fp, "mpz_set(%s%s, %s%s);\n", node->name.c_str(), idxStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str(), idxStr.c_str());
-          fprintf(fp, "%s", bracket.c_str());
+          else fprintf(fp, "memcpy(%s, %s, sizeof(%s));\n", node->name.c_str(),
+                    node->updateTree->getRoot()->computeInfo->valStr.c_str(), node->name.c_str());
         }
-        else fprintf(fp, "memcpy(%s, %s, sizeof(%s));\n", node->name.c_str(),
-                  node->updateTree->getRoot()->computeInfo->valStr.c_str(), node->name.c_str());
       }
     }
+    fprintf(fp, "}\n");
+
   }
-  fprintf(fp, "}\n");
 }
 
 void graph::genMemWrite(FILE* fp) {
@@ -648,7 +653,9 @@ void graph::genStep(FILE* fp) {
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
   fprintf(fp, "saveDiffRegs();\n");
 #endif
-  fprintf(fp, "updateRegister();\n");
+  for (int i = 0; i < updateRegNum; i ++) {
+    fprintf(fp, "updateRegister%d();\n", i);
+  }
   /* update memory*/
   fprintf(fp, "writeMem();\n");
 
@@ -669,6 +676,7 @@ void graph::cppEmitter() {
     if (!super->instsEmpty()) super->cppId = superId ++;
   }
   subStepNum = (superId + 9999) / 10000;
+  updateRegNum = (regsrc.size() + 9999) / 10000;
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == VALID_NODE)
@@ -710,7 +718,9 @@ void graph::cppEmitter() {
     fprintf(header, "void subStep%d();\n", i);
   }
   fprintf(header, "void updateMem();\n");
-  fprintf(header, "void updateRegister();\n");
+  for (int i = 0; i < updateRegNum; i ++) {
+    fprintf(header, "void updateRegister%d();\n", i);
+  }
   fprintf(header, "void writeMem();\n");
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
   fprintf(header, "void saveDiffRegs();\n");

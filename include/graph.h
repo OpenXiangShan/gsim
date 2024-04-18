@@ -52,6 +52,7 @@ class graph {
   int maxTmp = 0;
   int nodeNum = 0;
   int subStepNum = -1;
+  int updateRegNum = -1;
   void addReg(Node* reg) {
     regsrc.push_back(reg);
   }
