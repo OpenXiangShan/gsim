@@ -113,6 +113,7 @@ class ArrayMemberList;
 #include "graph.h"
 #include "util.h"
 #include "valInfo.h"
+#include "perf.h"
 
 
 #endif

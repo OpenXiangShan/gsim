@@ -100,6 +100,7 @@ class Node {
   int usedBit = -1;
   NodeStatus status = VALID_NODE;
   std::vector<int> dimension;
+  int order = -1;
 
   std::set<Node*> next;
   std::set<Node*> prev;

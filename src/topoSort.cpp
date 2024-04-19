@@ -32,5 +32,11 @@ void graph::topoSort() {
   sortedSuper.insert(sortedSuper.end(), potentialRegs.begin(), potentialRegs.end());
   /* order sortedSuper */
   for (size_t i = 0; i < sortedSuper.size(); i ++) sortedSuper[i]->order = i + 1;
+  int nodeOrder = 0;
+  for (SuperNode* super : sortedSuper) {
+    for (Node* node : super->member) {
+      node->order = nodeOrder ++;
+    }
+  }
 }
 

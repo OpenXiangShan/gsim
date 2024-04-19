@@ -5,6 +5,7 @@
 
 #include <map>
 #include <gmp.h>
+#include <queue>
 #include <stack>
 #include <tuple>
 
@@ -26,6 +27,16 @@ static int countArrayIndex(std::string name);
 static bool isSubArray(std::string name, Node* node);
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 std::string idx2Str(Node* node, int idx, int dim);
+void recomputeAllNodes();
+
+struct ordercmp {
+  bool operator()(Node* n1, Node* n2) {
+    return n1->order > n2->order;
+  }
+};
+
+static std::priority_queue<Node*, std::vector<Node*>, ordercmp> recomputeQueue;
+static std::set<Node*> uniqueRecompute;
 
 static std::string getConsStr(mpz_t& val) {
   std::string str = mpz_get_str(NULL, 16, val);
@@ -2026,9 +2037,13 @@ valInfo* Node::compute() {
         /* re-compute nodes depend on src */
         for (Node* next : (regSplit ? getSrc() : this)->next) {
           if (next->computeInfo) {
-            next->recompute();
+            if (uniqueRecompute.find(next) == uniqueRecompute.end()) {
+              recomputeQueue.push(next);
+              uniqueRecompute.insert(next);
+            }
           }
         }
+        recomputeAllNodes();
       }
     }
   } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant && getSrc()->assignTree.size() == 0) {
@@ -2039,10 +2054,14 @@ valInfo* Node::compute() {
     getSrc()->computeInfo = ret;
     for (Node* next : (regSplit ? getSrc() : this)->next) {
       if (next->computeInfo) {
-        next->recompute();
+        if (uniqueRecompute.find(next) == uniqueRecompute.end()) {
+          recomputeQueue.push(next);
+          uniqueRecompute.insert(next);
+        }
       }
     }
-  } else if (isRoot || assignTree.size() > 1 || ret->opNum < 0){
+    recomputeAllNodes();
+  } else if (isRoot || assignTree.size() > 1 || ret->opNum < 0){  // TODO: count validInfoNum, replace assignTree by validInfuNum
     ret->valStr = name;
     ret->opNum = 0;
     ret->status = VAL_VALID;
@@ -2073,6 +2092,14 @@ void ExpTree::clearInfo(){
     for (ENode* child : top->child) s.push(child);
   }
 }
+void recomputeAllNodes() {
+  while (!recomputeQueue.empty()) {
+    Node* node = recomputeQueue.top();
+    recomputeQueue.pop();
+    uniqueRecompute.erase(node);
+    node->recompute();
+  }
+}
 
 void Node::recompute() {
   if (!computeInfo) return;
@@ -2101,7 +2128,12 @@ void Node::recompute() {
     }
   }
   if (recomputeNext) {
-    for (Node* nextNode : next) nextNode->recompute();
+    for (Node* nextNode : next) {
+      if (uniqueRecompute.find(nextNode) == uniqueRecompute.end()) {
+        recomputeQueue.push(nextNode);
+        uniqueRecompute.insert(nextNode);
+      }
+    }
   }
 }
 
