@@ -43,6 +43,14 @@ static std::string getConsStr(mpz_t& val) {
   if (str.length() <= 16) return "0x" + str;
   else return format("UINT128(0x%s, 0x%s)", str.substr(0, str.length() - 16).c_str(), str.substr(str.length()-16, 16).c_str());
 }
+static bool allOnes(mpz_t& val, int width) {
+  mpz_t tmp;
+  mpz_init(tmp);
+  mpz_set_ui(tmp, 1);
+  mpz_mul_2exp(tmp, tmp, width);
+  mpz_sub_ui(tmp, tmp, 1);
+  return mpz_cmp(val, tmp) == 0;
+}
 /* return: 0 - same size, positive - the first is larger, negative - the second is larger  */
 static int typeCmp(int width1, int width2) {
   int bits1 = widthBits(width1);
@@ -922,14 +930,16 @@ valInfo* ENode::instsAnd(Node* node, std::string lvalue, bool isRoot) {
     if (sign) TODO();
     u_and(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
-    if ((ChildInfo(0, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(0, consVal)) == 0) ||
-        (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0)) {
+  } else if ((ChildInfo(0, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(0, consVal)) == 0) ||
+            (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0)) {
           ret->setConstantByStr("0");
-    } else {
-      ret->valStr = "(" + ChildInfo(0, valStr) + " & " + ChildInfo(1, valStr) + ")";
-      ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-    }
+  } else if (ChildInfo(0, status) == VAL_CONSTANT && allOnes(ChildInfo(0, consVal), width)) {
+    computeInfo = Child(1, computeInfo);
+  } else if (ChildInfo(1, status) == VAL_CONSTANT && allOnes(ChildInfo(1, consVal), width)) {
+    computeInfo = Child(0, computeInfo);
+  } else if (childBasic && enodeBasic) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " & " + ChildInfo(1, valStr) + ")";
+    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   } else if (!childBasic && enodeBasic) {
     if (width <= 64) {
       std::string lname = ChildInfo(0, width) <= 64 ? ChildInfo(0, valStr) : format("mpz_get_ui(%s)", ChildInfo(0, valStr).c_str());
