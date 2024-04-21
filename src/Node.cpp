@@ -230,9 +230,6 @@ void Node::updateActivate() {
     }
     if (nextNode->super->cppId != -1) regActivate.insert(nextNode->super->cppId);
   }
-  if (type == NODE_REG_DST && getSrc()->status == VALID_NODE && getSrc()->super->cppId != -1) {
-    regActivate.insert(getSrc()->super->cppId);
-  }
   if (type == NODE_REG_DST) {
     regActivate.insert(getSrc()->nextActiveId.begin(), getSrc()->nextActiveId.end());
   }
