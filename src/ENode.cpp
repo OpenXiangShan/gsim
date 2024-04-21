@@ -231,7 +231,8 @@ ENode* ENode::dup() {
   ret->values.insert(ret->values.end(), values.begin(), values.end());
   /* TODO : check isClock */
   for (ENode* childNode : child) {
-    ret->addChild(childNode->dup());
+    if (childNode) ret->addChild(childNode->dup());
+    else ret->addChild(nullptr);
   }
   return ret;
 }

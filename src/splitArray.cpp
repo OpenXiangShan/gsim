@@ -67,6 +67,10 @@ ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index) {
         top->addChild(idxNode);
       }
     }
+    if (top->opType == OP_WHEN || top->opType == OP_MUX) {
+      if (top->getChild(1)) s.push(top->getChild(1));
+      if (top->getChild(2)) s.push(top->getChild(2));
+    }
   }
   ExpTree* ret = new ExpTree(rvalue, lvalue);
   return ret;
@@ -343,27 +347,49 @@ bool nextVarConnect(Node* node) {
   }
   return false;
 }
+static std::map<Node*, bool> arraySplitMap;
+
+void graph::checkNodeSplit(Node* node) {
+  if (arraySplitMap.find(node) != arraySplitMap.end()) return;
+  if (!node->isArray()) return;
+  if (node->type != NODE_OTHERS || node->arrayEntryNum() <= 1) {
+    arraySplitMap[node] = false;
+    return;
+  }
+  for (Node* prev : node->prev) checkNodeSplit(prev);
+  bool prevSplitted = true;
+  for (Node* prev : node->prev) {
+    if (prev->isArray() && !arraySplitMap[prev]) prevSplitted = false;
+  }
+  bool anyVarIdx = false;
+  int beg, end;
+  for (ExpTree* tree : node->assignTree) {
+    std::tie(beg, end) = tree->getlval()->getIdx(node);
+    if (beg < 0 || (beg != end && !prevSplitted)) anyVarIdx = true;
+  }
+  for (ExpTree* tree : node->arrayVal) {
+    std::tie(beg, end) = tree->getlval()->getIdx(node);
+    if (beg < 0 || (beg != end&& !prevSplitted)) anyVarIdx = true;
+  }
+  if (!anyVarIdx && !nextVarConnect(node)) {
+    node->status = DEAD_NODE;
+    arraySplitMap[node] = true;
+  } else {
+    arraySplitMap[node] = false;
+  }
+}
 /* splitted separately assigned, no variable index acceesing arrays */
 void graph::splitOptionalArray() {
   int num = 0;
   for (Node* node : fullyVisited) {
-    if (node->type != NODE_OTHERS || !node->isArray() || node->arrayEntryNum() <= 1) continue;
-    bool anyVarIdx = false;
-    int beg, end;
-    for (ExpTree* tree : node->assignTree) {
-      std::tie(beg, end) = tree->getlval()->getIdx(node);
-      if (beg < 0 || beg != end) anyVarIdx = true;
-    }
-    for (ExpTree* tree : node->arrayVal) {
-      std::tie(beg, end) = tree->getlval()->getIdx(node);
-      if (beg < 0 || beg != end) anyVarIdx = true;
-    }
-    if (!anyVarIdx && !nextVarConnect(node)) {
-      num ++;
-      node->status = DEAD_NODE;
-      splitArrayNode(node);
-    }
+    checkNodeSplit(node);
   }
 
+  for (auto iter : arraySplitMap) {
+    if (iter.second) {
+      splitArrayNode(iter.first);
+      num ++;
+    }
+  }
   printf("[splitOptionalArray] split %d arrays\n", num);
 }

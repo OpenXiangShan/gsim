@@ -34,6 +34,7 @@ class graph {
   void mergeOut1();
   void mergeIn1();
   void splitArrayNode(Node* node);
+  void checkNodeSplit(Node* node);
   void splitOptionalArray();
  public:
   std::vector<Node*> allNodes;
