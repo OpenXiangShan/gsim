@@ -70,6 +70,8 @@ ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index) {
     if (top->opType == OP_WHEN || top->opType == OP_MUX) {
       if (top->getChild(1)) s.push(top->getChild(1));
       if (top->getChild(2)) s.push(top->getChild(2));
+    } else if (top->opType == OP_RESET) {
+      if (top->getChild(1)) s.push(top->getChild(1));
     }
   }
   ExpTree* ret = new ExpTree(rvalue, lvalue);
@@ -149,11 +151,10 @@ void distributeTree(Node* node, ExpTree* tree) {
   ArrayMemberList* list = tree->getlval()->getArrayMember(node);
   if (list->member.size() == 1) {
     int idx = list->idx[0];
-    if (node->arrayMember[idx]->assignTree.size() != 0) {
-      /* fill empty when body in tree with old valTree*/
-      ExpTree* oldTree = node->arrayMember[idx]->assignTree[0];
+    if (node->arrayMember[idx]->assignTree.size() != 0 && node->arrayMember[idx]->assignTree.back()->getRoot()->opType != OP_WHEN) {
+      ExpTree* oldTree = node->arrayMember[idx]->assignTree.back();
       fillEmptyWhen(tree, oldTree->getRoot());
-      node->arrayMember[idx]->assignTree[0] = tree;
+      node->arrayMember[idx]->assignTree.back() = tree;
     } else {
       node->arrayMember[idx]->assignTree.push_back(tree);
     }
@@ -169,20 +170,19 @@ void distributeTree(Node* node, ExpTree* tree) {
       }
       ExpTree* newTree = dupTreeWithIdx(tree, subIdx);
       /* duplicate tree with idx */
-      if (node->arrayMember[idx]->assignTree.size() != 0) {
-        /* fill empty when body in newTree with old valTree*/
-        ExpTree* oldTree = node->arrayMember[idx]->assignTree[0];
+      if (node->arrayMember[idx]->assignTree.size() != 0 && node->arrayMember[idx]->assignTree.back()->getRoot()->opType != OP_WHEN) {
+        ExpTree* oldTree = node->arrayMember[idx]->assignTree.back();
         fillEmptyWhen(newTree, oldTree->getRoot());
-        node->arrayMember[idx]->assignTree[0] = newTree;
+        node->arrayMember[idx]->assignTree.back() = newTree;
       } else {
         node->arrayMember[idx]->assignTree.push_back(newTree);
       }
-
     }
   }
 }
 
 void graph::splitArrayNode(Node* node) {
+  if (supersrc.find(node->super) != supersrc.end()) supersrc.erase(node->super);
   /* remove prev connection */
   for (Node* prev : node->prev) prev->next.erase(node);
   for (SuperNode* super : node->super->prev) super->next.erase(node->super);
@@ -204,7 +204,19 @@ void graph::splitArrayNode(Node* node) {
   /* distribute arrayVal */
   for (ExpTree* tree : node->assignTree) distributeTree(node, tree);
   for (ExpTree* tree : node->arrayVal) distributeTree(node, tree);
-
+  if (node->updateTree) {
+    for (int idx = 0; idx < node->arrayEntryNum(); idx ++) {
+      /* compute index for all array operands in tree */
+      std::vector<int> subIdx(node->dimension.size());
+      int tmp = idx;
+      for (int i = node->dimension.size() - 1; i >= 0; i --) {
+        subIdx[i] = tmp % node->dimension[i];
+        tmp /= node->dimension[i];
+      }
+      ExpTree* newTree = dupTreeWithIdx(node->updateTree, subIdx);
+      node->arrayMember[idx]->updateTree = newTree;
+    }
+  }
   /* construct connections */
   for (Node* member : node->arrayMember) {
     member->updateConnect();
@@ -309,11 +321,13 @@ Node* Node::arrayMemberNode(int idx) {
     memberName += "[" + std::to_string(index[i]) + "]";
   }
 
-  Node* member = new Node(NODE_ARRAY_MEMBER);
+  Node* member = new Node(type);
+  member->isArrayMember = true;
   member->name = memberName;
   member->arrayIdx = idx;
   arrayMember.push_back(member);
   member->arrayParent = this;
+  member->clock = clock;
   member->setType(width, sign);
   member->constructSuperNode();
 
@@ -352,7 +366,7 @@ static std::map<Node*, bool> arraySplitMap;
 void graph::checkNodeSplit(Node* node) {
   if (arraySplitMap.find(node) != arraySplitMap.end()) return;
   if (!node->isArray()) return;
-  if (node->type != NODE_OTHERS || node->arrayEntryNum() <= 1) {
+  if ((node->type != NODE_OTHERS && node->type != NODE_REG_SRC) || node->arrayEntryNum() <= 1) {
     arraySplitMap[node] = false;
     return;
   }
@@ -361,18 +375,20 @@ void graph::checkNodeSplit(Node* node) {
   for (Node* prev : node->prev) {
     if (prev->isArray() && !arraySplitMap[prev]) prevSplitted = false;
   }
+  Node* treeNode = node->type == NODE_REG_SRC ? node->getDst() : node;
   bool anyVarIdx = false;
   int beg, end;
-  for (ExpTree* tree : node->assignTree) {
-    std::tie(beg, end) = tree->getlval()->getIdx(node);
+  for (ExpTree* tree : treeNode->assignTree) {
+    std::tie(beg, end) = tree->getlval()->getIdx(treeNode);
     if (beg < 0 || (beg != end && !prevSplitted)) anyVarIdx = true;
   }
-  for (ExpTree* tree : node->arrayVal) {
-    std::tie(beg, end) = tree->getlval()->getIdx(node);
+  for (ExpTree* tree : treeNode->arrayVal) {
+    std::tie(beg, end) = tree->getlval()->getIdx(treeNode);
     if (beg < 0 || (beg != end&& !prevSplitted)) anyVarIdx = true;
   }
   if (!anyVarIdx && !nextVarConnect(node)) {
     node->status = DEAD_NODE;
+    if (node->type == NODE_REG_SRC) node->getDst()->status = DEAD_NODE;
     arraySplitMap[node] = true;
   } else {
     arraySplitMap[node] = false;
@@ -384,10 +400,21 @@ void graph::splitOptionalArray() {
   for (Node* node : fullyVisited) {
     checkNodeSplit(node);
   }
-
+  regsrc.erase(
+    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
+        regsrc.end()
+  );
   for (auto iter : arraySplitMap) {
     if (iter.second) {
       splitArrayNode(iter.first);
+      if (iter.first->type == NODE_REG_SRC) {
+        splitArrayNode(iter.first->getDst());
+        Assert(iter.first->arrayMember.size() == iter.first->getDst()->arrayMember.size(), "%p %s member not match", iter.first, iter.first->name.c_str());
+        for (size_t i = 0; i < iter.first->arrayMember.size(); i ++) {
+          regsrc.push_back(iter.first->arrayMember[i]);
+          iter.first->arrayMember[i]->bindReg(iter.first->getDst()->arrayMember[i]);
+        }
+      }
       num ++;
     }
   }

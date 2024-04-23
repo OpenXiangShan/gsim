@@ -46,6 +46,7 @@ public:
     status = VAL_CONSTANT;
     mpz_set(assignmentCons, consVal);
     sameConstant = true;
+    opNum = 0;
   }
   void updateConsVal() {
     mpz_set_ui(mask, 1);
@@ -67,14 +68,21 @@ public:
     ret->width = width;
     ret->sign = sign;
     ret->consLength = consLength;
-    if (beg < 0) {
-      beg = 0;
-      end = memberInfo.size() - 1;
+    if (status == VAL_CONSTANT) {
+      mpz_set(ret->assignmentCons, assignmentCons);
+      ret->sameConstant = sameConstant;
     }
+
     for (int i = beg; i <= end; i ++) {
       if (getMemberInfo(i)) ret->memberInfo.push_back(getMemberInfo(i)->dup());
       else ret->memberInfo.push_back(nullptr);
     }
+    return ret;
+  }
+  valInfo* dupWithCons() {
+    valInfo* ret = dup();
+    mpz_set(ret->assignmentCons, assignmentCons);
+    ret->sameConstant = sameConstant;
     return ret;
   }
   valInfo* getMemberInfo(size_t idx) {

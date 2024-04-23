@@ -6,7 +6,7 @@
 #include <stack>
 
 static inline bool potentialDead(Node* node) {
-  return node->type == NODE_OTHERS || node->type == NODE_REG_SRC || node->type == NODE_ARRAY_MEMBER;
+  return node->type == NODE_OTHERS || node->type == NODE_REG_SRC;
 }
 
 void graph::removeDeadNodes() {

@@ -1487,7 +1487,6 @@ void updatePrevNext(Node* n) {
     case NODE_READER:
     case NODE_WRITER:
     case NODE_READWRITER:
-    case NODE_ARRAY_MEMBER:
     case NODE_INVALID:
     default: Panic();
 

@@ -48,7 +48,7 @@ void Node::inferWidth() {
     for (Node* member : arrayMember) member->inferWidth();
   }
   for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();
-
+  if (updateTree) updateTree->getRoot()->inferWidth();
   if (resetVal) resetVal->getRoot()->inferWidth();
   if (width == -1) {
     int width = 0;

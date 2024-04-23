@@ -18,7 +18,6 @@ enum NodeType{
   NODE_READWRITER,
   NODE_MEM_MEMBER,
   NODE_OTHERS,
-  NODE_ARRAY_MEMBER,
 };
 
 enum NodeStatus{ VALID_NODE, DEAD_NODE, CONSTANT_NODE, MERGED_NODE, DEAD_SRC };
@@ -132,6 +131,7 @@ class Node {
   Node* clock;
   bool isClock = false;
   ResetType reset = UNCERTAIN;
+  bool isArrayMember = false;
 /* used for visitWhen in AST2Graph */
 
   int whenDepth = 0;

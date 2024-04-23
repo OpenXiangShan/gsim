@@ -9,7 +9,7 @@
 /* TODO: array alias */
 /* TODO: A = B[idx] */
 ENode* Node::isAlias() {
-  if (type != NODE_OTHERS && type != NODE_ARRAY_MEMBER) return nullptr;
+  if (type != NODE_OTHERS) return nullptr;
   if (isArray()) {
     /* alias array A to array B iff
       A <= B (if idx = dim[0], A.arrayval[idx] = B, otherwise A.arrayval[idx] = null ) (Done)
@@ -24,7 +24,7 @@ ENode* Node::isAlias() {
   if (assignTree.size() != 1) return nullptr;
   if (!assignTree[0]->getRoot()->getNode()) return nullptr;
   if (prev.size() != 1) return nullptr;
-  if (type == NODE_ARRAY_MEMBER && assignTree[0]->getRoot()->getNode()->isArray() && !assignTree[0]->getRoot()->getNode()->arraySplitted()) return nullptr;
+  if (isArrayMember && assignTree[0]->getRoot()->getNode()->isArray() && !assignTree[0]->getRoot()->getNode()->arraySplitted()) return nullptr;
   return assignTree[0]->getRoot();
 }
 
@@ -104,7 +104,7 @@ void graph::aliasAnalysis() {
         if (interNode == enode->getNode()) aliasENode = enode->mergeSubTree(aliasMap[interNode]);
         else aliasENode = aliasMap[interNode]->dup();
       }
-      if (member->type == NODE_ARRAY_MEMBER && aliasENode->getNode()->isArray() && !aliasENode->getNode()->arraySplitted()) {
+      if (member->isArrayMember && aliasENode->getNode()->isArray() && !aliasENode->getNode()->arraySplitted()) {
         /* do not alias array member to */
       } else {
         member->status = DEAD_NODE;
@@ -129,7 +129,7 @@ void graph::aliasAnalysis() {
     }
   }
   for (auto iter : aliasMap) {
-    if(iter.first->type == NODE_ARRAY_MEMBER) {
+    if(iter.first->isArrayMember) {
       Node* parent = iter.first->arrayParent;
       parent->arrayMember[iter.first->arrayIdx] = getLeafNode(false, iter.second);
     }

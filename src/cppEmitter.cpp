@@ -6,7 +6,7 @@
 
 #include <map>
 
-#define oldBasic(node) (node->type == NODE_ARRAY_MEMBER ? arrayMemberOld(node) : (node->name + "$old"))
+#define oldBasic(node) (node->isArrayMember ? arrayMemberOld(node) : (node->name + "$old"))
 #define oldMpz(node) std::string("oldValMpz")
 #define oldName(node) (node->width > BASIC_WIDTH ? oldMpz(node) : oldBasic(node))
 
@@ -46,11 +46,20 @@ std::string strReplace(std::string s, std::string oldStr, std::string newStr) {
 }
 
 static std::string arrayMemberOld(Node* node) {
-  Assert(node->type == NODE_ARRAY_MEMBER, "invalid type %d %s", node->type, node->name.c_str());
+  Assert(node->isArrayMember, "invalid type %d %s", node->type, node->name.c_str());
   std::string ret = strReplace(node->name, "[", "__");
   ret = strReplace(ret, "]", "__") + "$old";
   return ret;
 }
+
+#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
+static std::string arrayPrevName (std::string name) {
+  size_t pos = name.find("[");
+  if (pos == name.npos) return name + "$prev";
+  std::string ret = name.insert(pos, "$prev");
+  return ret;
+}
+#endif
 
 static void inline declStep(FILE* fp) {
   for (int i = 1; i < superId; i ++) fprintf(fp, "void step%d();\n", i);
@@ -88,7 +97,7 @@ void graph::genNodeInit(FILE* fp, Node* node) {
   } else {
 #ifdef MEM_CHECK
     static std::set<Node*> initNodes;
-    if (node->type == NODE_ARRAY_MEMBER) node = node->arrayParent;
+    if (node->isArrayMember) node = node->arrayParent;
     if (initNodes.find(node) != initNodes.end()) return;
     initNodes.insert(node);
     switch (node->type) {
@@ -213,7 +222,7 @@ void graph::genHeaderEnd(FILE* fp) {
 
 void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_SPECIAL || node->status != VALID_NODE) return;
-  if (node->type == NODE_ARRAY_MEMBER) node = node->arrayParent;
+  if (node->isArrayMember) node = node->arrayParent;
   if (definedNode.find(node) != definedNode.end()) return;
   definedNode.insert(node);
   if (node->width <= BASIC_WIDTH) {
@@ -327,7 +336,7 @@ std::string graph::saveOldVal(FILE* fp, Node* node) {
   } else if (node->arrayEntryNum() == 1) {
     std::string suffix = strRepeat("[0]", node->dimension.size());
     if (node->width > BASIC_WIDTH) {
-      if (node->type == NODE_ARRAY_MEMBER) TODO();
+      if (node->isArrayMember) TODO();
       fprintf(fp, "mpz_set(%s, %s%s);\n", oldMpz(node).c_str(), node->name.c_str(), suffix.c_str());
       ret = oldMpz(node);
     } else {
@@ -338,7 +347,7 @@ std::string graph::saveOldVal(FILE* fp, Node* node) {
   return ret;
 }
 
-static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::string oldName, std::string suffix) {
+static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep) {
   std::string nodeName = node->name;
   if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
   if (node->width > BASIC_WIDTH) {
@@ -352,7 +361,7 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   fprintf(fp, "}\n");
 }
 
-static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId) {
+static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bool inStep) {
   for (int id : activateId) {
     fprintf(fp, "activeFlags[%d] = true;\n", id);
   }
@@ -371,8 +380,8 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
     }
   }
   if (!node->needActivate()) ;
-  else if(node->dimension.size() == 0 || node->arrayEntryNum() == 1) activateNext(fp, node, node->nextActiveId, oldnode, "");
-  else activateUncondNext(fp, node, node->nextActiveId);
+  else if(node->dimension.size() == 0 || node->arrayEntryNum() == 1) activateNext(fp, node, node->nextActiveId, oldnode, true);
+  else activateUncondNext(fp, node, node->nextActiveId, true);
 }
 
 void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
@@ -468,7 +477,7 @@ void graph::genMemRead(FILE* fp) {
           } else {
             fprintf(fp, "mpz_set(%s, %s[%s]);\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
           }
-          activateUncondNext(fp, port->member[READER_DATA], port->member[READER_DATA]->nextActiveId);
+          activateUncondNext(fp, port->member[READER_DATA], port->member[READER_DATA]->nextActiveId, false);
         }
       }
     } else {
@@ -479,7 +488,7 @@ void graph::genMemRead(FILE* fp) {
           else {
             fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
           }
-          activateUncondNext(fp, port->member[READER_DATA], port->member[READER_DATA]->nextActiveId);
+          activateUncondNext(fp, port->member[READER_DATA], port->member[READER_DATA]->nextActiveId, false);
         }
       }
     }
@@ -522,10 +531,10 @@ void graph::genUpdateRegister(FILE* fp) {
             else if (node->width <= 64)
               fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%lx\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), nodeName.c_str());
   #endif
-          if (node->regNeedActivate()) activateNext(fp, node, node->regActivate, regold, "");
+          if (node->regNeedActivate()) activateNext(fp, node, node->regActivate, regold, false);
         } else {
           // if (node->super->cppId < 0)
-            activateUncondNext(fp, node, node->regActivate);
+            activateUncondNext(fp, node, node->regActivate, false);
           if (node->updateTree->getRoot()->computeInfo->opNum < 0) {
               fprintf(fp, "%s\n", node->updateTree->getRoot()->computeInfo->valStr.c_str());
           } else if (node->width > BASIC_WIDTH) {
@@ -621,9 +630,9 @@ void graph::saveDiffRegs(FILE* fp) {
           for (size_t i = 0; i < member->dimension.size(); i ++) memberName += "[0]";
         }
         if (member->width > BASIC_WIDTH)
-          fprintf(fp, "mpz_set(%s%s, %s);\n", member->getSrc()->name.c_str(), "$prev", memberName.c_str());
+          fprintf(fp, "mpz_set(%s, %s);\n", arrayPrevName(member->getSrc()->name).c_str(), memberName.c_str());
         else
-          fprintf(fp, "%s%s = %s;\n", member->getSrc()->name.c_str(), "$prev", memberName.c_str());
+          fprintf(fp, "%s = %s;\n", arrayPrevName(member->getSrc()->name).c_str(), memberName.c_str());
       } else if (member->type == NODE_REG_SRC && member->isArray() && member->status == VALID_NODE) {
         std::string idxStr, bracket;
         for (size_t i = 0; i < member->dimension.size(); i ++) {

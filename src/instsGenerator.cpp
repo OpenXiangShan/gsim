@@ -218,8 +218,8 @@ static int countArrayIndex(std::string name) {
 
 static bool isSubArray(std::string name, Node* node) {
   size_t count = countArrayIndex(name);
-  Assert(node->type == NODE_ARRAY_MEMBER || count <= node->dimension.size(), "invalid array %s in %s", name.c_str(), node->name.c_str());
-  if (node->type == NODE_ARRAY_MEMBER) return false;
+  Assert(node->isArrayMember || count <= node->dimension.size(), "invalid array %s in %s", name.c_str(), node->name.c_str());
+  if (node->isArrayMember) return false;
   return node->dimension.size() != count;
 }
 
@@ -310,12 +310,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     }
   }
 
-  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_ARRAY_MEMBER)) {
+  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID && node->type == NODE_OTHERS) {
     if (getChild(2)) computeInfo = Child(2, computeInfo);
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
   }
-  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_ARRAY_MEMBER)) {
+  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID && node->type == NODE_OTHERS) {
     if (getChild(1)) computeInfo = Child(1, computeInfo);
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
@@ -1780,7 +1780,6 @@ valInfo* ENode::instsAssert() {
 
 valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
   Assert(node->type == NODE_REG_SRC, "node %s is not reg_src\n", node->name.c_str());
-  Assert(node->resetVal, "empty reset val in node %s", node->name.c_str());
 
   if (ChildInfo(0, status) == VAL_CONSTANT) {
     if (mpz_sgn(ChildInfo(0, consVal)) == 0) {
@@ -2013,7 +2012,7 @@ valInfo* Node::compute() {
 
   if (assignTree.size() == 0) {
     computeInfo = new valInfo();
-    if (type == NODE_OTHERS || type == NODE_ARRAY_MEMBER) { // invalid nodes
+    if (type == NODE_OTHERS) { // invalid nodes
       computeInfo->setConstantByStr("0");
     } else {
       computeInfo->valStr = name;
@@ -2023,13 +2022,13 @@ valInfo* Node::compute() {
     return computeInfo;
   }
 
-  bool isRoot = anyExtEdge() || next.size() != 1 || type == NODE_ARRAY_MEMBER;
+  bool isRoot = anyExtEdge() || next.size() != 1 || isArrayMember;
   valInfo* ret = nullptr;
   for (size_t i = 0; i < assignTree.size(); i ++) {
     ExpTree* tree = assignTree[i];
     valInfo* info = tree->getRoot()->compute(this, name, isRoot);
     if (info->status == VAL_EMPTY || info->status == VAL_INVALID) continue;
-    ret = info->dup();
+    ret = info->dupWithCons();
     if ((ret->status == VAL_INVALID || ret->status == VAL_CONSTANT) && (i < assignTree.size() - 1) ) {
       fillEmptyWhen(assignTree[i+1], tree->getRoot());
     }
@@ -2037,7 +2036,8 @@ valInfo* Node::compute() {
   if (!ret) ret = assignTree.back()->getRoot()->compute(this, name, isRoot)->dup();
   Assert(ret, "empty info in %s\n", name.c_str());
   if (ret->status == VAL_INVALID) ret->setConstantByStr("0");
-  if (ret->status == VAL_EMPTY_SRC) status = DEAD_SRC;
+  if (ret->status == VAL_EMPTY_SRC && assignTree.size() == 1) status = DEAD_SRC;
+
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
     if (type == NODE_REG_DST) {
@@ -2056,9 +2056,11 @@ valInfo* Node::compute() {
         recomputeAllNodes();
       }
     }
-  } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant && getSrc()->assignTree.size() == 0) {
+  } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant &&
+    (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(getSrc()->computeInfo->consVal, ret->assignmentCons) == 0))) {
     ret->status = VAL_CONSTANT;
     mpz_set(ret->consVal, ret->assignmentCons);
+    ret->setConsStr();
     status = CONSTANT_NODE;
     getSrc()->status = CONSTANT_NODE;
     getSrc()->computeInfo = ret;
@@ -2329,6 +2331,7 @@ void graph::instsGenerator() {
   }
   /* generate assignment instrs */
   for (Node* n : s) {
+    if (n->status == MERGED_NODE || n->status == CONSTANT_NODE) continue;
     for (ExpTree* tree : n->assignTree) {
       valInfo* assignInfo = tree->getRoot()->computeInfo;
       if (assignInfo->status == VAL_VALID) {
