@@ -22,7 +22,7 @@
 #include <cstdarg>
 
 // #define MEM_CHECK
-
+// #define PERF
 // #define EMU_LOG
 // #define LOG_START 0
 // #define LOG_END 0

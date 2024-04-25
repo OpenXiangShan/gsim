@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <iostream>
 #include <time.h>
 #include <cstring>
@@ -135,8 +136,13 @@ int main(int argc, char** argv) {
   ref->step();
 #endif
   std::cout << "start testing.....\n";
+  // printf("size = %lx %lx\n", sizeof(*ref->rootp),
+  // (uintptr_t)&(ref->rootp->TestHarness__DOT__chiptop0__DOT__system__DOT__pbus__DOT__buffer__DOT__nodeOut_a_q__DOT__ram_opcode) - (uintptr_t)(ref->rootp));
   bool dut_end = false;
   uint64_t cycles = 0;
+#ifdef PERF
+  FILE* activeFp = fopen(ACTIVE_FILE, "w");
+#endif
   clock_t start = clock();
   while(!dut_end) {
 #ifdef VERILATOR
@@ -147,9 +153,26 @@ int main(int argc, char** argv) {
 #endif
     cycles ++;
 #if (!defined(GSIM) && defined(VERILATOR)) || (defined(GSIM) && !defined(VERILATOR))
-    if(cycles % 10000000 == 0 && cycles < 600000000) {
+    if(cycles % 10000000 == 0 && cycles <= 600000000) {
       clock_t dur = clock() - start;
       printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+#ifdef PERF
+      size_t totalActives = 0;
+      size_t validActives = 0;
+      for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
+        totalActives += mod->activeTimes[i];
+        validActives += mod->validActive[i];
+      }
+      printf("totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
+          totalActives, totalActives / cycles, validActives, validActives / cycles);
+      fprintf(activeFp, "totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
+          totalActives, totalActives / cycles, validActives, validActives / cycles);
+      for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
+        fprintf(activeFp, "%ld: activeTimes %ld validActive %ld\n", i, mod->activeTimes[i], mod->validActive[i]);
+      }
+      if (cycles == 50000000) return 0;
+#endif
+      if (cycles == 600000000) return 0;
     }
 #endif
 #if defined(GSIM)

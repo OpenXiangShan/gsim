@@ -148,6 +148,10 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   fprintf(header, "S%s() {\n", name.c_str());
   /* some initialization */
   fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags[i] = true;\n", superId);
+#ifdef PERF
+  fprintf(header, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
+  fprintf(header, "for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
+#endif
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_init(MPZ_TMP$%d);\n", i);
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
@@ -170,7 +174,10 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_t MPZ_TMP$%d;\n", i);
 
   fprintf(header, "bool activeFlags[%d];\n", superId); // or super.size() if id == idx
-
+#ifdef PERF
+  fprintf(header, "size_t activeTimes[%d];\n", superId);
+  fprintf(header, "size_t validActive[%d];\n", superId);
+#endif
   return header;
 }
 
@@ -358,6 +365,9 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   for (int id : nextNodeId) {
     fprintf(fp, "activeFlags[%d] = true;\n", id);
   }
+#ifdef PERF
+  if (inStep) fprintf(fp, "isActivateValid = true;\n");
+#endif
   fprintf(fp, "}\n");
 }
 
@@ -365,6 +375,9 @@ static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bo
   for (int id : activateId) {
     fprintf(fp, "activeFlags[%d] = true;\n", id);
   }
+#ifdef PERF
+  if (inStep) fprintf(fp, "isActivateValid = true;\n");
+#endif
 }
 
 void graph::genNodeInsts(FILE* fp, Node* node) {
@@ -378,6 +391,9 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
     for (std::string inst : node->insts) {
       fprintf(fp, "%s\n", inst.c_str());
     }
+#ifdef PERF
+    if (node->type == NODE_REG_DST) fprintf(fp, "isActivateValid = true;\n");
+#endif
   }
   if (!node->needActivate()) ;
   else if(node->dimension.size() == 0 || node->arrayEntryNum() == 1) activateNext(fp, node, node->nextActiveId, oldnode, true);
@@ -388,6 +404,10 @@ void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
   nodeNum ++;
   fprintf(fp, "void S%s::step%d() {\n", name.c_str(), node->cppId);
   fprintf(fp, "activeFlags[%d] = false;\n", node->cppId);
+#ifdef PERF
+  fprintf(fp, "activeTimes[%d] ++;\n", node->cppId);
+  fprintf(fp, "bool isActivateValid = false;\n");
+#endif
 }
 
 void graph::nodeDisplay(FILE* fp, SuperNode* super) {
@@ -445,6 +465,9 @@ void graph::nodeDisplay(FILE* fp, SuperNode* super) {
 }
 
 void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
+#ifdef PERF
+  fprintf(fp, "validActive[%d] += isActivateValid;\n", node->cppId);
+#endif
 #ifdef EMU_LOG
   int num = (node->member.size() + nodePerDisplay - 1) / nodePerDisplay;
   for (int i = 0; i < num; i ++) {
