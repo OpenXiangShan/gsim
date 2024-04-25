@@ -227,7 +227,7 @@ class Node {
   Node* clockAlias();
   clockVal* clockCompute();
   ResetType inferReset();
-  void setConstantZero(int width);
+  void setConstantZero(int width = 0);
   bool isFakeArray() { return dimension.size() == 1 && dimension[0] == 1; }
   void display();
   int arrayEntryNum() { int num = 1; for (int idx : dimension) num *= idx; return num; }

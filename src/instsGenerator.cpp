@@ -38,6 +38,13 @@ struct ordercmp {
 static std::priority_queue<Node*, std::vector<Node*>, ordercmp> recomputeQueue;
 static std::set<Node*> uniqueRecompute;
 
+static void addRecompute(Node* node) {
+  if (uniqueRecompute.find(node) == uniqueRecompute.end()) {
+    recomputeQueue.push(node);
+    uniqueRecompute.insert(node);
+  }
+}
+
 static std::string getConsStr(mpz_t& val) {
   std::string str = mpz_get_str(NULL, 16, val);
   if (str.length() <= 16) return "0x" + str;
@@ -310,12 +317,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     }
   }
 
-  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID && node->type == NODE_OTHERS) {
+  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_MEM_MEMBER)) {
     if (getChild(2)) computeInfo = Child(2, computeInfo);
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
   }
-  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID && node->type == NODE_OTHERS) {
+  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_MEM_MEMBER)) {
     if (getChild(1)) computeInfo = Child(1, computeInfo);
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
@@ -2047,14 +2054,30 @@ valInfo* Node::compute() {
         /* re-compute nodes depend on src */
         for (Node* next : (regSplit ? getSrc() : this)->next) {
           if (next->computeInfo) {
-            if (uniqueRecompute.find(next) == uniqueRecompute.end()) {
-              recomputeQueue.push(next);
-              uniqueRecompute.insert(next);
-            }
+            addRecompute(next);
           }
         }
         recomputeAllNodes();
       }
+    } else if (type == NODE_MEM_MEMBER && mpz_sgn(ret->consVal) == 0) {
+      Node* port = parent;
+      if (port->type == NODE_READER) {
+        if (this == port->get_member(READER_EN)) {
+          port->get_member(READER_DATA)->setConstantZero();
+          port->get_member(READER_ADDR)->setConstantZero();
+          for (Node* next : port->get_member(READER_DATA)->next) {
+            if (next->computeInfo) addRecompute(next);
+          }
+        }
+      } else if (port->type == NODE_WRITER) {
+        if (this == port->get_member(WRITER_EN) || this == port->get_member(WRITER_MASK)) {
+          port->get_member(WRITER_ADDR)->setConstantZero();
+          port->get_member(WRITER_DATA)->setConstantZero();
+          if (this != port->get_member(WRITER_EN)) port->get_member(WRITER_EN)->setConstantZero();
+          if (this != port->get_member(WRITER_MASK)) port->get_member(WRITER_MASK)->setConstantZero();
+        }
+      }
+      recomputeAllNodes();
     }
   } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant &&
     (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(getSrc()->computeInfo->consVal, ret->assignmentCons) == 0))) {
@@ -2066,10 +2089,7 @@ valInfo* Node::compute() {
     getSrc()->computeInfo = ret;
     for (Node* next : (regSplit ? getSrc() : this)->next) {
       if (next->computeInfo) {
-        if (uniqueRecompute.find(next) == uniqueRecompute.end()) {
-          recomputeQueue.push(next);
-          uniqueRecompute.insert(next);
-        }
+        addRecompute(next);
       }
     }
     recomputeAllNodes();
