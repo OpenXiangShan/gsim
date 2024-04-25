@@ -95,6 +95,7 @@ ALLID: ID {$$ = $1; }
     | Mux { $$ = strdup("mux"); }
     | Stop { $$ = strdup("stop"); }
     | Depth {$$ = strdup("depth"); }
+    | Skip {$$ = strdup("skip"); }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
