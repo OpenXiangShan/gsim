@@ -7,6 +7,7 @@
 #include <map>
 #include <iostream>
 #include "common.h"
+#include <execinfo.h>
 /* convert firrtl constant to C++ constant */
 std::pair<int, std::string> firStrBase(std::string s) {
   if (s.length() <= 1) { return std::make_pair(10, s); }
@@ -103,4 +104,15 @@ std::string format(const char *fmt, ...) {
   std::string ret = buf;
   Assert(ret.length() < sizeof(buf) - 1, "require larger buf");
   return ret;
+}
+
+void print_stacktrace() {
+  int size = 16;
+  void * array[16];
+  int stack_num = backtrace(array, size);
+  char ** stacktrace = backtrace_symbols(array, stack_num);
+  for (int i = 0; i < stack_num; ++i) {
+    fprintf(stderr, "%s\n", stacktrace[i]);
+  }
+  free(stacktrace);
 }

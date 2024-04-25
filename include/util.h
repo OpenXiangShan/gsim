@@ -11,5 +11,6 @@ int upperLog2(int x);
 std::string to_hex_string(BASIC_TYPE x);
 std::pair<int, std::string> firStrBase(std::string s);
 std::string format(const char *fmt, ...);
+void print_stacktrace();
 
 #endif

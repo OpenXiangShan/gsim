@@ -6,10 +6,12 @@
 #define DEBUG_H
 
 #include <assert.h>
+void print_stacktrace();
 
 #define Assert(cond, ...)           \
   do {                              \
     if (!(cond)) {                  \
+      print_stacktrace();           \
       fprintf(stderr, "\33[1;31m"); \
       fprintf(stderr, __VA_ARGS__); \
       fprintf(stderr, "\33[0m\n");  \
