@@ -663,6 +663,8 @@ valInfo* ENode::instsLt(Node* node, std::string lvalue, bool isRoot) {
   if (isConstant) {
     us_lt(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
+  } else if (ChildInfo(0, valStr) == ChildInfo(1, valStr)) {
+    ret->setConstantByStr("0");
   } else if (childBasic && enodeBasic) {
     if (Child(0, sign)) {
       ret->valStr = format("(%s%s < %s%s)", Cast(Child(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(),
@@ -688,6 +690,8 @@ valInfo* ENode::instsLeq(Node* node, std::string lvalue, bool isRoot) {
   if (isConstant) {
     us_leq(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
+  } else if (ChildInfo(0, valStr) == ChildInfo(1, valStr)) {
+    ret->setConstantByStr("1");
   } else if (childBasic && enodeBasic) {
     if (Child(0, sign)) {
       ret->valStr = format("(%s%s <= %s%s)", Cast(Child(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(),
@@ -713,6 +717,8 @@ valInfo* ENode::instsGt(Node* node, std::string lvalue, bool isRoot) {
   if (isConstant) {
     us_gt(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
+  } else if (ChildInfo(0, valStr) == ChildInfo(1, valStr)) {
+    ret->setConstantByStr("0");
   } else if (childBasic && enodeBasic) {
     if (Child(0, sign)) {
       ret->valStr = format("(%s%s > %s%s)", Cast(Child(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(),
@@ -738,6 +744,8 @@ valInfo* ENode::instsGeq(Node* node, std::string lvalue, bool isRoot) {
   if (isConstant) {
     us_geq(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
+  } else if (ChildInfo(0, valStr) == ChildInfo(1, valStr)) {
+    ret->setConstantByStr("1");
   } else if (childBasic && enodeBasic) {
     if (Child(0, sign)) {
       ret->valStr = format("(%s%s >= %s%s)", Cast(Child(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(),
@@ -763,6 +771,8 @@ valInfo* ENode::instsEq(Node* node, std::string lvalue, bool isRoot) {
   if (isConstant) {
     us_eq(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
+  } else if (ChildInfo(0, valStr) == ChildInfo(1, valStr)) {
+    ret->setConstantByStr("1");
   } else if (childBasic && enodeBasic) {
     if (Child(0, sign)) {
       ret->valStr = format("(%s%s == %s%s)", (ChildInfo(0, status) == VAL_CONSTANT ? "" : Cast(ChildInfo(0, width), ChildInfo(0, sign)).c_str()), ChildInfo(0, valStr).c_str(),
@@ -822,6 +832,8 @@ valInfo* ENode::instsNeq(Node* node, std::string lvalue, bool isRoot) {
   if (isConstant) {
     us_neq(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
+  } else if (ChildInfo(0, valStr) == ChildInfo(1, valStr)) {
+    ret->setConstantByStr("0");
   } else if (childBasic && enodeBasic) {
     if (Child(0, sign)) {
       ret->valStr = format("(%s%s != %s%s)", (ChildInfo(0, status) == VAL_CONSTANT ? "" : Cast(ChildInfo(0, width), ChildInfo(0, sign)).c_str()), ChildInfo(0, valStr).c_str(),
