@@ -146,7 +146,7 @@ void graph::aliasAnalysis() {
       member->updateConnect();
     }
   }
-  updateSuper();
+  removeNodes(DEAD_NODE);
 
   printf("remove %ld alias (%ld -> %ld)\n", aliasNum, totalNodes, totalNodes - aliasNum);
   printf("remove %ld superNodes (%ld -> %ld)\n", totalSuper - sortedSuper.size(), totalSuper, sortedSuper.size());
