@@ -28,7 +28,6 @@ class graph {
   std::string saveOldVal(FILE* fp, Node* node);
   void removeNodesNoConnect(NodeStatus status);
   void reconnectSuper();
-  void updateSuper();
   void resetAnalysis();
   /* defined in mergeNodes */
   void mergeOut1();
@@ -73,6 +72,7 @@ class graph {
   bool inSrc(SuperNode* super);
   void mergeRegister();
   void clockOptimize();
+  void constructRegs();
 };
 
 #endif

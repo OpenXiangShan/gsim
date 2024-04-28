@@ -154,6 +154,7 @@ FILE* graph::genHeaderStart(std::string headerFile) {
 #endif
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_init(MPZ_TMP$%d);\n", i);
   for (SuperNode* super : sortedSuper) {
+    if (super->superType != SUPER_VALID) continue;
     for (Node* member : super->member) {
       genNodeInit(header, member);
     }
@@ -197,12 +198,7 @@ void graph::genInterfaceInput(FILE* fp, Node* input) {
     activate all nodes for simplicity
   */
   /* update nodes in the same superNode */
-  if (input->super->cppId > 0)
-    fprintf(fp, "activeFlags[%d] = true;\n", input->super->cppId);
-  /* update next nodes*/
-  for (int nextId : input->nextActiveId) {
-    fprintf(fp, "activeFlags[%d] = true;\n", nextId);
-  }
+  fprintf(fp, "for (int i = 0; i < %d; i ++) activeFlags[i] = true;\n", superId);
   fprintf(fp, "}\n");
 }
 
@@ -228,7 +224,7 @@ void graph::genHeaderEnd(FILE* fp) {
 }
 
 void graph::genNodeDef(FILE* fp, Node* node) {
-  if (node->type == NODE_SPECIAL || node->status != VALID_NODE) return;
+  if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
   if (node->isArrayMember) node = node->arrayParent;
   if (definedNode.find(node) != definedNode.end()) return;
   definedNode.insert(node);
@@ -391,9 +387,6 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
     for (std::string inst : node->insts) {
       fprintf(fp, "%s\n", inst.c_str());
     }
-#ifdef PERF
-    if (node->type == NODE_REG_DST) fprintf(fp, "isActivateValid = true;\n");
-#endif
   }
   if (!node->needActivate()) ;
   else if(node->dimension.size() == 0 || node->arrayEntryNum() == 1) activateNext(fp, node, node->nextActiveId, oldnode, true);
@@ -403,11 +396,17 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
 void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
   nodeNum ++;
   fprintf(fp, "void S%s::step%d() {\n", name.c_str(), node->cppId);
-  fprintf(fp, "activeFlags[%d] = false;\n", node->cppId);
-#ifdef PERF
-  fprintf(fp, "activeTimes[%d] ++;\n", node->cppId);
-  fprintf(fp, "bool isActivateValid = false;\n");
+  if(node->superType == SUPER_SAVE_REG) {
+#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
+    fprintf(fp, "saveDiffRegs();\n");
 #endif
+  } else {
+    fprintf(fp, "activeFlags[%d] = false;\n", node->cppId);
+  #ifdef PERF
+    fprintf(fp, "activeTimes[%d] ++;\n", node->cppId);
+    fprintf(fp, "bool isActivateValid = false;\n");
+  #endif
+  }
 }
 
 void graph::nodeDisplay(FILE* fp, SuperNode* super) {
@@ -684,13 +683,7 @@ void graph::genStep(FILE* fp) {
   for (int i = 0; i < subStepNum; i ++) {
     fprintf(fp, "subStep%d();\n", i);
   }
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-  fprintf(fp, "saveDiffRegs();\n");
-#endif
-  for (int i = 0; i < updateRegNum; i ++) {
-    fprintf(fp, "updateRegister%d();\n", i);
-  }
-  /* update memory*/
+
   fprintf(fp, "writeMem();\n");
 
   fprintf(fp, "cycles ++;\n");
@@ -707,7 +700,7 @@ bool SuperNode::instsEmpty() {
 
 void graph::cppEmitter() {
   for (SuperNode* super : sortedSuper) {
-    if (!super->instsEmpty()) super->cppId = superId ++;
+    if (super->superType == SUPER_SAVE_REG || !super->instsEmpty()) super->cppId = superId ++;
   }
   subStepNum = (superId + 9999) / 10000;
   updateRegNum = (regsrc.size() + 9999) / 10000;
@@ -727,7 +720,9 @@ void graph::cppEmitter() {
 
   for (SuperNode* super : sortedSuper) {
     // std::string insts;
-    for (Node* n : super->member) genNodeDef(header, n);
+    if (super->superType == SUPER_VALID) {
+      for (Node* n : super->member) genNodeDef(header, n);
+    }
     if (super->cppId <= 0) continue;
     genNodeStepStart(src, super);
     for (Node* n : super->member) {
@@ -752,17 +747,12 @@ void graph::cppEmitter() {
     fprintf(header, "void subStep%d();\n", i);
   }
   fprintf(header, "void updateMem();\n");
-  for (int i = 0; i < updateRegNum; i ++) {
-    fprintf(header, "void updateRegister%d();\n", i);
-  }
+
   fprintf(header, "void writeMem();\n");
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-  fprintf(header, "void saveDiffRegs();\n");
-#endif
+
   /* main evaluation loop (step)*/
   genMemRead(src);
   genActivate(src);
-  genUpdateRegister(src);
   genMemWrite(src);
   saveDiffRegs(src);
   genStep(src);

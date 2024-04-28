@@ -70,3 +70,24 @@ void graph::mergeRegister() {
   removeNodes(DEAD_SRC);
   printf("[mergeRegister] merge %d (total %ld) registers\n", num, regsrc.size());
 }
+
+void graph::constructRegs() {
+#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
+  SuperNode* updateReg = new SuperNode();
+  updateReg->superType = SUPER_SAVE_REG;
+  sortedSuper.push_back(updateReg);
+#endif
+  for (Node* node : regsrc) {
+    if (node->status == VALID_NODE) {
+      Node* nodeUpdate = node->dup(NODE_REG_UPDATE);
+      node->regUpdate = nodeUpdate;
+      nodeUpdate->assignTree.push_back(node->updateTree);
+      nodeUpdate->super = new SuperNode(nodeUpdate);
+      nodeUpdate->super->superType = SUPER_UPDATE_REG;
+      sortedSuper.push_back(nodeUpdate->super);
+      nodeUpdate->next.insert(node->next.begin(), node->next.end());
+      nodeUpdate->isArrayMember = node->isArrayMember;
+      nodeUpdate->updateConnect();
+    }
+  }
+}

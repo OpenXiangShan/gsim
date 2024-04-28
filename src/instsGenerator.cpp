@@ -2054,7 +2054,7 @@ valInfo* Node::compute() {
   }
   if (!ret) ret = assignTree.back()->getRoot()->compute(this, name, isRoot)->dup();
   Assert(ret, "empty info in %s\n", name.c_str());
-  if (ret->status == VAL_INVALID) ret->setConstantByStr("0");
+  if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) ret->setConstantByStr("0");
   if (ret->status == VAL_EMPTY_SRC && assignTree.size() == 1) status = DEAD_SRC;
 
   if (ret->status == VAL_CONSTANT) {
@@ -2063,6 +2063,10 @@ valInfo* Node::compute() {
       if (getSrc()->status == DEAD_SRC || getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, getSrc()->computeInfo->consVal) == 0)) {
         getSrc()->status = CONSTANT_NODE;
         getSrc()->computeInfo = ret;
+        if (getSrc()->regUpdate) {
+          getSrc()->regUpdate->computeInfo = ret;
+          getSrc()->regUpdate->status = CONSTANT_NODE;
+        }
         /* re-compute nodes depend on src */
         for (Node* next : (regSplit ? getSrc() : this)->next) {
           if (next->computeInfo) {
@@ -2099,6 +2103,8 @@ valInfo* Node::compute() {
     status = CONSTANT_NODE;
     getSrc()->status = CONSTANT_NODE;
     getSrc()->computeInfo = ret;
+    getSrc()->regUpdate->status = CONSTANT_NODE;
+    getSrc()->regUpdate->computeInfo = ret;
     for (Node* next : (regSplit ? getSrc() : this)->next) {
       if (next->computeInfo) {
         addRecompute(next);
@@ -2349,18 +2355,7 @@ void graph::instsGenerator() {
     }
     maxTmp = MAX(maxTmp, mpzTmpNum);
   }
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      if (member->updateTree) {
-        valInfo* info = member->updateTree->getlval()->compute(member, INVALID_LVALUE, false);
-        member->updateTree->getRoot()->compute(member, info->valStr, true);
-      }
-      if (member->status == DEAD_SRC) {
-        Assert(member->type == NODE_REG_SRC, "%s is not reg_src %d", member->name.c_str(), member->type);
-        member->status = VALID_NODE;
-      }
-    }
-  }
+
   /* generate assignment instrs */
   for (Node* n : s) {
     if (n->status == MERGED_NODE || n->status == CONSTANT_NODE) continue;

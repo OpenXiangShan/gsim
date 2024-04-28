@@ -19,18 +19,6 @@ void graph::removeNodesNoConnect(NodeStatus status) {
   }
 }
 
-void graph::updateSuper() {
-  /* remove deadNodes from superNodes */
-  removeNodesNoConnect(DEAD_NODE);
-  /* remove empty superNodes */
-  sortedSuper.erase(
-    std::remove_if(sortedSuper.begin(), sortedSuper.end(), [](const SuperNode* sn) { return sn->member.size() == 0; }),
-    sortedSuper.end()
-  );
-
-  reconnectSuper();
-}
-
 size_t graph::countNodes() {
   size_t ret = 0;
   for (SuperNode* super : sortedSuper) ret += super->member.size();
@@ -45,7 +33,7 @@ void graph::removeNodes(NodeStatus status) {
 
 void graph::removeEmptySuper() {
   sortedSuper.erase(
-    std::remove_if(sortedSuper.begin(), sortedSuper.end(), [](const SuperNode* super) {return super->member.size() == 0; }),
+    std::remove_if(sortedSuper.begin(), sortedSuper.end(), [](const SuperNode* super) {return (super->superType == SUPER_VALID || super->superType == SUPER_UPDATE_REG) && super->member.size() == 0; }),
     sortedSuper.end()
   );
 }

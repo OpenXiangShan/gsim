@@ -66,6 +66,8 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->usedBits());
 
+  FUNC_WRAPPER(g->constructRegs());
+
   FUNC_WRAPPER(g->mergeNodes());
 
   // g->mergeRegister();

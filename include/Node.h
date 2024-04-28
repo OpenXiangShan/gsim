@@ -18,6 +18,7 @@ enum NodeType{
   NODE_READWRITER,
   NODE_MEM_MEMBER,
   NODE_OTHERS,
+  NODE_REG_UPDATE,
 };
 
 enum NodeStatus{ VALID_NODE, DEAD_NODE, CONSTANT_NODE, MERGED_NODE, DEAD_SRC };
@@ -119,6 +120,7 @@ class Node {
   Node* parent = nullptr;
 /* used for registers */
   Node* regNext = nullptr;
+  Node* regUpdate = nullptr;
   ExpTree* updateTree = nullptr;
   bool regSplit = true;
 /* used for instGerator */
@@ -235,6 +237,12 @@ class Node {
   void fillArrayInvalid(ExpTree* tree);
 };
 
+enum SuperType {
+  SUPER_VALID,
+  SUPER_SAVE_REG,
+  SUPER_UPDATE_REG,
+};
+
 class SuperNode {
 private:
   static int counter;  // initialize to 1
@@ -246,6 +254,7 @@ public:
   int id;
   int order;
   int cppId = -1;
+  SuperType superType = SUPER_VALID;
   SuperNode() {
     id = counter ++;
   }

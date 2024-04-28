@@ -8,13 +8,15 @@ void graph::mergeOut1() {
   for (int i = sortedSuper.size() - 1; i >= 0; i --) {
     SuperNode* super = sortedSuper[i];
     /* do not merge superNodes that contains reg src */
-    if (inSrc(super)) continue;
+    if (inSrc(super) || super->superType != SUPER_VALID) continue;
     if (super->next.size() == 1) {
       SuperNode* nextSuper = *(super->next.begin());
+      if (nextSuper->superType != SUPER_VALID) continue;
       /* move members in super to next super*/
       for (Node* member : super->member) {
         member->super = nextSuper;
       }
+
       nextSuper->member.insert(nextSuper->member.begin(), super->member.begin(), super->member.end());
       /* update connection */
       nextSuper->prev.erase(super);
@@ -35,9 +37,10 @@ void graph::mergeOut1() {
 void graph::mergeIn1() {
   for (size_t i = 0; i < sortedSuper.size(); i ++) {
     SuperNode* super = sortedSuper[i];
+    if (super->superType != SUPER_VALID) continue;
     if (super->prev.size() == 1) {
       SuperNode* prevSuper = *(super->prev.begin());
-      if (inSrc(prevSuper)) continue;
+      if (inSrc(prevSuper) || prevSuper->superType != SUPER_VALID) continue;
       /* move members in super to prev super */
       for (Node* member : super->member) member->super = prevSuper;
       Assert(prevSuper->member.size() != 0, "empty prevSuper %d", prevSuper->id);

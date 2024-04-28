@@ -84,7 +84,7 @@ void graph::traversal() {
 }
 
 void SuperNode::display() {
-   printf("----super %d----:\n", id);
+   printf("----super %d(type=%d)----:\n", id, superType);
     for (Node* node : member) {
       node->display();
     }

@@ -63,6 +63,7 @@ void Node::addReset() {
   Assert(type == NODE_REG_SRC, "%s(%d) is not regsrc", name.c_str(), type);
 
   ResetType resetType = resetCond->getRoot()->inferReset();
+  reset = resetType;
   Assert(resetType != UNCERTAIN, "reset %s is uncertain", name.c_str());
   if (resetType == ZERO_RESET) {
     /* do nothing */
