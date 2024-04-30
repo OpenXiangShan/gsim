@@ -750,6 +750,10 @@ void graph::cppEmitter() {
 
   fprintf(header, "void writeMem();\n");
 
+#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
+  fprintf(header, "void saveDiffRegs();\n");
+#endif
+
   /* main evaluation loop (step)*/
   genMemRead(src);
   genActivate(src);
