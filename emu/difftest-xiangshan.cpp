@@ -93,7 +93,8 @@ void mod_reset() {
 #ifdef GSIM_DIFF
 void ref_reset() {
   ref->set_reset(1);
-  ref->step();
+  for (int i = 0; i < 10; i ++)
+    ref->step();
   ref->set_reset(0);
 }
 #endif
@@ -129,8 +130,13 @@ int main(int argc, char** argv) {
 #endif
 #ifdef GSIM_DIFF
   ref = new REF_NAME();
-  memcpy(&ref->mem$rdata_mem$mem, program, program_sz);
-  ref->set_io_uart_in_ch(-1);
+  memcpy(&ref->memory$ram$rdata_mem$mem, program, program_sz);
+  ref->set_difftest$$perfCtrl$$clean(0);
+  ref->set_difftest$$perfCtrl$$dump(0);
+  ref->set_difftest$$logCtrl$$begin(0);
+  ref->set_difftest$$logCtrl$$end(0);
+  ref->set_difftest$$logCtrl$$level(0);
+  ref->set_difftest$$uart$$in$$ch(-1);
   ref_reset();
   ref->step();
 #endif
@@ -157,7 +163,7 @@ int main(int argc, char** argv) {
     ref->step();
 #endif
     cycles ++;
-    if(cycles % 100000 == 0 && cycles < 251000000) {
+    if(cycles % 100000 == 0 && cycles <= 6400000) {
       clock_t dur = clock() - start;
       printf("cycles %ld (%ld ms, %ld per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
 #ifdef PERF
@@ -177,7 +183,7 @@ int main(int argc, char** argv) {
       }
       if (cycles == 500000) return 0;
 #endif
-      if (cycles == 251000000) return 0;
+      if (cycles == 6400000) return 0;
     }
 #if defined(GSIM)
     mod->step();

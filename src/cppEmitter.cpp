@@ -4,6 +4,7 @@
 
 #include "common.h"
 
+#include <cstdio>
 #include <map>
 
 #define oldBasic(node) (node->isArrayMember ? arrayMemberOld(node) : (node->name + "$old"))
@@ -250,11 +251,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
       fprintf(fp, ";\n");
     }
   #endif
-  #ifdef VERILATOR_DIFF
   std::string verilatorName = name + "__DOT__" + (node->type == NODE_REG_DST? node->getSrc()->name : node->name);
-  #else
-  std::string verilatorName = name + "__DOT__" + node->name;
-  #endif
   size_t pos;
   while ((pos = verilatorName.find("$$")) != std::string::npos) {
     verilatorName.replace(pos, 2, "_");
@@ -262,7 +259,6 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   while ((pos = verilatorName.find("$")) != std::string::npos) {
     verilatorName.replace(pos, 1, "__DOT__");
   }
-  #ifdef VERILATOR_DIFF
   std::map<std::string, std::string> allNames;
   std::string diffNodeName = node->type == NODE_REG_DST ? (node->getSrc()->name + "$prev") : node->name;
   std::string originName = (node->type == NODE_REG_DST ? node->getSrc()->name : node->name);
@@ -303,12 +299,13 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   } else {
     allNames[diffNodeName] = verilatorName;
   }
+  #ifdef VERILATOR_DIFF
   if (node->type != NODE_REG_SRC) {
     for (auto iter : allNames)
       fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, iter.first.c_str(), iter.second.c_str());
     }
   #else
-  fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, diffNodeName.c_str(), verilatorName.c_str());
+  fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, diffNodeName.c_str(), diffNodeName.c_str());
   #endif
 #endif
 }
