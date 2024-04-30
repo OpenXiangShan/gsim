@@ -35,6 +35,7 @@ class graph {
   void splitArrayNode(Node* node);
   void checkNodeSplit(Node* node);
   void splitOptionalArray();
+  void constantMemory();
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;

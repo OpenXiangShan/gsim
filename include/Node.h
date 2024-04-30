@@ -29,7 +29,6 @@ enum WriterMember { WRITER_ADDR = 0, WRITER_EN, WRITER_CLK, WRITER_DATA, WRITER_
 enum ReadWriterMember { READWRITER_ADDR = 0, READWRITER_EN, READWRITER_CLK,
                       READWRITER_RDATA, READWRITER_WDATA, READWRITER_WMASK,
                       READWRITER_WMODE, READWRITER_MEMBER_NUM};
-enum ResetType { UNCERTAIN, ASYRESET, UINTRESET, ZERO_RESET };
 
 class TypeInfo {
 public:
@@ -229,7 +228,7 @@ class Node {
   Node* clockAlias();
   clockVal* clockCompute();
   ResetType inferReset();
-  void setConstantZero(int width = 0);
+  void setConstantZero(int w = -1);
   bool isFakeArray() { return dimension.size() == 1 && dimension[0] == 1; }
   void display();
   int arrayEntryNum() { int num = 1; for (int idx : dimension) num *= idx; return num; }
@@ -255,6 +254,8 @@ public:
   int order;
   int cppId = -1;
   SuperType superType = SUPER_VALID;
+  int localTmpNum = 0;
+  int mpzTmpNum = 0;
   SuperNode() {
     id = counter ++;
   }

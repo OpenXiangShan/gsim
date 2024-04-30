@@ -8,6 +8,7 @@
 #include <queue>
 #include <stack>
 #include <tuple>
+#include <utility>
 
 #include "common.h"
 #include "graph.h"
@@ -16,10 +17,11 @@
 #define Child(id, name) getChild(id)->name
 #define ChildInfo(id, name) getChild(id)->computeInfo->name
 
-#define newLocalTmp() ("TMP$" + std::to_string(localTmpNum ++))
-#define newMpzTmp() ("MPZ_TMP$" + std::to_string(mpzTmpNum ++))
-static int localTmpNum = 0;
-static int mpzTmpNum = 0;
+#define newLocalTmp() ("TMP$" + std::to_string((*localTmpNum) ++))
+#define newMpzTmp() ("MPZ_TMP$" + std::to_string((*mpzTmpNum) ++))
+static int *localTmpNum = nullptr;
+static int *mpzTmpNum = nullptr;
+
 #define INVALID_LVALUE "INVALID_STR"
 #define IS_INVALID_LVALUE(name) (name == INVALID_LVALUE)
 
@@ -28,6 +30,17 @@ static bool isSubArray(std::string name, Node* node);
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 std::string idx2Str(Node* node, int idx, int dim);
 void recomputeAllNodes();
+
+static std::stack<std::pair<int*, int*>> tmpStack;
+
+static void tmp_push() {
+  tmpStack.push(std::make_pair(localTmpNum, mpzTmpNum));
+}
+
+static void tmp_pop() {
+  std::tie(localTmpNum, mpzTmpNum) = tmpStack.top();
+  tmpStack.pop();
+}
 
 struct ordercmp {
   bool operator()(Node* n1, Node* n2) {
@@ -2021,12 +2034,20 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
 */
 valInfo* Node::compute() {
   if (computeInfo) return computeInfo;
-  if (isArray()) return computeArray();
   if (width == 0) {
     computeInfo = new valInfo();
     computeInfo->setConstantByStr("0");
     status = CONSTANT_NODE;
     return computeInfo;
+  }
+  tmp_push();
+  localTmpNum = &super->localTmpNum;
+  mpzTmpNum = &super->mpzTmpNum;
+
+  if (isArray()) {
+    valInfo* ret = computeArray();
+    tmp_pop();
+    return ret;
   }
 
   if (assignTree.size() == 0) {
@@ -2038,6 +2059,7 @@ valInfo* Node::compute() {
     }
     computeInfo->width = width;
     computeInfo->sign = sign;
+    tmp_pop();
     return computeInfo;
   }
 
@@ -2126,6 +2148,7 @@ valInfo* Node::compute() {
   for (ExpTree* tree : assignTree) {
     for (std::string inst : tree->getRoot()->computeInfo->insts) insts.push_back(inst);
   }
+  tmp_pop();
   return ret;
 }
 
@@ -2338,14 +2361,69 @@ valInfo* Node::computeArray() {
   return computeInfo;
 }
 
+void graph::constantMemory() {
+  int num = 0;
+  mpz_t val;
+  mpz_init(val);
+  while (1) {
+    for (Node* mem : memory) {
+      bool isConstant = true;
+      bool isFirst = true;
+      for (Node* port : mem->member) {
+        if (port->type == NODE_WRITER) {
+          Node* wdata = port->get_member(WRITER_DATA);
+          if (wdata->status == CONSTANT_NODE) {
+            if (isFirst) {
+              mpz_set(val, wdata->computeInfo->consVal);
+              isFirst = false;
+            } else if (mpz_cmp(wdata->computeInfo->consVal, val) == 0) {
+
+            } else {
+              isConstant = false;
+              break;
+            }
+          } else {
+            isConstant = false;
+            break;
+          }
+        }
+      }
+      if (isConstant) {
+        num ++;
+        for (Node* port : mem->member) {
+          if (port->type == NODE_READER) {
+            port->get_member(READER_ADDR)->setConstantZero();
+            port->get_member(READER_EN)->setConstantZero();
+            port->get_member(READER_DATA)->setConstantZero();
+            port->get_member(READER_DATA)->computeInfo->setConstantByStr(mpz_get_str(NULL, 16, val));
+            for (Node* next : port->get_member(READER_DATA)->next) {
+              if (next->computeInfo) addRecompute(next);
+            }
+          } else if (port->type == NODE_WRITER) {
+            port->get_member(WRITER_ADDR)->setConstantZero();
+            port->get_member(WRITER_EN)->setConstantZero();
+            port->get_member(WRITER_MASK)->setConstantZero();
+          } else TODO();
+        }
+        mem->status = CONSTANT_NODE;
+      }
+    }
+    if (recomputeQueue.empty()) break;
+    recomputeAllNodes();
+    memory.erase(
+      std::remove_if(memory.begin(), memory.end(), [](const Node* n){ return n->status == CONSTANT_NODE; }),
+        memory.end()
+    );
+  }
+  printf("[instsGenerator] find %d constant memories", num);
+}
+
 void graph::instsGenerator() {
   std::set<Node*>s;
   for (SuperNode* super : sortedSuper) {
-    localTmpNum = 0;
-    mpzTmpNum = 0;
     for (Node* n : super->member) {
       if (n->dimension.size() != 0) {
-        n->computeArray();
+        n->compute();
       } else {
         if (n->assignTree.size() == 0) continue;
         n->compute();
@@ -2353,8 +2431,9 @@ void graph::instsGenerator() {
         s.insert(n);
       }
     }
-    maxTmp = MAX(maxTmp, mpzTmpNum);
   }
+  constantMemory();
+  for (SuperNode* super : sortedSuper) maxTmp = MAX(maxTmp, super->mpzTmpNum);
 
   /* generate assignment instrs */
   for (Node* n : s) {

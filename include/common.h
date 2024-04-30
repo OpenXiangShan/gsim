@@ -105,6 +105,8 @@ class valInfo;
 class clockVal;
 class ArrayMemberList;
 
+enum ResetType { UNCERTAIN, ASYRESET, UINTRESET, ZERO_RESET };
+
 #include "opFuncs.h"
 #include "debug.h"
 #include "Node.h"

@@ -89,9 +89,10 @@ Node* Node::clockAlias() {
   return assignTree[0]->getRoot()->getNode();
 }
 
-void Node::setConstantZero(int width) {
+void Node::setConstantZero(int w) {
   computeInfo = new valInfo();
-  computeInfo->width = width;
+  if (w > 0) computeInfo->width = w;
+  else computeInfo->width = width;
   computeInfo->setConstantByStr("0");
   status = CONSTANT_NODE;
 }
