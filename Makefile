@@ -36,11 +36,21 @@ else ifeq ($(dutName),boom)
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
 	TEST_FILE = ready-to-run/$(NAME).LargeBoomConfig
+else ifeq ($(dutName),small-boom)
+	NAME ?= TestHarness
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
+	mainargs = ready-to-run/bin/bbl-test1.bin
+	TEST_FILE = ready-to-run/$(NAME).SmallBoomConfig
 else ifeq ($(dutName),xiangshan)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
 	mainargs = ready-to-run/bin/linux-xiangshan.bin
 	TEST_FILE = ready-to-run/$(NAME)-xiangshan
+else ifeq ($(dutName),xiangshan-default)
+	NAME ?= SimTop
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
+	mainargs = ready-to-run/bin/linux-xiangshan.bin
+	TEST_FILE = ready-to-run/$(NAME)-xiangshan-default
 endif
 
 MODE ?= 0
