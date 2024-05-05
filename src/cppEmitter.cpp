@@ -617,7 +617,11 @@ void graph::genMemWrite(FILE* fp) {
           }
           fprintf(fp, "%s", bracket.c_str());
         } else {
-          fprintf(fp, "if(%s && %s) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str(), port->member[WRITER_MASK]->computeInfo->valStr.c_str());
+          std::string cond;
+          if (info_en->status != VAL_CONSTANT) cond += port->member[WRITER_EN]->computeInfo->valStr.c_str();
+          valInfo* info_mask = port->member[WRITER_MASK]->computeInfo;
+          if (info_mask->status != VAL_CONSTANT) cond += (cond.length() == 0 ? "" : " & ") + port->member[WRITER_MASK]->computeInfo->valStr;
+          fprintf(fp, "if(%s) {\n", cond.c_str());
           if (mem->width > BASIC_WIDTH) {
             if (port->member[WRITER_DATA]->computeInfo->status == VAL_CONSTANT) {
               if (mpz_cmp_ui(port->member[WRITER_DATA]->computeInfo->consVal, MAX_U64) > 0) TODO();

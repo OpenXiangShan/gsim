@@ -111,7 +111,7 @@ endif
 ifeq ($(MODE),0)
 	MODE_FLAGS += -DGSIM
 	target = $(EMU_BUILD_DIR)/S$(NAME)
-	GSIM_CFLAGS += -O3
+	GSIM_CFLAGS += -O3 -Wno-format
 else ifeq ($(MODE), 1)
 	MODE_FLAGS += -DVERILATOR
 	target = ./obj_dir/V$(NAME)

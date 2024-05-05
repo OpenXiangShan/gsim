@@ -58,6 +58,16 @@ static void addRecompute(Node* node) {
   }
 }
 
+static bool mpzOutOfBound(mpz_t& val, int width) {
+  mpz_t tmp;
+  mpz_init(tmp);
+  mpz_set_ui(tmp, 1);
+  mpz_mul_2exp(tmp, tmp, width);
+  mpz_sub_ui(tmp, tmp, 1);
+  if (mpz_cmp(val, tmp) > 0) return true;
+  return false;
+}
+
 static std::string getConsStr(mpz_t& val) {
   std::string str = mpz_get_str(NULL, 16, val);
   if (str.length() <= 16) return "0x" + str;
@@ -786,6 +796,9 @@ valInfo* ENode::instsEq(Node* node, std::string lvalue, bool isRoot) {
     ret->setConsStr();
   } else if (ChildInfo(0, valStr) == ChildInfo(1, valStr)) {
     ret->setConstantByStr("1");
+  } else if ((ChildInfo(0, status) == VAL_CONSTANT && mpzOutOfBound(ChildInfo(0, consVal), Child(1, width)))
+      ||(ChildInfo(1, status) == VAL_CONSTANT && mpzOutOfBound(ChildInfo(1, consVal), Child(0, width)))) {
+    ret->setConstantByStr("0");
   } else if (childBasic && enodeBasic) {
     if (Child(0, sign)) {
       ret->valStr = format("(%s%s == %s%s)", (ChildInfo(0, status) == VAL_CONSTANT ? "" : Cast(ChildInfo(0, width), ChildInfo(0, sign)).c_str()), ChildInfo(0, valStr).c_str(),
@@ -2034,6 +2047,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
 */
 valInfo* Node::compute() {
   if (computeInfo) return computeInfo;
+  Assert(status != DEAD_NODE, "compute deadNode %s\n", name.c_str());
   if (width == 0) {
     computeInfo = new valInfo();
     computeInfo->setConstantByStr("0");
