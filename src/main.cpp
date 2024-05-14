@@ -69,14 +69,18 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->aliasAnalysis());
 
+  // FUNC_WRAPPER(g->commonExpr());
+
+
   FUNC_WRAPPER(g->constructRegs());
 
   FUNC_WRAPPER(g->mergeNodes());
 
   // g->mergeRegister();
+  // FUNC_WRAPPER(g->traversal());
 
   FUNC_WRAPPER(g->instsGenerator());
-  
+// return 0;
   FUNC_WRAPPER(g->cppEmitter());
 
   return 0;

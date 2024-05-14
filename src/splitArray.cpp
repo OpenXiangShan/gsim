@@ -182,6 +182,7 @@ void distributeTree(Node* node, ExpTree* tree) {
 }
 
 void graph::splitArrayNode(Node* node) {
+  splittedArray.insert(node);
   if (supersrc.find(node->super) != supersrc.end()) supersrc.erase(node->super);
   /* remove prev connection */
   for (Node* prev : node->prev) prev->next.erase(node);

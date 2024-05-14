@@ -50,6 +50,7 @@ class graph {
   std::set<SuperNode*> supersrc;
   /* used after toposort */
   std::vector<SuperNode*> sortedSuper;
+  std::set<Node*> splittedArray;
   std::string name;
   int maxTmp = 0;
   int nodeNum = 0;
@@ -76,6 +77,7 @@ class graph {
   void clockOptimize();
   void constantAnalysis();
   void constructRegs();
+  void commonExpr();
 };
 
 #endif

@@ -2,6 +2,8 @@
 #include <queue>
 #include <map>
 
+int Node::counter = 1;
+
 void Node::updateConnect() {
   std::queue<ENode*> q;
   for (ExpTree* tree : assignTree) q.push(tree->getRoot());

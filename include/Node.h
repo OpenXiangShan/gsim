@@ -87,10 +87,12 @@ public:
 
 class Node {
   void finalConnect(std::string lvalue, valInfo* info);
+  static int counter;
  public:
 
   Node(NodeType _type = NODE_OTHERS) {
     type    = _type;
+    id = counter ++;
   }
 
   std::string name;  // concat the module name in order (member in structure / temp variable)
@@ -144,9 +146,7 @@ class Node {
   std::set<int> regActivate;
 
   std::vector<std::string> insts;
-  void set_id(int _id) {
-    id     = _id;
-  }
+
   void updateInfo(TypeInfo* info);
   void setType(int _width, bool _sign) {
     width = _width;
@@ -178,14 +178,14 @@ class Node {
     member.push_back(_member);
     if(_member) _member->set_parent(this);
   }
-  void set_member(int id, Node* node) {
-    Assert(id < (int)member.size(), "id %d is out of bound [0, %ld)", id, member.size());
-    member[id] = node;
+  void set_member(int idx, Node* node) {
+    Assert(idx < (int)member.size(), "idx %d is out of bound [0, %ld)", idx, member.size());
+    member[idx] = node;
     node->set_parent(this);
   }
-  Node* get_member(int id) {
-    Assert(id < (int)member.size(), "id %d is out of bound [0, %ld)", id, member.size());
-    return member[id];
+  Node* get_member(int idx) {
+    Assert(idx < (int)member.size(), "idx %d is out of bound [0, %ld)", idx, member.size());
+    return member[idx];
   }
   void set_parent(Node* _parent) {
     Assert(!parent, "parent in %s is already set", name.c_str());
@@ -239,6 +239,7 @@ class Node {
   valInfo* computeConstant();
   void invalidArrayOptimize();
   void fillArrayInvalid(ExpTree* tree);
+  uint64_t keyHash();
 };
 
 enum SuperType {

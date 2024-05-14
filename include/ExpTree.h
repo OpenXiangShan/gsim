@@ -66,7 +66,8 @@ enum OPType {
 };
 
 class ENode {
-
+private:
+  static int counter;
   valInfo* instsMux(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsAdd(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsSub(Node* n, std::string lvalue, bool isRoot);
@@ -166,16 +167,18 @@ public:
   ResetType reset = UNCERTAIN;
   int usedBit = -1;
   // bool islvalue = false;  // true for root and L_INDEX, otherwise false
-  int id; // used to distinguish different whens
+  int id; // unique identifier
   std::vector<int> values;     // used in int_noinit/int_init leaf
   std::string strVal;
   valInfo* computeInfo = nullptr;
 // potential: index
   ENode(OPType type = OP_EMPTY) {
     opType = type;
+    id = counter ++;
   }
   ENode(Node* _node) {
     nodePtr = _node;
+    id = counter ++;
   }
   void setNode(Node* node) {
     nodePtr = node;
@@ -223,6 +226,8 @@ public:
   clockVal* clockCompute();
   ResetType inferReset();
   ArrayMemberList* getArrayMember(Node* node);
+  void display();
+  uint64_t keyHash();
 };
 
 /* 
@@ -269,6 +274,8 @@ public:
     void replace(std::map<Node*, ENode*>& aliasMap, bool isArray);
     /* used in mergeRegister */
     void replace(Node* oldNode, Node* newNode);
+    /* used in commonExpr */
+    void replace(std::map<Node*, Node*>& aliasMap);
     void clearInfo();
     bool isInvalid() {
       Assert(getRoot(), "empty root");
@@ -277,6 +284,7 @@ public:
     bool isConstant();
     void removeConstant();
     void removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::set<ENode*>& visited);
+    uint64_t keyHash();
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes

@@ -1,6 +1,8 @@
 #include "common.h"
 #include <tuple>
 
+int ENode::counter = 1;
+
 #define w0 getChild(0)->width
 #define w1 getChild(1)->width
 #define w2 getChild(2)->width
