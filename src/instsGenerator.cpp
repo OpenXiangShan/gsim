@@ -1299,7 +1299,8 @@ valInfo* ENode::instsAsAsyncReset(Node* node, std::string lvalue, bool isRoot) {
     u_asAsyncReset(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
   } else if (childBasic && enodeBasic) {
-    ret->valStr = "(" + ChildInfo(0, valStr) + " != 0)";
+    if (ChildInfo(0, width) == 1) ret->valStr = ChildInfo(0, valStr);
+    else ret->valStr = "(" + ChildInfo(0, valStr) + " != 0)";
     ret->opNum = ChildInfo(0, opNum) + 1;
   } else {
     TODO();
