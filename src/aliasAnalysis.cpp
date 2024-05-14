@@ -50,10 +50,12 @@ void ExpTree::replace(std::map<Node*, ENode*>& aliasMap, bool isArray) {
   std::stack<ENode*> s;
   Node* leafNode = getLeafNode(isArray, getRoot());
   if(aliasMap.find(leafNode) != aliasMap.end()) {
+    int width = getRoot()->width;
     if (leafNode == getRoot()->getNode())
       setRoot(getRoot()->mergeSubTree(aliasMap[leafNode]));
     else
       setRoot(aliasMap[leafNode]->dup());
+    getRoot()->width = width;
   }
   s.push(getRoot());
 
