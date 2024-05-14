@@ -22,10 +22,12 @@ public:
   bool sameConstant = false;
   mpz_t assignmentCons;
 
-  valInfo() {
+  valInfo(int _width = 0, bool _sign = 0) {
     mpz_init(consVal);
     mpz_init(mask);
     mpz_init(assignmentCons);
+    width = _width;
+    sign = _sign;
   }
   void mergeInsts(valInfo* newInfo) {
     insts.insert(insts.end(), newInfo->insts.begin(), newInfo->insts.end());

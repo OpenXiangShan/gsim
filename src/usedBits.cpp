@@ -17,14 +17,22 @@ static std::vector<Node*> checkNodes;
 void ENode::passWidthToChild() {
   std::vector<int>childBits;
   if (nodePtr) {
-    if (usedBit > nodePtr->usedBit) {
-      checkNodes.push_back(nodePtr);
+    Node* node = nodePtr;
+    if (usedBit > node->usedBit) {
+      if (node->isArray() && node->arraySplitted()) {
+        for (Node* member : node->arrayMember) {
+          member->update_usedBit(usedBit);
+          checkNodes.push_back(member);
+        }
+      } else {
+        checkNodes.push_back(node);
+      }
     }
-    nodePtr->update_usedBit(usedBit);
-    if (nodePtr->type == NODE_REG_SRC) {
-      if (nodePtr->usedBit != nodePtr->getDst()->usedBit) {
-        checkNodes.push_back(nodePtr->getDst());
-        nodePtr->getDst()->usedBit = nodePtr->usedBit;
+    node->update_usedBit(usedBit);
+    if (node->type == NODE_REG_SRC) {
+      if (node->usedBit != node->getDst()->usedBit) {
+        checkNodes.push_back(node->getDst());
+        node->getDst()->usedBit = node->usedBit;
       }
     }
     for (ENode* childENode : child) {
@@ -88,6 +96,12 @@ void ENode::passWidthToChild() {
       childBits.push_back(1);
       childBits.push_back(usedBit);
       break;
+    case OP_PRINTF:
+    case OP_ASSERT:
+      for (int i = 0; i < getChildNum(); i ++) {
+        childBits.push_back(getChild(i)->width);
+      }
+      break;
     default:
       printf("invalid op %d\n", opType);
       Panic();
@@ -115,8 +129,8 @@ void Node::passWidthToPrev() {
       tree->getRoot()->usedBit = usedBit;
       tree->getRoot()->passWidthToChild();
     }
-    if (tree->getlval() && tree->getlval()->usedBit != tree->getlval()->width) {
-      tree->getlval()->usedBit = tree->getlval()->width;
+    if (tree->getlval() && tree->getlval()->usedBit != usedBit) {
+      tree->getlval()->usedBit = usedBit;
       tree->getlval()->passWidthToChild();
     }
   }
@@ -135,8 +149,8 @@ void Node::passWidthToPrev() {
       tree->getRoot()->usedBit = usedBit;
       tree->getRoot()->passWidthToChild();
     }
-    if (tree->getlval() && tree->getlval()->usedBit != tree->getlval()->width) {
-      tree->getlval()->usedBit = tree->getlval()->width;
+    if (tree->getlval() && tree->getlval()->usedBit != usedBit) {
+      tree->getlval()->usedBit = usedBit;
       tree->getlval()->passWidthToChild();
     }
   }
@@ -146,6 +160,7 @@ void Node::passWidthToPrev() {
 void graph::usedBits() {
   std::set<Node*> visitedNodes;
   /* add all sink nodes in topological order */
+  for (Node* special : specialNodes) checkNodes.push_back(special);
   for (Node* reg : regsrc) checkNodes.push_back(reg->getDst());
   for (Node* out : output) checkNodes.push_back(out);
   for (Node* mem : memory) { // all memory input
@@ -177,6 +192,25 @@ void graph::usedBits() {
     visitedNodes.insert(top);
     checkNodes.pop_back();
     top->passWidthToPrev();
+    if (checkNodes.empty()) {
+      for (Node* mem : memory) {
+        int usedBit = 0;
+        for (Node* port : mem->member) {
+          if (port->type == NODE_READER) {
+            usedBit = MAX(port->get_member(READER_DATA)->usedBit, usedBit);
+          }
+        }
+        if (mem->usedBit != usedBit) {
+          mem->usedBit = usedBit;
+          for (Node* port : mem->member) {
+            if (port->type == NODE_WRITER) {
+              port->get_member(WRITER_DATA)->usedBit = usedBit;
+              checkNodes.push_back(port->get_member(WRITER_DATA));
+            }
+          }
+        }
+      }
+    }
   }
 
 /* NOTE: reset cond & reset val tree*/
@@ -188,5 +222,5 @@ void graph::usedBits() {
     if (node->resetVal) node->resetVal->getRoot()->updateWidth();
     if (node->updateTree) node->updateTree->getRoot()->updateWidth();
   }
-
+  for (Node* mem : memory) mem->width = mem->usedBit;
 }

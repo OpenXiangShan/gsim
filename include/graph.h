@@ -45,6 +45,7 @@ class graph {
   std::vector<Node*> memory;
   std::vector<Node*> external;
   std::set<Node*> halfConstantArray;
+  std::vector<Node*> specialNodes;
   /* used before toposort */
   std::set<SuperNode*> supersrc;
   /* used after toposort */

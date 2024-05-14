@@ -1273,6 +1273,7 @@ void visitWhenPrintf(graph* g, PNode* print) {
 
   n->valTree = new ExpTree(enode);
   addSignal(n->name, n);
+  g->specialNodes.push_back(n);
 }
 
 void visitWhenAssert(graph* g, PNode* ass) {
@@ -1305,6 +1306,7 @@ void visitWhenAssert(graph* g, PNode* ass) {
   
   n->valTree = new ExpTree(enode);
   addSignal(n->name, n);
+  g->specialNodes.push_back(n);
 }
 
 /* return the lvalue node */
@@ -1375,6 +1377,7 @@ void visitPrintf(graph* g, PNode* print) {
 
   n->valTree = new ExpTree(enode);
   addSignal(n->name, n);
+  g->specialNodes.push_back(n);
 }
 
 /*
@@ -1396,6 +1399,7 @@ void visitAssert(graph* g, PNode* ass) {
 
   n->valTree = new ExpTree(enode);
   addSignal(n->name, n);
+  g->specialNodes.push_back(n);
 }
 
 void saveWhenTree() {

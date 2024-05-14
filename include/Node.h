@@ -5,6 +5,8 @@
 #ifndef NODE_H
 #define NODE_H
 
+std::string format(const char *fmt, ...);
+
 enum NodeType{
   NODE_INVALID,
   NODE_REG_SRC,
