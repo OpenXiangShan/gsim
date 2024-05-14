@@ -44,8 +44,8 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
       match = re.search(r'(uint[0-9]*_t)|mpz_t ', line)
       if match:
         line = line.strip(" ;\n")
-        line = line.split(" ")
-        all_sigs[line[len(line) - 1]] = 0
+        line = re.split(' |\[', line)
+        all_sigs[line[1]] = 0
 
     self.newDstFile()
 
@@ -54,7 +54,12 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
       line = line.split(" ")
       sign = int(line[0])
       mod_width = int(line[1])
-      if line[3] in all_sigs:
+      index = line[3].find('[')
+      if index == -1:
+        matchName = line[3]
+      else:
+        matchName = line[3][:index]
+      if matchName in all_sigs:
         if self.varNum == self.numPerFile:
           self.newDstFile()
         self.varNum += 1

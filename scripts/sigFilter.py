@@ -92,7 +92,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
           refName128 = ""
           if ref_width > 64:
             num = int((ref_width + 31) / 32)
-            for i in range(num):
+            for i in range(min(4, num)):
               refName128 = refName128 + (" | " if i != 0 else "") + "((__uint128_t)" + refName + "[" + str(i) + "] << " + str(i * 32) + ")"
             refName = refName.lstrip("ref->rootp->") + "_128"
             self.dstfp.writelines("__uint128_t " + refName + " = " + refName128 + ";\n")
@@ -113,7 +113,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
     self.dstfp.writelines("#include <iostream>\n#include <gmp.h>\n#include <" + self.name + ".h>\n#include \"V" + self.name + "__Syms.h\"\n")
     for i in range (self.fileIdx):
       self.dstfp.writelines("bool checkSig" + str(i) + "(bool display, V" + self.name + "* ref, S" + self.name + "* mod);\n")
-    self.dstfp.writelines("bool checkSig" + "(bool display, V" + self.name + "* ref, S" + self.name + "* mod){\nbool ret;\n")
+    self.dstfp.writelines("bool checkSig" + "(bool display, V" + self.name + "* ref, S" + self.name + "* mod){\nbool ret = false;\n")
     for i in range (self.fileIdx):
       self.dstfp.writelines("ret |= checkSig" + str(i) + "(display, ref, mod);\n")
     self.dstfp.writelines("return ret;\n}\n")

@@ -260,9 +260,16 @@ void graph::genNodeDef(FILE* fp, Node* node) {
     verilatorName.replace(pos, 1, "__DOT__");
   }
   std::map<std::string, std::string> allNames;
+#if defined(VERILATOR_DIFF)
   std::string diffNodeName = node->type == NODE_REG_DST ? (node->getSrc()->name + "$prev") : node->name;
   std::string originName = (node->type == NODE_REG_DST ? node->getSrc()->name : node->name);
-  if (node->isArray() && node->arrayEntryNum() == 1) {
+#else
+  std::string diffNodeName = node->type == NODE_REG_DST ? node->getSrc()->name : node->name;
+  std::string originName = (node->type == NODE_REG_DST ? node->getSrc()->name : node->name);
+#endif
+  if (node->type == NODE_MEMORY){
+
+  } else if (node->isArray() && node->arrayEntryNum() == 1) {
     std::string verilatorSuffix, diffSuffix;
     for (size_t i = 0; i < node->dimension.size(); i ++) {
       if (node->type != NODE_REG_DST) diffSuffix += "[0]";
@@ -303,9 +310,10 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type != NODE_REG_SRC) {
     for (auto iter : allNames)
       fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, iter.first.c_str(), iter.second.c_str());
-    }
+  }
   #else
-  fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, diffNodeName.c_str(), diffNodeName.c_str());
+  for (auto iter : allNames)
+    fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, iter.first.c_str(), iter.first.c_str());
   #endif
 #endif
 }
