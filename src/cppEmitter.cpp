@@ -510,8 +510,22 @@ void graph::genMemRead(FILE* fp) {
     } else {
       for (Node* port : mem->member) {
         if (port->type == NODE_READER && mem->rlatency == 1) {
-          if (port->member[READER_DATA]->dimension.size() != 0)
+          if (port->member[READER_DATA]->dimension.size() != 0) {
             fprintf(fp, "memcpy(%s, %s[%s], sizeof(%s));\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str(), port->member[READER_DATA]->name.c_str());
+#ifdef EMU_LOG
+            fprintf(fp, "if (cycles >= %d && cycles <= %d) {\n", LOG_START, LOG_END);
+            std::string idxStr, bracket;
+            fprintf(fp, "printf(\"%%ld read %s \", cycles);\n", port->member[READER_DATA]->name.c_str());
+            for (size_t i = 0; i < port->member[READER_DATA]->dimension.size(); i ++) {
+              fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, port->member[READER_DATA]->dimension[i], i);
+              idxStr += "[i" + std::to_string(i) + "]";
+              bracket += "}\n";
+            }
+            fprintf(fp, "printf(\"%%lx \", (uint64_t(%s)));", (port->member[READER_DATA]->name + idxStr).c_str());
+            fprintf(fp, "\n%s", bracket.c_str());
+            fprintf(fp, "printf(\"\\n\");\n}\n");
+#endif
+          }
           else {
             fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
 #ifdef EMU_LOG
