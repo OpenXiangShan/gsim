@@ -111,6 +111,49 @@ class ENode {
   valInfo* instsReset(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsPrintf();
   valInfo* instsAssert();
+  /* used in constantNode */
+  valInfo* consMux(bool isLvalue);
+  valInfo* consAdd(bool isLvalue);
+  valInfo* consSub(bool isLvalue);
+  valInfo* consMul(bool isLvalue);
+  valInfo* consDIv(bool isLvalue);
+  valInfo* consRem(bool isLvalue);
+  valInfo* consLt(bool isLvalue);
+  valInfo* consLeq(bool isLvalue);
+  valInfo* consGt(bool isLvalue);
+  valInfo* consGeq(bool isLvalue);
+  valInfo* consEq(bool isLvalue);
+  valInfo* consNeq(bool isLvalue);
+  valInfo* consDshl(bool isLvalue);
+  valInfo* consDshr(bool isLvalue);
+  valInfo* consAnd(bool isLvalue);
+  valInfo* consOr(bool isLvalue);
+  valInfo* consXor(bool isLvalue);
+  valInfo* consCat(bool isLvalue);
+  valInfo* consAsUInt(bool isLvalue);
+  valInfo* consAsSInt(bool isLvalue);
+  valInfo* consAsClock(bool isLvalue);
+  valInfo* consAsAsyncReset(bool isLvalue);
+  valInfo* consCvt(bool isLvalue);
+  valInfo* consNeg(bool isLvalue);
+  valInfo* consNot(bool isLvalue);
+  valInfo* consAndr(bool isLvalue);
+  valInfo* consOrr(bool isLvalue);
+  valInfo* consXorr(bool isLvalue);
+  valInfo* consPad(bool isLvalue);
+  valInfo* consShl(bool isLvalue);
+  valInfo* consShr(bool isLvalue);
+  valInfo* consHead(bool isLvalue);
+  valInfo* consTail(bool isLvalue);
+  valInfo* consBits(bool isLvalue);
+  valInfo* consWhen(Node* node, bool isLvalue);
+  valInfo* consStmt(Node* node, bool isLvalue);
+  valInfo* consIndexInt(bool isLvalue);
+  valInfo* consIndex(bool isLvalue);
+  valInfo* consInt(bool isLvalue);
+  valInfo* consReadMem(bool isLvalue);
+  valInfo* consInvalid(bool isLvalue);
+  valInfo* consReset(bool isLvalue);
   /* used in usedBits */
 
 public:
@@ -166,6 +209,7 @@ public:
   }
   void inferWidth();
   valInfo* compute(Node* n, std::string lvalue, bool isRoot);
+  valInfo* computeConstant(Node* node, bool isLvalue);
   void passWidthToChild();
   void updateWidth();
   std::pair<int, int> getIdx(Node* n);
@@ -231,6 +275,7 @@ public:
       return getRoot()->opType == OP_INVALID;
     }
     bool isConstant();
+    void removeConstant();
     void removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::set<ENode*>& visited);
 };
 

@@ -29,7 +29,7 @@ static int countArrayIndex(std::string name);
 static bool isSubArray(std::string name, Node* node);
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 std::string idx2Str(Node* node, int idx, int dim);
-void recomputeAllNodes();
+static void recomputeAllNodes();
 
 static std::stack<std::pair<int*, int*>> tmpStack;
 
@@ -1743,6 +1743,10 @@ valInfo* ENode::instsInt(Node* node, std::string lvalue, bool isRoot) {
   std::tie(base, str) = firStrBase(strVal);
   ret->setConstantByStr(str, base);
   ret->opNum = 0;
+  if (sign) {
+    s_asSInt(ret->consVal, ret->consVal, width);
+    ret->setConsStr();
+  }
   return ret;
 }
 
@@ -1750,7 +1754,7 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   Assert(node->type == NODE_MEM_MEMBER, "invalid type %d", node->type);
   Node* memory = node->parent->parent;
-  ret->valStr = memory->name + "[" + node->parent->get_member(READER_ADDR)->computeInfo->valStr + "]";
+  ret->valStr = memory->name + "[" + ChildInfo(0, valStr) + "]";
   bool isZeroIdx = true;
   std::string zeroIdxStr;
   for (size_t i = 0; i < memory->dimension.size(); i ++) {
@@ -2179,7 +2183,7 @@ void ExpTree::clearInfo(){
     for (ENode* child : top->child) s.push(child);
   }
 }
-void recomputeAllNodes() {
+static void recomputeAllNodes() {
   while (!recomputeQueue.empty()) {
     Node* node = recomputeQueue.top();
     recomputeQueue.pop();
@@ -2372,64 +2376,13 @@ valInfo* Node::computeArray() {
   for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
     if (computeInfo->memberInfo[i] && computeInfo->memberInfo[i]->valStr.find("TMP$") != computeInfo->memberInfo[i]->valStr.npos) computeInfo->memberInfo[i] = nullptr;
   }
+  // printf("infos %s\n", name.c_str());
+  // for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
+  //   if (computeInfo->memberInfo[i]) {
+  //     printf("idx %ld %s\n", i, computeInfo->memberInfo[i]->valStr.c_str());
+  //   }
+  // }
   return computeInfo;
-}
-
-void graph::constantMemory() {
-  int num = 0;
-  mpz_t val;
-  mpz_init(val);
-  while (1) {
-    for (Node* mem : memory) {
-      bool isConstant = true;
-      bool isFirst = true;
-      for (Node* port : mem->member) {
-        if (port->type == NODE_WRITER) {
-          Node* wdata = port->get_member(WRITER_DATA);
-          if (wdata->status == CONSTANT_NODE) {
-            if (isFirst) {
-              mpz_set(val, wdata->computeInfo->consVal);
-              isFirst = false;
-            } else if (mpz_cmp(wdata->computeInfo->consVal, val) == 0) {
-
-            } else {
-              isConstant = false;
-              break;
-            }
-          } else {
-            isConstant = false;
-            break;
-          }
-        }
-      }
-      if (isConstant) {
-        num ++;
-        for (Node* port : mem->member) {
-          if (port->type == NODE_READER) {
-            port->get_member(READER_ADDR)->setConstantZero();
-            port->get_member(READER_EN)->setConstantZero();
-            port->get_member(READER_DATA)->setConstantZero();
-            port->get_member(READER_DATA)->computeInfo->setConstantByStr(mpz_get_str(NULL, 16, val));
-            for (Node* next : port->get_member(READER_DATA)->next) {
-              if (next->computeInfo) addRecompute(next);
-            }
-          } else if (port->type == NODE_WRITER) {
-            port->get_member(WRITER_ADDR)->setConstantZero();
-            port->get_member(WRITER_EN)->setConstantZero();
-            port->get_member(WRITER_MASK)->setConstantZero();
-          } else TODO();
-        }
-        mem->status = CONSTANT_NODE;
-      }
-    }
-    if (recomputeQueue.empty()) break;
-    recomputeAllNodes();
-    memory.erase(
-      std::remove_if(memory.begin(), memory.end(), [](const Node* n){ return n->status == CONSTANT_NODE; }),
-        memory.end()
-    );
-  }
-  printf("[instsGenerator] find %d constant memories", num);
 }
 
 void graph::instsGenerator() {
@@ -2446,7 +2399,7 @@ void graph::instsGenerator() {
       }
     }
   }
-  constantMemory();
+
   for (SuperNode* super : sortedSuper) maxTmp = MAX(maxTmp, super->mpzTmpNum);
 
   /* generate assignment instrs */
@@ -2479,4 +2432,5 @@ void graph::instsGenerator() {
   size_t optimizeSuper = sortedSuper.size();
   printf("[instGenerator] remove %ld constantNodes (%ld -> %ld)\n", totalNodes - optimizeNodes, totalNodes, optimizeNodes);
   printf("[instGenerator] remove %ld superNodes (%ld -> %ld)\n",  totalSuper - optimizeSuper, totalSuper, optimizeSuper);
+
 }

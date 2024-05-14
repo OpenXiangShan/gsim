@@ -216,7 +216,9 @@ class Node {
   void constructSuperConnect(); // connect superNode
   valInfo* compute(); // compute node
   valInfo* computeArray();
+  valInfo* computeConstantArray();
   void recompute();
+  void recomputeConstant();
   void passWidthToPrev();
   void splitArray();
   Node* arrayMemberNode(int idx);
@@ -234,6 +236,7 @@ class Node {
   bool isFakeArray() { return dimension.size() == 1 && dimension[0] == 1; }
   void display();
   int arrayEntryNum() { int num = 1; for (int idx : dimension) num *= idx; return num; }
+  valInfo* computeConstant();
   void invalidArrayOptimize();
   void fillArrayInvalid(ExpTree* tree);
 };

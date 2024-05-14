@@ -58,13 +58,16 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->clockOptimize());
 
+  FUNC_WRAPPER(g->removeDeadNodes());
+
   // FUNC_WRAPPER(g->traversal());
+  FUNC_WRAPPER(g->usedBits());
+
+  FUNC_WRAPPER(g->constantAnalysis());
 
   FUNC_WRAPPER(g->removeDeadNodes());
 
   FUNC_WRAPPER(g->aliasAnalysis());
-
-  FUNC_WRAPPER(g->usedBits());
 
   FUNC_WRAPPER(g->constructRegs());
 

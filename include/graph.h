@@ -74,6 +74,7 @@ class graph {
   bool inSrc(SuperNode* super);
   void mergeRegister();
   void clockOptimize();
+  void constantAnalysis();
   void constructRegs();
 };
 
