@@ -92,7 +92,8 @@ void mod_reset() {
 #ifdef GSIM_DIFF
 void ref_reset() {
   ref->set_reset(1);
-  ref->step();
+  for (int i = 0; i < 10; i ++)
+    ref->step();
   ref->set_reset(0);
 }
 #endif

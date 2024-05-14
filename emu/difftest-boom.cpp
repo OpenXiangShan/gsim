@@ -92,7 +92,8 @@ void mod_reset() {
 #ifdef GSIM_DIFF
 void ref_reset() {
   ref->set_reset(1);
-  ref->step();
+  for(int i = 0; i < 10; i++)
+    ref->step();
   ref->set_reset(0);
 }
 #endif
@@ -131,7 +132,7 @@ int main(int argc, char** argv) {
 #endif
 #ifdef GSIM_DIFF
   ref = new REF_NAME();
-  memcpy(&ref->mem$ram, program, program_sz);
+  memcpy(&ref->mem$srams$mem, program, program_sz);
   ref_reset();
   ref->step();
 #endif
@@ -184,7 +185,7 @@ int main(int argc, char** argv) {
     if(isDiff) {
       std::cout << "all Sigs:\n -----------------\n";
       checkSignals(true);
-      std::cout << "Failed after " << cycles << " cycles\nALL diffs: mode -- ref\n";
+      printf("Failed after %d cycles\nALL diffs: mode -- ref\n", cycles);
       checkSignals(false);
       return 0;
     }

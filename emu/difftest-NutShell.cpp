@@ -97,8 +97,9 @@ void ref_reset() {
 
 #if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
 
+bool checkSig(bool display, REF_NAME* ref, MOD_NAME* mod);
 bool checkSignals(bool display) {
-  #include "../obj/checkSig.h"
+  return checkSig(display, ref, mod);
 }
 #endif
 
@@ -184,7 +185,7 @@ int main(int argc, char** argv) {
     if(isDiff) {
       std::cout << "all Sigs:\n -----------------\n";
       checkSignals(true);
-      std::cout << "Failed after " << cycles << " cycles\nALL diffs: mode -- ref\n";
+      printf("Failed after %ld cucles\nALL diffs: mode -- ref\n", cycles);
       checkSignals(false);
       return 0;
     }

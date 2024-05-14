@@ -90,7 +90,8 @@ void mod_reset() {
 #ifdef GSIM_DIFF
 void ref_reset() {
   ref->set_reset(1);
-  ref->step();
+  for(int i = 0; i < 10; i++)
+    ref->step();
   ref->set_reset(0);
 }
 #endif
@@ -127,7 +128,7 @@ int main(int argc, char** argv) {
 #endif
 #ifdef GSIM_DIFF
   ref = new REF_NAME();
-  memcpy(&ref->mem$ram, program, program_sz);
+  memcpy(&ref->mem$srams$mem, program, program_sz);
   ref_reset();
   ref->step();
 #endif
@@ -149,7 +150,7 @@ int main(int argc, char** argv) {
 #endif
     cycles ++;
 #if (!defined(GSIM) && defined(VERILATOR)) || (defined(GSIM) && !defined(VERILATOR))
-    if(cycles % 10000000 == 0 && cycles <= 60000000) {
+    if(cycles % 10000000 == 0 && cycles <= 70000000) {
       clock_t dur = clock() - start;
       printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
 #ifdef PERF
@@ -168,7 +169,7 @@ int main(int argc, char** argv) {
       }
       if (cycles == 30000000) return 0;
 #endif
-      if (cycles == 60000000) return 0;
+      if (cycles == 70000000) return 0;
     }
 
 #endif
