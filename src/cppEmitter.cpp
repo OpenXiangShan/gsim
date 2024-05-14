@@ -96,7 +96,7 @@ void graph::genNodeInit(FILE* fp, Node* node) {
     else
       fprintf(fp, "mpz_init(%s);\n", node->name.c_str());
   } else {
-#ifdef MEM_CHECK
+#if  defined (MEM_CHECK) || defined (DIFFTEST_PER_SIG)
     static std::set<Node*> initNodes;
     if (node->isArrayMember) node = node->arrayParent;
     if (initNodes.find(node) != initNodes.end()) return;
@@ -164,7 +164,7 @@ FILE* graph::genHeaderStart(std::string headerFile) {
     genMemInit(header, mem);
   }
   fprintf(header, "mpz_init(oldValMpz);\n");
-#ifdef MEM_CHECK
+#if  defined (MEM_CHECK) || defined (DIFFTEST_PER_SIG)
   for (Node* mem :memory) {
     fprintf(header, "memset(%s, 0, sizeof(%s));\n", mem->name.c_str(), mem->name.c_str());
   }
