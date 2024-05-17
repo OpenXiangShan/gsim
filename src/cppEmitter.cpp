@@ -706,7 +706,7 @@ void graph::saveDiffRegs(FILE* fp) {
 void graph::genStep(FILE* fp) {
   fprintf(fp, "void S%s::step() {\n", name.c_str());
   /* readMemory */
-  fprintf(fp, "updateMem();\n");
+  // fprintf(fp, "updateMem();\n");
 
   for (int i = 0; i < subStepNum; i ++) {
     fprintf(fp, "subStep%d();\n", i);
@@ -774,7 +774,7 @@ void graph::cppEmitter() {
   for (int i = 0; i < subStepNum; i ++) {
     fprintf(header, "void subStep%d();\n", i);
   }
-  fprintf(header, "void updateMem();\n");
+  // fprintf(header, "void updateMem();\n");
 
   fprintf(header, "void writeMem();\n");
 
@@ -783,7 +783,7 @@ void graph::cppEmitter() {
 #endif
 
   /* main evaluation loop (step)*/
-  genMemRead(src);
+  // genMemRead(src);
   genActivate(src);
   genMemWrite(src);
   saveDiffRegs(src);

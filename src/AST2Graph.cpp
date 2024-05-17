@@ -1702,3 +1702,23 @@ void removeDummyDim(graph* g) {
     mem->dimension = std::vector<int>(validDim);
   }
 }
+
+void graph::addL1Tree() {
+  for (Node* memory : memory) {
+    if (memory->rlatency == 0) continue;
+    for (Node* port : memory->member) {
+      if (port->type == NODE_WRITER) continue;
+      if (port->type == NODE_READWRITER) TODO();
+      ENode* enode = new ENode(OP_READ_MEM);
+      Node* data = port->get_member(READER_DATA);
+      Node* addr = port->get_member(READER_ADDR);
+      enode->addChild(new ENode(addr));
+      data->assignTree.push_back(new ExpTree(enode, data));
+      data->assignTree.back()->getRoot()->inferWidth();
+      data->prev.insert(addr);
+      data->super->prev.insert(addr->super);
+      addr->next.insert(data);
+      addr->super->next.insert(data->super);
+    }
+  }
+}

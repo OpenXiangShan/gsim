@@ -78,6 +78,7 @@ class graph {
   void constantAnalysis();
   void constructRegs();
   void commonExpr();
+  void addL1Tree();
 };
 
 #endif
