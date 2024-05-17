@@ -1,6 +1,7 @@
 
+#include <cstdio>
 #include "common.h"
-
+#define MAX_NODES_PER_SUPER 7000
 /*
   merge nodes with out-degree=1 to their successors
 */
@@ -12,6 +13,8 @@ void graph::mergeOut1() {
     if (super->next.size() == 1) {
       SuperNode* nextSuper = *(super->next.begin());
       if (nextSuper->superType != SUPER_VALID) continue;
+      if (nextSuper->member.size() > MAX_NODES_PER_SUPER) continue;
+      for (Node* member : super->member) member->super = nextSuper;
       /* move members in super to next super*/
       for (Node* member : super->member) {
         member->super = nextSuper;
@@ -41,6 +44,7 @@ void graph::mergeIn1() {
     if (super->prev.size() == 1) {
       SuperNode* prevSuper = *(super->prev.begin());
       if (inSrc(prevSuper) || prevSuper->superType != SUPER_VALID) continue;
+      if (prevSuper->member.size() > MAX_NODES_PER_SUPER) continue;
       /* move members in super to prev super */
       for (Node* member : super->member) member->super = prevSuper;
       Assert(prevSuper->member.size() != 0, "empty prevSuper %d", prevSuper->id);
