@@ -230,6 +230,9 @@ void graph::genHeaderEnd(FILE* fp) {
 
 void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
+#if defined(DIFFTEST_PER_SIG)
+  Node* originNode = node;
+#endif
   if (node->isArrayMember) node = node->arrayParent;
   if (definedNode.find(node) != definedNode.end()) return;
   definedNode.insert(node);
@@ -241,7 +244,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", upperPower2(node->depth));
   for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
   fprintf(fp, ";\n");
-#ifdef DIFFTEST_PER_SIG
+#if defined(DIFFTEST_PER_SIG)
   #if defined(VERILATOR_DIFF)
     if (node->type == NODE_REG_SRC){
       if (node->width <= BASIC_WIDTH) {
@@ -268,11 +271,13 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   std::string diffNodeName = node->type == NODE_REG_DST ? (node->getSrc()->name + "$prev") : node->name;
   std::string originName = (node->type == NODE_REG_DST ? node->getSrc()->name : node->name);
 #else
-  std::string diffNodeName = node->type == NODE_REG_DST ? node->getSrc()->name : node->name;
-  std::string originName = (node->type == NODE_REG_DST ? node->getSrc()->name : node->name);
+  std::string diffNodeName = node->name;
+  std::string originName = node->name;
 #endif
   if (node->type == NODE_MEMORY){
 
+  } else if (originNode->isArrayMember) {
+    allNames[originNode->name] = originNode->name;
   } else if (node->isArray() && node->arrayEntryNum() == 1) {
     std::string verilatorSuffix, diffSuffix;
     for (size_t i = 0; i < node->dimension.size(); i ++) {
