@@ -151,6 +151,9 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags[i] = true;\n", superId);
 #ifdef PERF
   fprintf(header, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
+for (SuperNode* super : sortedSuper) {
+  if (super->cppId >= 0) fprintf(header, "nodeNum[%d] = %ld;\n", super->cppId, super->member.size());
+}
   fprintf(header, "for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
 #endif
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_init(MPZ_TMP$%d);\n", i);
@@ -179,6 +182,7 @@ FILE* graph::genHeaderStart(std::string headerFile) {
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
   fprintf(header, "size_t validActive[%d];\n", superId);
+  fprintf(header, "size_t nodeNum[%d];\n", superId);
 #endif
   return header;
 }
