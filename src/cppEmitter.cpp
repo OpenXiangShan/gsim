@@ -608,10 +608,10 @@ void graph::genMemWrite(FILE* fp) {
   /* writer affects other nodes through reader, no need to activate in writer */
   fprintf(fp, "void S%s::writeMem(){\n", name.c_str());
   for (Node* mem : memory) {
-    std::set<SuperNode*> readerL0;
-    if (mem->rlatency == 0) {
-      for (Node* port : mem->member) {
-        if (port->type == NODE_READER) readerL0.insert(port->get_member(READER_DATA)->super);
+    std::set<SuperNode*> readerNext;
+    for (Node* port : mem->member) {
+      if (port->type == NODE_READER) {
+        readerNext.insert(port->get_member(READER_DATA)->super);
       }
     }
     Assert(mem->rlatency <= 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
@@ -655,7 +655,7 @@ void graph::genMemWrite(FILE* fp) {
             fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
           }
         }
-        for (SuperNode* super : readerL0) {
+        for (SuperNode* super : readerNext) {
           if (super->cppId <= 0) continue;
           fprintf(fp, "activeFlags[%d] = true;\n", super->cppId);
         }

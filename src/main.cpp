@@ -76,8 +76,6 @@ int main(int argc, char** argv) {
   FUNC_WRAPPER(g->mergeNodes());
 
   // g->mergeRegister();
-
-  FUNC_WRAPPER(g->addL1Tree());
  
   FUNC_WRAPPER(g->instsGenerator());
 

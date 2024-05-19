@@ -1523,6 +1523,51 @@ graph* AST2Graph(PNode* root) {
     }
   }
   removeDummyDim(g);
+  /* add addrReg and reader_data trees */
+  for (Node* memory : g->memory) {
+    if (memory->rlatency == 0) {
+      for (Node* port : memory->member) {
+        if (port->type == NODE_WRITER) continue;
+        if (port->type == NODE_READWRITER) TODO();
+        ENode* enode = new ENode(OP_READ_MEM);
+        enode->addChild(new ENode(port->get_member(READER_ADDR)));
+        port->get_member(READER_DATA)->assignTree.push_back(new ExpTree(enode, port->get_member(READER_DATA)));
+      }
+    } else if (memory->rlatency == 1) {
+      for (Node* port : memory->member) {
+        if (port->type == NODE_WRITER) continue;
+        if (port->type == NODE_READWRITER) TODO();
+        /* alloc addr regs */
+        Node* addrNode = port->get_member(READER_ADDR);
+        Node* addrRegSrc = addrNode->dup();
+        addrRegSrc->type = NODE_REG_SRC;
+        addrRegSrc->name += "$IN";
+        g->addReg(addrRegSrc);
+        Node* addrRegDst = addrRegSrc->dup();
+        addrRegDst->type = NODE_REG_DST;
+        addrRegDst->name += "$NEXT";
+        addSignal(addrRegSrc->name, addrRegSrc);
+        addSignal(addrRegDst->name, addrRegDst);
+        addrRegSrc->bindReg(addrRegDst);
+        addrRegSrc->clock = addrRegDst->clock = port->get_member(READER_CLK);
+        ENode* resetCond = new ENode(OP_INT);
+        resetCond->strVal = "h0";
+        addrRegSrc->resetCond = new ExpTree(resetCond, addrRegSrc);
+        addrRegSrc->resetVal = new ExpTree(new ENode(addrRegSrc), addrRegSrc);
+        /* update assignTree: set trees in addr to reg & add new tree for addr */
+        for (ExpTree* tree : addrNode->assignTree) {
+          addrRegSrc->assignTree.push_back(new ExpTree(tree->getRoot(), addrRegSrc));
+        }
+        addrNode->assignTree.clear();
+        addrNode->assignTree.push_back(new ExpTree(new ENode(addrRegSrc), addrNode));
+        ENode* enode = new ENode(OP_READ_MEM);
+        enode->addChild(new ENode(addrNode));
+        port->get_member(READER_DATA)->assignTree.push_back(new ExpTree(enode, port->get_member(READER_DATA)));
+      }
+    } else {
+      TODO();
+    }
+  }
 
   for (Node* reg : g->regsrc) {
     /* set lvalue to regDst */
@@ -1546,16 +1591,6 @@ graph* AST2Graph(PNode* root) {
     reg->addUpdateTree();
   }
 
-  for (Node* memory : g->memory) {
-    if (memory->rlatency != 0) continue;
-    for (Node* port : memory->member) {
-      if (port->type == NODE_WRITER) continue;
-      if (port->type == NODE_READWRITER) TODO();
-      ENode* enode = new ENode(OP_READ_MEM);
-      enode->addChild(new ENode(port->get_member(READER_ADDR)));
-      port->get_member(READER_DATA)->assignTree.push_back(new ExpTree(enode, port->get_member(READER_DATA)));
-    }
-  }
 
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     it->second->invalidArrayOptimize();
@@ -1578,15 +1613,7 @@ graph* AST2Graph(PNode* root) {
     if (reg->getDst()->prev.size() == 0)
       g->supersrc.insert(reg->getDst()->super);
   }
-  for (Node* memory : g->memory) {
-    if (memory->rlatency >= 1) {
-      for (Node* port : memory->member) {
-        if (port->type == NODE_READER) {
-          g->supersrc.insert(port->get_member(READER_DATA)->super);
-        }
-      }
-    }
-  }
+
   for (Node* input : g->input) {
     g->supersrc.insert(input->super);
     for (ExpTree* tree : input->assignTree) Assert(tree->isInvalid(), "input %s not invalid", input->name.c_str());
@@ -1700,25 +1727,5 @@ void removeDummyDim(graph* g) {
     }
     if (validDim.size() == mem->dimension.size()) continue;
     mem->dimension = std::vector<int>(validDim);
-  }
-}
-
-void graph::addL1Tree() {
-  for (Node* memory : memory) {
-    if (memory->rlatency == 0) continue;
-    for (Node* port : memory->member) {
-      if (port->type == NODE_WRITER) continue;
-      if (port->type == NODE_READWRITER) TODO();
-      ENode* enode = new ENode(OP_READ_MEM);
-      Node* data = port->get_member(READER_DATA);
-      Node* addr = port->get_member(READER_ADDR);
-      enode->addChild(new ENode(addr));
-      data->assignTree.push_back(new ExpTree(enode, data));
-      data->assignTree.back()->getRoot()->inferWidth();
-      data->prev.insert(addr);
-      data->super->prev.insert(addr->super);
-      addr->next.insert(data);
-      addr->super->next.insert(data->super);
-    }
   }
 }
