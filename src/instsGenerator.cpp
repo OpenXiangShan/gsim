@@ -209,18 +209,6 @@ static std::string set128(std::string lvalue, valInfo* info, valInfo* ret) {
   return format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);\n", lvalue.c_str(), localName.c_str());
 }
 
-static std::string getZeroIdx(ENode* enode, Node* node) {
-  std::string zeroIdxStr;
-  for (size_t i = enode->getChildNum(); i < node->dimension.size(); i ++) {
-    if (node->dimension[i] == 1) zeroIdxStr += "[0]";
-    else {
-      zeroIdxStr = "";
-      break;
-    }
-  }
-  return zeroIdxStr;
-}
-
 static int countArrayIndex(std::string name) {
   int count = 0;
   int idx = 0;
@@ -1893,7 +1881,6 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->splittedArray = nodePtr;
           for (ENode* childENode : child)
             computeInfo->valStr += childENode->computeInfo->valStr;
-          computeInfo->valStr += getZeroIdx(this, nodePtr);
           computeInfo->opNum = 0;
           if (computeInfo->beg >= 0) {
             for (int i = computeInfo->beg; i <= computeInfo->end; i ++) {
@@ -1923,9 +1910,6 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
             computeInfo->valStr += childENode->computeInfo->valStr;
         }
 
-        if (isSubArray(computeInfo->valStr, nodePtr)) {
-          computeInfo->valStr += getZeroIdx(this, nodePtr);
-        }
       }
       computeInfo->beg = beg;
       computeInfo->end = end;
