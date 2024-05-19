@@ -494,7 +494,10 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
 }
 
 valInfo* ENode::instsStmt(Node* node, std::string lvalue, bool isRoot) {
-  if (getChildNum() == 1) return getChild(0)->compute(node, lvalue, isRoot);
+  if (getChildNum() == 1) {
+    computeInfo = getChild(0)->compute(node, lvalue, isRoot);
+    return computeInfo;
+  }
   for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
   for (ENode* childENode : child) {
     if (childENode->computeInfo->status == VAL_INVALID || childENode->computeInfo->status == VAL_EMPTY) continue;
