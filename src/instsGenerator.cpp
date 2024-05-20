@@ -2096,7 +2096,7 @@ valInfo* Node::compute() {
           getSrc()->regUpdate->status = CONSTANT_NODE;
         }
         /* re-compute nodes depend on src */
-        for (Node* next : (regSplit ? getSrc() : this)->next) {
+        for (Node* next : getSrc()->next) {
           if (next->computeInfo) {
             addRecompute(next);
           }
@@ -2131,9 +2131,11 @@ valInfo* Node::compute() {
     status = CONSTANT_NODE;
     getSrc()->status = CONSTANT_NODE;
     getSrc()->computeInfo = ret;
-    getSrc()->regUpdate->status = CONSTANT_NODE;
-    getSrc()->regUpdate->computeInfo = ret;
-    for (Node* next : (regSplit ? getSrc() : this)->next) {
+    if (getSrc()->regUpdate) {
+      getSrc()->regUpdate->status = CONSTANT_NODE;
+      getSrc()->regUpdate->computeInfo = ret;
+    }
+    for (Node* next : getSrc()->next) {
       if (next->computeInfo) {
         addRecompute(next);
       }

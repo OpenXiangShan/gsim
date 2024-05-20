@@ -273,7 +273,7 @@ public:
     /* used in alias */
     void replace(std::map<Node*, ENode*>& aliasMap, bool isArray);
     /* used in mergeRegister */
-    void replace(Node* oldNode, Node* newNode);
+    void replace(Node* oldNode, ENode* newENode);
     /* used in commonExpr */
     void replace(std::map<Node*, Node*>& aliasMap);
     void clearInfo();

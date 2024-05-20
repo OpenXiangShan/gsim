@@ -82,6 +82,7 @@ void graph::genMemInit(FILE* fp, Node* node) {
 
 void graph::genNodeInit(FILE* fp, Node* node) {
   if (node->status != VALID_NODE) return;
+  if (node->type == NODE_REG_DST && !node->regSplit) return;
   if (node->width > BASIC_WIDTH) {
     if (node->isArray()) {
       std::string idxStr, bracket;
@@ -230,6 +231,7 @@ void graph::genHeaderEnd(FILE* fp) {
 
 void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
+  if (node->type == NODE_REG_DST && !node->regSplit) return;
 #if defined(DIFFTEST_PER_SIG)
   Node* originNode = node;
 #endif
@@ -741,6 +743,7 @@ void graph::cppEmitter() {
   }
   subStepNum = (superId + 9999) / 10000;
   updateRegNum = (regsrc.size() + 9999) / 10000;
+
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == VALID_NODE)

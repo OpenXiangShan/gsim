@@ -36,6 +36,7 @@ class graph {
   void checkNodeSplit(Node* node);
   void splitOptionalArray();
   void constantMemory();
+  void orderAllNodes();
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;

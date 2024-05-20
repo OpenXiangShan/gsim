@@ -235,6 +235,12 @@ void Node::updateActivate() {
   if (type == NODE_REG_DST) {
     regActivate.insert(getSrc()->nextActiveId.begin(), getSrc()->nextActiveId.end());
   }
+  if (type == NODE_REG_DST && !regSplit) {
+    for (Node* nextNode : getSrc()->next) {
+      if (nextNode->super->cppId != -1)
+        nextActiveId.insert(nextNode->super->cppId);
+    }
+  }
 }
 
 void Node::removeConnection() {

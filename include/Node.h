@@ -5,6 +5,7 @@
 #ifndef NODE_H
 #define NODE_H
 
+#include "debug.h"
 std::string format(const char *fmt, ...);
 
 enum NodeType{
@@ -104,6 +105,7 @@ class Node {
   NodeStatus status = VALID_NODE;
   std::vector<int> dimension;
   int order = -1;
+  int orderInSuper = -1;
 
   std::set<Node*> next;
   std::set<Node*> prev;
@@ -288,6 +290,8 @@ public:
     for (size_t ret = 0; ret < member.size(); ret ++) {
       if (member[ret] == node) return ret;
     }
+    node->super->display();
+    node->display();
     Panic();
   }
 };

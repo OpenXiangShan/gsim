@@ -71,9 +71,10 @@ int main(int argc, char** argv) {
 
   // FUNC_WRAPPER(g->commonExpr());
 
-  FUNC_WRAPPER(g->constructRegs());
-
   FUNC_WRAPPER(g->mergeNodes());
+
+  FUNC_WRAPPER(g->mergeRegister());
+  FUNC_WRAPPER(g->constructRegs());
 
   // g->mergeRegister();
  
