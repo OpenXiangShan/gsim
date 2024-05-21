@@ -40,6 +40,7 @@ Node* laterNode(Node* node1, Node* node2) {
 
 void graph::orderAllNodes() {
   for (size_t i = 0; i < sortedSuper.size(); i ++) {
+    sortedSuper[i]->order = i;
     for (size_t j = 0; j < sortedSuper[i]->member.size(); j ++) {
       sortedSuper[i]->member[j]->orderInSuper = j;
     }
@@ -49,6 +50,7 @@ void graph::orderAllNodes() {
 void graph::mergeRegister() {
   orderAllNodes();
   int num = 0;
+  int totalNum = 0;
   std::map<Node*, Node*> maxNode;
   std::map<Node*, bool> anyNextNodes;
 
@@ -57,7 +59,6 @@ void graph::mergeRegister() {
       Node* node = sortedSuper[i]->member[j];
       Node* latestNode = nullptr;
       for (Node* next : node->next) {
-        latestNode = laterNode(latestNode, maxNode[next]);
         latestNode = laterNode(latestNode, next);
       }
       maxNode[node] = latestNode;
@@ -65,10 +66,10 @@ void graph::mergeRegister() {
   }
   for (Node* reg : regsrc) {
     if (reg->status != VALID_NODE) continue;
-    if (reg->getDst()->assignTree.size() != 1) continue;
+    totalNum ++;
+    if (reg->isArray() || reg->getDst()->assignTree.size() != 1) continue;
     bool split = false;
     if (maxNode[reg] && isNext(reg->getDst(), maxNode[reg])) split = true;
-
     /* checking updateTree */
     std::stack<ENode*> s;
     s.push(reg->updateTree->getRoot());
@@ -100,7 +101,7 @@ void graph::mergeRegister() {
     }
   }
 
-  printf("[mergeRegister] merge %d (total %ld) registers\n", num, regsrc.size());
+  printf("[mergeRegister] merge %d (total %d) registers\n", num, totalNum);
 }
 
 void graph::constructRegs() {
@@ -126,6 +127,8 @@ void graph::constructRegs() {
       node->updateTree->replace(node->getDst(), node->getDst()->assignTree.back()->getRoot());
       node->getDst()->assignTree[0] = node->updateTree;
       node->getDst()->updateConnect();
+      node->getDst()->status = VALID_NODE;
+      node->getDst()->computeInfo = nullptr;
     }
   }
 }

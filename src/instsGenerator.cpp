@@ -1894,23 +1894,15 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
         computeInfo = nodePtr->getArrayMember(idx)->compute()->dup();
       }
     } else if (nodePtr->isArray()) {
+      computeInfo = nodePtr->compute()->dup();
+      if (child.size() != 0 && computeInfo->status == VAL_VALID) { // TODO: constant array representation
+        valInfo* indexInfo = computeInfo->dup();  // TODO: no need
+        computeInfo = indexInfo;
+        for (ENode* childENode : child)
+          computeInfo->valStr += childENode->computeInfo->valStr;
+      }
       int beg, end;
       std::tie(beg, end) = getIdx(nodePtr);
-      if (!isSubArray(lvalue, n) && beg >= 0 && beg == end) { /* n may be an array with only one member */
-        computeInfo = nodePtr->compute()->getMemberInfo(beg);
-      }
-      if (computeInfo && computeInfo->opNum >= 0) {
-        computeInfo = computeInfo->dup();
-      } else {
-        computeInfo = nodePtr->compute()->dup(beg, end);
-        if (child.size() != 0 && computeInfo->status == VAL_VALID) { // TODO: constant array representation
-          valInfo* indexInfo = computeInfo->dup();  // TODO: no need
-          computeInfo = indexInfo;
-          for (ENode* childENode : child)
-            computeInfo->valStr += childENode->computeInfo->valStr;
-        }
-
-      }
       computeInfo->beg = beg;
       computeInfo->end = end;
     } else {

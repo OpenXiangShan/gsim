@@ -7,6 +7,10 @@
 #include <map>
 
 void graph::topoSort() {
+  std::set<SuperNode*> dstNode;
+  for (Node* reg : regsrc) {
+    dstNode.insert(reg->getDst()->super);
+  }
   std::map<SuperNode*, int>times;
   std::stack<SuperNode*> s;
   for (SuperNode* node : supersrc) s.push(node);
@@ -23,7 +27,7 @@ void graph::topoSort() {
       if (times.find(next) == times.end()) times[next] = 0;
       times[next] ++;
       if (times[next] == (int)next->prev.size()) {
-        if (next->next.size() == 0) potentialRegs.push_back(next);
+        if (dstNode.find(next) != dstNode.end()) potentialRegs.push_back(next);
         else s.push(next);
       }
     }
