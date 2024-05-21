@@ -101,7 +101,7 @@ void graph::mergeRegister() {
     }
   }
 
-  printf("[mergeRegister] merge %d (total %d) registers\n", num, totalNum);
+  printf("[mergeRegister] merge %d registers (total %d)\n", num, totalNum);
 }
 
 void graph::constructRegs() {

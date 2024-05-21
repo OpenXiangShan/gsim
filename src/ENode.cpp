@@ -260,7 +260,7 @@ int ENode::getArrayIndex(Node* node) {
 }
 
 ArrayMemberList* ENode::getArrayMember(Node* node) {
-  Assert(nodePtr, "empty  node");
+  Assert(nodePtr, "empty node");
   Assert(nodePtr == node, "lvalue not match %s != %s", nodePtr->name.c_str(), node->name.c_str());
   Assert(child.size() <= node->dimension.size(), "%s index out of bound", node->name.c_str());
   ArrayMemberList* ret = new ArrayMemberList();

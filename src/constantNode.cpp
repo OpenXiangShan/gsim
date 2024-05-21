@@ -1002,11 +1002,11 @@ void graph::constantAnalysis() {
   constantMemory();
 
   /* remove constant nodes */
-  size_t totalNodes = countNodes();
-  size_t totalSuper = sortedSuper.size();
+  int consNum = 0;
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == CONSTANT_NODE) {
+          consNum ++;
           member->computeInfo = consMap[member];
       }
     }
@@ -1049,8 +1049,6 @@ void graph::constantAnalysis() {
   reconnectSuper();
 
   size_t optimizeNodes = countNodes();
-  size_t optimizeSuper = sortedSuper.size();
-  printf("[constantNode] remove %ld constantNodes (%ld -> %ld)\n", totalNodes - optimizeNodes, totalNodes, optimizeNodes);
-  printf("[constantNode] remove %ld superNodes (%ld -> %ld)\n",  totalSuper - optimizeSuper, totalSuper, optimizeSuper);
+  printf("[constantNode] find %d constantNodes (total %ld)\n", consNum, optimizeNodes);
 
 }
