@@ -1,66 +1,45 @@
-/**
- * @file deadNodes.cpp
- * @brief 从计算图g中删除死节点.
- * 死节点是指没有输出, 或者所有的输出都是死节点的节点. 删除死节点可以简化计算图,
- * 减少计算时间和内存开销.
- */
-
-#include <stdio.h>
-#include <stack>
-#include <tuple>
-
+/*
+  Remove deadNodes. A node is a deadNode if it has no successor or all successors are also deadNodes.
+  must be called after topo-sort
+*/
 #include "common.h"
-#include "Node.h"
-#include "graph.h"
-#include <queue>
+#include <stack>
 
-enum { DEAD = 1, VALID };
+static inline bool potentialDead(Node* node) {
+  return node->type == NODE_OTHERS || node->type == NODE_REG_SRC;
+}
 
-#define N(i) g->sorted[i]
+void graph::removeDeadNodes() {
+  /* counters */
+  size_t totalNodes = 0;
+  size_t deadNum = 0;
+  size_t totalSuper = sortedSuper.size();
 
-void removeDeadNodes(graph* g) {  // after topo sort
-  std::vector<size_t> info(g->sorted.size(), 0);
-  int deadNum = 0;
-
-  std::queue<Node*>s;
-  for (size_t i = 0; i < g->sorted.size(); i ++) {
-    if (N(i)->dimension.size() != 0 || N(i)->type == NODE_ARRAY_MEMBER) continue; // TODO
-    Assert(N(i)->id >= 0 && N(i)->id < (int)g->sorted.size(), "%s id %d\n", N(i)->name.c_str(), N(i)->id);
-    if ((N(i)->type == NODE_OTHERS || (N(i)->type == NODE_REG_DST && !N(i)->regNext->regSplit)) &&
-                    N(i)->next.size() == 0)
-        s.push(N(i));
+  std::stack<Node*> s;
+  for (SuperNode* super : sortedSuper) {
+    totalNodes += super->member.size();
+    for (Node* member : super->member) {
+      if (member->next.size() == 0 && potentialDead(member)) s.push(member);
+    }
   }
-  while (!s.empty()) {
-    Node* top = s.front();
+  while(!s.empty()) {
+    deadNum ++;
+    Node* top = s.top();
     s.pop();
+    if (top->type == NODE_REG_SRC) s.push(top->getDst());
     top->status = DEAD_NODE;
     for (Node* prev : top->prev) {
-      if (prev->id < 0 || prev->status != VALID_NODE) continue;
-      if (prev->type == NODE_OTHERS || (prev->type == NODE_REG_DST && !prev->regNext->regSplit)) {
-        info[prev->id ] ++;
-        if (prev->next.size() == info[prev->id]) s.push(prev);
+      /* remove node connection */
+      Assert(prev->next.find(top) != prev->next.end(), "next %s is not in prev(%s)->next", top->name.c_str(), prev->name.c_str());
+      prev->next.erase(top);
+      if (prev->next.size() == 0 && potentialDead(prev)) {
+        s.push(prev);
       }
     }
   }
+  removeNodes(DEAD_NODE);
 
-  std::cout << "find " << deadNum << " deadNodes( " << g->sorted.size() << " )\n";
+  printf("remove %ld deadNodes (%ld -> %ld)\n", deadNum, totalNodes, totalNodes - deadNum);
+  printf("remove %ld superNodes (%ld -> %ld)\n", totalSuper - sortedSuper.size(), totalSuper, sortedSuper.size());
 
-#if 0
-  for (Node* superNode : g->superNodes) {
-    std::cout << superNode->name << " " << superNode->id << ": ";
-    for (Node* member : superNode->setOrder) std::cout << member->name <<  "(" << member->id << ", " << (member->type == NODE_INVALID ? "invalid " : "valid ") << member->prev.size()<< " " << member->next.size() << ") ";
-    std::cout << "\nprev: " << std::endl;
-    for (Node* prevSuper : superNode->prev) std::cout << "  " <<prevSuper->name << " " << prevSuper->id << std::endl;
-    std::cout << "next: " << std::endl;
-    for (Node* nextSuper : superNode->next) std::cout << "  " <<nextSuper->name << " " << nextSuper->id << std::endl;
-  }
-  for (Node* node : g->sorted) {
-    std::cout << node->name << " " << node->id << " " << node->master->name << " " << node->master->id << ": (" << node->status << ")" << std::endl;
-    for (Node* next : node->next) {
-      std::cout << "   next " << next->name << " " << next->id << " ";
-      if (next->master) std::cout << next->master->name << " " << next->master->id << std::endl;
-      else std::cout << "NULL " << std::endl;
-    }
-  }
-#endif
 }

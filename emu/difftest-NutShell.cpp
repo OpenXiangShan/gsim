@@ -8,13 +8,18 @@
 #include <fstream>
 
 #if defined(GSIM)
-#include <top.h>
+#include <SimTop.h>
 MOD_NAME* mod;
 #endif
 
 #if defined(VERILATOR)
 #include "verilated.h"
 #include HEADER
+REF_NAME* ref;
+#endif
+
+#if defined(GSIM_DIFF)
+#include <top_ref.h>
 REF_NAME* ref;
 #endif
 
@@ -92,8 +97,9 @@ void ref_reset() {
 
 #if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
 
+bool checkSig(bool display, REF_NAME* ref, MOD_NAME* mod);
 bool checkSignals(bool display) {
-  #include "../obj/checkSig.h"
+  return checkSig(display, ref, mod);
 }
 #endif
 
@@ -118,10 +124,16 @@ int main(int argc, char** argv) {
 #ifdef GSIM_DIFF
   ref = new REF_NAME();
   memcpy(&ref->mem$rdata_mem$mem, program, program_sz);
+  ref->set_io_uart_in_ch(-1);
   ref_reset();
   ref->step();
 #endif
   std::cout << "start testing.....\n";
+  // printf("size = %lx %lx\n", sizeof(*ref->rootp),
+  // (uintptr_t)&(ref->rootp->SimTop__DOT__soc__DOT__nutcore__DOT__frontend__DOT__ifu__DOT__bp1__DOT__pht) - (uintptr_t)(ref->rootp));
+#ifdef PERF
+  FILE* activeFp = fopen(ACTIVE_FILE, "w");
+#endif
   bool dut_end = false;
   uint64_t cycles = 0;
   clock_t start = clock();
@@ -139,10 +151,31 @@ int main(int argc, char** argv) {
     ref->step();
 #endif
     cycles ++;
+    if(cycles % 10000000 == 0 && cycles <= 250000000) {
+      clock_t dur = clock() - start;
+      printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+#ifdef PERF
+      size_t totalActives = 0;
+      size_t validActives = 0;
+      for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
+        totalActives += mod->activeTimes[i];
+        validActives += mod->validActive[i];
+      }
+      printf("totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
+          totalActives, totalActives / cycles, validActives, validActives / cycles);
+      fprintf(activeFp, "totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
+          totalActives, totalActives / cycles, validActives, validActives / cycles);
+      for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
+        fprintf(activeFp, "%ld: activeTimes %ld validActive %ld\n", i, mod->activeTimes[i], mod->validActive[i]);
+      }
+      if (cycles == 50000000) return 0;
+#endif
+      if (cycles == 250000000) return 0;
+    }
 #if defined(GSIM)
     mod->step();
-    if (mod->io_uart_out_valid) {
-      printf("%c", mod->io_uart_out_ch);
+    if (mod->get_io_uart_out_valid()) {
+      printf("%c", mod->get_io_uart_out_ch());
       fflush(stdout);
     }
     // dut_end = (mod->cpu$writeback$valid_r == 1) && (mod->cpu$writeback$inst_r == 0x6b);
@@ -152,22 +185,13 @@ int main(int argc, char** argv) {
     if(isDiff) {
       std::cout << "all Sigs:\n -----------------\n";
       checkSignals(true);
-      std::cout << "Failed after " << cycles << " cycles\nALL diffs: mode -- ref\n";
+      printf("Failed after %ld cucles\nALL diffs: mode -- ref\n", cycles);
       checkSignals(false);
       return 0;
     }
 #endif
     if(dut_end) {
       clock_t dur = clock() - start;
-#if defined(GSIM)
-      // if(mod->cpu$regs$regs[0] == 0){
-#else
-      // if(ref->rootp->newtop__DOT__cpu__DOT__regs__DOT__regs_0 == 0) {
-#endif
-      //     printf("\33[1;32mCPU HIT GOOD TRAP after %d cycles (%d ms, %d per sec)\033[0m\n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
-      // }else{
-      //     printf("\33[1;31mCPU HIT BAD TRAP after %d cycles\033[0m\n", cycles);
-      // }
     }
   }
 }

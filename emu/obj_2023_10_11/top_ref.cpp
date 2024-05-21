@@ -1,6 +1,6 @@
 #include "top_ref.h"
 static long cycles = 0;
-void DiffNewTop::step2() {
+void Diffnewtop::step2() {
   activeFlags[2] = false;
   uint8_t crossBar$_T$oldVal = crossBar$_T;
   crossBar$_T = (0x0 == crossBar$state);
@@ -19,7 +19,7 @@ void DiffNewTop::step2() {
     activeFlags[1131] = true;
   }
 }
-void DiffNewTop::step3() {
+void Diffnewtop::step3() {
   activeFlags[3] = false;
   uint8_t crossBar$_T_11$oldVal = crossBar$_T_11;
   crossBar$_T_11 = (0x1 == crossBar$state);
@@ -38,7 +38,7 @@ void DiffNewTop::step3() {
     activeFlags[1131] = true;
   }
 }
-void DiffNewTop::step4() {
+void Diffnewtop::step4() {
   activeFlags[4] = false;
   uint8_t crossBar$_T_15$oldVal = crossBar$_T_15;
   crossBar$_T_15 = (0x2 == crossBar$state);
@@ -51,7 +51,7 @@ void DiffNewTop::step4() {
     activeFlags[1131] = true;
   }
 }
-void DiffNewTop::step7() {
+void Diffnewtop::step7() {
   activeFlags[7] = false;
   uint8_t dma$_T_2$oldVal = dma$_T_2;
   dma$_T_2 = (0x0 == dma$state);
@@ -76,7 +76,7 @@ void DiffNewTop::step7() {
     activeFlags[1264] = true;
   }
 }
-void DiffNewTop::step8() {
+void Diffnewtop::step8() {
   activeFlags[8] = false;
   uint8_t dma$_T_3$oldVal = dma$_T_3;
   dma$_T_3 = (0x1 == dma$state);
@@ -93,7 +93,7 @@ void DiffNewTop::step8() {
     activeFlags[1256] = true;
   }
 }
-void DiffNewTop::step9() {
+void Diffnewtop::step9() {
   activeFlags[9] = false;
   uint8_t dma$_T_5$oldVal = dma$_T_5;
   dma$_T_5 = (0x2 == dma$state);
@@ -109,7 +109,7 @@ void DiffNewTop::step9() {
     activeFlags[1256] = true;
   }
 }
-void DiffNewTop::step10() {
+void Diffnewtop::step10() {
   activeFlags[10] = false;
   uint8_t dma$_T_9$oldVal = dma$_T_9;
   dma$_T_9 = (0x3 == dma$state);
@@ -124,7 +124,7 @@ void DiffNewTop::step10() {
     activeFlags[1256] = true;
   }
 }
-void DiffNewTop::step11() {
+void Diffnewtop::step11() {
   activeFlags[11] = false;
   uint8_t dma$_T_11$oldVal = dma$_T_11;
   dma$_T_11 = (0x4 == dma$state);
@@ -138,7 +138,7 @@ void DiffNewTop::step11() {
     activeFlags[1256] = true;
   }
 }
-void DiffNewTop::step12() {
+void Diffnewtop::step12() {
   activeFlags[12] = false;
   uint8_t dma$_T_13$oldVal = dma$_T_13;
   dma$_T_13 = (0x5 == dma$state);
@@ -147,7 +147,7 @@ void DiffNewTop::step12() {
     activeFlags[1254] = true;
   }
 }
-void DiffNewTop::step13() {
+void Diffnewtop::step13() {
   activeFlags[13] = false;
   uint8_t mmio$_T_1$oldVal = mmio$_T_1;
   mmio$_T_1 = (0x0 == mmio$state);
@@ -177,7 +177,7 @@ void DiffNewTop::step13() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step14() {
+void Diffnewtop::step14() {
   activeFlags[14] = false;
   uint8_t mmio$_T_40$oldVal = mmio$_T_40;
   mmio$_T_40 = (0x1 == mmio$state);
@@ -204,7 +204,7 @@ void DiffNewTop::step14() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step15() {
+void Diffnewtop::step15() {
   activeFlags[15] = false;
   uint8_t mmio$_T_155$oldVal = mmio$_T_155;
   mmio$_T_155 = (0x2 == mmio$state);
@@ -215,7 +215,7 @@ void DiffNewTop::step15() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step16() {
+void Diffnewtop::step16() {
   activeFlags[16] = false;
   uint8_t mmio$_T_156$oldVal = mmio$_T_156;
   mmio$_T_156 = (0x3 == mmio$state);
@@ -226,7 +226,7 @@ void DiffNewTop::step16() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step17() {
+void Diffnewtop::step17() {
   activeFlags[17] = false;
   uint8_t mmio$_T_158$oldVal = mmio$_T_158;
   mmio$_T_158 = (0x4 == mmio$state);
@@ -235,7 +235,7 @@ void DiffNewTop::step17() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step19() {
+void Diffnewtop::step19() {
   activeFlags[19] = false;
   uint8_t mmio$islast$oldVal = mmio$islast;
   mmio$islast = (mmio$offset == 0x0);
@@ -246,7 +246,7 @@ void DiffNewTop::step19() {
     activeFlags[1131] = true;
   }
 }
-void DiffNewTop::step21() {
+void Diffnewtop::step21() {
   activeFlags[21] = false;
   uint8_t mmio$_T_45$oldVal = mmio$_T_45;
   mmio$_T_45 = ((mmio$waddr >= 0x10000000) & (mmio$waddr <= 0x10000007));
@@ -268,7 +268,7 @@ void DiffNewTop::step21() {
     activeFlags[1107] = true;
   }
 }
-void DiffNewTop::step22() {
+void Diffnewtop::step22() {
   activeFlags[22] = false;
   uint8_t mmio$_T_54$oldVal = mmio$_T_54;
   mmio$_T_54 = (mmio$waddr == 0x2004000);
@@ -289,7 +289,7 @@ void DiffNewTop::step22() {
     activeFlags[1106] = true;
   }
 }
-void DiffNewTop::step23() {
+void Diffnewtop::step23() {
   activeFlags[23] = false;
   uint8_t mmio$_T_55$oldVal = mmio$_T_55;
   mmio$_T_55 = (mmio$waddr == 0xa10003f8);
@@ -309,7 +309,7 @@ void DiffNewTop::step23() {
     activeFlags[1105] = true;
   }
 }
-void DiffNewTop::step24() {
+void Diffnewtop::step24() {
   activeFlags[24] = false;
   uint8_t mmio$_T_63$oldVal = mmio$_T_63;
   mmio$_T_63 = ((mmio$waddr >= 0xa0000000) & (mmio$waddr <= 0xa0075300));
@@ -329,7 +329,7 @@ void DiffNewTop::step24() {
     activeFlags[1105] = true;
   }
 }
-void DiffNewTop::step25() {
+void Diffnewtop::step25() {
   activeFlags[25] = false;
   uint8_t mmio$_T_100$oldVal = mmio$_T_100;
   mmio$_T_100 = (mmio$waddr == 0xa1000100);
@@ -345,7 +345,7 @@ void DiffNewTop::step25() {
     activeFlags[1105] = true;
   }
 }
-void DiffNewTop::step26() {
+void Diffnewtop::step26() {
   activeFlags[26] = false;
   uint8_t mmio$_T_101$oldVal = mmio$_T_101;
   mmio$_T_101 = (mmio$waddr == 0xa1000104);
@@ -361,7 +361,7 @@ void DiffNewTop::step26() {
     activeFlags[1105] = true;
   }
 }
-void DiffNewTop::step27() {
+void Diffnewtop::step27() {
   activeFlags[27] = false;
   uint8_t mmio$_T_104$oldVal = mmio$_T_104;
   mmio$_T_104 = ((mmio$waddr >= 0xc000000) & (mmio$waddr <= 0xc202000));
@@ -376,7 +376,7 @@ void DiffNewTop::step27() {
     activeFlags[463] = true;
   }
 }
-void DiffNewTop::step28() {
+void Diffnewtop::step28() {
   activeFlags[28] = false;
   uint8_t mmio$_T_105$oldVal = mmio$_T_105;
   mmio$_T_105 = (mmio$waddr == 0x2000000);
@@ -391,7 +391,7 @@ void DiffNewTop::step28() {
     activeFlags[463] = true;
   }
 }
-void DiffNewTop::step29() {
+void Diffnewtop::step29() {
   activeFlags[29] = false;
   uint8_t mmio$_T_110$oldVal = mmio$_T_110;
   mmio$_T_110 = ((mmio$waddr >= 0xc000000) & (mmio$waddr < 0xc003000));
@@ -406,7 +406,7 @@ void DiffNewTop::step29() {
     activeFlags[463] = true;
   }
 }
-void DiffNewTop::step30() {
+void Diffnewtop::step30() {
   activeFlags[30] = false;
   uint8_t mmio$_T_115$oldVal = mmio$_T_115;
   mmio$_T_115 = ((mmio$waddr >= 0x43000000) & (mmio$waddr < 0x43000080));
@@ -421,7 +421,7 @@ void DiffNewTop::step30() {
     activeFlags[463] = true;
   }
 }
-void DiffNewTop::step31() {
+void Diffnewtop::step31() {
   activeFlags[31] = false;
   uint8_t mem$_T$oldVal = mem$_T;
   mem$_T = (0x0 == mem$state);
@@ -453,7 +453,7 @@ void DiffNewTop::step31() {
     activeFlags[1120] = true;
   }
 }
-void DiffNewTop::step32() {
+void Diffnewtop::step32() {
   activeFlags[32] = false;
   uint8_t mem$_T_3$oldVal = mem$_T_3;
   mem$_T_3 = (0x1 == mem$state);
@@ -480,7 +480,7 @@ void DiffNewTop::step32() {
     activeFlags[1120] = true;
   }
 }
-void DiffNewTop::step33() {
+void Diffnewtop::step33() {
   activeFlags[33] = false;
   uint8_t mem$_T_84$oldVal = mem$_T_84;
   mem$_T_84 = (0x3 == mem$state);
@@ -490,7 +490,7 @@ void DiffNewTop::step33() {
     activeFlags[1120] = true;
   }
 }
-void DiffNewTop::step36() {
+void Diffnewtop::step36() {
   activeFlags[36] = false;
   uint32_t mem$waddr$oldVal = mem$waddr;
   mem$waddr = (((mem$waStart + (mem$offset * 0x8)) & 0xfffffff) & 0xfffffff);
@@ -513,7 +513,7 @@ void DiffNewTop::step36() {
     activeFlags[417] = true;
   }
 }
-void DiffNewTop::step37() {
+void Diffnewtop::step37() {
   activeFlags[37] = false;
   uint8_t mem$ram$rdata_MPORT$data$oldVal = mem$ram$rdata_MPORT$data;
   mem$ram$rdata_MPORT$addr =
@@ -522,7 +522,7 @@ void DiffNewTop::step37() {
   mem$ram$rdata_MPORT$data = mem$ram[mem$ram$rdata_MPORT$addr];
   if (mem$ram$rdata_MPORT$data$oldVal != mem$ram$rdata_MPORT$data) { activeFlags[370] = true; }
 }
-void DiffNewTop::step38() {
+void Diffnewtop::step38() {
   activeFlags[38] = false;
   uint8_t mem$ram$rdata_MPORT_1$data$oldVal = mem$ram$rdata_MPORT_1$data;
   mem$ram$rdata_MPORT_1$addr =
@@ -531,7 +531,7 @@ void DiffNewTop::step38() {
   mem$ram$rdata_MPORT_1$data = mem$ram[mem$ram$rdata_MPORT_1$addr];
   if (mem$ram$rdata_MPORT_1$data$oldVal != mem$ram$rdata_MPORT_1$data) { activeFlags[370] = true; }
 }
-void DiffNewTop::step39() {
+void Diffnewtop::step39() {
   activeFlags[39] = false;
   uint8_t mem$ram$rdata_MPORT_2$data$oldVal = mem$ram$rdata_MPORT_2$data;
   mem$ram$rdata_MPORT_2$addr =
@@ -540,7 +540,7 @@ void DiffNewTop::step39() {
   mem$ram$rdata_MPORT_2$data = mem$ram[mem$ram$rdata_MPORT_2$addr];
   if (mem$ram$rdata_MPORT_2$data$oldVal != mem$ram$rdata_MPORT_2$data) { activeFlags[370] = true; }
 }
-void DiffNewTop::step40() {
+void Diffnewtop::step40() {
   activeFlags[40] = false;
   uint8_t mem$ram$rdata_MPORT_3$data$oldVal = mem$ram$rdata_MPORT_3$data;
   mem$ram$rdata_MPORT_3$addr =
@@ -549,7 +549,7 @@ void DiffNewTop::step40() {
   mem$ram$rdata_MPORT_3$data = mem$ram[mem$ram$rdata_MPORT_3$addr];
   if (mem$ram$rdata_MPORT_3$data$oldVal != mem$ram$rdata_MPORT_3$data) { activeFlags[370] = true; }
 }
-void DiffNewTop::step41() {
+void Diffnewtop::step41() {
   activeFlags[41] = false;
   uint8_t mem$ram$rdata_MPORT_4$data$oldVal = mem$ram$rdata_MPORT_4$data;
   mem$ram$rdata_MPORT_4$addr =
@@ -558,7 +558,7 @@ void DiffNewTop::step41() {
   mem$ram$rdata_MPORT_4$data = mem$ram[mem$ram$rdata_MPORT_4$addr];
   if (mem$ram$rdata_MPORT_4$data$oldVal != mem$ram$rdata_MPORT_4$data) { activeFlags[370] = true; }
 }
-void DiffNewTop::step42() {
+void Diffnewtop::step42() {
   activeFlags[42] = false;
   uint8_t mem$ram$rdata_MPORT_5$data$oldVal = mem$ram$rdata_MPORT_5$data;
   mem$ram$rdata_MPORT_5$addr =
@@ -567,7 +567,7 @@ void DiffNewTop::step42() {
   mem$ram$rdata_MPORT_5$data = mem$ram[mem$ram$rdata_MPORT_5$addr];
   if (mem$ram$rdata_MPORT_5$data$oldVal != mem$ram$rdata_MPORT_5$data) { activeFlags[370] = true; }
 }
-void DiffNewTop::step43() {
+void Diffnewtop::step43() {
   activeFlags[43] = false;
   uint8_t mem$ram$rdata_MPORT_6$data$oldVal = mem$ram$rdata_MPORT_6$data;
   mem$ram$rdata_MPORT_6$addr =
@@ -576,7 +576,7 @@ void DiffNewTop::step43() {
   mem$ram$rdata_MPORT_6$data = mem$ram[mem$ram$rdata_MPORT_6$addr];
   if (mem$ram$rdata_MPORT_6$data$oldVal != mem$ram$rdata_MPORT_6$data) { activeFlags[370] = true; }
 }
-void DiffNewTop::step44() {
+void Diffnewtop::step44() {
   activeFlags[44] = false;
   uint8_t mem$ram$rdata_MPORT_7$data$oldVal = mem$ram$rdata_MPORT_7$data;
   mem$ram$rdata_MPORT_7$addr =
@@ -585,7 +585,7 @@ void DiffNewTop::step44() {
   mem$ram$rdata_MPORT_7$data = mem$ram[mem$ram$rdata_MPORT_7$addr];
   if (mem$ram$rdata_MPORT_7$data$oldVal != mem$ram$rdata_MPORT_7$data) { activeFlags[370] = true; }
 }
-void DiffNewTop::step45() {
+void Diffnewtop::step45() {
   activeFlags[45] = false;
   uint8_t mem$isLast$oldVal = mem$isLast;
   mem$isLast = (mem$offset >= mem$burstLen);
@@ -595,7 +595,7 @@ void DiffNewTop::step45() {
     activeFlags[1131] = true;
   }
 }
-void DiffNewTop::step47() {
+void Diffnewtop::step47() {
   activeFlags[47] = false;
   uint8_t cpu$dmaBridge$_T_12$oldVal = cpu$dmaBridge$_T_12;
   cpu$dmaBridge$_T_12 = (cpu$dmaBridge$len_r == 0x0);
@@ -606,7 +606,7 @@ void DiffNewTop::step47() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step49() {
+void Diffnewtop::step49() {
   activeFlags[49] = false;
   uint8_t cpu$dmaBridge$_T_11$oldVal = cpu$dmaBridge$_T_11;
   cpu$dmaBridge$_T_11 = (cpu$dmaBridge$data_strb_r == 0x0);
@@ -624,7 +624,7 @@ void DiffNewTop::step49() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step50() {
+void Diffnewtop::step50() {
   activeFlags[50] = false;
   uint8_t cpu$dmaBridge$_T_13$oldVal = cpu$dmaBridge$_T_13;
   cpu$dmaBridge$_T_13 = ((cpu$dmaBridge$data_strb_r >> 0) & 0x1);
@@ -637,7 +637,7 @@ void DiffNewTop::step50() {
     activeFlags[1248] = true;
   }
 }
-void DiffNewTop::step51() {
+void Diffnewtop::step51() {
   activeFlags[51] = false;
   uint8_t cpu$dcSelector$_T_5$oldVal = cpu$dcSelector$_T_5;
   cpu$dcSelector$_T_5 = (cpu$dmaBridge$dc_mode_r != 0x0);
@@ -649,7 +649,7 @@ void DiffNewTop::step51() {
     activeFlags[1246] = true;
   }
 }
-void DiffNewTop::step53() {
+void Diffnewtop::step53() {
   activeFlags[53] = false;
   uint8_t dma$_T_6$oldVal = dma$_T_6;
   dma$_T_6 = (cpu$dmaBridge$rvalid_r & dma$rready_r);
@@ -658,7 +658,7 @@ void DiffNewTop::step53() {
     activeFlags[1091] = true;
   }
 }
-void DiffNewTop::step54() {
+void Diffnewtop::step54() {
   activeFlags[54] = false;
   uint8_t cpu$dmaBridge$_T_6$oldVal = cpu$dmaBridge$_T_6;
   cpu$dmaBridge$_T_6 = (dma$rready_r & cpu$dmaBridge$rvalid_r);
@@ -671,7 +671,7 @@ void DiffNewTop::step54() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step55() {
+void Diffnewtop::step55() {
   activeFlags[55] = false;
   uint8_t dma$_T_4$oldVal = dma$_T_4;
   dma$_T_4 = (cpu$dmaBridge$arready_r & dma$arvalid_r);
@@ -681,7 +681,7 @@ void DiffNewTop::step55() {
     activeFlags[1091] = true;
   }
 }
-void DiffNewTop::step57() {
+void Diffnewtop::step57() {
   activeFlags[57] = false;
   uint8_t dma$_T_14$oldVal = dma$_T_14;
   dma$_T_14 = (dma$bready_r & cpu$dmaBridge$bvalid_r);
@@ -690,7 +690,7 @@ void DiffNewTop::step57() {
     activeFlags[1254] = true;
   }
 }
-void DiffNewTop::step58() {
+void Diffnewtop::step58() {
   activeFlags[58] = false;
   uint8_t dma$_T_12$oldVal = dma$_T_12;
   dma$_T_12 = (cpu$dmaBridge$wready_r & dma$wvalid_r);
@@ -704,7 +704,7 @@ void DiffNewTop::step58() {
     activeFlags[1256] = true;
   }
 }
-void DiffNewTop::step59() {
+void Diffnewtop::step59() {
   activeFlags[59] = false;
   uint8_t cpu$dmaBridge$_T_9$oldVal = cpu$dmaBridge$_T_9;
   cpu$dmaBridge$_T_9 = (dma$wvalid_r & cpu$dmaBridge$wready_r);
@@ -716,7 +716,7 @@ void DiffNewTop::step59() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step60() {
+void Diffnewtop::step60() {
   activeFlags[60] = false;
   uint8_t dma$_T_10$oldVal = dma$_T_10;
   dma$_T_10 = (cpu$dmaBridge$awready_r & dma$awvalid_r);
@@ -728,7 +728,7 @@ void DiffNewTop::step60() {
     activeFlags[1251] = true;
   }
 }
-void DiffNewTop::step61() {
+void Diffnewtop::step61() {
   activeFlags[61] = false;
   uint8_t cpu$dmaBridge$_T$oldVal = cpu$dmaBridge$_T;
   cpu$dmaBridge$_T = (0x0 == cpu$dmaBridge$state);
@@ -752,7 +752,7 @@ void DiffNewTop::step61() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step62() {
+void Diffnewtop::step62() {
   activeFlags[62] = false;
   uint8_t cpu$dmaBridge$_T_1$oldVal = cpu$dmaBridge$_T_1;
   cpu$dmaBridge$_T_1 = (0x1 == cpu$dmaBridge$state);
@@ -776,7 +776,7 @@ void DiffNewTop::step62() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step63() {
+void Diffnewtop::step63() {
   activeFlags[63] = false;
   uint8_t cpu$dmaBridge$_T_2$oldVal = cpu$dmaBridge$_T_2;
   cpu$dmaBridge$_T_2 = (0x6 == cpu$dmaBridge$state);
@@ -799,7 +799,7 @@ void DiffNewTop::step63() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step64() {
+void Diffnewtop::step64() {
   activeFlags[64] = false;
   uint8_t cpu$dmaBridge$_T_5$oldVal = cpu$dmaBridge$_T_5;
   cpu$dmaBridge$_T_5 = (0x2 == cpu$dmaBridge$state);
@@ -822,7 +822,7 @@ void DiffNewTop::step64() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step65() {
+void Diffnewtop::step65() {
   activeFlags[65] = false;
   uint8_t cpu$dmaBridge$_T_7$oldVal = cpu$dmaBridge$_T_7;
   cpu$dmaBridge$_T_7 = (0x3 == cpu$dmaBridge$state);
@@ -842,7 +842,7 @@ void DiffNewTop::step65() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step66() {
+void Diffnewtop::step66() {
   activeFlags[66] = false;
   uint8_t cpu$dmaBridge$_T_8$oldVal = cpu$dmaBridge$_T_8;
   cpu$dmaBridge$_T_8 = (0x4 == cpu$dmaBridge$state);
@@ -860,7 +860,7 @@ void DiffNewTop::step66() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step67() {
+void Diffnewtop::step67() {
   activeFlags[67] = false;
   uint8_t cpu$dmaBridge$_T_10$oldVal = cpu$dmaBridge$_T_10;
   cpu$dmaBridge$_T_10 = (0x7 == cpu$dmaBridge$state);
@@ -878,7 +878,7 @@ void DiffNewTop::step67() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step72() {
+void Diffnewtop::step72() {
   activeFlags[72] = false;
   uint8_t cpu$plic$_io_intr_out_s_raise_T_2$oldVal = cpu$plic$_io_intr_out_s_raise_T_2;
   cpu$plic$_io_intr_out_s_raise_T_2 = (((cpu$plic$pending >> 1) & 0x1) & (cpu$plic$priority >= cpu$plic$threshold2));
@@ -887,7 +887,7 @@ void DiffNewTop::step72() {
     activeFlags[1226] = true;
   }
 }
-void DiffNewTop::step73() {
+void Diffnewtop::step73() {
   activeFlags[73] = false;
   uint8_t cpu$plic$_io_intr_out_m_raise_T_2$oldVal = cpu$plic$_io_intr_out_m_raise_T_2;
   cpu$plic$_io_intr_out_m_raise_T_2 = (((cpu$plic$pending >> 1) & 0x1) & (cpu$plic$priority >= cpu$plic$threshold1));
@@ -896,7 +896,7 @@ void DiffNewTop::step73() {
     activeFlags[1070] = true;
   }
 }
-void DiffNewTop::step75() {
+void Diffnewtop::step75() {
   activeFlags[75] = false;
   uint64_t cpu$tlb_mem$ppn_mask$oldVal = cpu$tlb_mem$ppn_mask;
   cpu$tlb_mem$ppn_mask =
@@ -908,7 +908,7 @@ void DiffNewTop::step75() {
     activeFlags[1236] = true;
   }
 }
-void DiffNewTop::step77() {
+void Diffnewtop::step77() {
   activeFlags[77] = false;
   uint8_t cpu$tlb_mem$_T_50$oldVal = cpu$tlb_mem$_T_50;
   cpu$tlb_mem$_T_50 = (cpu$tlb_mem$state == 0x0);
@@ -917,7 +917,7 @@ void DiffNewTop::step77() {
     activeFlags[1062] = true;
   }
 }
-void DiffNewTop::step78() {
+void Diffnewtop::step78() {
   activeFlags[78] = false;
   uint8_t cpu$tlb_mem$_T_54$oldVal = cpu$tlb_mem$_T_54;
   cpu$tlb_mem$_T_54 = (0x0 == cpu$tlb_mem$state);
@@ -944,7 +944,7 @@ void DiffNewTop::step78() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step79() {
+void Diffnewtop::step79() {
   activeFlags[79] = false;
   uint8_t cpu$tlb_mem$_T_68$oldVal = cpu$tlb_mem$_T_68;
   cpu$tlb_mem$_T_68 = (0x3 == cpu$tlb_mem$state);
@@ -964,7 +964,7 @@ void DiffNewTop::step79() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step80() {
+void Diffnewtop::step80() {
   activeFlags[80] = false;
   uint8_t cpu$tlb_mem$_T_69$oldVal = cpu$tlb_mem$_T_69;
   cpu$tlb_mem$_T_69 = (0x1 == cpu$tlb_mem$state);
@@ -983,7 +983,7 @@ void DiffNewTop::step80() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step85() {
+void Diffnewtop::step85() {
   activeFlags[85] = false;
   uint8_t cpu$tlb_mem$_T_51$oldVal = cpu$tlb_mem$_T_51;
   cpu$tlb_mem$_T_51 = (cpu$tlb_mem$out_valid_r | cpu$tlb_mem$out_excep_r$en);
@@ -992,7 +992,7 @@ void DiffNewTop::step85() {
     activeFlags[1061] = true;
   }
 }
-void DiffNewTop::step86() {
+void Diffnewtop::step86() {
   activeFlags[86] = false;
   uint8_t cpu$dcSelector$_T_3$oldVal = cpu$dcSelector$_T_3;
   cpu$dcSelector$_T_3 = (cpu$tlb_mem$dc_mode_r != 0x0);
@@ -1006,7 +1006,7 @@ void DiffNewTop::step86() {
     activeFlags[1246] = true;
   }
 }
-void DiffNewTop::step89() {
+void Diffnewtop::step89() {
   activeFlags[89] = false;
   uint64_t cpu$tlb_if$ppn_mask$oldVal = cpu$tlb_if$ppn_mask;
   cpu$tlb_if$ppn_mask =
@@ -1018,7 +1018,7 @@ void DiffNewTop::step89() {
     activeFlags[1142] = true;
   }
 }
-void DiffNewTop::step91() {
+void Diffnewtop::step91() {
   activeFlags[91] = false;
   uint8_t cpu$tlb_if$_T_50$oldVal = cpu$tlb_if$_T_50;
   cpu$tlb_if$_T_50 = (cpu$tlb_if$state == 0x0);
@@ -1027,7 +1027,7 @@ void DiffNewTop::step91() {
     activeFlags[1271] = true;
   }
 }
-void DiffNewTop::step92() {
+void Diffnewtop::step92() {
   activeFlags[92] = false;
   uint8_t cpu$tlb_if$_T_54$oldVal = cpu$tlb_if$_T_54;
   cpu$tlb_if$_T_54 = (0x0 == cpu$tlb_if$state);
@@ -1054,7 +1054,7 @@ void DiffNewTop::step92() {
     activeFlags[1148] = true;
   }
 }
-void DiffNewTop::step93() {
+void Diffnewtop::step93() {
   activeFlags[93] = false;
   uint8_t cpu$tlb_if$_T_68$oldVal = cpu$tlb_if$_T_68;
   cpu$tlb_if$_T_68 = (0x3 == cpu$tlb_if$state);
@@ -1074,7 +1074,7 @@ void DiffNewTop::step93() {
     activeFlags[1144] = true;
   }
 }
-void DiffNewTop::step94() {
+void Diffnewtop::step94() {
   activeFlags[94] = false;
   uint8_t cpu$tlb_if$_T_69$oldVal = cpu$tlb_if$_T_69;
   cpu$tlb_if$_T_69 = (0x1 == cpu$tlb_if$state);
@@ -1093,7 +1093,7 @@ void DiffNewTop::step94() {
     activeFlags[1144] = true;
   }
 }
-void DiffNewTop::step98() {
+void Diffnewtop::step98() {
   activeFlags[98] = false;
   uint8_t cpu$tlb_if$_T_51$oldVal = cpu$tlb_if$_T_51;
   cpu$tlb_if$_T_51 = (cpu$tlb_if$out_valid_r | cpu$tlb_if$out_excep_r$en);
@@ -1102,7 +1102,7 @@ void DiffNewTop::step98() {
     activeFlags[1049] = true;
   }
 }
-void DiffNewTop::step99() {
+void Diffnewtop::step99() {
   activeFlags[99] = false;
   uint8_t cpu$dcSelector$_T_4$oldVal = cpu$dcSelector$_T_4;
   cpu$dcSelector$_T_4 = (cpu$tlb_if$dc_mode_r != 0x0);
@@ -1115,7 +1115,7 @@ void DiffNewTop::step99() {
     activeFlags[1246] = true;
   }
 }
-void DiffNewTop::step102() {
+void Diffnewtop::step102() {
   activeFlags[102] = false;
   uint8_t cpu$memCrossbar$_T_4$oldVal = cpu$memCrossbar$_T_4;
   cpu$memCrossbar$_T_4 =
@@ -1126,7 +1126,7 @@ void DiffNewTop::step102() {
     activeFlags[1410] = true;
   }
 }
-void DiffNewTop::step103() {
+void Diffnewtop::step103() {
   activeFlags[103] = false;
   uint8_t cpu$memCrossbar$_T_5$oldVal = cpu$memCrossbar$_T_5;
   cpu$memCrossbar$_T_5 = (cpu$memCrossbar$pre_type == 0x1);
@@ -1135,7 +1135,7 @@ void DiffNewTop::step103() {
     activeFlags[1099] = true;
   }
 }
-void DiffNewTop::step104() {
+void Diffnewtop::step104() {
   activeFlags[104] = false;
   uint8_t cpu$memCrossbar$_T_6$oldVal = cpu$memCrossbar$_T_6;
   cpu$memCrossbar$_T_6 = (cpu$memCrossbar$pre_type == 0x0);
@@ -1144,7 +1144,7 @@ void DiffNewTop::step104() {
     activeFlags[1099] = true;
   }
 }
-void DiffNewTop::step105() {
+void Diffnewtop::step105() {
   activeFlags[105] = false;
   uint8_t cpu$split64to32$_T$oldVal = cpu$split64to32$_T;
   cpu$split64to32$_T = (0x0 == cpu$split64to32$state);
@@ -1159,7 +1159,7 @@ void DiffNewTop::step105() {
     activeFlags[1136] = true;
   }
 }
-void DiffNewTop::step106() {
+void Diffnewtop::step106() {
   activeFlags[106] = false;
   uint8_t cpu$split64to32$_T_4$oldVal = cpu$split64to32$_T_4;
   cpu$split64to32$_T_4 = (0x1 == cpu$split64to32$state);
@@ -1170,7 +1170,7 @@ void DiffNewTop::step106() {
     activeFlags[1095] = true;
   }
 }
-void DiffNewTop::step108() {
+void Diffnewtop::step108() {
   activeFlags[108] = false;
   uint8_t cpu$crossBar$_T$oldVal = cpu$crossBar$_T;
   cpu$crossBar$_T = (0x0 == cpu$crossBar$state);
@@ -1201,7 +1201,7 @@ void DiffNewTop::step108() {
     activeFlags[1101] = true;
   }
 }
-void DiffNewTop::step109() {
+void Diffnewtop::step109() {
   activeFlags[109] = false;
   uint8_t cpu$crossBar$_T_3$oldVal = cpu$crossBar$_T_3;
   cpu$crossBar$_T_3 = (0x1 == cpu$crossBar$state);
@@ -1232,7 +1232,7 @@ void DiffNewTop::step109() {
     activeFlags[1101] = true;
   }
 }
-void DiffNewTop::step110() {
+void Diffnewtop::step110() {
   activeFlags[110] = false;
   uint8_t cpu$crossBar$_T_6$oldVal = cpu$crossBar$_T_6;
   cpu$crossBar$_T_6 = (0x3 == cpu$crossBar$state);
@@ -1263,7 +1263,7 @@ void DiffNewTop::step110() {
     activeFlags[1101] = true;
   }
 }
-void DiffNewTop::step111() {
+void Diffnewtop::step111() {
   activeFlags[111] = false;
   uint8_t cpu$crossBar$_T_7$oldVal = cpu$crossBar$_T_7;
   cpu$crossBar$_T_7 = (0x2 == cpu$crossBar$state);
@@ -1287,7 +1287,7 @@ void DiffNewTop::step111() {
     activeFlags[1101] = true;
   }
 }
-void DiffNewTop::step112() {
+void Diffnewtop::step112() {
   activeFlags[112] = false;
   uint8_t cpu$crossBar$_T_8$oldVal = cpu$crossBar$_T_8;
   cpu$crossBar$_T_8 = (0x4 == cpu$crossBar$state);
@@ -1311,7 +1311,7 @@ void DiffNewTop::step112() {
     activeFlags[1101] = true;
   }
 }
-void DiffNewTop::step113() {
+void Diffnewtop::step113() {
   activeFlags[113] = false;
   uint8_t cpu$crossBar$_T_9$oldVal = cpu$crossBar$_T_9;
   cpu$crossBar$_T_9 = (0x5 == cpu$crossBar$state);
@@ -1331,7 +1331,7 @@ void DiffNewTop::step113() {
     activeFlags[1101] = true;
   }
 }
-void DiffNewTop::step114() {
+void Diffnewtop::step114() {
   activeFlags[114] = false;
   uint8_t cpu$crossBar$_T_10$oldVal = cpu$crossBar$_T_10;
   cpu$crossBar$_T_10 = (0x6 == cpu$crossBar$state);
@@ -1351,7 +1351,7 @@ void DiffNewTop::step114() {
     activeFlags[1101] = true;
   }
 }
-void DiffNewTop::step115() {
+void Diffnewtop::step115() {
   activeFlags[115] = false;
   uint8_t cpu$crossBar$_T_11$oldVal = cpu$crossBar$_T_11;
   cpu$crossBar$_T_11 = (0x7 == cpu$crossBar$state);
@@ -1366,7 +1366,7 @@ void DiffNewTop::step115() {
     activeFlags[1101] = true;
   }
 }
-void DiffNewTop::step116() {
+void Diffnewtop::step116() {
   activeFlags[116] = false;
   uint8_t cpu$crossBar$_T_12$oldVal = cpu$crossBar$_T_12;
   cpu$crossBar$_T_12 = (0x8 == cpu$crossBar$state);
@@ -1381,7 +1381,7 @@ void DiffNewTop::step116() {
     activeFlags[1101] = true;
   }
 }
-void DiffNewTop::step117() {
+void Diffnewtop::step117() {
   activeFlags[117] = false;
   uint8_t cpu$split64to32$io$data_in$rvalid$oldVal = cpu$split64to32$io$data_in$rvalid;
   cpu$split64to32$io$data_in$rvalid =
@@ -1391,7 +1391,7 @@ void DiffNewTop::step117() {
     activeFlags[1038] = true;
   }
 }
-void DiffNewTop::step119() {
+void Diffnewtop::step119() {
   activeFlags[119] = false;
   uint8_t cpu$flash2Axi$_T$oldVal = cpu$flash2Axi$_T;
   cpu$flash2Axi$_T = (0x0 == cpu$flash2Axi$state);
@@ -1411,7 +1411,7 @@ void DiffNewTop::step119() {
     activeFlags[1412] = true;
   }
 }
-void DiffNewTop::step120() {
+void Diffnewtop::step120() {
   activeFlags[120] = false;
   uint8_t cpu$flash2Axi$_T_6$oldVal = cpu$flash2Axi$_T_6;
   cpu$flash2Axi$_T_6 = (0x1 == cpu$flash2Axi$state);
@@ -1425,7 +1425,7 @@ void DiffNewTop::step120() {
     activeFlags[1412] = true;
   }
 }
-void DiffNewTop::step121() {
+void Diffnewtop::step121() {
   activeFlags[121] = false;
   uint8_t cpu$flash2Axi$_T_8$oldVal = cpu$flash2Axi$_T_8;
   cpu$flash2Axi$_T_8 = (0x2 == cpu$flash2Axi$state);
@@ -1438,7 +1438,7 @@ void DiffNewTop::step121() {
     activeFlags[1412] = true;
   }
 }
-void DiffNewTop::step122() {
+void Diffnewtop::step122() {
   activeFlags[122] = false;
   uint8_t cpu$flash2Axi$_T_9$oldVal = cpu$flash2Axi$_T_9;
   cpu$flash2Axi$_T_9 = (0x3 == cpu$flash2Axi$state);
@@ -1451,7 +1451,7 @@ void DiffNewTop::step122() {
     activeFlags[1412] = true;
   }
 }
-void DiffNewTop::step123() {
+void Diffnewtop::step123() {
   activeFlags[123] = false;
   uint8_t cpu$flash2Axi$_T_10$oldVal = cpu$flash2Axi$_T_10;
   cpu$flash2Axi$_T_10 = (0x4 == cpu$flash2Axi$state);
@@ -1463,7 +1463,7 @@ void DiffNewTop::step123() {
     activeFlags[1121] = true;
   }
 }
-void DiffNewTop::step124() {
+void Diffnewtop::step124() {
   activeFlags[124] = false;
   uint8_t cpu$flash2Axi$_T_12$oldVal = cpu$flash2Axi$_T_12;
   cpu$flash2Axi$_T_12 = (0x5 == cpu$flash2Axi$state);
@@ -1474,7 +1474,7 @@ void DiffNewTop::step124() {
     activeFlags[1121] = true;
   }
 }
-void DiffNewTop::step127() {
+void Diffnewtop::step127() {
   activeFlags[127] = false;
   uint8_t cpu$flash2Axi$wlast$oldVal = cpu$flash2Axi$wlast;
   cpu$flash2Axi$wlast = (cpu$flash2Axi$offset >= 0x0);
@@ -1483,7 +1483,7 @@ void DiffNewTop::step127() {
     activeFlags[1034] = true;
   }
 }
-void DiffNewTop::step128() {
+void Diffnewtop::step128() {
   activeFlags[128] = false;
   uint8_t cpu$mem2Axi$_T$oldVal = cpu$mem2Axi$_T;
   cpu$mem2Axi$_T = (0x0 == cpu$mem2Axi$state);
@@ -1503,7 +1503,7 @@ void DiffNewTop::step128() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step129() {
+void Diffnewtop::step129() {
   activeFlags[129] = false;
   uint8_t cpu$mem2Axi$_T_6$oldVal = cpu$mem2Axi$_T_6;
   cpu$mem2Axi$_T_6 = (0x1 == cpu$mem2Axi$state);
@@ -1517,7 +1517,7 @@ void DiffNewTop::step129() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step130() {
+void Diffnewtop::step130() {
   activeFlags[130] = false;
   uint8_t cpu$mem2Axi$_T_8$oldVal = cpu$mem2Axi$_T_8;
   cpu$mem2Axi$_T_8 = (0x2 == cpu$mem2Axi$state);
@@ -1530,7 +1530,7 @@ void DiffNewTop::step130() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step131() {
+void Diffnewtop::step131() {
   activeFlags[131] = false;
   uint8_t cpu$mem2Axi$_T_9$oldVal = cpu$mem2Axi$_T_9;
   cpu$mem2Axi$_T_9 = (0x3 == cpu$mem2Axi$state);
@@ -1543,7 +1543,7 @@ void DiffNewTop::step131() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step132() {
+void Diffnewtop::step132() {
   activeFlags[132] = false;
   uint8_t cpu$mem2Axi$_T_10$oldVal = cpu$mem2Axi$_T_10;
   cpu$mem2Axi$_T_10 = (0x4 == cpu$mem2Axi$state);
@@ -1555,7 +1555,7 @@ void DiffNewTop::step132() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step133() {
+void Diffnewtop::step133() {
   activeFlags[133] = false;
   uint8_t cpu$mem2Axi$_T_12$oldVal = cpu$mem2Axi$_T_12;
   cpu$mem2Axi$_T_12 = (0x5 == cpu$mem2Axi$state);
@@ -1566,7 +1566,7 @@ void DiffNewTop::step133() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step138() {
+void Diffnewtop::step138() {
   activeFlags[138] = false;
   uint8_t cpu$mem2Axi$wlast$oldVal = cpu$mem2Axi$wlast;
   cpu$mem2Axi$wlast = (cpu$mem2Axi$offset >= 0x0);
@@ -1576,7 +1576,7 @@ void DiffNewTop::step138() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step142() {
+void Diffnewtop::step142() {
   activeFlags[142] = false;
   uint8_t cpu$dcache$_T_68$oldVal = cpu$dcache$_T_68;
   cpu$dcache$_T_68 = (0x0 == cpu$dcache$state);
@@ -1600,7 +1600,7 @@ void DiffNewTop::step142() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step143() {
+void Diffnewtop::step143() {
   activeFlags[143] = false;
   uint8_t cpu$dcache$_T_74$oldVal = cpu$dcache$_T_74;
   cpu$dcache$_T_74 = (0x1 == cpu$dcache$state);
@@ -1623,7 +1623,7 @@ void DiffNewTop::step143() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step144() {
+void Diffnewtop::step144() {
   activeFlags[144] = false;
   uint8_t cpu$dcache$_T_76$oldVal = cpu$dcache$_T_76;
   cpu$dcache$_T_76 = (0x2 == cpu$dcache$state);
@@ -1645,7 +1645,7 @@ void DiffNewTop::step144() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step145() {
+void Diffnewtop::step145() {
   activeFlags[145] = false;
   uint8_t cpu$dcache$_T_79$oldVal = cpu$dcache$_T_79;
   cpu$dcache$_T_79 = (0x3 == cpu$dcache$state);
@@ -1664,7 +1664,7 @@ void DiffNewTop::step145() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step146() {
+void Diffnewtop::step146() {
   activeFlags[146] = false;
   uint8_t cpu$dcache$_T_81$oldVal = cpu$dcache$_T_81;
   cpu$dcache$_T_81 = (0x4 == cpu$dcache$state);
@@ -1683,7 +1683,7 @@ void DiffNewTop::step146() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step147() {
+void Diffnewtop::step147() {
   activeFlags[147] = false;
   uint8_t cpu$dcache$_T_83$oldVal = cpu$dcache$_T_83;
   cpu$dcache$_T_83 = (0x5 == cpu$dcache$state);
@@ -1699,7 +1699,7 @@ void DiffNewTop::step147() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step148() {
+void Diffnewtop::step148() {
   activeFlags[148] = false;
   uint8_t cpu$dcache$_T_84$oldVal = cpu$dcache$_T_84;
   cpu$dcache$_T_84 = (0x6 == cpu$dcache$state);
@@ -1712,7 +1712,7 @@ void DiffNewTop::step148() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step152() {
+void Diffnewtop::step152() {
   activeFlags[152] = false;
   uint8_t cpu$dcache$axiWdataLast$oldVal = cpu$dcache$axiWdataLast;
   cpu$dcache$axiWdataLast = (cpu$dcache$offset == 0x7);
@@ -1725,7 +1725,7 @@ void DiffNewTop::step152() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step153() {
+void Diffnewtop::step153() {
   activeFlags[153] = false;
   uint8_t cpu$dcache$_T_78$oldVal = cpu$dcache$_T_78;
   cpu$dcache$_T_78 = ((cpu$dcache$offset >> 0) & 0x1);
@@ -1734,7 +1734,7 @@ void DiffNewTop::step153() {
     activeFlags[1102] = true;
   }
 }
-void DiffNewTop::step155() {
+void Diffnewtop::step155() {
   activeFlags[155] = false;
   uint8_t cpu$dcache$pre_blockIdx$oldVal = cpu$dcache$pre_blockIdx;
   cpu$dcache$pre_blockIdx = ((cpu$dcache$addr_r >> 6) & 0xf);
@@ -1743,7 +1743,7 @@ void DiffNewTop::step155() {
     activeFlags[1006] = true;
   }
 }
-void DiffNewTop::step157() {
+void Diffnewtop::step157() {
   activeFlags[157] = false;
   uint8_t cpu$crossBar$_T_5$oldVal = cpu$crossBar$_T_5;
   cpu$crossBar$_T_5 = (cpu$crossBar$selectMem_r & (cpu$dcache$flush_r == 0x0));
@@ -1760,7 +1760,7 @@ void DiffNewTop::step157() {
     activeFlags[1078] = true;
   }
 }
-void DiffNewTop::step159() {
+void Diffnewtop::step159() {
   activeFlags[159] = false;
   uint8_t cpu$dcSelector$_T_1$oldVal = cpu$dcSelector$_T_1;
   cpu$dcSelector$_T_1 = (cpu$dcSelector$busy & (cpu$dcache$valid_r == 0x0));
@@ -1775,7 +1775,7 @@ void DiffNewTop::step159() {
     activeFlags[1246] = true;
   }
 }
-void DiffNewTop::step160() {
+void Diffnewtop::step160() {
   activeFlags[160] = false;
   uint8_t cpu$dcSelector$_io_tlb_mem2dc_rvalid_T_1$oldVal = cpu$dcSelector$_io_tlb_mem2dc_rvalid_T_1;
   cpu$dcSelector$_io_tlb_mem2dc_rvalid_T_1 = (cpu$dcache$valid_r & (cpu$dcSelector$pre_idx == 0x1));
@@ -1792,7 +1792,7 @@ void DiffNewTop::step160() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step161() {
+void Diffnewtop::step161() {
   activeFlags[161] = false;
   uint8_t cpu$dcSelector$_io_tlb_if2dc_rvalid_T_1$oldVal = cpu$dcSelector$_io_tlb_if2dc_rvalid_T_1;
   cpu$dcSelector$_io_tlb_if2dc_rvalid_T_1 = (cpu$dcache$valid_r & (cpu$dcSelector$pre_idx == 0x2));
@@ -1809,7 +1809,7 @@ void DiffNewTop::step161() {
     activeFlags[1142] = true;
   }
 }
-void DiffNewTop::step162() {
+void Diffnewtop::step162() {
   activeFlags[162] = false;
   uint8_t cpu$dcSelector$_io_dma2dc_rvalid_T_1$oldVal = cpu$dcSelector$_io_dma2dc_rvalid_T_1;
   cpu$dcSelector$_io_dma2dc_rvalid_T_1 = (cpu$dcache$valid_r & (cpu$dcSelector$pre_idx == 0x3));
@@ -1818,7 +1818,7 @@ void DiffNewTop::step162() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step163() {
+void Diffnewtop::step163() {
   activeFlags[163] = false;
   cpu$dcache$data$rdata[3] = cpu$dcache$Ram_bw_3$ram$output;
   cpu$dcache$data$rdata[2] = cpu$dcache$Ram_bw_2$ram$output;
@@ -1827,7 +1827,7 @@ void DiffNewTop::step163() {
   activeFlags[164] = true;
   activeFlags[367] = true;
 }
-void DiffNewTop::step164() {
+void Diffnewtop::step164() {
   activeFlags[164] = false;
   uint64_t cpu$dcache$rdata64$oldVal = cpu$dcache$rdata64;
   cpu$dcache$rdata64 =
@@ -1837,7 +1837,7 @@ void DiffNewTop::step164() {
     activeFlags[472] = true;
   }
 }
-void DiffNewTop::step165() {
+void Diffnewtop::step165() {
   activeFlags[165] = false;
   uint64_t cpu$dcache$io$dcRW$rdata$oldVal = cpu$dcache$io$dcRW$rdata;
   cpu$dcache$io$dcRW$rdata =
@@ -1897,7 +1897,7 @@ void DiffNewTop::step165() {
     activeFlags[1236] = true;
   }
 }
-void DiffNewTop::step166() {
+void Diffnewtop::step166() {
   activeFlags[166] = false;
   uint8_t cpu$tlb_if$_T_74$oldVal = cpu$tlb_if$_T_74;
   cpu$tlb_if$_T_74 = ((cpu$dcache$io$dcRW$rdata & 0xf) == 0x1);
@@ -1914,7 +1914,7 @@ void DiffNewTop::step166() {
     activeFlags[1142] = true;
   }
 }
-void DiffNewTop::step167() {
+void Diffnewtop::step167() {
   activeFlags[167] = false;
   uint8_t cpu$tlb_if$_T_78$oldVal = cpu$tlb_if$_T_78;
   cpu$tlb_if$_T_78 = ((cpu$dcache$io$dcRW$rdata & 0xd0) != 0x0);
@@ -1925,7 +1925,7 @@ void DiffNewTop::step167() {
     activeFlags[1050] = true;
   }
 }
-void DiffNewTop::step168() {
+void Diffnewtop::step168() {
   activeFlags[168] = false;
   uint8_t cpu$tlb_if$_T_94$oldVal = cpu$tlb_if$_T_94;
   cpu$tlb_if$_T_94 = ((((cpu$dcache$io$dcRW$rdata >> 0) & 0x1) == 0x0) |
@@ -1941,7 +1941,7 @@ void DiffNewTop::step168() {
     activeFlags[1142] = true;
   }
 }
-void DiffNewTop::step169() {
+void Diffnewtop::step169() {
   activeFlags[169] = false;
   uint8_t cpu$tlb_if$_T_121$oldVal = cpu$tlb_if$_T_121;
   cpu$tlb_if$_T_121 = (((cpu$tlb_if$level == 0x1) & (((cpu$dcache$io$dcRW$rdata >> 10) & 0x1ff) != 0x0)) |
@@ -1957,7 +1957,7 @@ void DiffNewTop::step169() {
     activeFlags[1142] = true;
   }
 }
-void DiffNewTop::step170() {
+void Diffnewtop::step170() {
   activeFlags[170] = false;
   uint8_t cpu$tlb_mem$_T_74$oldVal = cpu$tlb_mem$_T_74;
   cpu$tlb_mem$_T_74 = ((cpu$dcache$io$dcRW$rdata & 0xf) == 0x1);
@@ -1974,7 +1974,7 @@ void DiffNewTop::step170() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step171() {
+void Diffnewtop::step171() {
   activeFlags[171] = false;
   uint8_t cpu$tlb_mem$_T_78$oldVal = cpu$tlb_mem$_T_78;
   cpu$tlb_mem$_T_78 = ((cpu$dcache$io$dcRW$rdata & 0xd0) != 0x0);
@@ -1985,7 +1985,7 @@ void DiffNewTop::step171() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step172() {
+void Diffnewtop::step172() {
   activeFlags[172] = false;
   uint8_t cpu$tlb_mem$_T_94$oldVal = cpu$tlb_mem$_T_94;
   cpu$tlb_mem$_T_94 = ((((cpu$dcache$io$dcRW$rdata >> 0) & 0x1) == 0x0) |
@@ -2001,7 +2001,7 @@ void DiffNewTop::step172() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step173() {
+void Diffnewtop::step173() {
   activeFlags[173] = false;
   uint8_t cpu$tlb_mem$_T_121$oldVal = cpu$tlb_mem$_T_121;
   cpu$tlb_mem$_T_121 = (((cpu$tlb_mem$level == 0x1) & (((cpu$dcache$io$dcRW$rdata >> 10) & 0x1ff) != 0x0)) |
@@ -2017,7 +2017,7 @@ void DiffNewTop::step173() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step174() {
+void Diffnewtop::step174() {
   activeFlags[174] = false;
   uint8_t cpu$memCrossbar$io$dataRW$rvalid$oldVal = cpu$memCrossbar$io$dataRW$rvalid;
   cpu$memCrossbar$io$dataRW$rvalid =
@@ -2029,7 +2029,7 @@ void DiffNewTop::step174() {
     activeFlags[990] = true;
   }
 }
-void DiffNewTop::step175() {
+void Diffnewtop::step175() {
   activeFlags[175] = false;
   uint8_t cpu$dcache$_T$oldVal = cpu$dcache$_T;
   cpu$dcache$_T = (cpu$dcache$valid[0][0] & cpu$dcache$dirty[0][0]);
@@ -2039,7 +2039,7 @@ void DiffNewTop::step175() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step176() {
+void Diffnewtop::step176() {
   activeFlags[176] = false;
   uint8_t cpu$dcache$_T_1$oldVal = cpu$dcache$_T_1;
   cpu$dcache$_T_1 = (cpu$dcache$valid[0][1] & cpu$dcache$dirty[0][1]);
@@ -2049,7 +2049,7 @@ void DiffNewTop::step176() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step177() {
+void Diffnewtop::step177() {
   activeFlags[177] = false;
   uint8_t cpu$dcache$_T_2$oldVal = cpu$dcache$_T_2;
   cpu$dcache$_T_2 = (cpu$dcache$valid[0][2] & cpu$dcache$dirty[0][2]);
@@ -2059,7 +2059,7 @@ void DiffNewTop::step177() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step178() {
+void Diffnewtop::step178() {
   activeFlags[178] = false;
   uint8_t cpu$dcache$_T_3$oldVal = cpu$dcache$_T_3;
   cpu$dcache$_T_3 = (cpu$dcache$valid[0][3] & cpu$dcache$dirty[0][3]);
@@ -2069,7 +2069,7 @@ void DiffNewTop::step178() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step179() {
+void Diffnewtop::step179() {
   activeFlags[179] = false;
   uint8_t cpu$dcache$_T_4$oldVal = cpu$dcache$_T_4;
   cpu$dcache$_T_4 = (cpu$dcache$valid[0][4] & cpu$dcache$dirty[0][4]);
@@ -2079,7 +2079,7 @@ void DiffNewTop::step179() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step180() {
+void Diffnewtop::step180() {
   activeFlags[180] = false;
   uint8_t cpu$dcache$_T_5$oldVal = cpu$dcache$_T_5;
   cpu$dcache$_T_5 = (cpu$dcache$valid[0][5] & cpu$dcache$dirty[0][5]);
@@ -2089,7 +2089,7 @@ void DiffNewTop::step180() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step181() {
+void Diffnewtop::step181() {
   activeFlags[181] = false;
   uint8_t cpu$dcache$_T_6$oldVal = cpu$dcache$_T_6;
   cpu$dcache$_T_6 = (cpu$dcache$valid[0][6] & cpu$dcache$dirty[0][6]);
@@ -2099,7 +2099,7 @@ void DiffNewTop::step181() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step182() {
+void Diffnewtop::step182() {
   activeFlags[182] = false;
   uint8_t cpu$dcache$_T_7$oldVal = cpu$dcache$_T_7;
   cpu$dcache$_T_7 = (cpu$dcache$valid[0][7] & cpu$dcache$dirty[0][7]);
@@ -2109,7 +2109,7 @@ void DiffNewTop::step182() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step183() {
+void Diffnewtop::step183() {
   activeFlags[183] = false;
   uint8_t cpu$dcache$_T_8$oldVal = cpu$dcache$_T_8;
   cpu$dcache$_T_8 = (cpu$dcache$valid[0][8] & cpu$dcache$dirty[0][8]);
@@ -2119,7 +2119,7 @@ void DiffNewTop::step183() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step184() {
+void Diffnewtop::step184() {
   activeFlags[184] = false;
   uint8_t cpu$dcache$_T_9$oldVal = cpu$dcache$_T_9;
   cpu$dcache$_T_9 = (cpu$dcache$valid[0][9] & cpu$dcache$dirty[0][9]);
@@ -2129,7 +2129,7 @@ void DiffNewTop::step184() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step185() {
+void Diffnewtop::step185() {
   activeFlags[185] = false;
   uint8_t cpu$dcache$_T_10$oldVal = cpu$dcache$_T_10;
   cpu$dcache$_T_10 = (cpu$dcache$valid[0][10] & cpu$dcache$dirty[0][10]);
@@ -2139,7 +2139,7 @@ void DiffNewTop::step185() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step186() {
+void Diffnewtop::step186() {
   activeFlags[186] = false;
   uint8_t cpu$dcache$_T_11$oldVal = cpu$dcache$_T_11;
   cpu$dcache$_T_11 = (cpu$dcache$valid[0][11] & cpu$dcache$dirty[0][11]);
@@ -2149,7 +2149,7 @@ void DiffNewTop::step186() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step187() {
+void Diffnewtop::step187() {
   activeFlags[187] = false;
   uint8_t cpu$dcache$_T_12$oldVal = cpu$dcache$_T_12;
   cpu$dcache$_T_12 = (cpu$dcache$valid[0][12] & cpu$dcache$dirty[0][12]);
@@ -2159,7 +2159,7 @@ void DiffNewTop::step187() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step188() {
+void Diffnewtop::step188() {
   activeFlags[188] = false;
   uint8_t cpu$dcache$_T_13$oldVal = cpu$dcache$_T_13;
   cpu$dcache$_T_13 = (cpu$dcache$valid[0][13] & cpu$dcache$dirty[0][13]);
@@ -2169,7 +2169,7 @@ void DiffNewTop::step188() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step189() {
+void Diffnewtop::step189() {
   activeFlags[189] = false;
   uint8_t cpu$dcache$_T_14$oldVal = cpu$dcache$_T_14;
   cpu$dcache$_T_14 = (cpu$dcache$valid[0][14] & cpu$dcache$dirty[0][14]);
@@ -2179,7 +2179,7 @@ void DiffNewTop::step189() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step190() {
+void Diffnewtop::step190() {
   activeFlags[190] = false;
   uint8_t cpu$dcache$_T_15$oldVal = cpu$dcache$_T_15;
   cpu$dcache$_T_15 = (cpu$dcache$valid[0][15] & cpu$dcache$dirty[0][15]);
@@ -2189,7 +2189,7 @@ void DiffNewTop::step190() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step191() {
+void Diffnewtop::step191() {
   activeFlags[191] = false;
   uint8_t cpu$dcache$_T_16$oldVal = cpu$dcache$_T_16;
   cpu$dcache$_T_16 = (cpu$dcache$valid[1][0] & cpu$dcache$dirty[1][0]);
@@ -2199,7 +2199,7 @@ void DiffNewTop::step191() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step192() {
+void Diffnewtop::step192() {
   activeFlags[192] = false;
   uint8_t cpu$dcache$_T_17$oldVal = cpu$dcache$_T_17;
   cpu$dcache$_T_17 = (cpu$dcache$valid[1][1] & cpu$dcache$dirty[1][1]);
@@ -2209,7 +2209,7 @@ void DiffNewTop::step192() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step193() {
+void Diffnewtop::step193() {
   activeFlags[193] = false;
   uint8_t cpu$dcache$_T_18$oldVal = cpu$dcache$_T_18;
   cpu$dcache$_T_18 = (cpu$dcache$valid[1][2] & cpu$dcache$dirty[1][2]);
@@ -2219,7 +2219,7 @@ void DiffNewTop::step193() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step194() {
+void Diffnewtop::step194() {
   activeFlags[194] = false;
   uint8_t cpu$dcache$_T_19$oldVal = cpu$dcache$_T_19;
   cpu$dcache$_T_19 = (cpu$dcache$valid[1][3] & cpu$dcache$dirty[1][3]);
@@ -2229,7 +2229,7 @@ void DiffNewTop::step194() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step195() {
+void Diffnewtop::step195() {
   activeFlags[195] = false;
   uint8_t cpu$dcache$_T_20$oldVal = cpu$dcache$_T_20;
   cpu$dcache$_T_20 = (cpu$dcache$valid[1][4] & cpu$dcache$dirty[1][4]);
@@ -2239,7 +2239,7 @@ void DiffNewTop::step195() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step196() {
+void Diffnewtop::step196() {
   activeFlags[196] = false;
   uint8_t cpu$dcache$_T_22$oldVal = cpu$dcache$_T_22;
   cpu$dcache$_T_22 = (cpu$dcache$valid[1][6] & cpu$dcache$dirty[1][6]);
@@ -2249,7 +2249,7 @@ void DiffNewTop::step196() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step197() {
+void Diffnewtop::step197() {
   activeFlags[197] = false;
   uint8_t cpu$dcache$_T_21$oldVal = cpu$dcache$_T_21;
   cpu$dcache$_T_21 = (cpu$dcache$valid[1][5] & cpu$dcache$dirty[1][5]);
@@ -2259,7 +2259,7 @@ void DiffNewTop::step197() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step198() {
+void Diffnewtop::step198() {
   activeFlags[198] = false;
   uint8_t cpu$dcache$_T_23$oldVal = cpu$dcache$_T_23;
   cpu$dcache$_T_23 = (cpu$dcache$valid[1][7] & cpu$dcache$dirty[1][7]);
@@ -2269,7 +2269,7 @@ void DiffNewTop::step198() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step199() {
+void Diffnewtop::step199() {
   activeFlags[199] = false;
   uint8_t cpu$dcache$_T_24$oldVal = cpu$dcache$_T_24;
   cpu$dcache$_T_24 = (cpu$dcache$valid[1][8] & cpu$dcache$dirty[1][8]);
@@ -2279,7 +2279,7 @@ void DiffNewTop::step199() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step200() {
+void Diffnewtop::step200() {
   activeFlags[200] = false;
   uint8_t cpu$dcache$_T_25$oldVal = cpu$dcache$_T_25;
   cpu$dcache$_T_25 = (cpu$dcache$valid[1][9] & cpu$dcache$dirty[1][9]);
@@ -2289,7 +2289,7 @@ void DiffNewTop::step200() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step201() {
+void Diffnewtop::step201() {
   activeFlags[201] = false;
   uint8_t cpu$dcache$_T_26$oldVal = cpu$dcache$_T_26;
   cpu$dcache$_T_26 = (cpu$dcache$valid[1][10] & cpu$dcache$dirty[1][10]);
@@ -2299,7 +2299,7 @@ void DiffNewTop::step201() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step202() {
+void Diffnewtop::step202() {
   activeFlags[202] = false;
   uint8_t cpu$dcache$_T_27$oldVal = cpu$dcache$_T_27;
   cpu$dcache$_T_27 = (cpu$dcache$valid[1][11] & cpu$dcache$dirty[1][11]);
@@ -2309,7 +2309,7 @@ void DiffNewTop::step202() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step203() {
+void Diffnewtop::step203() {
   activeFlags[203] = false;
   uint8_t cpu$dcache$_T_28$oldVal = cpu$dcache$_T_28;
   cpu$dcache$_T_28 = (cpu$dcache$valid[1][12] & cpu$dcache$dirty[1][12]);
@@ -2319,7 +2319,7 @@ void DiffNewTop::step203() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step204() {
+void Diffnewtop::step204() {
   activeFlags[204] = false;
   uint8_t cpu$dcache$_T_29$oldVal = cpu$dcache$_T_29;
   cpu$dcache$_T_29 = (cpu$dcache$valid[1][13] & cpu$dcache$dirty[1][13]);
@@ -2329,7 +2329,7 @@ void DiffNewTop::step204() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step205() {
+void Diffnewtop::step205() {
   activeFlags[205] = false;
   uint8_t cpu$dcache$_T_30$oldVal = cpu$dcache$_T_30;
   cpu$dcache$_T_30 = (cpu$dcache$valid[1][14] & cpu$dcache$dirty[1][14]);
@@ -2339,7 +2339,7 @@ void DiffNewTop::step205() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step206() {
+void Diffnewtop::step206() {
   activeFlags[206] = false;
   uint8_t cpu$dcache$_T_31$oldVal = cpu$dcache$_T_31;
   cpu$dcache$_T_31 = (cpu$dcache$valid[1][15] & cpu$dcache$dirty[1][15]);
@@ -2349,7 +2349,7 @@ void DiffNewTop::step206() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step207() {
+void Diffnewtop::step207() {
   activeFlags[207] = false;
   uint8_t cpu$dcache$_T_32$oldVal = cpu$dcache$_T_32;
   cpu$dcache$_T_32 = (cpu$dcache$valid[2][0] & cpu$dcache$dirty[2][0]);
@@ -2359,7 +2359,7 @@ void DiffNewTop::step207() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step208() {
+void Diffnewtop::step208() {
   activeFlags[208] = false;
   uint8_t cpu$dcache$_T_33$oldVal = cpu$dcache$_T_33;
   cpu$dcache$_T_33 = (cpu$dcache$valid[2][1] & cpu$dcache$dirty[2][1]);
@@ -2369,7 +2369,7 @@ void DiffNewTop::step208() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step209() {
+void Diffnewtop::step209() {
   activeFlags[209] = false;
   uint8_t cpu$dcache$_T_34$oldVal = cpu$dcache$_T_34;
   cpu$dcache$_T_34 = (cpu$dcache$valid[2][2] & cpu$dcache$dirty[2][2]);
@@ -2379,7 +2379,7 @@ void DiffNewTop::step209() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step210() {
+void Diffnewtop::step210() {
   activeFlags[210] = false;
   uint8_t cpu$dcache$_T_35$oldVal = cpu$dcache$_T_35;
   cpu$dcache$_T_35 = (cpu$dcache$valid[2][3] & cpu$dcache$dirty[2][3]);
@@ -2389,7 +2389,7 @@ void DiffNewTop::step210() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step211() {
+void Diffnewtop::step211() {
   activeFlags[211] = false;
   uint8_t cpu$dcache$_T_36$oldVal = cpu$dcache$_T_36;
   cpu$dcache$_T_36 = (cpu$dcache$valid[2][4] & cpu$dcache$dirty[2][4]);
@@ -2399,7 +2399,7 @@ void DiffNewTop::step211() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step212() {
+void Diffnewtop::step212() {
   activeFlags[212] = false;
   uint8_t cpu$dcache$_T_37$oldVal = cpu$dcache$_T_37;
   cpu$dcache$_T_37 = (cpu$dcache$valid[2][5] & cpu$dcache$dirty[2][5]);
@@ -2409,7 +2409,7 @@ void DiffNewTop::step212() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step213() {
+void Diffnewtop::step213() {
   activeFlags[213] = false;
   uint8_t cpu$dcache$_T_38$oldVal = cpu$dcache$_T_38;
   cpu$dcache$_T_38 = (cpu$dcache$valid[2][6] & cpu$dcache$dirty[2][6]);
@@ -2419,7 +2419,7 @@ void DiffNewTop::step213() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step214() {
+void Diffnewtop::step214() {
   activeFlags[214] = false;
   uint8_t cpu$dcache$_T_39$oldVal = cpu$dcache$_T_39;
   cpu$dcache$_T_39 = (cpu$dcache$valid[2][7] & cpu$dcache$dirty[2][7]);
@@ -2429,7 +2429,7 @@ void DiffNewTop::step214() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step215() {
+void Diffnewtop::step215() {
   activeFlags[215] = false;
   uint8_t cpu$dcache$_T_40$oldVal = cpu$dcache$_T_40;
   cpu$dcache$_T_40 = (cpu$dcache$valid[2][8] & cpu$dcache$dirty[2][8]);
@@ -2439,7 +2439,7 @@ void DiffNewTop::step215() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step216() {
+void Diffnewtop::step216() {
   activeFlags[216] = false;
   uint8_t cpu$dcache$_T_41$oldVal = cpu$dcache$_T_41;
   cpu$dcache$_T_41 = (cpu$dcache$valid[2][9] & cpu$dcache$dirty[2][9]);
@@ -2449,7 +2449,7 @@ void DiffNewTop::step216() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step217() {
+void Diffnewtop::step217() {
   activeFlags[217] = false;
   uint8_t cpu$dcache$_T_42$oldVal = cpu$dcache$_T_42;
   cpu$dcache$_T_42 = (cpu$dcache$valid[2][10] & cpu$dcache$dirty[2][10]);
@@ -2459,7 +2459,7 @@ void DiffNewTop::step217() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step218() {
+void Diffnewtop::step218() {
   activeFlags[218] = false;
   uint8_t cpu$dcache$_T_43$oldVal = cpu$dcache$_T_43;
   cpu$dcache$_T_43 = (cpu$dcache$valid[2][11] & cpu$dcache$dirty[2][11]);
@@ -2469,7 +2469,7 @@ void DiffNewTop::step218() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step219() {
+void Diffnewtop::step219() {
   activeFlags[219] = false;
   uint8_t cpu$dcache$_T_44$oldVal = cpu$dcache$_T_44;
   cpu$dcache$_T_44 = (cpu$dcache$valid[2][12] & cpu$dcache$dirty[2][12]);
@@ -2479,7 +2479,7 @@ void DiffNewTop::step219() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step220() {
+void Diffnewtop::step220() {
   activeFlags[220] = false;
   uint8_t cpu$dcache$_T_45$oldVal = cpu$dcache$_T_45;
   cpu$dcache$_T_45 = (cpu$dcache$valid[2][13] & cpu$dcache$dirty[2][13]);
@@ -2489,7 +2489,7 @@ void DiffNewTop::step220() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step221() {
+void Diffnewtop::step221() {
   activeFlags[221] = false;
   uint8_t cpu$dcache$_T_46$oldVal = cpu$dcache$_T_46;
   cpu$dcache$_T_46 = (cpu$dcache$valid[2][14] & cpu$dcache$dirty[2][14]);
@@ -2499,7 +2499,7 @@ void DiffNewTop::step221() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step222() {
+void Diffnewtop::step222() {
   activeFlags[222] = false;
   uint8_t cpu$dcache$_T_47$oldVal = cpu$dcache$_T_47;
   cpu$dcache$_T_47 = (cpu$dcache$valid[2][15] & cpu$dcache$dirty[2][15]);
@@ -2509,7 +2509,7 @@ void DiffNewTop::step222() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step223() {
+void Diffnewtop::step223() {
   activeFlags[223] = false;
   uint8_t cpu$dcache$_T_48$oldVal = cpu$dcache$_T_48;
   cpu$dcache$_T_48 = (cpu$dcache$valid[3][0] & cpu$dcache$dirty[3][0]);
@@ -2519,7 +2519,7 @@ void DiffNewTop::step223() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step224() {
+void Diffnewtop::step224() {
   activeFlags[224] = false;
   uint8_t cpu$dcache$_T_49$oldVal = cpu$dcache$_T_49;
   cpu$dcache$_T_49 = (cpu$dcache$valid[3][1] & cpu$dcache$dirty[3][1]);
@@ -2529,7 +2529,7 @@ void DiffNewTop::step224() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step225() {
+void Diffnewtop::step225() {
   activeFlags[225] = false;
   uint8_t cpu$dcache$_T_50$oldVal = cpu$dcache$_T_50;
   cpu$dcache$_T_50 = (cpu$dcache$valid[3][2] & cpu$dcache$dirty[3][2]);
@@ -2539,7 +2539,7 @@ void DiffNewTop::step225() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step226() {
+void Diffnewtop::step226() {
   activeFlags[226] = false;
   uint8_t cpu$dcache$_T_51$oldVal = cpu$dcache$_T_51;
   cpu$dcache$_T_51 = (cpu$dcache$valid[3][3] & cpu$dcache$dirty[3][3]);
@@ -2549,7 +2549,7 @@ void DiffNewTop::step226() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step227() {
+void Diffnewtop::step227() {
   activeFlags[227] = false;
   uint8_t cpu$dcache$_T_52$oldVal = cpu$dcache$_T_52;
   cpu$dcache$_T_52 = (cpu$dcache$valid[3][4] & cpu$dcache$dirty[3][4]);
@@ -2559,7 +2559,7 @@ void DiffNewTop::step227() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step228() {
+void Diffnewtop::step228() {
   activeFlags[228] = false;
   uint8_t cpu$dcache$_T_53$oldVal = cpu$dcache$_T_53;
   cpu$dcache$_T_53 = (cpu$dcache$valid[3][5] & cpu$dcache$dirty[3][5]);
@@ -2569,7 +2569,7 @@ void DiffNewTop::step228() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step229() {
+void Diffnewtop::step229() {
   activeFlags[229] = false;
   uint8_t cpu$dcache$_T_54$oldVal = cpu$dcache$_T_54;
   cpu$dcache$_T_54 = (cpu$dcache$valid[3][6] & cpu$dcache$dirty[3][6]);
@@ -2579,7 +2579,7 @@ void DiffNewTop::step229() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step230() {
+void Diffnewtop::step230() {
   activeFlags[230] = false;
   uint8_t cpu$dcache$_T_55$oldVal = cpu$dcache$_T_55;
   cpu$dcache$_T_55 = (cpu$dcache$valid[3][7] & cpu$dcache$dirty[3][7]);
@@ -2589,7 +2589,7 @@ void DiffNewTop::step230() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step231() {
+void Diffnewtop::step231() {
   activeFlags[231] = false;
   uint8_t cpu$dcache$_T_56$oldVal = cpu$dcache$_T_56;
   cpu$dcache$_T_56 = (cpu$dcache$valid[3][8] & cpu$dcache$dirty[3][8]);
@@ -2599,7 +2599,7 @@ void DiffNewTop::step231() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step232() {
+void Diffnewtop::step232() {
   activeFlags[232] = false;
   uint8_t cpu$dcache$_T_57$oldVal = cpu$dcache$_T_57;
   cpu$dcache$_T_57 = (cpu$dcache$valid[3][9] & cpu$dcache$dirty[3][9]);
@@ -2609,7 +2609,7 @@ void DiffNewTop::step232() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step233() {
+void Diffnewtop::step233() {
   activeFlags[233] = false;
   uint8_t cpu$dcache$_T_58$oldVal = cpu$dcache$_T_58;
   cpu$dcache$_T_58 = (cpu$dcache$valid[3][10] & cpu$dcache$dirty[3][10]);
@@ -2619,7 +2619,7 @@ void DiffNewTop::step233() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step234() {
+void Diffnewtop::step234() {
   activeFlags[234] = false;
   uint8_t cpu$dcache$_T_59$oldVal = cpu$dcache$_T_59;
   cpu$dcache$_T_59 = (cpu$dcache$valid[3][11] & cpu$dcache$dirty[3][11]);
@@ -2629,7 +2629,7 @@ void DiffNewTop::step234() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step235() {
+void Diffnewtop::step235() {
   activeFlags[235] = false;
   uint8_t cpu$dcache$_T_60$oldVal = cpu$dcache$_T_60;
   cpu$dcache$_T_60 = (cpu$dcache$valid[3][12] & cpu$dcache$dirty[3][12]);
@@ -2639,7 +2639,7 @@ void DiffNewTop::step235() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step236() {
+void Diffnewtop::step236() {
   activeFlags[236] = false;
   uint8_t cpu$dcache$_T_61$oldVal = cpu$dcache$_T_61;
   cpu$dcache$_T_61 = (cpu$dcache$valid[3][13] & cpu$dcache$dirty[3][13]);
@@ -2649,7 +2649,7 @@ void DiffNewTop::step236() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step237() {
+void Diffnewtop::step237() {
   activeFlags[237] = false;
   uint8_t cpu$dcache$_T_62$oldVal = cpu$dcache$_T_62;
   cpu$dcache$_T_62 = (cpu$dcache$valid[3][14] & cpu$dcache$dirty[3][14]);
@@ -2659,7 +2659,7 @@ void DiffNewTop::step237() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step238() {
+void Diffnewtop::step238() {
   activeFlags[238] = false;
   uint8_t cpu$dcache$_T_63$oldVal = cpu$dcache$_T_63;
   cpu$dcache$_T_63 = (cpu$dcache$valid[3][15] & cpu$dcache$dirty[3][15]);
@@ -2669,7 +2669,7 @@ void DiffNewTop::step238() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step239() {
+void Diffnewtop::step239() {
   activeFlags[239] = false;
   uint8_t cpu$dcache$flush_idx$oldVal = cpu$dcache$flush_idx;
 cpu$dcache$flush_idx = (cpu$dcache$_T_63? 0xf : (cpu$dcache$_T_62? 0xe : (cpu$dcache$_T_61? 0xd : (cpu$dcache$_T_60? 0xc : (cpu$dcache$_T_59? 0xb : (cpu$dcache$_T_58? 0xa : (cpu$dcache$_T_57? 0x9 : (cpu$dcache$_T_56? 0x8 : (cpu$dcache$_T_55? 0x7 : (cpu$dcache$_T_54? 0x6 : (cpu$dcache$_T_53? 0x5 : (cpu$dcache$_T_52? 0x4 : (cpu$dcache$_T_51? 0x3 : (cpu$dcache$_T_50? 0x2 : (cpu$dcache$_T_49? 0x1 : (cpu$dcache$_T_48? 0x0 : (cpu$dcache$_T_47? 0xf : (cpu$dcache$_T_46? 0xe : (cpu$dcache$_T_45? 0xd : (cpu$dcache$_T_44? 0xc : (cpu$dcache$_T_43? 0xb : (cpu$dcache$_T_42? 0xa : (cpu$dcache$_T_41? 0x9 : (cpu$dcache$_T_40? 0x8 : (cpu$dcache$_T_39? 0x7 : (cpu$dcache$_T_38? 0x6 : (cpu$dcache$_T_37? 0x5 : (cpu$dcache$_T_36? 0x4 : (cpu$dcache$_T_35? 0x3 : (cpu$dcache$_T_34? 0x2 : (cpu$dcache$_T_33? 0x1 : (cpu$dcache$_T_32? 0x0 : (cpu$dcache$_T_31? 0xf : (cpu$dcache$_T_30? 0xe : (cpu$dcache$_T_29? 0xd : (cpu$dcache$_T_28? 0xc : (cpu$dcache$_T_27? 0xb : (cpu$dcache$_T_26? 0xa : (cpu$dcache$_T_25? 0x9 : (cpu$dcache$_T_24? 0x8 : (cpu$dcache$_T_23? 0x7 : (cpu$dcache$_T_22? 0x6 : (cpu$dcache$_T_21? 0x5 : (cpu$dcache$_T_20? 0x4 : (cpu$dcache$_T_19? 0x3 : (cpu$dcache$_T_18? 0x2 : (cpu$dcache$_T_17? 0x1 : (cpu$dcache$_T_16? 0x0 : (cpu$dcache$_T_15? 0xf : (cpu$dcache$_T_14? 0xe : (cpu$dcache$_T_13? 0xd : (cpu$dcache$_T_12? 0xc : (cpu$dcache$_T_11? 0xb : (cpu$dcache$_T_10? 0xa : (cpu$dcache$_T_9? 0x9 : (cpu$dcache$_T_8? 0x8 : (cpu$dcache$_T_7? 0x7 : (cpu$dcache$_T_6? 0x6 : (cpu$dcache$_T_5? 0x5 : (cpu$dcache$_T_4? 0x4 : (cpu$dcache$_T_3? 0x3 : (cpu$dcache$_T_2? 0x2 : (cpu$dcache$_T_1? 0x1 : 0x0)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
@@ -2678,7 +2678,7 @@ if (cpu$dcache$flush_idx$oldVal != cpu$dcache$flush_idx) {
   activeFlags[1017] = true;
 }
 }
-void DiffNewTop::step240() {
+void Diffnewtop::step240() {
   activeFlags[240] = false;
   uint8_t cpu$dcache$flush_done$oldVal = cpu$dcache$flush_done;
 cpu$dcache$flush_done = (cpu$dcache$_T_63? 0x0 : (cpu$dcache$_T_62? 0x0 : (cpu$dcache$_T_61? 0x0 : (cpu$dcache$_T_60? 0x0 : (cpu$dcache$_T_59? 0x0 : (cpu$dcache$_T_58? 0x0 : (cpu$dcache$_T_57? 0x0 : (cpu$dcache$_T_56? 0x0 : (cpu$dcache$_T_55? 0x0 : (cpu$dcache$_T_54? 0x0 : (cpu$dcache$_T_53? 0x0 : (cpu$dcache$_T_52? 0x0 : (cpu$dcache$_T_51? 0x0 : (cpu$dcache$_T_50? 0x0 : (cpu$dcache$_T_49? 0x0 : (cpu$dcache$_T_48? 0x0 : (cpu$dcache$_T_47? 0x0 : (cpu$dcache$_T_46? 0x0 : (cpu$dcache$_T_45? 0x0 : (cpu$dcache$_T_44? 0x0 : (cpu$dcache$_T_43? 0x0 : (cpu$dcache$_T_42? 0x0 : (cpu$dcache$_T_41? 0x0 : (cpu$dcache$_T_40? 0x0 : (cpu$dcache$_T_39? 0x0 : (cpu$dcache$_T_38? 0x0 : (cpu$dcache$_T_37? 0x0 : (cpu$dcache$_T_36? 0x0 : (cpu$dcache$_T_35? 0x0 : (cpu$dcache$_T_34? 0x0 : (cpu$dcache$_T_33? 0x0 : (cpu$dcache$_T_32? 0x0 : (cpu$dcache$_T_31? 0x0 : (cpu$dcache$_T_30? 0x0 : (cpu$dcache$_T_29? 0x0 : (cpu$dcache$_T_28? 0x0 : (cpu$dcache$_T_27? 0x0 : (cpu$dcache$_T_26? 0x0 : (cpu$dcache$_T_25? 0x0 : (cpu$dcache$_T_24? 0x0 : (cpu$dcache$_T_23? 0x0 : (cpu$dcache$_T_22? 0x0 : (cpu$dcache$_T_21? 0x0 : (cpu$dcache$_T_20? 0x0 : (cpu$dcache$_T_19? 0x0 : (cpu$dcache$_T_18? 0x0 : (cpu$dcache$_T_17? 0x0 : (cpu$dcache$_T_16? 0x0 : (cpu$dcache$_T_15? 0x0 : (cpu$dcache$_T_14? 0x0 : (cpu$dcache$_T_13? 0x0 : (cpu$dcache$_T_12? 0x0 : (cpu$dcache$_T_11? 0x0 : (cpu$dcache$_T_10? 0x0 : (cpu$dcache$_T_9? 0x0 : (cpu$dcache$_T_8? 0x0 : (cpu$dcache$_T_7? 0x0 : (cpu$dcache$_T_6? 0x0 : (cpu$dcache$_T_5? 0x0 : (cpu$dcache$_T_4? 0x0 : (cpu$dcache$_T_3? 0x0 : (cpu$dcache$_T_2? 0x0 : (cpu$dcache$_T_1? 0x0 : (cpu$dcache$_T? 0x0 : 0x1))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
@@ -2691,7 +2691,7 @@ if (cpu$dcache$flush_done$oldVal != cpu$dcache$flush_done) {
   activeFlags[1114] = true;
 }
 }
-void DiffNewTop::step242() {
+void Diffnewtop::step242() {
   activeFlags[242] = false;
   uint8_t cpu$icache$_T_5$oldVal = cpu$icache$_T_5;
   cpu$icache$_T_5 = (0x0 == cpu$icache$state);
@@ -2709,7 +2709,7 @@ void DiffNewTop::step242() {
     activeFlags[1130] = true;
   }
 }
-void DiffNewTop::step243() {
+void Diffnewtop::step243() {
   activeFlags[243] = false;
   uint8_t cpu$icache$_T_9$oldVal = cpu$icache$_T_9;
   cpu$icache$_T_9 = (0x1 == cpu$icache$state);
@@ -2724,7 +2724,7 @@ void DiffNewTop::step243() {
     activeFlags[1130] = true;
   }
 }
-void DiffNewTop::step244() {
+void Diffnewtop::step244() {
   activeFlags[244] = false;
   uint8_t cpu$icache$_T_11$oldVal = cpu$icache$_T_11;
   cpu$icache$_T_11 = (0x2 == cpu$icache$state);
@@ -2738,7 +2738,7 @@ void DiffNewTop::step244() {
     activeFlags[1130] = true;
   }
 }
-void DiffNewTop::step246() {
+void Diffnewtop::step246() {
   activeFlags[246] = false;
   uint8_t cpu$icache$_T_13$oldVal = cpu$icache$_T_13;
   cpu$icache$_T_13 = ((cpu$icache$axiOffset >> 0) & 0x1);
@@ -2747,7 +2747,7 @@ void DiffNewTop::step246() {
     activeFlags[1103] = true;
   }
 }
-void DiffNewTop::step249() {
+void Diffnewtop::step249() {
   activeFlags[249] = false;
   uint8_t cpu$icache$pre_blockIdx$oldVal = cpu$icache$pre_blockIdx;
   cpu$icache$pre_blockIdx = ((cpu$icache$addr_r >> 6) & 0xf);
@@ -2756,7 +2756,7 @@ void DiffNewTop::step249() {
     activeFlags[1129] = true;
   }
 }
-void DiffNewTop::step250() {
+void Diffnewtop::step250() {
   activeFlags[250] = false;
   cpu$icache$data$rdata[3] = cpu$icache$Ram_bw_3$ram$output;
   cpu$icache$data$rdata[2] = cpu$icache$Ram_bw_2$ram$output;
@@ -2764,7 +2764,7 @@ void DiffNewTop::step250() {
   cpu$icache$data$rdata[0] = cpu$icache$Ram_bw$ram$output;
   activeFlags[943] = true;
 }
-void DiffNewTop::step251() {
+void Diffnewtop::step251() {
   activeFlags[251] = false;
   uint8_t cpu$fetchCrossbar$io$instIO$rvalid$oldVal = cpu$fetchCrossbar$io$instIO$rvalid;
   cpu$fetchCrossbar$io$instIO$rvalid =
@@ -2774,7 +2774,7 @@ void DiffNewTop::step251() {
     activeFlags[949] = true;
   }
 }
-void DiffNewTop::step256() {
+void Diffnewtop::step256() {
   activeFlags[256] = false;
   uint8_t cpu$tlb_if$_T_112$oldVal = cpu$tlb_if$_T_112;
   cpu$tlb_if$_T_112 = ((((cpu$tlb_if$out_excep_r$cause == 0xc) & (((cpu$dcache$io$dcRW$rdata >> 3) & 0x1) == 0x0)) |
@@ -2793,7 +2793,7 @@ void DiffNewTop::step256() {
     activeFlags[1142] = true;
   }
 }
-void DiffNewTop::step257() {
+void Diffnewtop::step257() {
   activeFlags[257] = false;
   uint8_t cpu$tlb_mem$_T_112$oldVal = cpu$tlb_mem$_T_112;
   cpu$tlb_mem$_T_112 = ((((cpu$tlb_mem$out_excep_r$cause == 0xc) & (((cpu$dcache$io$dcRW$rdata >> 3) & 0x1) == 0x0)) |
@@ -2812,7 +2812,7 @@ void DiffNewTop::step257() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step258() {
+void Diffnewtop::step258() {
   activeFlags[258] = false;
   uint64_t cpu$csrs$sstatus$oldVal = cpu$csrs$sstatus;
   cpu$csrs$sstatus = (cpu$csrs$mstatus & 0x80000003000de122);
@@ -2822,7 +2822,7 @@ void DiffNewTop::step258() {
     activeFlags[994] = true;
   }
 }
-void DiffNewTop::step260() {
+void Diffnewtop::step260() {
   activeFlags[260] = false;
   uint8_t cpu$tlb_if$is_Sv39$oldVal = cpu$tlb_if$is_Sv39;
   cpu$tlb_if$is_Sv39 = (((cpu$csrs$priv == 0x3) ? 0x0 : ((cpu$csrs$satp >> 60) & 0xf)) == 0x8);
@@ -2831,7 +2831,7 @@ void DiffNewTop::step260() {
     activeFlags[933] = true;
   }
 }
-void DiffNewTop::step261() {
+void Diffnewtop::step261() {
   activeFlags[261] = false;
   uint8_t cpu$tlb_if$_T_53$oldVal = cpu$tlb_if$_T_53;
   cpu$tlb_if$_T_53 = (cpu$tlb_if$is_Sv39 | (cpu$tlb_if$state != 0x0));
@@ -2858,7 +2858,7 @@ void DiffNewTop::step261() {
     activeFlags[1148] = true;
   }
 }
-void DiffNewTop::step262() {
+void Diffnewtop::step262() {
   activeFlags[262] = false;
   uint8_t cpu$tlb_if$_T_87$oldVal = cpu$tlb_if$_T_87;
   cpu$tlb_if$_T_87 = (((cpu$dcache$io$dcRW$rdata >> 4) & 0x1)
@@ -2876,7 +2876,7 @@ void DiffNewTop::step262() {
     activeFlags[1142] = true;
   }
 }
-void DiffNewTop::step263() {
+void Diffnewtop::step263() {
   activeFlags[263] = false;
   uint8_t cpu$tlb_mem$_T_87$oldVal = cpu$tlb_mem$_T_87;
   cpu$tlb_mem$_T_87 = (((cpu$dcache$io$dcRW$rdata >> 4) & 0x1)
@@ -2894,7 +2894,7 @@ void DiffNewTop::step263() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step264() {
+void Diffnewtop::step264() {
   activeFlags[264] = false;
   uint64_t cpu$csrs$enable_int$oldVal = cpu$csrs$enable_int;
   cpu$csrs$enable_int =
@@ -2920,7 +2920,7 @@ void DiffNewTop::step264() {
     activeFlags[1225] = true;
   }
 }
-void DiffNewTop::step265() {
+void Diffnewtop::step265() {
   activeFlags[265] = false;
   uint8_t cpu$dcache$_T_69$oldVal = cpu$dcache$_T_69;
   cpu$dcache$_T_69 = (cpu$dcache$flush_r | cpu$writeback$cache_r);
@@ -2934,7 +2934,7 @@ void DiffNewTop::step265() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step266() {
+void Diffnewtop::step266() {
   activeFlags[266] = false;
   uint8_t cpu$tlb_if$_T_49$oldVal = cpu$tlb_if$_T_49;
   cpu$tlb_if$_T_49 = (cpu$writeback$tlb_r | cpu$tlb_if$flush_r);
@@ -2943,7 +2943,7 @@ void DiffNewTop::step266() {
     activeFlags[1271] = true;
   }
 }
-void DiffNewTop::step267() {
+void Diffnewtop::step267() {
   activeFlags[267] = false;
   uint8_t cpu$tlb_mem$_T_49$oldVal = cpu$tlb_mem$_T_49;
   cpu$tlb_mem$_T_49 = (cpu$writeback$tlb_r | cpu$tlb_mem$flush_r);
@@ -2952,7 +2952,7 @@ void DiffNewTop::step267() {
     activeFlags[1062] = true;
   }
 }
-void DiffNewTop::step268() {
+void Diffnewtop::step268() {
   activeFlags[268] = false;
   uint8_t cpu$memory$_T_35$oldVal = cpu$memory$_T_35;
   cpu$memory$_T_35 = (cpu$writeback$drop_r == 0x0);
@@ -2961,7 +2961,7 @@ void DiffNewTop::step268() {
     activeFlags[1099] = true;
   }
 }
-void DiffNewTop::step269() {
+void Diffnewtop::step269() {
   activeFlags[269] = false;
   uint8_t cpu$writeback$_T$oldVal = cpu$writeback$_T;
   cpu$writeback$_T = (cpu$writeback$drop_r == 0x0);
@@ -2977,7 +2977,7 @@ void DiffNewTop::step269() {
     activeFlags[1276] = true;
   }
 }
-void DiffNewTop::step271() {
+void Diffnewtop::step271() {
   activeFlags[271] = false;
   uint8_t cpu$writeback$_T_5$oldVal = cpu$writeback$_T_5;
   cpu$writeback$_T_5 = (cpu$memory$special3_r == 0x1);
@@ -2986,7 +2986,7 @@ void DiffNewTop::step271() {
     activeFlags[1273] = true;
   }
 }
-void DiffNewTop::step272() {
+void Diffnewtop::step272() {
   activeFlags[272] = false;
   uint8_t cpu$csrs$_T_37$oldVal = cpu$csrs$_T_37;
   cpu$csrs$_T_37 = (cpu$memory$csr_id3_r == 0x301);
@@ -3018,7 +3018,7 @@ void DiffNewTop::step272() {
     activeFlags[1297] = true;
   }
 }
-void DiffNewTop::step273() {
+void Diffnewtop::step273() {
   activeFlags[273] = false;
   uint8_t cpu$csrs$_T_38$oldVal = cpu$csrs$_T_38;
   cpu$csrs$_T_38 = (cpu$memory$csr_id3_r == 0x300);
@@ -3049,7 +3049,7 @@ void DiffNewTop::step273() {
     activeFlags[1296] = true;
   }
 }
-void DiffNewTop::step274() {
+void Diffnewtop::step274() {
   activeFlags[274] = false;
   uint8_t cpu$csrs$_T_39$oldVal = cpu$csrs$_T_39;
   cpu$csrs$_T_39 = (cpu$memory$csr_id3_r == 0x341);
@@ -3080,7 +3080,7 @@ void DiffNewTop::step274() {
     activeFlags[1296] = true;
   }
 }
-void DiffNewTop::step275() {
+void Diffnewtop::step275() {
   activeFlags[275] = false;
   uint8_t cpu$csrs$_T_40$oldVal = cpu$csrs$_T_40;
   cpu$csrs$_T_40 = (cpu$memory$csr_id3_r == 0x343);
@@ -3110,7 +3110,7 @@ void DiffNewTop::step275() {
     activeFlags[1296] = true;
   }
 }
-void DiffNewTop::step276() {
+void Diffnewtop::step276() {
   activeFlags[276] = false;
   uint8_t cpu$csrs$_T_41$oldVal = cpu$csrs$_T_41;
   cpu$csrs$_T_41 = (cpu$memory$csr_id3_r == 0x340);
@@ -3139,7 +3139,7 @@ void DiffNewTop::step276() {
     activeFlags[1296] = true;
   }
 }
-void DiffNewTop::step277() {
+void Diffnewtop::step277() {
   activeFlags[277] = false;
   uint8_t cpu$csrs$_T_42$oldVal = cpu$csrs$_T_42;
   cpu$csrs$_T_42 = (cpu$memory$csr_id3_r == 0x305);
@@ -3167,7 +3167,7 @@ void DiffNewTop::step277() {
     activeFlags[1295] = true;
   }
 }
-void DiffNewTop::step278() {
+void Diffnewtop::step278() {
   activeFlags[278] = false;
   uint8_t cpu$csrs$_T_43$oldVal = cpu$csrs$_T_43;
   cpu$csrs$_T_43 = (cpu$memory$csr_id3_r == 0x304);
@@ -3194,7 +3194,7 @@ void DiffNewTop::step278() {
     activeFlags[1294] = true;
   }
 }
-void DiffNewTop::step279() {
+void Diffnewtop::step279() {
   activeFlags[279] = false;
   uint8_t cpu$csrs$_T_44$oldVal = cpu$csrs$_T_44;
   cpu$csrs$_T_44 = (cpu$memory$csr_id3_r == 0x344);
@@ -3221,7 +3221,7 @@ void DiffNewTop::step279() {
     activeFlags[1294] = true;
   }
 }
-void DiffNewTop::step280() {
+void Diffnewtop::step280() {
   activeFlags[280] = false;
   uint8_t cpu$csrs$_T_45$oldVal = cpu$csrs$_T_45;
   cpu$csrs$_T_45 = (cpu$memory$csr_id3_r == 0x342);
@@ -3248,7 +3248,7 @@ void DiffNewTop::step280() {
     activeFlags[1294] = true;
   }
 }
-void DiffNewTop::step281() {
+void Diffnewtop::step281() {
   activeFlags[281] = false;
   uint8_t cpu$csrs$_T_46$oldVal = cpu$csrs$_T_46;
   cpu$csrs$_T_46 = (cpu$memory$csr_id3_r == 0x302);
@@ -3274,7 +3274,7 @@ void DiffNewTop::step281() {
     activeFlags[1294] = true;
   }
 }
-void DiffNewTop::step282() {
+void Diffnewtop::step282() {
   activeFlags[282] = false;
   uint8_t cpu$csrs$_T_47$oldVal = cpu$csrs$_T_47;
   cpu$csrs$_T_47 = (cpu$memory$csr_id3_r == 0x303);
@@ -3299,7 +3299,7 @@ void DiffNewTop::step282() {
     activeFlags[1293] = true;
   }
 }
-void DiffNewTop::step283() {
+void Diffnewtop::step283() {
   activeFlags[283] = false;
   uint8_t cpu$csrs$_T_48$oldVal = cpu$csrs$_T_48;
   cpu$csrs$_T_48 = (cpu$memory$csr_id3_r == 0x306);
@@ -3323,7 +3323,7 @@ void DiffNewTop::step283() {
     activeFlags[1292] = true;
   }
 }
-void DiffNewTop::step284() {
+void Diffnewtop::step284() {
   activeFlags[284] = false;
   uint8_t cpu$csrs$_T_49$oldVal = cpu$csrs$_T_49;
   cpu$csrs$_T_49 = (cpu$memory$csr_id3_r == 0x106);
@@ -3346,7 +3346,7 @@ void DiffNewTop::step284() {
     activeFlags[1292] = true;
   }
 }
-void DiffNewTop::step285() {
+void Diffnewtop::step285() {
   activeFlags[285] = false;
   uint8_t cpu$csrs$_T_50$oldVal = cpu$csrs$_T_50;
   cpu$csrs$_T_50 = (cpu$memory$csr_id3_r == 0x141);
@@ -3368,7 +3368,7 @@ void DiffNewTop::step285() {
     activeFlags[1292] = true;
   }
 }
-void DiffNewTop::step286() {
+void Diffnewtop::step286() {
   activeFlags[286] = false;
   uint8_t cpu$csrs$_T_51$oldVal = cpu$csrs$_T_51;
   cpu$csrs$_T_51 = (cpu$memory$csr_id3_r == 0x143);
@@ -3389,7 +3389,7 @@ void DiffNewTop::step286() {
     activeFlags[1292] = true;
   }
 }
-void DiffNewTop::step287() {
+void Diffnewtop::step287() {
   activeFlags[287] = false;
   uint8_t cpu$csrs$_T_52$oldVal = cpu$csrs$_T_52;
   cpu$csrs$_T_52 = (cpu$memory$csr_id3_r == 0x140);
@@ -3409,7 +3409,7 @@ void DiffNewTop::step287() {
     activeFlags[1292] = true;
   }
 }
-void DiffNewTop::step288() {
+void Diffnewtop::step288() {
   activeFlags[288] = false;
   uint8_t cpu$csrs$_T_53$oldVal = cpu$csrs$_T_53;
   cpu$csrs$_T_53 = (cpu$memory$csr_id3_r == 0x105);
@@ -3428,7 +3428,7 @@ void DiffNewTop::step288() {
     activeFlags[1292] = true;
   }
 }
-void DiffNewTop::step289() {
+void Diffnewtop::step289() {
   activeFlags[289] = false;
   uint8_t cpu$csrs$_T_54$oldVal = cpu$csrs$_T_54;
   cpu$csrs$_T_54 = (cpu$memory$csr_id3_r == 0x180);
@@ -3446,7 +3446,7 @@ void DiffNewTop::step289() {
     activeFlags[1292] = true;
   }
 }
-void DiffNewTop::step290() {
+void Diffnewtop::step290() {
   activeFlags[290] = false;
   uint8_t cpu$csrs$_T_55$oldVal = cpu$csrs$_T_55;
   cpu$csrs$_T_55 = (cpu$memory$csr_id3_r == 0x142);
@@ -3463,7 +3463,7 @@ void DiffNewTop::step290() {
     activeFlags[1292] = true;
   }
 }
-void DiffNewTop::step291() {
+void Diffnewtop::step291() {
   activeFlags[291] = false;
   uint8_t cpu$csrs$_T_56$oldVal = cpu$csrs$_T_56;
   cpu$csrs$_T_56 = (cpu$memory$csr_id3_r == 0x100);
@@ -3479,7 +3479,7 @@ void DiffNewTop::step291() {
     activeFlags[1292] = true;
   }
 }
-void DiffNewTop::step292() {
+void Diffnewtop::step292() {
   activeFlags[292] = false;
   uint8_t cpu$csrs$_T_57$oldVal = cpu$csrs$_T_57;
   cpu$csrs$_T_57 = (cpu$memory$csr_id3_r == 0x104);
@@ -3494,7 +3494,7 @@ void DiffNewTop::step292() {
     activeFlags[1292] = true;
   }
 }
-void DiffNewTop::step293() {
+void Diffnewtop::step293() {
   activeFlags[293] = false;
   uint8_t cpu$csrs$_T_58$oldVal = cpu$csrs$_T_58;
   cpu$csrs$_T_58 = (cpu$memory$csr_id3_r == 0x144);
@@ -3508,7 +3508,7 @@ void DiffNewTop::step293() {
     activeFlags[1286] = true;
   }
 }
-void DiffNewTop::step294() {
+void Diffnewtop::step294() {
   activeFlags[294] = false;
   uint8_t cpu$csrs$_T_59$oldVal = cpu$csrs$_T_59;
   cpu$csrs$_T_59 = (cpu$memory$csr_id3_r == 0x3b0);
@@ -3521,7 +3521,7 @@ void DiffNewTop::step294() {
     activeFlags[1286] = true;
   }
 }
-void DiffNewTop::step295() {
+void Diffnewtop::step295() {
   activeFlags[295] = false;
   uint8_t cpu$csrs$_T_60$oldVal = cpu$csrs$_T_60;
   cpu$csrs$_T_60 = (cpu$memory$csr_id3_r == 0x3b1);
@@ -3533,7 +3533,7 @@ void DiffNewTop::step295() {
     activeFlags[1285] = true;
   }
 }
-void DiffNewTop::step296() {
+void Diffnewtop::step296() {
   activeFlags[296] = false;
   uint8_t cpu$csrs$_T_61$oldVal = cpu$csrs$_T_61;
   cpu$csrs$_T_61 = (cpu$memory$csr_id3_r == 0x3b2);
@@ -3544,7 +3544,7 @@ void DiffNewTop::step296() {
     activeFlags[1284] = true;
   }
 }
-void DiffNewTop::step297() {
+void Diffnewtop::step297() {
   activeFlags[297] = false;
   uint8_t cpu$csrs$_T_62$oldVal = cpu$csrs$_T_62;
   cpu$csrs$_T_62 = (cpu$memory$csr_id3_r == 0x3b3);
@@ -3554,7 +3554,7 @@ void DiffNewTop::step297() {
     activeFlags[1283] = true;
   }
 }
-void DiffNewTop::step298() {
+void Diffnewtop::step298() {
   activeFlags[298] = false;
   uint8_t cpu$csrs$_T_63$oldVal = cpu$csrs$_T_63;
   cpu$csrs$_T_63 = (cpu$memory$csr_id3_r == 0x3a0);
@@ -3563,7 +3563,7 @@ void DiffNewTop::step298() {
     activeFlags[1282] = true;
   }
 }
-void DiffNewTop::step299() {
+void Diffnewtop::step299() {
   activeFlags[299] = false;
   uint8_t cpu$csrs$_T_64$oldVal = cpu$csrs$_T_64;
   cpu$csrs$_T_64 = (cpu$memory$csr_id3_r == 0x40);
@@ -3572,7 +3572,7 @@ void DiffNewTop::step299() {
     activeFlags[1282] = true;
   }
 }
-void DiffNewTop::step300() {
+void Diffnewtop::step300() {
   activeFlags[300] = false;
   uint8_t cpu$memory$io$d_mem3$state$oldVal = cpu$memory$io$d_mem3$state;
   cpu$memory$io$d_mem3$state = ((cpu$memory$valid3_r & cpu$memory$dst_en3_r) ? 0x1 : 0x0);
@@ -3583,7 +3583,7 @@ void DiffNewTop::step300() {
     activeFlags[654] = true;
   }
 }
-void DiffNewTop::step301() {
+void Diffnewtop::step301() {
   activeFlags[301] = false;
   uint8_t cpu$forwading$_T_23$oldVal = cpu$forwading$_T_23;
   cpu$forwading$_T_23 = (cpu$memory$io$d_mem3$state == 0x1);
@@ -3593,7 +3593,7 @@ void DiffNewTop::step301() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step302() {
+void Diffnewtop::step302() {
   activeFlags[302] = false;
   uint8_t cpu$forwading$_T_47$oldVal = cpu$forwading$_T_47;
   cpu$forwading$_T_47 = (cpu$memory$io$d_mem3$state == 0x1);
@@ -3603,7 +3603,7 @@ void DiffNewTop::step302() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step303() {
+void Diffnewtop::step303() {
   activeFlags[303] = false;
   uint8_t cpu$csrs$_T$oldVal = cpu$csrs$_T;
   cpu$csrs$_T = (cpu$memory$excep3_r$etype == 0x2);
@@ -3620,7 +3620,7 @@ void DiffNewTop::step303() {
     activeFlags[1192] = true;
   }
 }
-void DiffNewTop::step304() {
+void Diffnewtop::step304() {
   activeFlags[304] = false;
   uint8_t cpu$csrs$_T_1$oldVal = cpu$csrs$_T_1;
   cpu$csrs$_T_1 = (cpu$memory$excep3_r$etype == 0x3);
@@ -3637,7 +3637,7 @@ void DiffNewTop::step304() {
     activeFlags[1192] = true;
   }
 }
-void DiffNewTop::step305() {
+void Diffnewtop::step305() {
   activeFlags[305] = false;
   uint8_t cpu$writeback$_T_4$oldVal = cpu$writeback$_T_4;
   cpu$writeback$_T_4 = ((cpu$memory$special3_r != 0x0) | (cpu$memory$recov3_r & (cpu$memory$excep3_r$en == 0x0)));
@@ -3648,7 +3648,7 @@ void DiffNewTop::step305() {
     activeFlags[1275] = true;
   }
 }
-void DiffNewTop::step306() {
+void Diffnewtop::step306() {
   activeFlags[306] = false;
   uint8_t cpu$writeback$io$excep$en$oldVal = cpu$writeback$io$excep$en;
   cpu$writeback$io$excep$en = (cpu$writeback$_T ? (cpu$memory$valid3_r ? cpu$memory$excep3_r$en : 0x0) : 0x0);
@@ -3665,7 +3665,7 @@ void DiffNewTop::step306() {
     activeFlags[1192] = true;
   }
 }
-void DiffNewTop::step307() {
+void Diffnewtop::step307() {
   activeFlags[307] = false;
   uint8_t cpu$csrs$_T_36$oldVal = cpu$csrs$_T_36;
   cpu$csrs$_T_36 = ((cpu$writeback$_T ? (cpu$memory$valid3_r ? cpu$memory$csr_en3_r : 0x0) : 0x0) == 0x0);
@@ -3697,7 +3697,7 @@ void DiffNewTop::step307() {
     activeFlags[1297] = true;
   }
 }
-void DiffNewTop::step308() {
+void Diffnewtop::step308() {
   activeFlags[308] = false;
   uint8_t cpu$memory$hs_out$oldVal = cpu$memory$hs_out;
   cpu$memory$hs_out = ((cpu$writeback$_T ? (cpu$memory$valid3_r ? 0x1 : 0x0) : 0x0) &
@@ -3707,7 +3707,7 @@ void DiffNewTop::step308() {
     activeFlags[991] = true;
   }
 }
-void DiffNewTop::step309() {
+void Diffnewtop::step309() {
   activeFlags[309] = false;
   uint8_t cpu$csrs$_T_6$oldVal = cpu$csrs$_T_6;
   cpu$csrs$_T_6 =
@@ -3728,7 +3728,7 @@ void DiffNewTop::step309() {
     activeFlags[1192] = true;
   }
 }
-void DiffNewTop::step312() {
+void Diffnewtop::step312() {
   activeFlags[312] = false;
   uint8_t cpu$memory$is_dc_r$oldVal = cpu$memory$is_dc_r;
   cpu$memory$is_dc_r = (cpu$memory$ctrl2_r$dcMode != 0x0);
@@ -3739,7 +3739,7 @@ void DiffNewTop::step312() {
     activeFlags[1099] = true;
   }
 }
-void DiffNewTop::step313() {
+void Diffnewtop::step313() {
   activeFlags[313] = false;
   uint8_t cpu$memory$io$d_mem2$state$oldVal = cpu$memory$io$d_mem2$state;
   cpu$memory$io$d_mem2$state =
@@ -3753,7 +3753,7 @@ void DiffNewTop::step313() {
     activeFlags[653] = true;
   }
 }
-void DiffNewTop::step314() {
+void Diffnewtop::step314() {
   activeFlags[314] = false;
   uint8_t cpu$forwading$_T_19$oldVal = cpu$forwading$_T_19;
   cpu$forwading$_T_19 = (cpu$memory$io$d_mem2$state == 0x1);
@@ -3763,7 +3763,7 @@ void DiffNewTop::step314() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step315() {
+void Diffnewtop::step315() {
   activeFlags[315] = false;
   uint8_t cpu$forwading$_T_43$oldVal = cpu$forwading$_T_43;
   cpu$forwading$_T_43 = (cpu$memory$io$d_mem2$state == 0x1);
@@ -3773,7 +3773,7 @@ void DiffNewTop::step315() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step316() {
+void Diffnewtop::step316() {
   activeFlags[316] = false;
   uint8_t cpu$memory$_T_26$oldVal = cpu$memory$_T_26;
   cpu$memory$_T_26 = (cpu$tlb_mem$out_excep_r$en & (cpu$memory$drop_tlb == 0x0));
@@ -3792,7 +3792,7 @@ void DiffNewTop::step316() {
     activeFlags[1405] = true;
   }
 }
-void DiffNewTop::step318() {
+void Diffnewtop::step318() {
   activeFlags[318] = false;
   uint8_t cpu$memory$_T_18$oldVal = cpu$memory$_T_18;
   cpu$memory$_T_18 =
@@ -3804,7 +3804,7 @@ void DiffNewTop::step318() {
     activeFlags[1399] = true;
   }
 }
-void DiffNewTop::step319() {
+void Diffnewtop::step319() {
   activeFlags[319] = false;
   uint8_t cpu$memory$_T_19$oldVal = cpu$memory$_T_19;
   cpu$memory$_T_19 = ((cpu$memory$indi1_r >> 1) & 0x1);
@@ -3815,7 +3815,7 @@ void DiffNewTop::step319() {
     activeFlags[1399] = true;
   }
 }
-void DiffNewTop::step321() {
+void Diffnewtop::step321() {
   activeFlags[321] = false;
   uint8_t cpu$memory$io$d_mem1$state$oldVal = cpu$memory$io$d_mem1$state;
   cpu$memory$io$d_mem1$state =
@@ -3831,7 +3831,7 @@ void DiffNewTop::step321() {
     activeFlags[652] = true;
   }
 }
-void DiffNewTop::step322() {
+void Diffnewtop::step322() {
   activeFlags[322] = false;
   uint8_t cpu$forwading$_T_15$oldVal = cpu$forwading$_T_15;
   cpu$forwading$_T_15 = (cpu$memory$io$d_mem1$state == 0x1);
@@ -3841,7 +3841,7 @@ void DiffNewTop::step322() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step323() {
+void Diffnewtop::step323() {
   activeFlags[323] = false;
   uint8_t cpu$forwading$_T_39$oldVal = cpu$forwading$_T_39;
   cpu$forwading$_T_39 = (cpu$memory$io$d_mem1$state == 0x1);
@@ -3851,7 +3851,7 @@ void DiffNewTop::step323() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step325() {
+void Diffnewtop::step325() {
   activeFlags[325] = false;
   uint8_t cpu$memory$stage2_is_excep$oldVal = cpu$memory$stage2_is_excep;
   cpu$memory$stage2_is_excep = (cpu$memory$excep1_r$en | cpu$tlb_mem$out_excep_r$en);
@@ -3863,7 +3863,7 @@ void DiffNewTop::step325() {
     activeFlags[1399] = true;
   }
 }
-void DiffNewTop::step326() {
+void Diffnewtop::step326() {
   activeFlags[326] = false;
   uint8_t cpu$memory$_T_14$oldVal = cpu$memory$_T_14;
   cpu$memory$_T_14 = (((cpu$memory$indi1_r >> 0) & 0x1) & (cpu$memory$stage2_is_excep == 0x0));
@@ -3872,7 +3872,7 @@ void DiffNewTop::step326() {
     activeFlags[989] = true;
   }
 }
-void DiffNewTop::step327() {
+void Diffnewtop::step327() {
   activeFlags[327] = false;
   uint8_t cpu$memory$drop3_in$oldVal = cpu$memory$drop3_in;
   cpu$memory$drop3_in = (cpu$memory$drop3_r | cpu$writeback$drop_r);
@@ -3883,7 +3883,7 @@ void DiffNewTop::step327() {
     activeFlags[937] = true;
   }
 }
-void DiffNewTop::step328() {
+void Diffnewtop::step328() {
   activeFlags[328] = false;
   uint8_t cpu$memory$_T_24$oldVal = cpu$memory$_T_24;
   cpu$memory$_T_24 = (cpu$memory$drop3_in == 0x0);
@@ -3904,7 +3904,7 @@ void DiffNewTop::step328() {
     activeFlags[1405] = true;
   }
 }
-void DiffNewTop::step329() {
+void Diffnewtop::step329() {
   activeFlags[329] = false;
   uint8_t cpu$memory$hs2$oldVal = cpu$memory$hs2;
   cpu$memory$hs2 =
@@ -3938,7 +3938,7 @@ void DiffNewTop::step329() {
     activeFlags[1397] = true;
   }
 }
-void DiffNewTop::step330() {
+void Diffnewtop::step330() {
   activeFlags[330] = false;
   uint8_t cpu$memory$drop2_in$oldVal = cpu$memory$drop2_in;
   cpu$memory$drop2_in = (cpu$memory$drop2_r | cpu$memory$drop3_in);
@@ -3949,7 +3949,7 @@ void DiffNewTop::step330() {
     activeFlags[937] = true;
   }
 }
-void DiffNewTop::step331() {
+void Diffnewtop::step331() {
   activeFlags[331] = false;
   uint8_t cpu$memory$_T_3$oldVal = cpu$memory$_T_3;
   cpu$memory$_T_3 = (cpu$memory$drop2_in == 0x0);
@@ -3960,7 +3960,7 @@ void DiffNewTop::step331() {
     activeFlags[1414] = true;
   }
 }
-void DiffNewTop::step332() {
+void Diffnewtop::step332() {
   activeFlags[332] = false;
   uint8_t cpu$memory$hs1$oldVal = cpu$memory$hs1;
   cpu$memory$hs1 =
@@ -4008,7 +4008,7 @@ void DiffNewTop::step332() {
     activeFlags[1405] = true;
   }
 }
-void DiffNewTop::step333() {
+void Diffnewtop::step333() {
   activeFlags[333] = false;
   uint32_t cpu$memory$_io_dataRW_addr_T$oldVal = cpu$memory$_io_dataRW_addr_T;
   cpu$memory$_io_dataRW_addr_T = (cpu$memory$hs1 ? cpu$tlb_mem$out_paddr_r : cpu$memory$paddr2_r);
@@ -4034,7 +4034,7 @@ void DiffNewTop::step333() {
     activeFlags[1112] = true;
   }
 }
-void DiffNewTop::step334() {
+void Diffnewtop::step334() {
   activeFlags[334] = false;
   uint8_t cpu$clint$_T_1$oldVal = cpu$clint$_T_1;
   cpu$clint$_T_1 = (cpu$memory$_io_dataRW_addr_T == 0x200bff8);
@@ -4043,7 +4043,7 @@ void DiffNewTop::step334() {
     activeFlags[1174] = true;
   }
 }
-void DiffNewTop::step335() {
+void Diffnewtop::step335() {
   activeFlags[335] = false;
   uint8_t cpu$clint$_T_2$oldVal = cpu$clint$_T_2;
   cpu$clint$_T_2 = (cpu$memory$_io_dataRW_addr_T == 0x2004000);
@@ -4053,7 +4053,7 @@ void DiffNewTop::step335() {
     activeFlags[1269] = true;
   }
 }
-void DiffNewTop::step336() {
+void Diffnewtop::step336() {
   activeFlags[336] = false;
   uint8_t cpu$clint$_T_3$oldVal = cpu$clint$_T_3;
   cpu$clint$_T_3 = (cpu$memory$_io_dataRW_addr_T == 0x2000000);
@@ -4063,7 +4063,7 @@ void DiffNewTop::step336() {
     activeFlags[1172] = true;
   }
 }
-void DiffNewTop::step337() {
+void Diffnewtop::step337() {
   activeFlags[337] = false;
   uint8_t cpu$plic$_T$oldVal = cpu$plic$_T;
   cpu$plic$_T = (cpu$memory$_io_dataRW_addr_T == 0xc000004);
@@ -4072,7 +4072,7 @@ void DiffNewTop::step337() {
     activeFlags[1168] = true;
   }
 }
-void DiffNewTop::step338() {
+void Diffnewtop::step338() {
   activeFlags[338] = false;
   uint8_t cpu$plic$_T_1$oldVal = cpu$plic$_T_1;
   cpu$plic$_T_1 = (cpu$memory$_io_dataRW_addr_T == 0xc002000);
@@ -4081,7 +4081,7 @@ void DiffNewTop::step338() {
     activeFlags[1171] = true;
   }
 }
-void DiffNewTop::step339() {
+void Diffnewtop::step339() {
   activeFlags[339] = false;
   uint8_t cpu$plic$_T_2$oldVal = cpu$plic$_T_2;
   cpu$plic$_T_2 = (cpu$memory$_io_dataRW_addr_T == 0xc002100);
@@ -4090,7 +4090,7 @@ void DiffNewTop::step339() {
     activeFlags[1170] = true;
   }
 }
-void DiffNewTop::step340() {
+void Diffnewtop::step340() {
   activeFlags[340] = false;
   uint8_t cpu$plic$_T_3$oldVal = cpu$plic$_T_3;
   cpu$plic$_T_3 = (cpu$memory$_io_dataRW_addr_T == 0xc200004);
@@ -4101,7 +4101,7 @@ void DiffNewTop::step340() {
     activeFlags[1268] = true;
   }
 }
-void DiffNewTop::step341() {
+void Diffnewtop::step341() {
   activeFlags[341] = false;
   uint8_t cpu$plic$_T_4$oldVal = cpu$plic$_T_4;
   cpu$plic$_T_4 = (cpu$memory$_io_dataRW_addr_T == 0xc201004);
@@ -4112,7 +4112,7 @@ void DiffNewTop::step341() {
     activeFlags[1268] = true;
   }
 }
-void DiffNewTop::step342() {
+void Diffnewtop::step342() {
   activeFlags[342] = false;
   uint8_t cpu$plic$_T_5$oldVal = cpu$plic$_T_5;
   cpu$plic$_T_5 = (cpu$memory$_io_dataRW_addr_T == 0xc200000);
@@ -4121,7 +4121,7 @@ void DiffNewTop::step342() {
     activeFlags[1169] = true;
   }
 }
-void DiffNewTop::step343() {
+void Diffnewtop::step343() {
   activeFlags[343] = false;
   uint8_t cpu$plic$_T_6$oldVal = cpu$plic$_T_6;
   cpu$plic$_T_6 = (cpu$memory$_io_dataRW_addr_T == 0xc201000);
@@ -4130,7 +4130,7 @@ void DiffNewTop::step343() {
     activeFlags[1168] = true;
   }
 }
-void DiffNewTop::step344() {
+void Diffnewtop::step344() {
   activeFlags[344] = false;
   uint8_t cpu$memCrossbar$is_clint$oldVal = cpu$memCrossbar$is_clint;
   cpu$memCrossbar$is_clint =
@@ -4144,7 +4144,7 @@ void DiffNewTop::step344() {
     activeFlags[1410] = true;
   }
 }
-void DiffNewTop::step345() {
+void Diffnewtop::step345() {
   activeFlags[345] = false;
   uint8_t cpu$memCrossbar$is_plic$oldVal = cpu$memCrossbar$is_plic;
   cpu$memCrossbar$is_plic = ((cpu$memory$_io_dataRW_addr_T >= 0xc000000) & (cpu$memory$_io_dataRW_addr_T <= 0xfffffff));
@@ -4156,7 +4156,7 @@ void DiffNewTop::step345() {
     activeFlags[1410] = true;
   }
 }
-void DiffNewTop::step346() {
+void Diffnewtop::step346() {
   activeFlags[346] = false;
   uint8_t cpu$memCrossbar$inp_mem$oldVal = cpu$memCrossbar$inp_mem;
   cpu$memCrossbar$inp_mem =
@@ -4167,7 +4167,7 @@ void DiffNewTop::step346() {
     activeFlags[1040] = true;
   }
 }
-void DiffNewTop::step347() {
+void Diffnewtop::step347() {
   activeFlags[347] = false;
   uint64_t cpu$memory$_io_dataRW_wdata_T$oldVal = cpu$memory$_io_dataRW_wdata_T;
   cpu$memory$_io_dataRW_wdata_T = (cpu$memory$hs1 ? cpu$memory$mem_data1_r : cpu$memory$mem_data2_r);
@@ -4185,7 +4185,7 @@ void DiffNewTop::step347() {
     activeFlags[1174] = true;
   }
 }
-void DiffNewTop::step348() {
+void Diffnewtop::step348() {
   activeFlags[348] = false;
   uint8_t cpu$memory$io$dataRW$dc_mode$oldVal = cpu$memory$io$dataRW$dc_mode;
   cpu$memory$io$dataRW$dc_mode =
@@ -4200,7 +4200,7 @@ void DiffNewTop::step348() {
     activeFlags[987] = true;
   }
 }
-void DiffNewTop::step349() {
+void Diffnewtop::step349() {
   activeFlags[349] = false;
   uint8_t cpu$memCrossbar$_T$oldVal = cpu$memCrossbar$_T;
   cpu$memCrossbar$_T = (cpu$memory$io$dataRW$dc_mode != 0x0);
@@ -4212,7 +4212,7 @@ void DiffNewTop::step349() {
     activeFlags[1410] = true;
   }
 }
-void DiffNewTop::step350() {
+void Diffnewtop::step350() {
   activeFlags[350] = false;
   uint8_t cpu$memCrossbar$io$plicIO$arvalid$oldVal = cpu$memCrossbar$io$plicIO$arvalid;
   cpu$memCrossbar$io$plicIO$arvalid =
@@ -4274,7 +4274,7 @@ void DiffNewTop::step350() {
     activeFlags[1111] = true;
   }
 }
-void DiffNewTop::step351() {
+void Diffnewtop::step351() {
   activeFlags[351] = false;
   uint8_t cpu$mem2Axi$_T_3$oldVal = cpu$mem2Axi$_T_3;
   cpu$mem2Axi$_T_3 = (((cpu$memCrossbar$io$mmio$dc_mode >> 3) & 0x1) == 0x1);
@@ -4289,7 +4289,7 @@ void DiffNewTop::step351() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step352() {
+void Diffnewtop::step352() {
   activeFlags[352] = false;
   uint8_t cpu$mem2Axi$_T_5$oldVal = cpu$mem2Axi$_T_5;
   cpu$mem2Axi$_T_5 = (((cpu$memCrossbar$io$mmio$dc_mode >> 2) & 0x1) == 0x1);
@@ -4300,7 +4300,7 @@ void DiffNewTop::step352() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step353() {
+void Diffnewtop::step353() {
   activeFlags[353] = false;
   uint8_t cpu$dcSelector$_T_2$oldVal = cpu$dcSelector$_T_2;
   cpu$dcSelector$_T_2 = (cpu$memCrossbar$io$dcRW$dc_mode != 0x0);
@@ -4315,7 +4315,7 @@ void DiffNewTop::step353() {
     activeFlags[1246] = true;
   }
 }
-void DiffNewTop::step354() {
+void Diffnewtop::step354() {
   activeFlags[354] = false;
   uint8_t cpu$dcSelector$io$select$dc_mode$oldVal = cpu$dcSelector$io$select$dc_mode;
   cpu$dcSelector$io$select$dc_mode =
@@ -4363,7 +4363,7 @@ void DiffNewTop::step354() {
     activeFlags[1241] = true;
   }
 }
-void DiffNewTop::step355() {
+void Diffnewtop::step355() {
   activeFlags[355] = false;
   uint8_t cpu$dcache$_io_dcRW_ready_T_1$oldVal = cpu$dcache$_io_dcRW_ready_T_1;
   cpu$dcache$_io_dcRW_ready_T_1 =
@@ -4377,7 +4377,7 @@ void DiffNewTop::step355() {
     activeFlags[1067] = true;
   }
 }
-void DiffNewTop::step356() {
+void Diffnewtop::step356() {
   activeFlags[356] = false;
   uint8_t cpu$dcSelector$io$tlb_if2dc$ready$oldVal = cpu$dcSelector$io$tlb_if2dc$ready;
   cpu$dcSelector$io$tlb_if2dc$ready =
@@ -4392,7 +4392,7 @@ void DiffNewTop::step356() {
     activeFlags[1092] = true;
   }
 }
-void DiffNewTop::step357() {
+void Diffnewtop::step357() {
   activeFlags[357] = false;
   uint8_t cpu$tlb_if$dc_hand$oldVal = cpu$tlb_if$dc_hand;
   cpu$tlb_if$dc_hand = (cpu$dcSelector$io$tlb_if2dc$ready & (cpu$tlb_if$dc_mode_r != 0x0));
@@ -4402,7 +4402,7 @@ void DiffNewTop::step357() {
     activeFlags[1144] = true;
   }
 }
-void DiffNewTop::step358() {
+void Diffnewtop::step358() {
   activeFlags[358] = false;
   uint8_t cpu$dcSelector$io$tlb_mem2dc$ready$oldVal = cpu$dcSelector$io$tlb_mem2dc$ready;
   cpu$dcSelector$io$tlb_mem2dc$ready =
@@ -4414,7 +4414,7 @@ void DiffNewTop::step358() {
     activeFlags[1232] = true;
   }
 }
-void DiffNewTop::step359() {
+void Diffnewtop::step359() {
   activeFlags[359] = false;
   uint8_t cpu$tlb_mem$dc_hand$oldVal = cpu$tlb_mem$dc_hand;
   cpu$tlb_mem$dc_hand = (cpu$dcSelector$io$tlb_mem2dc$ready & (cpu$tlb_mem$dc_mode_r != 0x0));
@@ -4424,7 +4424,7 @@ void DiffNewTop::step359() {
     activeFlags[1233] = true;
   }
 }
-void DiffNewTop::step360() {
+void Diffnewtop::step360() {
   activeFlags[360] = false;
   uint8_t cpu$dcSelector$io$dma2dc$ready$oldVal = cpu$dcSelector$io$dma2dc$ready;
   cpu$dcSelector$io$dma2dc$ready =
@@ -4440,7 +4440,7 @@ void DiffNewTop::step360() {
     activeFlags[1248] = true;
   }
 }
-void DiffNewTop::step361() {
+void Diffnewtop::step361() {
   activeFlags[361] = false;
   uint8_t cpu$dmaBridge$_T_15$oldVal = cpu$dmaBridge$_T_15;
   cpu$dmaBridge$_T_15 = (cpu$dcSelector$io$dma2dc$ready & (cpu$dmaBridge$dc_mode_r != 0x0));
@@ -4452,7 +4452,7 @@ void DiffNewTop::step361() {
     activeFlags[1248] = true;
   }
 }
-void DiffNewTop::step362() {
+void Diffnewtop::step362() {
   activeFlags[362] = false;
   uint8_t cpu$dcache$hs_in$oldVal = cpu$dcache$hs_in;
   cpu$dcache$hs_in = ((cpu$dcSelector$io$select$dc_mode != 0x0) & cpu$dcache$_io_dcRW_ready_T_1);
@@ -4472,7 +4472,7 @@ void DiffNewTop::step362() {
     activeFlags[1247] = true;
   }
 }
-void DiffNewTop::step363() {
+void Diffnewtop::step363() {
   activeFlags[363] = false;
   uint32_t cpu$dcache$cur_addr$oldVal = cpu$dcache$cur_addr;
   cpu$dcache$cur_addr = (cpu$dcache$hs_in ? cpu$dcSelector$io$select$addr : cpu$dcache$addr_r);
@@ -4485,7 +4485,7 @@ void DiffNewTop::step363() {
     activeFlags[492] = true;
   }
 }
-void DiffNewTop::step364() {
+void Diffnewtop::step364() {
   activeFlags[364] = false;
   uint8_t cpu$dcache$blockIdx$oldVal = cpu$dcache$blockIdx;
   cpu$dcache$blockIdx = ((cpu$dcache$cur_addr >> 6) & 0xf);
@@ -4495,7 +4495,7 @@ void DiffNewTop::step364() {
     activeFlags[1007] = true;
   }
 }
-void DiffNewTop::step365() {
+void Diffnewtop::step365() {
   activeFlags[365] = false;
   cpu$dcache$cache_hit_vec[3] = ((cpu$dcache$tag[3][cpu$dcache$blockIdx] == ((cpu$dcache$cur_addr >> 10) & 0x3fffff)) &
                                  cpu$dcache$valid[3][cpu$dcache$blockIdx]);
@@ -4508,7 +4508,7 @@ void DiffNewTop::step365() {
   activeFlags[366] = true;
   activeFlags[465] = true;
 }
-void DiffNewTop::step366() {
+void Diffnewtop::step366() {
   activeFlags[366] = false;
   uint8_t cpu$dcache$cacheHit$oldVal = cpu$dcache$cacheHit;
   cpu$dcache$cacheHit =
@@ -4525,7 +4525,7 @@ void DiffNewTop::step366() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step367() {
+void Diffnewtop::step367() {
   activeFlags[367] = false;
   uint8_t cpu$crossBar$io$outAxi$rd$ready$oldVal = cpu$crossBar$io$outAxi$rd$ready;
   cpu$crossBar$io$outAxi$rd$ready =
@@ -4746,7 +4746,7 @@ void DiffNewTop::step367() {
     activeFlags[1117] = true;
   }
 }
-void DiffNewTop::step368() {
+void Diffnewtop::step368() {
   activeFlags[368] = false;
   uint8_t crossBar$_T_10$oldVal = crossBar$_T_10;
   crossBar$_T_10 = (cpu$crossBar$io$outAxi$ra$valid | cpu$crossBar$io$outAxi$wa$valid);
@@ -4761,7 +4761,7 @@ void DiffNewTop::step368() {
     activeFlags[1131] = true;
   }
 }
-void DiffNewTop::step369() {
+void Diffnewtop::step369() {
   activeFlags[369] = false;
   uint8_t crossBar$_T_9$oldVal = crossBar$_T_9;
   crossBar$_T_9 = ((cpu$crossBar$io$outAxi$ra$valid & ((cpu$crossBar$io$outAxi$ra$bits$addr > 0x90000000) |
@@ -4783,7 +4783,7 @@ void DiffNewTop::step369() {
     activeFlags[1131] = true;
   }
 }
-void DiffNewTop::step370() {
+void Diffnewtop::step370() {
   activeFlags[370] = false;
   uint32_t crossBar$io$mmioAxi$ra$bits$addr$oldVal = crossBar$io$mmioAxi$ra$bits$addr;
   crossBar$io$mmioAxi$ra$bits$addr =
@@ -5009,7 +5009,7 @@ void DiffNewTop::step370() {
     activeFlags[374] = true;
   }
 }
-void DiffNewTop::step371() {
+void Diffnewtop::step371() {
   activeFlags[371] = false;
   uint8_t cpu$flash2Axi$_T_7$oldVal = cpu$flash2Axi$_T_7;
   cpu$flash2Axi$_T_7 =
@@ -5033,7 +5033,7 @@ void DiffNewTop::step371() {
     activeFlags[1034] = true;
   }
 }
-void DiffNewTop::step372() {
+void Diffnewtop::step372() {
   activeFlags[372] = false;
   uint8_t cpu$crossBar$io$memAxi$wa$ready$oldVal = cpu$crossBar$io$memAxi$wa$ready;
   cpu$crossBar$io$memAxi$wa$ready =
@@ -5045,7 +5045,7 @@ void DiffNewTop::step372() {
     activeFlags[1035] = true;
   }
 }
-void DiffNewTop::step373() {
+void Diffnewtop::step373() {
   activeFlags[373] = false;
   uint8_t cpu$dcache$_T_80$oldVal = cpu$dcache$_T_80;
   cpu$dcache$_T_80 = (cpu$dcache$axiWaddrEn & cpu$crossBar$io$memAxi$wa$ready);
@@ -5055,7 +5055,7 @@ void DiffNewTop::step373() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step374() {
+void Diffnewtop::step374() {
   activeFlags[374] = false;
   uint8_t cpu$crossBar$io$mmioAxi$wa$ready$oldVal = cpu$crossBar$io$mmioAxi$wa$ready;
   cpu$crossBar$io$mmioAxi$wa$ready =
@@ -5082,7 +5082,7 @@ void DiffNewTop::step374() {
     activeFlags[1035] = true;
   }
 }
-void DiffNewTop::step375() {
+void Diffnewtop::step375() {
   activeFlags[375] = false;
   uint8_t cpu$mem2Axi$_T_7$oldVal = cpu$mem2Axi$_T_7;
   cpu$mem2Axi$_T_7 = (cpu$mem2Axi$waddrEn & cpu$crossBar$io$mmioAxi$wa$ready);
@@ -5092,7 +5092,7 @@ void DiffNewTop::step375() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step376() {
+void Diffnewtop::step376() {
   activeFlags[376] = false;
   uint8_t cpu$crossBar$io$flashAxi$wd$ready$oldVal = cpu$crossBar$io$flashAxi$wd$ready;
   cpu$crossBar$io$flashAxi$wd$ready =
@@ -5114,7 +5114,7 @@ void DiffNewTop::step376() {
     activeFlags[1034] = true;
   }
 }
-void DiffNewTop::step377() {
+void Diffnewtop::step377() {
   activeFlags[377] = false;
   uint8_t cpu$crossBar$io$memAxi$wd$ready$oldVal = cpu$crossBar$io$memAxi$wd$ready;
   cpu$crossBar$io$memAxi$wd$ready =
@@ -5126,7 +5126,7 @@ void DiffNewTop::step377() {
     activeFlags[400] = true;
   }
 }
-void DiffNewTop::step378() {
+void Diffnewtop::step378() {
   activeFlags[378] = false;
   uint8_t cpu$dcache$_T_82$oldVal = cpu$dcache$_T_82;
   cpu$dcache$_T_82 = (cpu$dcache$axiWdataEn & cpu$crossBar$io$memAxi$wd$ready);
@@ -5138,7 +5138,7 @@ void DiffNewTop::step378() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step379() {
+void Diffnewtop::step379() {
   activeFlags[379] = false;
   uint8_t cpu$crossBar$io$mmioAxi$wd$ready$oldVal = cpu$crossBar$io$mmioAxi$wd$ready;
   cpu$crossBar$io$mmioAxi$wd$ready =
@@ -5166,7 +5166,7 @@ void DiffNewTop::step379() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step380() {
+void Diffnewtop::step380() {
   activeFlags[380] = false;
   uint8_t cpu$crossBar$io$icAxi$ra$ready$oldVal = cpu$crossBar$io$icAxi$ra$ready;
   cpu$crossBar$io$icAxi$ra$ready =
@@ -5182,7 +5182,7 @@ void DiffNewTop::step380() {
     activeFlags[1035] = true;
   }
 }
-void DiffNewTop::step381() {
+void Diffnewtop::step381() {
   activeFlags[381] = false;
   uint8_t cpu$icache$_T_10$oldVal = cpu$icache$_T_10;
   cpu$icache$_T_10 = (cpu$icache$raddrEn & cpu$crossBar$io$icAxi$ra$ready);
@@ -5193,7 +5193,7 @@ void DiffNewTop::step381() {
     activeFlags[1130] = true;
   }
 }
-void DiffNewTop::step382() {
+void Diffnewtop::step382() {
   activeFlags[382] = false;
   uint8_t cpu$crossBar$io$flashAxi$ra$ready$oldVal = cpu$crossBar$io$flashAxi$ra$ready;
   cpu$crossBar$io$flashAxi$ra$ready =
@@ -5215,7 +5215,7 @@ void DiffNewTop::step382() {
     activeFlags[1035] = true;
   }
 }
-void DiffNewTop::step383() {
+void Diffnewtop::step383() {
   activeFlags[383] = false;
   uint8_t cpu$flash2Axi$_T_11$oldVal = cpu$flash2Axi$_T_11;
   cpu$flash2Axi$_T_11 = (cpu$flash2Axi$raddrEn & cpu$crossBar$io$flashAxi$ra$ready);
@@ -5225,7 +5225,7 @@ void DiffNewTop::step383() {
     activeFlags[1034] = true;
   }
 }
-void DiffNewTop::step384() {
+void Diffnewtop::step384() {
   activeFlags[384] = false;
   uint8_t cpu$crossBar$io$memAxi$ra$ready$oldVal = cpu$crossBar$io$memAxi$ra$ready;
   cpu$crossBar$io$memAxi$ra$ready =
@@ -5237,7 +5237,7 @@ void DiffNewTop::step384() {
     activeFlags[1035] = true;
   }
 }
-void DiffNewTop::step385() {
+void Diffnewtop::step385() {
   activeFlags[385] = false;
   uint8_t cpu$dcache$_T_75$oldVal = cpu$dcache$_T_75;
   cpu$dcache$_T_75 = (cpu$dcache$axiRaddrEn & cpu$crossBar$io$memAxi$ra$ready);
@@ -5247,7 +5247,7 @@ void DiffNewTop::step385() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step386() {
+void Diffnewtop::step386() {
   activeFlags[386] = false;
   uint8_t cpu$crossBar$io$mmioAxi$ra$ready$oldVal = cpu$crossBar$io$mmioAxi$ra$ready;
   cpu$crossBar$io$mmioAxi$ra$ready =
@@ -5274,7 +5274,7 @@ void DiffNewTop::step386() {
     activeFlags[1035] = true;
   }
 }
-void DiffNewTop::step387() {
+void Diffnewtop::step387() {
   activeFlags[387] = false;
   uint8_t cpu$mem2Axi$_T_11$oldVal = cpu$mem2Axi$_T_11;
   cpu$mem2Axi$_T_11 = (cpu$mem2Axi$raddrEn & cpu$crossBar$io$mmioAxi$ra$ready);
@@ -5284,7 +5284,7 @@ void DiffNewTop::step387() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step388() {
+void Diffnewtop::step388() {
   activeFlags[388] = false;
   uint8_t cpu$crossBar$io$icAxi$rd$valid$oldVal = cpu$crossBar$io$icAxi$rd$valid;
   cpu$crossBar$io$icAxi$rd$valid =
@@ -5300,7 +5300,7 @@ void DiffNewTop::step388() {
     activeFlags[1035] = true;
   }
 }
-void DiffNewTop::step389() {
+void Diffnewtop::step389() {
   activeFlags[389] = false;
   uint8_t cpu$icache$_T_12$oldVal = cpu$icache$_T_12;
   cpu$icache$_T_12 = (cpu$icache$rdataEn & cpu$crossBar$io$icAxi$rd$valid);
@@ -5314,7 +5314,7 @@ void DiffNewTop::step389() {
     activeFlags[1130] = true;
   }
 }
-void DiffNewTop::step390() {
+void Diffnewtop::step390() {
   activeFlags[390] = false;
   uint8_t cpu$crossBar$io$flashAxi$rd$valid$oldVal = cpu$crossBar$io$flashAxi$rd$valid;
   cpu$crossBar$io$flashAxi$rd$valid =
@@ -5336,7 +5336,7 @@ void DiffNewTop::step390() {
     activeFlags[1035] = true;
   }
 }
-void DiffNewTop::step391() {
+void Diffnewtop::step391() {
   activeFlags[391] = false;
   uint8_t cpu$flash2Axi$_T_13$oldVal = cpu$flash2Axi$_T_13;
   cpu$flash2Axi$_T_13 = (cpu$flash2Axi$rdataEn & cpu$crossBar$io$flashAxi$rd$valid);
@@ -5347,7 +5347,7 @@ void DiffNewTop::step391() {
     activeFlags[1121] = true;
   }
 }
-void DiffNewTop::step392() {
+void Diffnewtop::step392() {
   activeFlags[392] = false;
   uint8_t cpu$crossBar$io$memAxi$rd$valid$oldVal = cpu$crossBar$io$memAxi$rd$valid;
   cpu$crossBar$io$memAxi$rd$valid =
@@ -5359,7 +5359,7 @@ void DiffNewTop::step392() {
     activeFlags[400] = true;
   }
 }
-void DiffNewTop::step393() {
+void Diffnewtop::step393() {
   activeFlags[393] = false;
   uint8_t cpu$dcache$_T_77$oldVal = cpu$dcache$_T_77;
   cpu$dcache$_T_77 = (cpu$dcache$axiRdataEn & cpu$crossBar$io$memAxi$rd$valid);
@@ -5373,7 +5373,7 @@ void DiffNewTop::step393() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step394() {
+void Diffnewtop::step394() {
   activeFlags[394] = false;
   uint8_t cpu$crossBar$io$mmioAxi$rd$valid$oldVal = cpu$crossBar$io$mmioAxi$rd$valid;
   cpu$crossBar$io$mmioAxi$rd$valid =
@@ -5400,7 +5400,7 @@ void DiffNewTop::step394() {
     activeFlags[1035] = true;
   }
 }
-void DiffNewTop::step395() {
+void Diffnewtop::step395() {
   activeFlags[395] = false;
   uint8_t cpu$mem2Axi$_T_13$oldVal = cpu$mem2Axi$_T_13;
   cpu$mem2Axi$_T_13 = (cpu$mem2Axi$rdataEn & cpu$crossBar$io$mmioAxi$rd$valid);
@@ -5411,7 +5411,7 @@ void DiffNewTop::step395() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step396() {
+void Diffnewtop::step396() {
   activeFlags[396] = false;
   uint64_t cpu$crossBar$io$icAxi$rd$bits$data$oldVal = cpu$crossBar$io$icAxi$rd$bits$data;
   cpu$crossBar$io$icAxi$rd$bits$data =
@@ -5428,7 +5428,7 @@ void DiffNewTop::step396() {
     activeFlags[1103] = true;
   }
 }
-void DiffNewTop::step397() {
+void Diffnewtop::step397() {
   activeFlags[397] = false;
   uint64_t cpu$crossBar$io$memAxi$rd$bits$data$oldVal = cpu$crossBar$io$memAxi$rd$bits$data;
   cpu$crossBar$io$memAxi$rd$bits$data =
@@ -5440,7 +5440,7 @@ void DiffNewTop::step397() {
     activeFlags[1102] = true;
   }
 }
-void DiffNewTop::step398() {
+void Diffnewtop::step398() {
   activeFlags[398] = false;
   uint8_t cpu$crossBar$io$icAxi$rd$bits$last$oldVal = cpu$crossBar$io$icAxi$rd$bits$last;
   cpu$crossBar$io$icAxi$rd$bits$last =
@@ -5461,7 +5461,7 @@ void DiffNewTop::step398() {
     activeFlags[1130] = true;
   }
 }
-void DiffNewTop::step399() {
+void Diffnewtop::step399() {
   activeFlags[399] = false;
   uint8_t cpu$crossBar$io$memAxi$rd$bits$last$oldVal = cpu$crossBar$io$memAxi$rd$bits$last;
   cpu$crossBar$io$memAxi$rd$bits$last =
@@ -5476,7 +5476,7 @@ void DiffNewTop::step399() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step400() {
+void Diffnewtop::step400() {
   activeFlags[400] = false;
   uint8_t cpu$crossBar$memDone$oldVal = cpu$crossBar$memDone;
   cpu$crossBar$memDone = (((cpu$crossBar$io$memAxi$rd$valid & 0x1) & cpu$crossBar$io$memAxi$rd$bits$last) |
@@ -5486,7 +5486,7 @@ void DiffNewTop::step400() {
     activeFlags[1036] = true;
   }
 }
-void DiffNewTop::step401() {
+void Diffnewtop::step401() {
   activeFlags[401] = false;
   uint8_t mem$_T_1$oldVal = mem$_T_1;
   mem$_T_1 = ((crossBar$_T ? (crossBar$_T_9 ? 0x0 : (crossBar$_T_10 ? cpu$crossBar$io$outAxi$wa$valid : 0x0))
@@ -5500,7 +5500,7 @@ void DiffNewTop::step401() {
     activeFlags[1120] = true;
   }
 }
-void DiffNewTop::step402() {
+void Diffnewtop::step402() {
   activeFlags[402] = false;
   uint8_t mem$ram$MPORT_1$data$oldVal = mem$ram$MPORT_1$data;
   mem$ram$MPORT_1$addr =
@@ -5512,7 +5512,7 @@ void DiffNewTop::step402() {
   mem$ram$MPORT_1$data = mem$ram[mem$ram$MPORT_1$addr];
   if (mem$ram$MPORT_1$data$oldVal != mem$ram$MPORT_1$data) { activeFlags[410] = true; }
 }
-void DiffNewTop::step403() {
+void Diffnewtop::step403() {
   activeFlags[403] = false;
   uint8_t mem$ram$MPORT_3$data$oldVal = mem$ram$MPORT_3$data;
   mem$ram$MPORT_3$addr =
@@ -5524,7 +5524,7 @@ void DiffNewTop::step403() {
   mem$ram$MPORT_3$data = mem$ram[mem$ram$MPORT_3$addr];
   if (mem$ram$MPORT_3$data$oldVal != mem$ram$MPORT_3$data) { activeFlags[411] = true; }
 }
-void DiffNewTop::step404() {
+void Diffnewtop::step404() {
   activeFlags[404] = false;
   uint8_t mem$ram$MPORT_5$data$oldVal = mem$ram$MPORT_5$data;
   mem$ram$MPORT_5$addr =
@@ -5536,7 +5536,7 @@ void DiffNewTop::step404() {
   mem$ram$MPORT_5$data = mem$ram[mem$ram$MPORT_5$addr];
   if (mem$ram$MPORT_5$data$oldVal != mem$ram$MPORT_5$data) { activeFlags[412] = true; }
 }
-void DiffNewTop::step405() {
+void Diffnewtop::step405() {
   activeFlags[405] = false;
   uint8_t mem$ram$MPORT_7$data$oldVal = mem$ram$MPORT_7$data;
   mem$ram$MPORT_7$addr =
@@ -5548,7 +5548,7 @@ void DiffNewTop::step405() {
   mem$ram$MPORT_7$data = mem$ram[mem$ram$MPORT_7$addr];
   if (mem$ram$MPORT_7$data$oldVal != mem$ram$MPORT_7$data) { activeFlags[413] = true; }
 }
-void DiffNewTop::step406() {
+void Diffnewtop::step406() {
   activeFlags[406] = false;
   uint8_t mem$ram$MPORT_9$data$oldVal = mem$ram$MPORT_9$data;
   mem$ram$MPORT_9$addr =
@@ -5560,7 +5560,7 @@ void DiffNewTop::step406() {
   mem$ram$MPORT_9$data = mem$ram[mem$ram$MPORT_9$addr];
   if (mem$ram$MPORT_9$data$oldVal != mem$ram$MPORT_9$data) { activeFlags[414] = true; }
 }
-void DiffNewTop::step407() {
+void Diffnewtop::step407() {
   activeFlags[407] = false;
   uint8_t mem$ram$MPORT_11$data$oldVal = mem$ram$MPORT_11$data;
   mem$ram$MPORT_11$addr =
@@ -5572,7 +5572,7 @@ void DiffNewTop::step407() {
   mem$ram$MPORT_11$data = mem$ram[mem$ram$MPORT_11$addr];
   if (mem$ram$MPORT_11$data$oldVal != mem$ram$MPORT_11$data) { activeFlags[415] = true; }
 }
-void DiffNewTop::step408() {
+void Diffnewtop::step408() {
   activeFlags[408] = false;
   uint8_t mem$ram$MPORT_13$data$oldVal = mem$ram$MPORT_13$data;
   mem$ram$MPORT_13$addr =
@@ -5584,7 +5584,7 @@ void DiffNewTop::step408() {
   mem$ram$MPORT_13$data = mem$ram[mem$ram$MPORT_13$addr];
   if (mem$ram$MPORT_13$data$oldVal != mem$ram$MPORT_13$data) { activeFlags[416] = true; }
 }
-void DiffNewTop::step409() {
+void Diffnewtop::step409() {
   activeFlags[409] = false;
   uint8_t mem$ram$MPORT_15$data$oldVal = mem$ram$MPORT_15$data;
   mem$ram$MPORT_15$addr =
@@ -5596,7 +5596,7 @@ void DiffNewTop::step409() {
   mem$ram$MPORT_15$data = mem$ram[mem$ram$MPORT_15$addr];
   if (mem$ram$MPORT_15$data$oldVal != mem$ram$MPORT_15$data) { activeFlags[417] = true; }
 }
-void DiffNewTop::step410() {
+void Diffnewtop::step410() {
   activeFlags[410] = false;
   mem$ram$MPORT$addr =
       (mem$_T ? 0x0
@@ -5613,7 +5613,7 @@ void DiffNewTop::step410() {
                           : 0x0));
   mem$ram$MPORT$mask = (mem$_T ? 0x0 : (mem$_T_3 ? (crossBar$io$memAxi$wd$valid ? 0x1 : 0x0) : 0x0));
 }
-void DiffNewTop::step411() {
+void Diffnewtop::step411() {
   activeFlags[411] = false;
   mem$ram$MPORT_2$addr =
       (mem$_T ? 0x0
@@ -5630,7 +5630,7 @@ void DiffNewTop::step411() {
                           : 0x0));
   mem$ram$MPORT_2$mask = (mem$_T ? 0x0 : (mem$_T_3 ? (crossBar$io$memAxi$wd$valid ? 0x1 : 0x0) : 0x0));
 }
-void DiffNewTop::step412() {
+void Diffnewtop::step412() {
   activeFlags[412] = false;
   mem$ram$MPORT_4$addr =
       (mem$_T ? 0x0
@@ -5647,7 +5647,7 @@ void DiffNewTop::step412() {
                           : 0x0));
   mem$ram$MPORT_4$mask = (mem$_T ? 0x0 : (mem$_T_3 ? (crossBar$io$memAxi$wd$valid ? 0x1 : 0x0) : 0x0));
 }
-void DiffNewTop::step413() {
+void Diffnewtop::step413() {
   activeFlags[413] = false;
   mem$ram$MPORT_6$addr =
       (mem$_T ? 0x0
@@ -5664,7 +5664,7 @@ void DiffNewTop::step413() {
                           : 0x0));
   mem$ram$MPORT_6$mask = (mem$_T ? 0x0 : (mem$_T_3 ? (crossBar$io$memAxi$wd$valid ? 0x1 : 0x0) : 0x0));
 }
-void DiffNewTop::step414() {
+void Diffnewtop::step414() {
   activeFlags[414] = false;
   mem$ram$MPORT_8$addr =
       (mem$_T ? 0x0
@@ -5681,7 +5681,7 @@ void DiffNewTop::step414() {
                           : 0x0));
   mem$ram$MPORT_8$mask = (mem$_T ? 0x0 : (mem$_T_3 ? (crossBar$io$memAxi$wd$valid ? 0x1 : 0x0) : 0x0));
 }
-void DiffNewTop::step415() {
+void Diffnewtop::step415() {
   activeFlags[415] = false;
   mem$ram$MPORT_10$addr =
       (mem$_T ? 0x0
@@ -5698,7 +5698,7 @@ void DiffNewTop::step415() {
                           : 0x0));
   mem$ram$MPORT_10$mask = (mem$_T ? 0x0 : (mem$_T_3 ? (crossBar$io$memAxi$wd$valid ? 0x1 : 0x0) : 0x0));
 }
-void DiffNewTop::step416() {
+void Diffnewtop::step416() {
   activeFlags[416] = false;
   mem$ram$MPORT_12$addr =
       (mem$_T ? 0x0
@@ -5715,7 +5715,7 @@ void DiffNewTop::step416() {
                           : 0x0));
   mem$ram$MPORT_12$mask = (mem$_T ? 0x0 : (mem$_T_3 ? (crossBar$io$memAxi$wd$valid ? 0x1 : 0x0) : 0x0));
 }
-void DiffNewTop::step417() {
+void Diffnewtop::step417() {
   activeFlags[417] = false;
   mem$ram$MPORT_14$addr =
       (mem$_T ? 0x0
@@ -5732,7 +5732,7 @@ void DiffNewTop::step417() {
                           : 0x0));
   mem$ram$MPORT_14$mask = (mem$_T ? 0x0 : (mem$_T_3 ? (crossBar$io$memAxi$wd$valid ? 0x1 : 0x0) : 0x0));
 }
-void DiffNewTop::step418() {
+void Diffnewtop::step418() {
   activeFlags[418] = false;
   uint8_t mem$_T_2$oldVal = mem$_T_2;
   mem$_T_2 = ((crossBar$_T ? (crossBar$_T_9 ? 0x0 : (crossBar$_T_10 ? cpu$crossBar$io$outAxi$ra$valid : 0x0))
@@ -5746,7 +5746,7 @@ void DiffNewTop::step418() {
     activeFlags[1120] = true;
   }
 }
-void DiffNewTop::step419() {
+void Diffnewtop::step419() {
   activeFlags[419] = false;
   uint8_t mem$_T_85$oldVal = mem$_T_85;
   mem$_T_85 =
@@ -5758,7 +5758,7 @@ void DiffNewTop::step419() {
     activeFlags[1120] = true;
   }
 }
-void DiffNewTop::step420() {
+void Diffnewtop::step420() {
   activeFlags[420] = false;
   uint8_t mmio$_T_2$oldVal = mmio$_T_2;
   mmio$_T_2 = ((crossBar$_T ? (crossBar$_T_9 ? cpu$crossBar$io$outAxi$wa$valid : 0x0)
@@ -5770,7 +5770,7 @@ void DiffNewTop::step420() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step421() {
+void Diffnewtop::step421() {
   activeFlags[421] = false;
   uint64_t mmio$inputwd$oldVal = mmio$inputwd;
   mmio$inputwd =
@@ -5855,7 +5855,7 @@ void DiffNewTop::step421() {
     activeFlags[1107] = true;
   }
 }
-void DiffNewTop::step422() {
+void Diffnewtop::step422() {
   activeFlags[422] = false;
   mmio$vga$MPORT$addr =
       (mmio$_T_1
@@ -5915,7 +5915,7 @@ void DiffNewTop::step422() {
                                : 0x0)
                         : 0x0));
 }
-void DiffNewTop::step423() {
+void Diffnewtop::step423() {
   activeFlags[423] = false;
   mmio$vga$MPORT_1$addr =
       (mmio$_T_1
@@ -5975,7 +5975,7 @@ void DiffNewTop::step423() {
                                : 0x0)
                         : 0x0));
 }
-void DiffNewTop::step424() {
+void Diffnewtop::step424() {
   activeFlags[424] = false;
   mmio$vga$MPORT_2$addr =
       (mmio$_T_1
@@ -6035,7 +6035,7 @@ void DiffNewTop::step424() {
                                : 0x0)
                         : 0x0));
 }
-void DiffNewTop::step425() {
+void Diffnewtop::step425() {
   activeFlags[425] = false;
   mmio$vga$MPORT_3$addr =
       (mmio$_T_1
@@ -6095,7 +6095,7 @@ void DiffNewTop::step425() {
                                : 0x0)
                         : 0x0));
 }
-void DiffNewTop::step426() {
+void Diffnewtop::step426() {
   activeFlags[426] = false;
   uint8_t mmio$_T_3$oldVal = mmio$_T_3;
   mmio$_T_3 = ((crossBar$_T ? (crossBar$_T_9 ? cpu$crossBar$io$outAxi$ra$valid : 0x0)
@@ -6107,7 +6107,7 @@ void DiffNewTop::step426() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step427() {
+void Diffnewtop::step427() {
   activeFlags[427] = false;
   uint8_t mmio$disk$disk_rdata_MPORT$data$oldVal = mmio$disk$disk_rdata_MPORT$data;
   mmio$disk$disk_rdata_MPORT$addr =
@@ -6116,7 +6116,7 @@ void DiffNewTop::step427() {
   mmio$disk$disk_rdata_MPORT$data = mmio$disk[mmio$disk$disk_rdata_MPORT$addr];
   if (mmio$disk$disk_rdata_MPORT$data$oldVal != mmio$disk$disk_rdata_MPORT$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step428() {
+void Diffnewtop::step428() {
   activeFlags[428] = false;
   uint8_t mmio$disk$disk_rdata_MPORT_1$data$oldVal = mmio$disk$disk_rdata_MPORT_1$data;
   mmio$disk$disk_rdata_MPORT_1$addr =
@@ -6125,7 +6125,7 @@ void DiffNewTop::step428() {
   mmio$disk$disk_rdata_MPORT_1$data = mmio$disk[mmio$disk$disk_rdata_MPORT_1$addr];
   if (mmio$disk$disk_rdata_MPORT_1$data$oldVal != mmio$disk$disk_rdata_MPORT_1$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step429() {
+void Diffnewtop::step429() {
   activeFlags[429] = false;
   uint8_t mmio$disk$disk_rdata_MPORT_2$data$oldVal = mmio$disk$disk_rdata_MPORT_2$data;
   mmio$disk$disk_rdata_MPORT_2$addr =
@@ -6134,7 +6134,7 @@ void DiffNewTop::step429() {
   mmio$disk$disk_rdata_MPORT_2$data = mmio$disk[mmio$disk$disk_rdata_MPORT_2$addr];
   if (mmio$disk$disk_rdata_MPORT_2$data$oldVal != mmio$disk$disk_rdata_MPORT_2$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step430() {
+void Diffnewtop::step430() {
   activeFlags[430] = false;
   uint8_t mmio$disk$disk_rdata_MPORT_3$data$oldVal = mmio$disk$disk_rdata_MPORT_3$data;
   mmio$disk$disk_rdata_MPORT_3$addr =
@@ -6143,7 +6143,7 @@ void DiffNewTop::step430() {
   mmio$disk$disk_rdata_MPORT_3$data = mmio$disk[mmio$disk$disk_rdata_MPORT_3$addr];
   if (mmio$disk$disk_rdata_MPORT_3$data$oldVal != mmio$disk$disk_rdata_MPORT_3$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step431() {
+void Diffnewtop::step431() {
   activeFlags[431] = false;
   uint8_t mmio$disk$disk_rdata_MPORT_4$data$oldVal = mmio$disk$disk_rdata_MPORT_4$data;
   mmio$disk$disk_rdata_MPORT_4$addr =
@@ -6152,7 +6152,7 @@ void DiffNewTop::step431() {
   mmio$disk$disk_rdata_MPORT_4$data = mmio$disk[mmio$disk$disk_rdata_MPORT_4$addr];
   if (mmio$disk$disk_rdata_MPORT_4$data$oldVal != mmio$disk$disk_rdata_MPORT_4$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step432() {
+void Diffnewtop::step432() {
   activeFlags[432] = false;
   uint8_t mmio$disk$disk_rdata_MPORT_5$data$oldVal = mmio$disk$disk_rdata_MPORT_5$data;
   mmio$disk$disk_rdata_MPORT_5$addr =
@@ -6161,7 +6161,7 @@ void DiffNewTop::step432() {
   mmio$disk$disk_rdata_MPORT_5$data = mmio$disk[mmio$disk$disk_rdata_MPORT_5$addr];
   if (mmio$disk$disk_rdata_MPORT_5$data$oldVal != mmio$disk$disk_rdata_MPORT_5$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step433() {
+void Diffnewtop::step433() {
   activeFlags[433] = false;
   uint8_t mmio$disk$disk_rdata_MPORT_6$data$oldVal = mmio$disk$disk_rdata_MPORT_6$data;
   mmio$disk$disk_rdata_MPORT_6$addr =
@@ -6170,7 +6170,7 @@ void DiffNewTop::step433() {
   mmio$disk$disk_rdata_MPORT_6$data = mmio$disk[mmio$disk$disk_rdata_MPORT_6$addr];
   if (mmio$disk$disk_rdata_MPORT_6$data$oldVal != mmio$disk$disk_rdata_MPORT_6$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step434() {
+void Diffnewtop::step434() {
   activeFlags[434] = false;
   uint8_t mmio$disk$disk_rdata_MPORT_7$data$oldVal = mmio$disk$disk_rdata_MPORT_7$data;
   mmio$disk$disk_rdata_MPORT_7$addr =
@@ -6179,7 +6179,7 @@ void DiffNewTop::step434() {
   mmio$disk$disk_rdata_MPORT_7$data = mmio$disk[mmio$disk$disk_rdata_MPORT_7$addr];
   if (mmio$disk$disk_rdata_MPORT_7$data$oldVal != mmio$disk$disk_rdata_MPORT_7$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step435() {
+void Diffnewtop::step435() {
   activeFlags[435] = false;
   uint8_t mmio$flash$flash_rdata_MPORT$data$oldVal = mmio$flash$flash_rdata_MPORT$data;
   mmio$flash$flash_rdata_MPORT$addr =
@@ -6188,7 +6188,7 @@ void DiffNewTop::step435() {
   mmio$flash$flash_rdata_MPORT$data = mmio$flash[mmio$flash$flash_rdata_MPORT$addr];
   if (mmio$flash$flash_rdata_MPORT$data$oldVal != mmio$flash$flash_rdata_MPORT$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step436() {
+void Diffnewtop::step436() {
   activeFlags[436] = false;
   uint8_t mmio$flash$flash_rdata_MPORT_1$data$oldVal = mmio$flash$flash_rdata_MPORT_1$data;
   mmio$flash$flash_rdata_MPORT_1$addr =
@@ -6197,7 +6197,7 @@ void DiffNewTop::step436() {
   mmio$flash$flash_rdata_MPORT_1$data = mmio$flash[mmio$flash$flash_rdata_MPORT_1$addr];
   if (mmio$flash$flash_rdata_MPORT_1$data$oldVal != mmio$flash$flash_rdata_MPORT_1$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step437() {
+void Diffnewtop::step437() {
   activeFlags[437] = false;
   uint8_t mmio$flash$flash_rdata_MPORT_2$data$oldVal = mmio$flash$flash_rdata_MPORT_2$data;
   mmio$flash$flash_rdata_MPORT_2$addr =
@@ -6206,7 +6206,7 @@ void DiffNewTop::step437() {
   mmio$flash$flash_rdata_MPORT_2$data = mmio$flash[mmio$flash$flash_rdata_MPORT_2$addr];
   if (mmio$flash$flash_rdata_MPORT_2$data$oldVal != mmio$flash$flash_rdata_MPORT_2$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step438() {
+void Diffnewtop::step438() {
   activeFlags[438] = false;
   uint8_t mmio$flash$flash_rdata_MPORT_3$data$oldVal = mmio$flash$flash_rdata_MPORT_3$data;
   mmio$flash$flash_rdata_MPORT_3$addr =
@@ -6215,7 +6215,7 @@ void DiffNewTop::step438() {
   mmio$flash$flash_rdata_MPORT_3$data = mmio$flash[mmio$flash$flash_rdata_MPORT_3$addr];
   if (mmio$flash$flash_rdata_MPORT_3$data$oldVal != mmio$flash$flash_rdata_MPORT_3$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step439() {
+void Diffnewtop::step439() {
   activeFlags[439] = false;
   uint8_t mmio$flash$flash_rdata_MPORT_4$data$oldVal = mmio$flash$flash_rdata_MPORT_4$data;
   mmio$flash$flash_rdata_MPORT_4$addr =
@@ -6224,7 +6224,7 @@ void DiffNewTop::step439() {
   mmio$flash$flash_rdata_MPORT_4$data = mmio$flash[mmio$flash$flash_rdata_MPORT_4$addr];
   if (mmio$flash$flash_rdata_MPORT_4$data$oldVal != mmio$flash$flash_rdata_MPORT_4$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step440() {
+void Diffnewtop::step440() {
   activeFlags[440] = false;
   uint8_t mmio$flash$flash_rdata_MPORT_5$data$oldVal = mmio$flash$flash_rdata_MPORT_5$data;
   mmio$flash$flash_rdata_MPORT_5$addr =
@@ -6233,7 +6233,7 @@ void DiffNewTop::step440() {
   mmio$flash$flash_rdata_MPORT_5$data = mmio$flash[mmio$flash$flash_rdata_MPORT_5$addr];
   if (mmio$flash$flash_rdata_MPORT_5$data$oldVal != mmio$flash$flash_rdata_MPORT_5$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step441() {
+void Diffnewtop::step441() {
   activeFlags[441] = false;
   uint8_t mmio$flash$flash_rdata_MPORT_6$data$oldVal = mmio$flash$flash_rdata_MPORT_6$data;
   mmio$flash$flash_rdata_MPORT_6$addr =
@@ -6242,7 +6242,7 @@ void DiffNewTop::step441() {
   mmio$flash$flash_rdata_MPORT_6$data = mmio$flash[mmio$flash$flash_rdata_MPORT_6$addr];
   if (mmio$flash$flash_rdata_MPORT_6$data$oldVal != mmio$flash$flash_rdata_MPORT_6$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step442() {
+void Diffnewtop::step442() {
   activeFlags[442] = false;
   uint8_t mmio$flash$flash_rdata_MPORT_7$data$oldVal = mmio$flash$flash_rdata_MPORT_7$data;
   mmio$flash$flash_rdata_MPORT_7$addr =
@@ -6251,7 +6251,7 @@ void DiffNewTop::step442() {
   mmio$flash$flash_rdata_MPORT_7$data = mmio$flash[mmio$flash$flash_rdata_MPORT_7$addr];
   if (mmio$flash$flash_rdata_MPORT_7$data$oldVal != mmio$flash$flash_rdata_MPORT_7$data) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step443() {
+void Diffnewtop::step443() {
   activeFlags[443] = false;
   uint8_t mmio$_T_8$oldVal = mmio$_T_8;
   mmio$_T_8 = ((crossBar$io$mmioAxi$ra$bits$addr >= 0x10000000) & (crossBar$io$mmioAxi$ra$bits$addr <= 0x10000007));
@@ -6260,7 +6260,7 @@ void DiffNewTop::step443() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step444() {
+void Diffnewtop::step444() {
   activeFlags[444] = false;
   uint8_t mmio$_T_9$oldVal = mmio$_T_9;
   mmio$_T_9 = (crossBar$io$mmioAxi$ra$bits$addr == 0x200bff8);
@@ -6269,7 +6269,7 @@ void DiffNewTop::step444() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step445() {
+void Diffnewtop::step445() {
   activeFlags[445] = false;
   uint8_t mmio$_T_10$oldVal = mmio$_T_10;
   mmio$_T_10 = (crossBar$io$mmioAxi$ra$bits$addr == 0x2004000);
@@ -6278,7 +6278,7 @@ void DiffNewTop::step445() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step446() {
+void Diffnewtop::step446() {
   activeFlags[446] = false;
   uint8_t mmio$_T_11$oldVal = mmio$_T_11;
   mmio$_T_11 = (crossBar$io$mmioAxi$ra$bits$addr == 0xa1000100);
@@ -6287,7 +6287,7 @@ void DiffNewTop::step446() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step447() {
+void Diffnewtop::step447() {
   activeFlags[447] = false;
   uint8_t mmio$_T_12$oldVal = mmio$_T_12;
   mmio$_T_12 = (crossBar$io$mmioAxi$ra$bits$addr == 0xa1000048);
@@ -6296,7 +6296,7 @@ void DiffNewTop::step447() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step448() {
+void Diffnewtop::step448() {
   activeFlags[448] = false;
   uint8_t mmio$_T_15$oldVal = mmio$_T_15;
   mmio$_T_15 = (crossBar$io$mmioAxi$ra$bits$addr == 0xa100004c);
@@ -6305,7 +6305,7 @@ void DiffNewTop::step448() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step449() {
+void Diffnewtop::step449() {
   activeFlags[449] = false;
   uint8_t mmio$_T_16$oldVal = mmio$_T_16;
   mmio$_T_16 = (crossBar$io$mmioAxi$ra$bits$addr == 0xa1000060);
@@ -6314,7 +6314,7 @@ void DiffNewTop::step449() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step450() {
+void Diffnewtop::step450() {
   activeFlags[450] = false;
   uint8_t mmio$_T_17$oldVal = mmio$_T_17;
   mmio$_T_17 = (crossBar$io$mmioAxi$ra$bits$addr == 0x2000000);
@@ -6323,7 +6323,7 @@ void DiffNewTop::step450() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step451() {
+void Diffnewtop::step451() {
   activeFlags[451] = false;
   uint8_t mmio$_T_22$oldVal = mmio$_T_22;
   mmio$_T_22 = ((crossBar$io$mmioAxi$ra$bits$addr >= 0xc000000) & (crossBar$io$mmioAxi$ra$bits$addr < 0xc003000));
@@ -6332,7 +6332,7 @@ void DiffNewTop::step451() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step452() {
+void Diffnewtop::step452() {
   activeFlags[452] = false;
   uint8_t mmio$_T_27$oldVal = mmio$_T_27;
   mmio$_T_27 = ((crossBar$io$mmioAxi$ra$bits$addr >= 0x43000000) & (crossBar$io$mmioAxi$ra$bits$addr < 0x43000080));
@@ -6341,19 +6341,19 @@ void DiffNewTop::step452() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step453() {
+void Diffnewtop::step453() {
   activeFlags[453] = false;
   uint8_t mmio$_T_32$oldVal = mmio$_T_32;
   mmio$_T_32 = ((crossBar$io$mmioAxi$ra$bits$addr >= 0x40000000) & (crossBar$io$mmioAxi$ra$bits$addr < 0x44000000));
   if (mmio$_T_32$oldVal != mmio$_T_32) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step454() {
+void Diffnewtop::step454() {
   activeFlags[454] = false;
   uint8_t mmio$_T_37$oldVal = mmio$_T_37;
   mmio$_T_37 = ((crossBar$io$mmioAxi$ra$bits$addr >= 0x30000000) & (crossBar$io$mmioAxi$ra$bits$addr < 0x40000000));
   if (mmio$_T_37$oldVal != mmio$_T_37) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step455() {
+void Diffnewtop::step455() {
   activeFlags[455] = false;
   uint8_t mmio$_T_120$oldVal = mmio$_T_120;
   mmio$_T_120 = ((crossBar$io$mmioAxi$ra$bits$addr >= 0x40000000) & (crossBar$io$mmioAxi$ra$bits$addr < 0x44000000));
@@ -6368,7 +6368,7 @@ void DiffNewTop::step455() {
     activeFlags[463] = true;
   }
 }
-void DiffNewTop::step456() {
+void Diffnewtop::step456() {
   activeFlags[456] = false;
   mmio$disk$MPORT_4$addr =
       (mmio$_T_1
@@ -6527,7 +6527,7 @@ void DiffNewTop::step456() {
                          : 0x0)
                   : 0x0));
 }
-void DiffNewTop::step457() {
+void Diffnewtop::step457() {
   activeFlags[457] = false;
   mmio$disk$MPORT_5$addr =
       (mmio$_T_1
@@ -6686,7 +6686,7 @@ void DiffNewTop::step457() {
                          : 0x0)
                   : 0x0));
 }
-void DiffNewTop::step458() {
+void Diffnewtop::step458() {
   activeFlags[458] = false;
   mmio$disk$MPORT_6$addr =
       (mmio$_T_1
@@ -6845,7 +6845,7 @@ void DiffNewTop::step458() {
                          : 0x0)
                   : 0x0));
 }
-void DiffNewTop::step459() {
+void Diffnewtop::step459() {
   activeFlags[459] = false;
   mmio$disk$MPORT_7$addr =
       (mmio$_T_1
@@ -7004,7 +7004,7 @@ void DiffNewTop::step459() {
                          : 0x0)
                   : 0x0));
 }
-void DiffNewTop::step460() {
+void Diffnewtop::step460() {
   activeFlags[460] = false;
   mmio$disk$MPORT_8$addr =
       (mmio$_T_1
@@ -7163,7 +7163,7 @@ void DiffNewTop::step460() {
                          : 0x0)
                   : 0x0));
 }
-void DiffNewTop::step461() {
+void Diffnewtop::step461() {
   activeFlags[461] = false;
   mmio$disk$MPORT_9$addr =
       (mmio$_T_1
@@ -7322,7 +7322,7 @@ void DiffNewTop::step461() {
                          : 0x0)
                   : 0x0));
 }
-void DiffNewTop::step462() {
+void Diffnewtop::step462() {
   activeFlags[462] = false;
   mmio$disk$MPORT_10$addr =
       (mmio$_T_1
@@ -7481,7 +7481,7 @@ void DiffNewTop::step462() {
                          : 0x0)
                   : 0x0));
 }
-void DiffNewTop::step463() {
+void Diffnewtop::step463() {
   activeFlags[463] = false;
   mmio$disk$MPORT_11$addr =
       (mmio$_T_1
@@ -7640,7 +7640,7 @@ void DiffNewTop::step463() {
                          : 0x0)
                   : 0x0));
 }
-void DiffNewTop::step464() {
+void Diffnewtop::step464() {
   activeFlags[464] = false;
   uint8_t mmio$_T_157$oldVal = mmio$_T_157;
   mmio$_T_157 = ((crossBar$_T ? (crossBar$_T_9 ? cpu$crossBar$io$outAxi$rd$ready : 0x0)
@@ -7652,7 +7652,7 @@ void DiffNewTop::step464() {
     activeFlags[1116] = true;
   }
 }
-void DiffNewTop::step465() {
+void Diffnewtop::step465() {
   activeFlags[465] = false;
   uint8_t cpu$dcache$matchWay$oldVal = cpu$dcache$matchWay;
   cpu$dcache$matchWay =
@@ -7681,7 +7681,7 @@ void DiffNewTop::step465() {
     activeFlags[1015] = true;
   }
 }
-void DiffNewTop::step466() {
+void Diffnewtop::step466() {
   activeFlags[466] = false;
   uint8_t cpu$dcache$cur_way$oldVal = cpu$dcache$cur_way;
   cpu$dcache$cur_way = (cpu$dcache$hs_in ? cpu$dcache$matchWay : cpu$dcache$matchWay_r);
@@ -7694,7 +7694,7 @@ void DiffNewTop::step466() {
     activeFlags[1007] = true;
   }
 }
-void DiffNewTop::step467() {
+void Diffnewtop::step467() {
   activeFlags[467] = false;
   cpu$dcache$data$addr[3] = 0x0;
   cpu$dcache$data$addr[2] = 0x0;
@@ -7711,7 +7711,7 @@ void DiffNewTop::step467() {
   activeFlags[470] = true;
   activeFlags[471] = true;
 }
-void DiffNewTop::step468() {
+void Diffnewtop::step468() {
   activeFlags[468] = false;
   uint8_t cpu$dcache$Ram_bw$io$addr$oldVal = cpu$dcache$Ram_bw$io$addr;
   cpu$dcache$Ram_bw$io$addr = cpu$dcache$data$addr[0];
@@ -7721,7 +7721,7 @@ void DiffNewTop::step468() {
     activeFlags[493] = true;
   }
 }
-void DiffNewTop::step469() {
+void Diffnewtop::step469() {
   activeFlags[469] = false;
   uint8_t cpu$dcache$Ram_bw_1$io$addr$oldVal = cpu$dcache$Ram_bw_1$io$addr;
   cpu$dcache$Ram_bw_1$io$addr = cpu$dcache$data$addr[1];
@@ -7731,7 +7731,7 @@ void DiffNewTop::step469() {
     activeFlags[494] = true;
   }
 }
-void DiffNewTop::step470() {
+void Diffnewtop::step470() {
   activeFlags[470] = false;
   uint8_t cpu$dcache$Ram_bw_2$io$addr$oldVal = cpu$dcache$Ram_bw_2$io$addr;
   cpu$dcache$Ram_bw_2$io$addr = cpu$dcache$data$addr[2];
@@ -7741,7 +7741,7 @@ void DiffNewTop::step470() {
     activeFlags[495] = true;
   }
 }
-void DiffNewTop::step471() {
+void Diffnewtop::step471() {
   activeFlags[471] = false;
   uint8_t cpu$dcache$Ram_bw_3$io$addr$oldVal = cpu$dcache$Ram_bw_3$io$addr;
   cpu$dcache$Ram_bw_3$io$addr = cpu$dcache$data$addr[3];
@@ -7751,7 +7751,7 @@ void DiffNewTop::step471() {
     activeFlags[496] = true;
   }
 }
-void DiffNewTop::step472() {
+void Diffnewtop::step472() {
   activeFlags[472] = false;
   cpu$dcache$data$wdata[3] = 0x0;
   cpu$dcache$data$wdata[2] = 0x0;
@@ -10981,7 +10981,7 @@ void DiffNewTop::step472() {
   activeFlags[495] = true;
   activeFlags[496] = true;
 }
-void DiffNewTop::step473() {
+void Diffnewtop::step473() {
   activeFlags[473] = false;
   uint8_t cpu$dcache$WHEN_COND_6363$oldVal = cpu$dcache$WHEN_COND_6363;
   cpu$dcache$WHEN_COND_6363 = cpu$dcache$dirty[cpu$dcache$matchWay][cpu$dcache$blockIdx];
@@ -10991,7 +10991,7 @@ void DiffNewTop::step473() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step474() {
+void Diffnewtop::step474() {
   activeFlags[474] = false;
   uint8_t cpu$dcache$cur_mode$oldVal = cpu$dcache$cur_mode;
   cpu$dcache$cur_mode = (cpu$dcache$hs_in ? cpu$dcSelector$io$select$dc_mode : cpu$dcache$mode_r);
@@ -11001,7 +11001,7 @@ void DiffNewTop::step474() {
     activeFlags[492] = true;
   }
 }
-void DiffNewTop::step475() {
+void Diffnewtop::step475() {
   activeFlags[475] = false;
   uint8_t cpu$dcache$_T_73$oldVal = cpu$dcache$_T_73;
   cpu$dcache$_T_73 = (((cpu$dcache$cur_mode >> 2) & 0x3) == 0x3);
@@ -11013,7 +11013,7 @@ void DiffNewTop::step475() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step476() {
+void Diffnewtop::step476() {
   activeFlags[476] = false;
   cpu$dcache$data$cen[3] = 0x0;
   cpu$dcache$data$cen[2] = 0x0;
@@ -11025,7 +11025,7 @@ void DiffNewTop::step476() {
   activeFlags[486] = true;
   activeFlags[489] = true;
 }
-void DiffNewTop::step477() {
+void Diffnewtop::step477() {
   activeFlags[477] = false;
   uint8_t cpu$dcache$_T_72$oldVal = cpu$dcache$_T_72;
   cpu$dcache$_T_72 = ((cpu$dcache$hs_in == 0x0) & (cpu$dcache$wait_r == 0x0));
@@ -11039,7 +11039,7 @@ void DiffNewTop::step477() {
     activeFlags[1114] = true;
   }
 }
-void DiffNewTop::step478() {
+void Diffnewtop::step478() {
   activeFlags[478] = false;
   uint8_t cpu$dcache$wen$oldVal = cpu$dcache$wen;
   cpu$dcache$wen =
@@ -11059,7 +11059,7 @@ void DiffNewTop::step478() {
     activeFlags[1007] = true;
   }
 }
-void DiffNewTop::step479() {
+void Diffnewtop::step479() {
   activeFlags[479] = false;
   cpu$dcache$data$wen[3] = 0x0;
   cpu$dcache$data$wen[2] = 0x0;
@@ -11071,7 +11071,7 @@ void DiffNewTop::step479() {
   activeFlags[486] = true;
   activeFlags[489] = true;
 }
-void DiffNewTop::step480() {
+void Diffnewtop::step480() {
   activeFlags[480] = false;
   uint8_t cpu$dcache$Ram_bw$ram$_T_2$oldVal = cpu$dcache$Ram_bw$ram$_T_2;
   cpu$dcache$Ram_bw$ram$_T_2 = (((cpu$dcache$data$cen[0] ^ 0x1) == 0x0) & ((cpu$dcache$data$wen[0] ^ 0x1) == 0x0));
@@ -11082,7 +11082,7 @@ void DiffNewTop::step480() {
     activeFlags[1008] = true;
   }
 }
-void DiffNewTop::step481() {
+void Diffnewtop::step481() {
   activeFlags[481] = false;
   uint128_t cpu$dcache$Ram_bw$ram$ram$MPORT_1$data$oldVal = cpu$dcache$Ram_bw$ram$ram$MPORT_1$data;
   cpu$dcache$Ram_bw$ram$ram$MPORT_1$addr = (cpu$dcache$Ram_bw$ram$_T_2 ? cpu$dcache$Ram_bw$io$addr : 0x0);
@@ -11093,7 +11093,7 @@ void DiffNewTop::step481() {
     activeFlags[493] = true;
   }
 }
-void DiffNewTop::step482() {
+void Diffnewtop::step482() {
   activeFlags[482] = false;
   uint128_t cpu$dcache$Ram_bw$ram$ram$output_MPORT$data$oldVal = cpu$dcache$Ram_bw$ram$ram$output_MPORT$data;
   cpu$dcache$Ram_bw$ram$ram$output_MPORT$addr = (cpu$dcache$Ram_bw$ram$_T_2 ? 0x0 : cpu$dcache$Ram_bw$io$addr);
@@ -11104,7 +11104,7 @@ void DiffNewTop::step482() {
     activeFlags[1008] = true;
   }
 }
-void DiffNewTop::step483() {
+void Diffnewtop::step483() {
   activeFlags[483] = false;
   uint8_t cpu$dcache$Ram_bw_1$ram$_T_2$oldVal = cpu$dcache$Ram_bw_1$ram$_T_2;
   cpu$dcache$Ram_bw_1$ram$_T_2 = (((cpu$dcache$data$cen[1] ^ 0x1) == 0x0) & ((cpu$dcache$data$wen[1] ^ 0x1) == 0x0));
@@ -11115,7 +11115,7 @@ void DiffNewTop::step483() {
     activeFlags[1009] = true;
   }
 }
-void DiffNewTop::step484() {
+void Diffnewtop::step484() {
   activeFlags[484] = false;
   uint128_t cpu$dcache$Ram_bw_1$ram$ram$MPORT_1$data$oldVal = cpu$dcache$Ram_bw_1$ram$ram$MPORT_1$data;
   cpu$dcache$Ram_bw_1$ram$ram$MPORT_1$addr = (cpu$dcache$Ram_bw_1$ram$_T_2 ? cpu$dcache$Ram_bw_1$io$addr : 0x0);
@@ -11126,7 +11126,7 @@ void DiffNewTop::step484() {
     activeFlags[494] = true;
   }
 }
-void DiffNewTop::step485() {
+void Diffnewtop::step485() {
   activeFlags[485] = false;
   uint128_t cpu$dcache$Ram_bw_1$ram$ram$output_MPORT$data$oldVal = cpu$dcache$Ram_bw_1$ram$ram$output_MPORT$data;
   cpu$dcache$Ram_bw_1$ram$ram$output_MPORT$addr = (cpu$dcache$Ram_bw_1$ram$_T_2 ? 0x0 : cpu$dcache$Ram_bw_1$io$addr);
@@ -11138,7 +11138,7 @@ void DiffNewTop::step485() {
     activeFlags[1009] = true;
   }
 }
-void DiffNewTop::step486() {
+void Diffnewtop::step486() {
   activeFlags[486] = false;
   uint8_t cpu$dcache$Ram_bw_2$ram$_T_2$oldVal = cpu$dcache$Ram_bw_2$ram$_T_2;
   cpu$dcache$Ram_bw_2$ram$_T_2 = (((cpu$dcache$data$cen[2] ^ 0x1) == 0x0) & ((cpu$dcache$data$wen[2] ^ 0x1) == 0x0));
@@ -11149,7 +11149,7 @@ void DiffNewTop::step486() {
     activeFlags[1010] = true;
   }
 }
-void DiffNewTop::step487() {
+void Diffnewtop::step487() {
   activeFlags[487] = false;
   uint128_t cpu$dcache$Ram_bw_2$ram$ram$MPORT_1$data$oldVal = cpu$dcache$Ram_bw_2$ram$ram$MPORT_1$data;
   cpu$dcache$Ram_bw_2$ram$ram$MPORT_1$addr = (cpu$dcache$Ram_bw_2$ram$_T_2 ? cpu$dcache$Ram_bw_2$io$addr : 0x0);
@@ -11160,7 +11160,7 @@ void DiffNewTop::step487() {
     activeFlags[495] = true;
   }
 }
-void DiffNewTop::step488() {
+void Diffnewtop::step488() {
   activeFlags[488] = false;
   uint128_t cpu$dcache$Ram_bw_2$ram$ram$output_MPORT$data$oldVal = cpu$dcache$Ram_bw_2$ram$ram$output_MPORT$data;
   cpu$dcache$Ram_bw_2$ram$ram$output_MPORT$addr = (cpu$dcache$Ram_bw_2$ram$_T_2 ? 0x0 : cpu$dcache$Ram_bw_2$io$addr);
@@ -11172,7 +11172,7 @@ void DiffNewTop::step488() {
     activeFlags[1010] = true;
   }
 }
-void DiffNewTop::step489() {
+void Diffnewtop::step489() {
   activeFlags[489] = false;
   uint8_t cpu$dcache$Ram_bw_3$ram$_T_2$oldVal = cpu$dcache$Ram_bw_3$ram$_T_2;
   cpu$dcache$Ram_bw_3$ram$_T_2 = (((cpu$dcache$data$cen[3] ^ 0x1) == 0x0) & ((cpu$dcache$data$wen[3] ^ 0x1) == 0x0));
@@ -11183,7 +11183,7 @@ void DiffNewTop::step489() {
     activeFlags[1011] = true;
   }
 }
-void DiffNewTop::step490() {
+void Diffnewtop::step490() {
   activeFlags[490] = false;
   uint128_t cpu$dcache$Ram_bw_3$ram$ram$MPORT_1$data$oldVal = cpu$dcache$Ram_bw_3$ram$ram$MPORT_1$data;
   cpu$dcache$Ram_bw_3$ram$ram$MPORT_1$addr = (cpu$dcache$Ram_bw_3$ram$_T_2 ? cpu$dcache$Ram_bw_3$io$addr : 0x0);
@@ -11194,7 +11194,7 @@ void DiffNewTop::step490() {
     activeFlags[496] = true;
   }
 }
-void DiffNewTop::step491() {
+void Diffnewtop::step491() {
   activeFlags[491] = false;
   uint128_t cpu$dcache$Ram_bw_3$ram$ram$output_MPORT$data$oldVal = cpu$dcache$Ram_bw_3$ram$ram$output_MPORT$data;
   cpu$dcache$Ram_bw_3$ram$ram$output_MPORT$addr = (cpu$dcache$Ram_bw_3$ram$_T_2 ? 0x0 : cpu$dcache$Ram_bw_3$io$addr);
@@ -11206,7 +11206,7 @@ void DiffNewTop::step491() {
     activeFlags[1011] = true;
   }
 }
-void DiffNewTop::step492() {
+void Diffnewtop::step492() {
   activeFlags[492] = false;
   cpu$dcache$data$mask[3] = 0x0;
   cpu$dcache$data$mask[2] = 0x0;
@@ -11253,7 +11253,7 @@ void DiffNewTop::step492() {
   activeFlags[495] = true;
   activeFlags[496] = true;
 }
-void DiffNewTop::step493() {
+void Diffnewtop::step493() {
   activeFlags[493] = false;
   cpu$dcache$Ram_bw$ram$ram$MPORT$addr = (cpu$dcache$Ram_bw$ram$_T_2 ? cpu$dcache$Ram_bw$io$addr : 0x0);
   cpu$dcache$Ram_bw$ram$ram$MPORT$en = (cpu$dcache$Ram_bw$ram$_T_2 ? 0x1 : 0x0);
@@ -11267,7 +11267,7 @@ void DiffNewTop::step493() {
            : 0x0);
   cpu$dcache$Ram_bw$ram$ram$MPORT$mask = (cpu$dcache$Ram_bw$ram$_T_2 ? 0x1 : 0x0);
 }
-void DiffNewTop::step494() {
+void Diffnewtop::step494() {
   activeFlags[494] = false;
   cpu$dcache$Ram_bw_1$ram$ram$MPORT$addr = (cpu$dcache$Ram_bw_1$ram$_T_2 ? cpu$dcache$Ram_bw_1$io$addr : 0x0);
   cpu$dcache$Ram_bw_1$ram$ram$MPORT$en = (cpu$dcache$Ram_bw_1$ram$_T_2 ? 0x1 : 0x0);
@@ -11281,7 +11281,7 @@ void DiffNewTop::step494() {
            : 0x0);
   cpu$dcache$Ram_bw_1$ram$ram$MPORT$mask = (cpu$dcache$Ram_bw_1$ram$_T_2 ? 0x1 : 0x0);
 }
-void DiffNewTop::step495() {
+void Diffnewtop::step495() {
   activeFlags[495] = false;
   cpu$dcache$Ram_bw_2$ram$ram$MPORT$addr = (cpu$dcache$Ram_bw_2$ram$_T_2 ? cpu$dcache$Ram_bw_2$io$addr : 0x0);
   cpu$dcache$Ram_bw_2$ram$ram$MPORT$en = (cpu$dcache$Ram_bw_2$ram$_T_2 ? 0x1 : 0x0);
@@ -11295,7 +11295,7 @@ void DiffNewTop::step495() {
            : 0x0);
   cpu$dcache$Ram_bw_2$ram$ram$MPORT$mask = (cpu$dcache$Ram_bw_2$ram$_T_2 ? 0x1 : 0x0);
 }
-void DiffNewTop::step496() {
+void Diffnewtop::step496() {
   activeFlags[496] = false;
   cpu$dcache$Ram_bw_3$ram$ram$MPORT$addr = (cpu$dcache$Ram_bw_3$ram$_T_2 ? cpu$dcache$Ram_bw_3$io$addr : 0x0);
   cpu$dcache$Ram_bw_3$ram$ram$MPORT$en = (cpu$dcache$Ram_bw_3$ram$_T_2 ? 0x1 : 0x0);
@@ -11309,7 +11309,7 @@ void DiffNewTop::step496() {
            : 0x0);
   cpu$dcache$Ram_bw_3$ram$ram$MPORT$mask = (cpu$dcache$Ram_bw_3$ram$_T_2 ? 0x1 : 0x0);
 }
-void DiffNewTop::step497() {
+void Diffnewtop::step497() {
   activeFlags[497] = false;
   uint8_t cpu$memory$drop1_in$oldVal = cpu$memory$drop1_in;
   cpu$memory$drop1_in = (cpu$memory$drop1_r | cpu$memory$drop2_in);
@@ -11322,7 +11322,7 @@ void DiffNewTop::step497() {
     activeFlags[1162] = true;
   }
 }
-void DiffNewTop::step498() {
+void Diffnewtop::step498() {
   activeFlags[498] = false;
   uint8_t cpu$execute$_T_7$oldVal = cpu$execute$_T_7;
   cpu$execute$_T_7 = (cpu$memory$drop1_in == 0x0);
@@ -11333,7 +11333,7 @@ void DiffNewTop::step498() {
     activeFlags[1344] = true;
   }
 }
-void DiffNewTop::step500() {
+void Diffnewtop::step500() {
   activeFlags[500] = false;
   uint8_t cpu$execute$_T_8$oldVal = cpu$execute$_T_8;
   cpu$execute$_T_8 = (cpu$execute$state == 0x0);
@@ -11342,7 +11342,7 @@ void DiffNewTop::step500() {
     activeFlags[977] = true;
   }
 }
-void DiffNewTop::step501() {
+void Diffnewtop::step501() {
   activeFlags[501] = false;
   uint8_t cpu$execute$_T_11$oldVal = cpu$execute$_T_11;
   cpu$execute$_T_11 = (cpu$execute$state == 0x1);
@@ -11353,7 +11353,7 @@ void DiffNewTop::step501() {
     activeFlags[1344] = true;
   }
 }
-void DiffNewTop::step502() {
+void Diffnewtop::step502() {
   activeFlags[502] = false;
   uint8_t cpu$memory$io$ex2mem$ready$oldVal = cpu$memory$io$ex2mem$ready;
   cpu$memory$io$ex2mem$ready =
@@ -11365,7 +11365,7 @@ void DiffNewTop::step502() {
     activeFlags[504] = true;
   }
 }
-void DiffNewTop::step503() {
+void Diffnewtop::step503() {
   activeFlags[503] = false;
   uint8_t cpu$execute$hs_out$oldVal = cpu$execute$hs_out;
   cpu$execute$hs_out = (cpu$memory$io$ex2mem$ready & cpu$execute$valid_r);
@@ -11374,7 +11374,7 @@ void DiffNewTop::step503() {
     activeFlags[976] = true;
   }
 }
-void DiffNewTop::step504() {
+void Diffnewtop::step504() {
   activeFlags[504] = false;
   uint8_t cpu$memory$hs_in$oldVal = cpu$memory$hs_in;
   cpu$memory$hs_in = (cpu$memory$io$ex2mem$ready & cpu$execute$valid_r);
@@ -11405,13 +11405,13 @@ void DiffNewTop::step504() {
     activeFlags[1404] = true;
   }
 }
-void DiffNewTop::step505() {
+void Diffnewtop::step505() {
   activeFlags[505] = false;
   uint8_t cpu$execute$_T_6$oldVal = cpu$execute$_T_6;
   cpu$execute$_T_6 = ((cpu$execute$valid_r | (cpu$execute$state != 0x0)) & (cpu$execute$hs_out == 0x0));
   if (cpu$execute$_T_6$oldVal != cpu$execute$_T_6) { activeFlags[563] = true; }
 }
-void DiffNewTop::step507() {
+void Diffnewtop::step507() {
   activeFlags[507] = false;
   uint64_t cpu$memory$_io_va2pa_vaddr_T$oldVal = cpu$memory$_io_va2pa_vaddr_T;
   cpu$memory$_io_va2pa_vaddr_T = (cpu$memory$hs_in ? cpu$execute$mem_addr_r : cpu$memory$mem_addr1_r);
@@ -11425,7 +11425,7 @@ void DiffNewTop::step507() {
     activeFlags[1239] = true;
   }
 }
-void DiffNewTop::step508() {
+void Diffnewtop::step508() {
   activeFlags[508] = false;
   uint64_t cpu$tlb_mem$inp_tag$oldVal = cpu$tlb_mem$inp_tag;
   cpu$tlb_mem$inp_tag = ((cpu$memory$_io_va2pa_vaddr_T >> 12) & 0xfffffffffffff);
@@ -11448,7 +11448,7 @@ void DiffNewTop::step508() {
     activeFlags[524] = true;
   }
 }
-void DiffNewTop::step509() {
+void Diffnewtop::step509() {
   activeFlags[509] = false;
   uint8_t cpu$tlb_mem$_T_3$oldVal = cpu$tlb_mem$_T_3;
   cpu$tlb_mem$_T_3 =
@@ -11468,7 +11468,7 @@ void DiffNewTop::step509() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step510() {
+void Diffnewtop::step510() {
   activeFlags[510] = false;
   uint8_t cpu$tlb_mem$_T_6$oldVal = cpu$tlb_mem$_T_6;
   cpu$tlb_mem$_T_6 =
@@ -11488,7 +11488,7 @@ void DiffNewTop::step510() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step511() {
+void Diffnewtop::step511() {
   activeFlags[511] = false;
   uint8_t cpu$tlb_mem$_T_9$oldVal = cpu$tlb_mem$_T_9;
   cpu$tlb_mem$_T_9 =
@@ -11508,7 +11508,7 @@ void DiffNewTop::step511() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step512() {
+void Diffnewtop::step512() {
   activeFlags[512] = false;
   uint8_t cpu$tlb_mem$_T_12$oldVal = cpu$tlb_mem$_T_12;
   cpu$tlb_mem$_T_12 =
@@ -11528,7 +11528,7 @@ void DiffNewTop::step512() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step513() {
+void Diffnewtop::step513() {
   activeFlags[513] = false;
   uint8_t cpu$tlb_mem$_T_15$oldVal = cpu$tlb_mem$_T_15;
   cpu$tlb_mem$_T_15 =
@@ -11548,7 +11548,7 @@ void DiffNewTop::step513() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step514() {
+void Diffnewtop::step514() {
   activeFlags[514] = false;
   uint8_t cpu$tlb_mem$_T_18$oldVal = cpu$tlb_mem$_T_18;
   cpu$tlb_mem$_T_18 =
@@ -11568,7 +11568,7 @@ void DiffNewTop::step514() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step515() {
+void Diffnewtop::step515() {
   activeFlags[515] = false;
   uint8_t cpu$tlb_mem$_T_21$oldVal = cpu$tlb_mem$_T_21;
   cpu$tlb_mem$_T_21 =
@@ -11588,7 +11588,7 @@ void DiffNewTop::step515() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step516() {
+void Diffnewtop::step516() {
   activeFlags[516] = false;
   uint8_t cpu$tlb_mem$_T_24$oldVal = cpu$tlb_mem$_T_24;
   cpu$tlb_mem$_T_24 =
@@ -11608,7 +11608,7 @@ void DiffNewTop::step516() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step517() {
+void Diffnewtop::step517() {
   activeFlags[517] = false;
   uint8_t cpu$tlb_mem$_T_27$oldVal = cpu$tlb_mem$_T_27;
   cpu$tlb_mem$_T_27 =
@@ -11628,7 +11628,7 @@ void DiffNewTop::step517() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step518() {
+void Diffnewtop::step518() {
   activeFlags[518] = false;
   uint8_t cpu$tlb_mem$_T_30$oldVal = cpu$tlb_mem$_T_30;
   cpu$tlb_mem$_T_30 =
@@ -11648,7 +11648,7 @@ void DiffNewTop::step518() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step519() {
+void Diffnewtop::step519() {
   activeFlags[519] = false;
   uint8_t cpu$tlb_mem$_T_33$oldVal = cpu$tlb_mem$_T_33;
   cpu$tlb_mem$_T_33 =
@@ -11668,7 +11668,7 @@ void DiffNewTop::step519() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step520() {
+void Diffnewtop::step520() {
   activeFlags[520] = false;
   uint8_t cpu$tlb_mem$_T_36$oldVal = cpu$tlb_mem$_T_36;
   cpu$tlb_mem$_T_36 =
@@ -11688,7 +11688,7 @@ void DiffNewTop::step520() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step521() {
+void Diffnewtop::step521() {
   activeFlags[521] = false;
   uint8_t cpu$tlb_mem$_T_39$oldVal = cpu$tlb_mem$_T_39;
   cpu$tlb_mem$_T_39 =
@@ -11708,7 +11708,7 @@ void DiffNewTop::step521() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step522() {
+void Diffnewtop::step522() {
   activeFlags[522] = false;
   uint8_t cpu$tlb_mem$_T_42$oldVal = cpu$tlb_mem$_T_42;
   cpu$tlb_mem$_T_42 =
@@ -11728,7 +11728,7 @@ void DiffNewTop::step522() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step523() {
+void Diffnewtop::step523() {
   activeFlags[523] = false;
   uint8_t cpu$tlb_mem$_T_45$oldVal = cpu$tlb_mem$_T_45;
   cpu$tlb_mem$_T_45 =
@@ -11748,7 +11748,7 @@ void DiffNewTop::step523() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step524() {
+void Diffnewtop::step524() {
   activeFlags[524] = false;
   uint8_t cpu$tlb_mem$_T_48$oldVal = cpu$tlb_mem$_T_48;
   cpu$tlb_mem$_T_48 =
@@ -11768,7 +11768,7 @@ void DiffNewTop::step524() {
     activeFlags[1059] = true;
   }
 }
-void DiffNewTop::step525() {
+void Diffnewtop::step525() {
   activeFlags[525] = false;
   uint8_t cpu$tlb_mem$tlbMsg$tlbHit$oldVal = cpu$tlb_mem$tlbMsg$tlbHit;
   cpu$tlb_mem$tlbMsg$tlbHit =
@@ -11825,7 +11825,7 @@ void DiffNewTop::step525() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step526() {
+void Diffnewtop::step526() {
   activeFlags[526] = false;
   uint8_t cpu$tlb_mem$_T_62$oldVal = cpu$tlb_mem$_T_62;
   cpu$tlb_mem$_T_62 = (cpu$tlb_mem$tlbMsg$tlbHit == 0x0);
@@ -11842,7 +11842,7 @@ void DiffNewTop::step526() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step527() {
+void Diffnewtop::step527() {
   activeFlags[527] = false;
   uint32_t cpu$tlb_mem$tlbMsg$tlbPa$oldVal = cpu$tlb_mem$tlbMsg$tlbPa;
   cpu$tlb_mem$tlbMsg$tlbPa =
@@ -11887,7 +11887,7 @@ void DiffNewTop::step527() {
     activeFlags[1235] = true;
   }
 }
-void DiffNewTop::step528() {
+void Diffnewtop::step528() {
   activeFlags[528] = false;
   uint16_t cpu$tlb_mem$tlbMsg$tlbInfo$oldVal = cpu$tlb_mem$tlbMsg$tlbInfo;
   cpu$tlb_mem$tlbMsg$tlbInfo =
@@ -11934,7 +11934,7 @@ void DiffNewTop::step528() {
     activeFlags[1235] = true;
   }
 }
-void DiffNewTop::step529() {
+void Diffnewtop::step529() {
   activeFlags[529] = false;
   uint8_t cpu$tlb_mem$_T_67$oldVal = cpu$tlb_mem$_T_67;
   cpu$tlb_mem$_T_67 = (((cpu$memory$_io_va2pa_vaddr_T >> 39) & 0x1ffffff) !=
@@ -11948,7 +11948,7 @@ void DiffNewTop::step529() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step532() {
+void Diffnewtop::step532() {
   activeFlags[532] = false;
   uint8_t cpu$memory$access_tlb$oldVal = cpu$memory$access_tlb;
   cpu$memory$access_tlb = (cpu$execute$ctrl_r$dcMode != 0x0);
@@ -11957,7 +11957,7 @@ void DiffNewTop::step532() {
     activeFlags[983] = true;
   }
 }
-void DiffNewTop::step533() {
+void Diffnewtop::step533() {
   activeFlags[533] = false;
   uint8_t cpu$memory$io$va2pa$vvalid$oldVal = cpu$memory$io$va2pa$vvalid;
   cpu$memory$io$va2pa$vvalid =
@@ -11972,7 +11972,7 @@ void DiffNewTop::step533() {
     activeFlags[1239] = true;
   }
 }
-void DiffNewTop::step534() {
+void Diffnewtop::step534() {
   activeFlags[534] = false;
   uint8_t cpu$tlb_mem$_io_va2pa_ready_T_5$oldVal = cpu$tlb_mem$_io_va2pa_ready_T_5;
   cpu$tlb_mem$_io_va2pa_ready_T_5 =
@@ -11983,7 +11983,7 @@ void DiffNewTop::step534() {
     activeFlags[1239] = true;
   }
 }
-void DiffNewTop::step535() {
+void Diffnewtop::step535() {
   activeFlags[535] = false;
   uint8_t cpu$tlb_mem$handshake$oldVal = cpu$tlb_mem$handshake;
   cpu$tlb_mem$handshake = (cpu$memory$io$va2pa$vvalid & cpu$tlb_mem$_io_va2pa_ready_T_5);
@@ -11993,7 +11993,7 @@ void DiffNewTop::step535() {
     activeFlags[1239] = true;
   }
 }
-void DiffNewTop::step536() {
+void Diffnewtop::step536() {
   activeFlags[536] = false;
   uint8_t cpu$tlb_mem$_T_55$oldVal = cpu$tlb_mem$_T_55;
   cpu$tlb_mem$_T_55 = (cpu$tlb_mem$handshake == 0x0);
@@ -12015,7 +12015,7 @@ void DiffNewTop::step536() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step537() {
+void Diffnewtop::step537() {
   activeFlags[537] = false;
   uint8_t cpu$memory$_io_va2pa_m_type_T_1$oldVal = cpu$memory$_io_va2pa_m_type_T_1;
   cpu$memory$_io_va2pa_m_type_T_1 =
@@ -12027,7 +12027,7 @@ void DiffNewTop::step537() {
     activeFlags[1063] = true;
   }
 }
-void DiffNewTop::step538() {
+void Diffnewtop::step538() {
   activeFlags[538] = false;
   uint8_t cpu$tlb_mem$cur_m_type$oldVal = cpu$tlb_mem$cur_m_type;
   cpu$tlb_mem$cur_m_type = (cpu$tlb_mem$handshake ? cpu$memory$_io_va2pa_m_type_T_1 : cpu$tlb_mem$m_type_r);
@@ -12036,7 +12036,7 @@ void DiffNewTop::step538() {
     activeFlags[540] = true;
   }
 }
-void DiffNewTop::step539() {
+void Diffnewtop::step539() {
   activeFlags[539] = false;
   uint16_t cpu$tlb_mem$ad$oldVal = cpu$tlb_mem$ad;
   cpu$tlb_mem$ad = ((cpu$tlb_mem$cur_m_type == 0x3) ? 0xc0 : 0x40);
@@ -12046,7 +12046,7 @@ void DiffNewTop::step539() {
     activeFlags[1235] = true;
   }
 }
-void DiffNewTop::step540() {
+void Diffnewtop::step540() {
   activeFlags[540] = false;
   uint8_t cpu$tlb_mem$_T_58$oldVal = cpu$tlb_mem$_T_58;
   cpu$tlb_mem$_T_58 = ((((((((cpu$memory$_io_va2pa_vaddr_T >> 38) & 0x1) >> 0) & 0x1) ? 0x1ffffff : 0x0) ==
@@ -12075,7 +12075,7 @@ void DiffNewTop::step540() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step541() {
+void Diffnewtop::step541() {
   activeFlags[541] = false;
   uint8_t cpu$tlb_mem$is_Sv39$oldVal = cpu$tlb_mem$is_Sv39;
   cpu$tlb_mem$is_Sv39 =
@@ -12089,7 +12089,7 @@ void DiffNewTop::step541() {
     activeFlags[543] = true;
   }
 }
-void DiffNewTop::step542() {
+void Diffnewtop::step542() {
   activeFlags[542] = false;
   uint8_t cpu$tlb_mem$_T_61$oldVal = cpu$tlb_mem$_T_61;
   cpu$tlb_mem$_T_61 = (((cpu$tlb_mem$ad & cpu$tlb_mem$tlbMsg$tlbInfo) != cpu$tlb_mem$ad) & cpu$tlb_mem$is_Sv39);
@@ -12101,7 +12101,7 @@ void DiffNewTop::step542() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step543() {
+void Diffnewtop::step543() {
   activeFlags[543] = false;
   uint8_t cpu$tlb_mem$_T_53$oldVal = cpu$tlb_mem$_T_53;
   cpu$tlb_mem$_T_53 = (cpu$tlb_mem$is_Sv39 | (cpu$tlb_mem$state != 0x0));
@@ -12128,7 +12128,7 @@ void DiffNewTop::step543() {
     activeFlags[1240] = true;
   }
 }
-void DiffNewTop::step544() {
+void Diffnewtop::step544() {
   activeFlags[544] = false;
   uint8_t cpu$execute$io$d_ex$state$oldVal = cpu$execute$io$d_ex$state;
   cpu$execute$io$d_ex$state =
@@ -12143,7 +12143,7 @@ void DiffNewTop::step544() {
     activeFlags[651] = true;
   }
 }
-void DiffNewTop::step545() {
+void Diffnewtop::step545() {
   activeFlags[545] = false;
   uint8_t cpu$forwading$_T_11$oldVal = cpu$forwading$_T_11;
   cpu$forwading$_T_11 = (cpu$execute$io$d_ex$state == 0x1);
@@ -12153,7 +12153,7 @@ void DiffNewTop::step545() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step546() {
+void Diffnewtop::step546() {
   activeFlags[546] = false;
   uint8_t cpu$forwading$_T_35$oldVal = cpu$forwading$_T_35;
   cpu$forwading$_T_35 = (cpu$execute$io$d_ex$state == 0x1);
@@ -12163,7 +12163,7 @@ void DiffNewTop::step546() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step547() {
+void Diffnewtop::step547() {
   activeFlags[547] = false;
   uint8_t cpu$execute$alu$_T$oldVal = cpu$execute$alu$_T;
   cpu$execute$alu$_T = (0x0 == cpu$execute$alu$state);
@@ -12174,7 +12174,7 @@ void DiffNewTop::step547() {
     activeFlags[1348] = true;
   }
 }
-void DiffNewTop::step548() {
+void Diffnewtop::step548() {
   activeFlags[548] = false;
   uint8_t cpu$execute$alu$_T_15$oldVal = cpu$execute$alu$_T_15;
   cpu$execute$alu$_T_15 = (0x1 == cpu$execute$alu$state);
@@ -12184,7 +12184,7 @@ void DiffNewTop::step548() {
     activeFlags[1348] = true;
   }
 }
-void DiffNewTop::step549() {
+void Diffnewtop::step549() {
   activeFlags[549] = false;
   uint8_t cpu$execute$alu$_T_16$oldVal = cpu$execute$alu$_T_16;
   cpu$execute$alu$_T_16 = (0x2 == cpu$execute$alu$state);
@@ -12194,7 +12194,7 @@ void DiffNewTop::step549() {
     activeFlags[1348] = true;
   }
 }
-void DiffNewTop::step550() {
+void Diffnewtop::step550() {
   activeFlags[550] = false;
   uint8_t cpu$execute$alu$divider$_T$oldVal = cpu$execute$alu$divider$_T;
   cpu$execute$alu$divider$_T = (0x0 == cpu$execute$alu$divider$state);
@@ -12211,7 +12211,7 @@ void DiffNewTop::step550() {
     activeFlags[1339] = true;
   }
 }
-void DiffNewTop::step551() {
+void Diffnewtop::step551() {
   activeFlags[551] = false;
   uint8_t cpu$execute$alu$divider$_T_1$oldVal = cpu$execute$alu$divider$_T_1;
   cpu$execute$alu$divider$_T_1 = (0x1 == cpu$execute$alu$divider$state);
@@ -12225,7 +12225,7 @@ void DiffNewTop::step551() {
     activeFlags[1339] = true;
   }
 }
-void DiffNewTop::step553() {
+void Diffnewtop::step553() {
   activeFlags[553] = false;
   uint8_t cpu$execute$alu$divider$_T_2$oldVal = cpu$execute$alu$divider$_T_2;
   cpu$execute$alu$divider$_T_2 = (cpu$execute$alu$divider$iter <= 0x40);
@@ -12239,7 +12239,7 @@ void DiffNewTop::step553() {
     activeFlags[1339] = true;
   }
 }
-void DiffNewTop::step555() {
+void Diffnewtop::step555() {
   activeFlags[555] = false;
   uint8_t cpu$execute$alu$divider$_T_3$oldVal = cpu$execute$alu$divider$_T_3;
   cpu$execute$alu$divider$_T_3 = (cpu$execute$alu$divider$val1 >= cpu$execute$alu$divider$val2);
@@ -12249,7 +12249,7 @@ void DiffNewTop::step555() {
     activeFlags[1339] = true;
   }
 }
-void DiffNewTop::step556() {
+void Diffnewtop::step556() {
   activeFlags[556] = false;
   uint8_t cpu$execute$alu$divider$io$valid$oldVal = cpu$execute$alu$divider$io$valid;
   cpu$execute$alu$divider$io$valid =
@@ -12261,7 +12261,7 @@ void DiffNewTop::step556() {
     activeFlags[1348] = true;
   }
 }
-void DiffNewTop::step557() {
+void Diffnewtop::step557() {
   activeFlags[557] = false;
   uint8_t cpu$execute$alu$multiplier$_T$oldVal = cpu$execute$alu$multiplier$_T;
   cpu$execute$alu$multiplier$_T = (0x0 == cpu$execute$alu$multiplier$state);
@@ -12274,7 +12274,7 @@ void DiffNewTop::step557() {
     activeFlags[1347] = true;
   }
 }
-void DiffNewTop::step558() {
+void Diffnewtop::step558() {
   activeFlags[558] = false;
   uint8_t cpu$execute$alu$multiplier$_T_1$oldVal = cpu$execute$alu$multiplier$_T_1;
   cpu$execute$alu$multiplier$_T_1 = (0x1 == cpu$execute$alu$multiplier$state);
@@ -12284,7 +12284,7 @@ void DiffNewTop::step558() {
     activeFlags[1347] = true;
   }
 }
-void DiffNewTop::step560() {
+void Diffnewtop::step560() {
   activeFlags[560] = false;
   uint8_t cpu$execute$drop_in$oldVal = cpu$execute$drop_in;
   cpu$execute$drop_in = (cpu$execute$drop_r | cpu$memory$drop1_in);
@@ -12296,13 +12296,13 @@ void DiffNewTop::step560() {
     activeFlags[1409] = true;
   }
 }
-void DiffNewTop::step561() {
+void Diffnewtop::step561() {
   activeFlags[561] = false;
   uint8_t cpu$execute$_T_2$oldVal = cpu$execute$_T_2;
   cpu$execute$_T_2 = (cpu$execute$drop_in == 0x0);
   if (cpu$execute$_T_2$oldVal != cpu$execute$_T_2) { activeFlags[563] = true; }
 }
-void DiffNewTop::step562() {
+void Diffnewtop::step562() {
   activeFlags[562] = false;
   uint8_t cpu$execute$_T_13$oldVal = cpu$execute$_T_13;
   cpu$execute$_T_13 = (cpu$execute$drop_in == 0x0);
@@ -12312,7 +12312,7 @@ void DiffNewTop::step562() {
     activeFlags[1314] = true;
   }
 }
-void DiffNewTop::step563() {
+void Diffnewtop::step563() {
   activeFlags[563] = false;
   uint8_t cpu$execute$alu$io$en$oldVal = cpu$execute$alu$io$en;
   cpu$execute$alu$io$en = (cpu$execute$_T_2 ? (cpu$execute$_T_6 ? 0x0 : (cpu$readregs$valid_r ? 0x1 : 0x0)) : 0x0);
@@ -12329,7 +12329,7 @@ void DiffNewTop::step563() {
     activeFlags[565] = true;
   }
 }
-void DiffNewTop::step564() {
+void Diffnewtop::step564() {
   activeFlags[564] = false;
   uint8_t cpu$readregs$hs_out$oldVal = cpu$readregs$hs_out;
   cpu$readregs$hs_out = (cpu$execute$io$rr2ex$ready & cpu$readregs$valid_r);
@@ -12338,7 +12338,7 @@ void DiffNewTop::step564() {
     activeFlags[1409] = true;
   }
 }
-void DiffNewTop::step565() {
+void Diffnewtop::step565() {
   activeFlags[565] = false;
   uint8_t cpu$execute$hs_in$oldVal = cpu$execute$hs_in;
   cpu$execute$hs_in = (cpu$execute$io$rr2ex$ready & cpu$readregs$valid_r);
@@ -12372,7 +12372,7 @@ void DiffNewTop::step565() {
     activeFlags[1407] = true;
   }
 }
-void DiffNewTop::step566() {
+void Diffnewtop::step566() {
   activeFlags[566] = false;
   uint8_t cpu$readregs$_io_d_rr_state_T$oldVal = cpu$readregs$_io_d_rr_state_T;
   cpu$readregs$_io_d_rr_state_T = (cpu$readregs$valid_r ? 0x2 : 0x0);
@@ -12383,7 +12383,7 @@ void DiffNewTop::step566() {
     activeFlags[650] = true;
   }
 }
-void DiffNewTop::step567() {
+void Diffnewtop::step567() {
   activeFlags[567] = false;
   uint8_t cpu$forwading$_T_7$oldVal = cpu$forwading$_T_7;
   cpu$forwading$_T_7 = (cpu$readregs$_io_d_rr_state_T == 0x1);
@@ -12393,7 +12393,7 @@ void DiffNewTop::step567() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step568() {
+void Diffnewtop::step568() {
   activeFlags[568] = false;
   uint8_t cpu$forwading$_T_31$oldVal = cpu$forwading$_T_31;
   cpu$forwading$_T_31 = (cpu$readregs$_io_d_rr_state_T == 0x1);
@@ -12403,7 +12403,7 @@ void DiffNewTop::step568() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step570() {
+void Diffnewtop::step570() {
   activeFlags[570] = false;
   uint8_t cpu$execute$alu64$oldVal = cpu$execute$alu64;
   cpu$execute$alu64 = (cpu$readregs$ctrl_r$aluWidth == 0x0);
@@ -12416,7 +12416,7 @@ void DiffNewTop::step570() {
     activeFlags[1335] = true;
   }
 }
-void DiffNewTop::step571() {
+void Diffnewtop::step571() {
   activeFlags[571] = false;
   uint8_t cpu$execute$alu$div_type_1$oldVal = cpu$execute$alu$div_type_1;
   cpu$execute$alu$div_type_1 = ((0x11 == (cpu$readregs$ctrl_r$aluOp & 0x1f))
@@ -12431,7 +12431,7 @@ void DiffNewTop::step571() {
     activeFlags[1339] = true;
   }
 }
-void DiffNewTop::step572() {
+void Diffnewtop::step572() {
   activeFlags[572] = false;
   uint8_t cpu$execute$alu$_T_7$oldVal = cpu$execute$alu$_T_7;
   cpu$execute$alu$_T_7 = ((((cpu$readregs$ctrl_r$aluOp == 0xd) | (cpu$readregs$ctrl_r$aluOp == 0xe)) |
@@ -12443,7 +12443,7 @@ void DiffNewTop::step572() {
     activeFlags[1348] = true;
   }
 }
-void DiffNewTop::step573() {
+void Diffnewtop::step573() {
   activeFlags[573] = false;
   uint8_t cpu$execute$alu$_T_14$oldVal = cpu$execute$alu$_T_14;
   cpu$execute$alu$_T_14 = ((((cpu$readregs$ctrl_r$aluOp == 0x11) | (cpu$readregs$ctrl_r$aluOp == 0x12)) |
@@ -12455,7 +12455,7 @@ void DiffNewTop::step573() {
     activeFlags[1348] = true;
   }
 }
-void DiffNewTop::step574() {
+void Diffnewtop::step574() {
   activeFlags[574] = false;
   uint8_t cpu$execute$signed_dr$oldVal = cpu$execute$signed_dr;
   cpu$execute$signed_dr =
@@ -12465,7 +12465,7 @@ void DiffNewTop::step574() {
     activeFlags[577] = true;
   }
 }
-void DiffNewTop::step575() {
+void Diffnewtop::step575() {
   activeFlags[575] = false;
   uint8_t cpu$execute$unsigned_dr$oldVal = cpu$execute$unsigned_dr;
   cpu$execute$unsigned_dr =
@@ -12475,7 +12475,7 @@ void DiffNewTop::step575() {
     activeFlags[577] = true;
   }
 }
-void DiffNewTop::step576() {
+void Diffnewtop::step576() {
   activeFlags[576] = false;
   uint64_t cpu$execute$val1$oldVal = cpu$execute$val1;
   cpu$execute$val1 =
@@ -12494,7 +12494,7 @@ void DiffNewTop::step576() {
     activeFlags[1342] = true;
   }
 }
-void DiffNewTop::step577() {
+void Diffnewtop::step577() {
   activeFlags[577] = false;
   uint64_t cpu$execute$val2$oldVal = cpu$execute$val2;
   cpu$execute$val2 =
@@ -12516,7 +12516,7 @@ void DiffNewTop::step577() {
     activeFlags[1341] = true;
   }
 }
-void DiffNewTop::step578() {
+void Diffnewtop::step578() {
   activeFlags[578] = false;
   uint8_t cpu$execute$alu$divider$io$en$oldVal = cpu$execute$alu$divider$io$en;
   cpu$execute$alu$divider$io$en =
@@ -12556,7 +12556,7 @@ void DiffNewTop::step578() {
     activeFlags[1344] = true;
   }
 }
-void DiffNewTop::step579() {
+void Diffnewtop::step579() {
   activeFlags[579] = false;
   uint64_t cpu$execute$alu_out$oldVal = cpu$execute$alu_out;
   cpu$execute$alu_out =
@@ -13077,7 +13077,7 @@ void DiffNewTop::step579() {
     activeFlags[1333] = true;
   }
 }
-void DiffNewTop::step580() {
+void Diffnewtop::step580() {
   activeFlags[580] = false;
   uint64_t cpu$execute$wdata$oldVal = cpu$execute$wdata;
   cpu$execute$wdata = (((cpu$readregs$ctrl_r$dcMode >> 3) & 0x1)
@@ -13088,7 +13088,7 @@ void DiffNewTop::step580() {
     activeFlags[1177] = true;
   }
 }
-void DiffNewTop::step581() {
+void Diffnewtop::step581() {
   activeFlags[581] = false;
   uint8_t cpu$execute$_T_1$oldVal = cpu$execute$_T_1;
   cpu$execute$_T_1 =
@@ -13114,7 +13114,7 @@ void DiffNewTop::step581() {
     activeFlags[1327] = true;
   }
 }
-void DiffNewTop::step582() {
+void Diffnewtop::step582() {
   activeFlags[582] = false;
   uint8_t cpu$execute$_T_10$oldVal = cpu$execute$_T_10;
   cpu$execute$_T_10 = (cpu$execute$hs_in & (cpu$execute$alu$io$valid == 0x0));
@@ -13123,7 +13123,7 @@ void DiffNewTop::step582() {
     activeFlags[977] = true;
   }
 }
-void DiffNewTop::step583() {
+void Diffnewtop::step583() {
   activeFlags[583] = false;
   uint8_t cpu$execute$real_is_target$oldVal = cpu$execute$real_is_target;
   cpu$execute$real_is_target = ((0x2 == cpu$readregs$jmp_type_r)
@@ -13148,7 +13148,7 @@ void DiffNewTop::step583() {
     activeFlags[585] = true;
   }
 }
-void DiffNewTop::step584() {
+void Diffnewtop::step584() {
   activeFlags[584] = false;
   uint8_t cpu$execute$_T_18$oldVal = cpu$execute$_T_18;
   cpu$execute$_T_18 = (((cpu$execute$hs_in & (cpu$readregs$excep_r$en == 0x0)) & cpu$execute$real_is_target) &
@@ -13159,7 +13159,7 @@ void DiffNewTop::step584() {
     activeFlags[1314] = true;
   }
 }
-void DiffNewTop::step585() {
+void Diffnewtop::step585() {
   activeFlags[585] = false;
   uint64_t cpu$execute$real_target$oldVal = cpu$execute$real_target;
   cpu$execute$real_target =
@@ -13176,7 +13176,7 @@ void DiffNewTop::step585() {
     activeFlags[1164] = true;
   }
 }
-void DiffNewTop::step586() {
+void Diffnewtop::step586() {
   activeFlags[586] = false;
   uint8_t cpu$readregs$drop_in$oldVal = cpu$readregs$drop_in;
   cpu$readregs$drop_in = (cpu$execute$drop_in | cpu$readregs$drop_r);
@@ -13187,7 +13187,7 @@ void DiffNewTop::step586() {
     activeFlags[937] = true;
   }
 }
-void DiffNewTop::step587() {
+void Diffnewtop::step587() {
   activeFlags[587] = false;
   uint8_t cpu$forwading$_T_52$oldVal = cpu$forwading$_T_52;
   cpu$forwading$_T_52 = (cpu$readregs$drop_in == 0x0);
@@ -13197,7 +13197,7 @@ void DiffNewTop::step587() {
     activeFlags[1394] = true;
   }
 }
-void DiffNewTop::step588() {
+void Diffnewtop::step588() {
   activeFlags[588] = false;
   uint8_t cpu$forwading$_T_57$oldVal = cpu$forwading$_T_57;
   cpu$forwading$_T_57 = (cpu$forwading$state == 0x0);
@@ -13206,7 +13206,7 @@ void DiffNewTop::step588() {
     activeFlags[1394] = true;
   }
 }
-void DiffNewTop::step589() {
+void Diffnewtop::step589() {
   activeFlags[589] = false;
   uint8_t cpu$forwading$_T_60$oldVal = cpu$forwading$_T_60;
   cpu$forwading$_T_60 = (cpu$forwading$state == 0x1);
@@ -13215,7 +13215,7 @@ void DiffNewTop::step589() {
     activeFlags[1394] = true;
   }
 }
-void DiffNewTop::step590() {
+void Diffnewtop::step590() {
   activeFlags[590] = false;
   uint8_t cpu$readregs$io$df2rr$ready$oldVal = cpu$readregs$io$df2rr$ready;
   cpu$readregs$io$df2rr$ready =
@@ -13227,7 +13227,7 @@ void DiffNewTop::step590() {
     activeFlags[592] = true;
   }
 }
-void DiffNewTop::step591() {
+void Diffnewtop::step591() {
   activeFlags[591] = false;
   uint8_t cpu$forwading$hs_out$oldVal = cpu$forwading$hs_out;
   cpu$forwading$hs_out = (cpu$readregs$io$df2rr$ready & cpu$forwading$valid_r);
@@ -13237,7 +13237,7 @@ void DiffNewTop::step591() {
     activeFlags[963] = true;
   }
 }
-void DiffNewTop::step592() {
+void Diffnewtop::step592() {
   activeFlags[592] = false;
   uint8_t cpu$readregs$hs_in$oldVal = cpu$readregs$hs_in;
   cpu$readregs$hs_in = (cpu$readregs$io$df2rr$ready & cpu$forwading$valid_r);
@@ -13269,7 +13269,7 @@ void DiffNewTop::step592() {
     activeFlags[1409] = true;
   }
 }
-void DiffNewTop::step594() {
+void Diffnewtop::step594() {
   activeFlags[594] = false;
   uint8_t cpu$csrs$_T_7$oldVal = cpu$csrs$_T_7;
   cpu$csrs$_T_7 = (cpu$forwading$rs2_r == 0x301);
@@ -13278,7 +13278,7 @@ void DiffNewTop::step594() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step595() {
+void Diffnewtop::step595() {
   activeFlags[595] = false;
   uint8_t cpu$csrs$_T_8$oldVal = cpu$csrs$_T_8;
   cpu$csrs$_T_8 = (cpu$forwading$rs2_r == 0x300);
@@ -13287,7 +13287,7 @@ void DiffNewTop::step595() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step596() {
+void Diffnewtop::step596() {
   activeFlags[596] = false;
   uint8_t cpu$csrs$_T_9$oldVal = cpu$csrs$_T_9;
   cpu$csrs$_T_9 = (cpu$forwading$rs2_r == 0x341);
@@ -13296,7 +13296,7 @@ void DiffNewTop::step596() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step597() {
+void Diffnewtop::step597() {
   activeFlags[597] = false;
   uint8_t cpu$csrs$_T_10$oldVal = cpu$csrs$_T_10;
   cpu$csrs$_T_10 = (cpu$forwading$rs2_r == 0x343);
@@ -13305,7 +13305,7 @@ void DiffNewTop::step597() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step598() {
+void Diffnewtop::step598() {
   activeFlags[598] = false;
   uint8_t cpu$csrs$_T_11$oldVal = cpu$csrs$_T_11;
   cpu$csrs$_T_11 = (cpu$forwading$rs2_r == 0x340);
@@ -13314,7 +13314,7 @@ void DiffNewTop::step598() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step599() {
+void Diffnewtop::step599() {
   activeFlags[599] = false;
   uint8_t cpu$csrs$_T_12$oldVal = cpu$csrs$_T_12;
   cpu$csrs$_T_12 = (cpu$forwading$rs2_r == 0x305);
@@ -13323,7 +13323,7 @@ void DiffNewTop::step599() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step600() {
+void Diffnewtop::step600() {
   activeFlags[600] = false;
   uint8_t cpu$csrs$_T_13$oldVal = cpu$csrs$_T_13;
   cpu$csrs$_T_13 = (cpu$forwading$rs2_r == 0x304);
@@ -13332,7 +13332,7 @@ void DiffNewTop::step600() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step601() {
+void Diffnewtop::step601() {
   activeFlags[601] = false;
   uint8_t cpu$csrs$_T_14$oldVal = cpu$csrs$_T_14;
   cpu$csrs$_T_14 = (cpu$forwading$rs2_r == 0x344);
@@ -13341,7 +13341,7 @@ void DiffNewTop::step601() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step602() {
+void Diffnewtop::step602() {
   activeFlags[602] = false;
   uint8_t cpu$csrs$_T_15$oldVal = cpu$csrs$_T_15;
   cpu$csrs$_T_15 = (cpu$forwading$rs2_r == 0x342);
@@ -13350,7 +13350,7 @@ void DiffNewTop::step602() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step603() {
+void Diffnewtop::step603() {
   activeFlags[603] = false;
   uint8_t cpu$csrs$_T_16$oldVal = cpu$csrs$_T_16;
   cpu$csrs$_T_16 = (cpu$forwading$rs2_r == 0x302);
@@ -13359,7 +13359,7 @@ void DiffNewTop::step603() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step604() {
+void Diffnewtop::step604() {
   activeFlags[604] = false;
   uint8_t cpu$csrs$_T_17$oldVal = cpu$csrs$_T_17;
   cpu$csrs$_T_17 = (cpu$forwading$rs2_r == 0x303);
@@ -13368,7 +13368,7 @@ void DiffNewTop::step604() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step605() {
+void Diffnewtop::step605() {
   activeFlags[605] = false;
   uint8_t cpu$csrs$_T_18$oldVal = cpu$csrs$_T_18;
   cpu$csrs$_T_18 = (cpu$forwading$rs2_r == 0x306);
@@ -13377,7 +13377,7 @@ void DiffNewTop::step605() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step606() {
+void Diffnewtop::step606() {
   activeFlags[606] = false;
   uint8_t cpu$csrs$_T_19$oldVal = cpu$csrs$_T_19;
   cpu$csrs$_T_19 = (cpu$forwading$rs2_r == 0x106);
@@ -13386,7 +13386,7 @@ void DiffNewTop::step606() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step607() {
+void Diffnewtop::step607() {
   activeFlags[607] = false;
   uint8_t cpu$csrs$_T_20$oldVal = cpu$csrs$_T_20;
   cpu$csrs$_T_20 = (cpu$forwading$rs2_r == 0x141);
@@ -13395,7 +13395,7 @@ void DiffNewTop::step607() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step608() {
+void Diffnewtop::step608() {
   activeFlags[608] = false;
   uint8_t cpu$csrs$_T_21$oldVal = cpu$csrs$_T_21;
   cpu$csrs$_T_21 = (cpu$forwading$rs2_r == 0x143);
@@ -13404,7 +13404,7 @@ void DiffNewTop::step608() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step609() {
+void Diffnewtop::step609() {
   activeFlags[609] = false;
   uint8_t cpu$csrs$_T_22$oldVal = cpu$csrs$_T_22;
   cpu$csrs$_T_22 = (cpu$forwading$rs2_r == 0x140);
@@ -13413,7 +13413,7 @@ void DiffNewTop::step609() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step610() {
+void Diffnewtop::step610() {
   activeFlags[610] = false;
   uint8_t cpu$csrs$_T_23$oldVal = cpu$csrs$_T_23;
   cpu$csrs$_T_23 = (cpu$forwading$rs2_r == 0x105);
@@ -13422,7 +13422,7 @@ void DiffNewTop::step610() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step611() {
+void Diffnewtop::step611() {
   activeFlags[611] = false;
   uint8_t cpu$csrs$_T_24$oldVal = cpu$csrs$_T_24;
   cpu$csrs$_T_24 = (cpu$forwading$rs2_r == 0x180);
@@ -13431,7 +13431,7 @@ void DiffNewTop::step611() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step612() {
+void Diffnewtop::step612() {
   activeFlags[612] = false;
   uint8_t cpu$csrs$_T_25$oldVal = cpu$csrs$_T_25;
   cpu$csrs$_T_25 = (cpu$forwading$rs2_r == 0x142);
@@ -13440,7 +13440,7 @@ void DiffNewTop::step612() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step613() {
+void Diffnewtop::step613() {
   activeFlags[613] = false;
   uint8_t cpu$csrs$_T_26$oldVal = cpu$csrs$_T_26;
   cpu$csrs$_T_26 = (cpu$forwading$rs2_r == 0x100);
@@ -13449,7 +13449,7 @@ void DiffNewTop::step613() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step614() {
+void Diffnewtop::step614() {
   activeFlags[614] = false;
   uint8_t cpu$csrs$_T_27$oldVal = cpu$csrs$_T_27;
   cpu$csrs$_T_27 = (cpu$forwading$rs2_r == 0x104);
@@ -13458,7 +13458,7 @@ void DiffNewTop::step614() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step615() {
+void Diffnewtop::step615() {
   activeFlags[615] = false;
   uint8_t cpu$csrs$_T_28$oldVal = cpu$csrs$_T_28;
   cpu$csrs$_T_28 = (cpu$forwading$rs2_r == 0x144);
@@ -13467,7 +13467,7 @@ void DiffNewTop::step615() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step616() {
+void Diffnewtop::step616() {
   activeFlags[616] = false;
   uint8_t cpu$csrs$_T_29$oldVal = cpu$csrs$_T_29;
   cpu$csrs$_T_29 = (cpu$forwading$rs2_r == 0x3b0);
@@ -13476,7 +13476,7 @@ void DiffNewTop::step616() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step617() {
+void Diffnewtop::step617() {
   activeFlags[617] = false;
   uint8_t cpu$csrs$_T_30$oldVal = cpu$csrs$_T_30;
   cpu$csrs$_T_30 = (cpu$forwading$rs2_r == 0x3b1);
@@ -13485,7 +13485,7 @@ void DiffNewTop::step617() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step618() {
+void Diffnewtop::step618() {
   activeFlags[618] = false;
   uint8_t cpu$csrs$_T_31$oldVal = cpu$csrs$_T_31;
   cpu$csrs$_T_31 = (cpu$forwading$rs2_r == 0x3b2);
@@ -13494,7 +13494,7 @@ void DiffNewTop::step618() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step619() {
+void Diffnewtop::step619() {
   activeFlags[619] = false;
   uint8_t cpu$csrs$_T_32$oldVal = cpu$csrs$_T_32;
   cpu$csrs$_T_32 = (cpu$forwading$rs2_r == 0x3b3);
@@ -13503,7 +13503,7 @@ void DiffNewTop::step619() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step620() {
+void Diffnewtop::step620() {
   activeFlags[620] = false;
   uint8_t cpu$csrs$_T_33$oldVal = cpu$csrs$_T_33;
   cpu$csrs$_T_33 = (cpu$forwading$rs2_r == 0x3a0);
@@ -13512,7 +13512,7 @@ void DiffNewTop::step620() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step621() {
+void Diffnewtop::step621() {
   activeFlags[621] = false;
   uint8_t cpu$csrs$_T_34$oldVal = cpu$csrs$_T_34;
   cpu$csrs$_T_34 = (cpu$forwading$rs2_r == 0x40);
@@ -13521,7 +13521,7 @@ void DiffNewTop::step621() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step622() {
+void Diffnewtop::step622() {
   activeFlags[622] = false;
   uint8_t cpu$csrs$_T_35$oldVal = cpu$csrs$_T_35;
   cpu$csrs$_T_35 = (cpu$forwading$rs2_r == 0xf14);
@@ -13530,7 +13530,7 @@ void DiffNewTop::step622() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step623() {
+void Diffnewtop::step623() {
   activeFlags[623] = false;
   uint64_t cpu$readregs$rs1_bef$oldVal = cpu$readregs$rs1_bef;
   cpu$readregs$rs1_bef = (cpu$forwading$rrs1_r ? cpu$regs$regs[cpu$forwading$rs1_r] : cpu$forwading$rs1_d_r);
@@ -13540,7 +13540,7 @@ void DiffNewTop::step623() {
     activeFlags[1178] = true;
   }
 }
-void DiffNewTop::step624() {
+void Diffnewtop::step624() {
   activeFlags[624] = false;
   uint8_t cpu$readregs$_T$oldVal = cpu$readregs$_T;
   cpu$readregs$_T =
@@ -13604,7 +13604,7 @@ void DiffNewTop::step624() {
     activeFlags[1351] = true;
   }
 }
-void DiffNewTop::step625() {
+void Diffnewtop::step625() {
   activeFlags[625] = false;
   uint64_t cpu$readregs$rs2_bef$oldVal = cpu$readregs$rs2_bef;
   cpu$readregs$rs2_bef =
@@ -13665,7 +13665,7 @@ void DiffNewTop::step625() {
     activeFlags[1178] = true;
   }
 }
-void DiffNewTop::step626() {
+void Diffnewtop::step626() {
   activeFlags[626] = false;
   uint8_t cpu$forwading$_io_id2df_drop_T$oldVal = cpu$forwading$_io_id2df_drop_T;
   cpu$forwading$_io_id2df_drop_T = (cpu$forwading$drop_r | cpu$readregs$drop_in);
@@ -13675,7 +13675,7 @@ void DiffNewTop::step626() {
     activeFlags[954] = true;
   }
 }
-void DiffNewTop::step627() {
+void Diffnewtop::step627() {
   activeFlags[627] = false;
   uint8_t cpu$forwading$io$id2df$ready$oldVal = cpu$forwading$io$id2df$ready;
   cpu$forwading$io$id2df$ready =
@@ -13688,7 +13688,7 @@ void DiffNewTop::step627() {
     activeFlags[629] = true;
   }
 }
-void DiffNewTop::step628() {
+void Diffnewtop::step628() {
   activeFlags[628] = false;
   uint8_t cpu$decode$hs_out$oldVal = cpu$decode$hs_out;
   cpu$decode$hs_out = (cpu$forwading$io$id2df$ready & cpu$decode$valid_r);
@@ -13697,7 +13697,7 @@ void DiffNewTop::step628() {
     activeFlags[954] = true;
   }
 }
-void DiffNewTop::step629() {
+void Diffnewtop::step629() {
   activeFlags[629] = false;
   uint8_t cpu$forwading$hs_in$oldVal = cpu$forwading$hs_in;
   cpu$forwading$hs_in = (cpu$forwading$io$id2df$ready & cpu$decode$valid_r);
@@ -13739,7 +13739,7 @@ void DiffNewTop::step629() {
     activeFlags[1368] = true;
   }
 }
-void DiffNewTop::step630() {
+void Diffnewtop::step630() {
   activeFlags[630] = false;
   uint8_t cpu$forwading$_T_49$oldVal = cpu$forwading$_T_49;
   cpu$forwading$_T_49 = (cpu$forwading$hs_in | (cpu$forwading$state != 0x0));
@@ -13750,7 +13750,7 @@ void DiffNewTop::step630() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step632() {
+void Diffnewtop::step632() {
   activeFlags[632] = false;
   uint8_t cpu$forwading$cur_rrs2$oldVal = cpu$forwading$cur_rrs2;
   cpu$forwading$cur_rrs2 = (cpu$forwading$hs_in ? cpu$decode$rrs2_r : cpu$forwading$rrs2_r);
@@ -13760,7 +13760,7 @@ void DiffNewTop::step632() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step634() {
+void Diffnewtop::step634() {
   activeFlags[634] = false;
   uint16_t cpu$forwading$cur_rs2$oldVal = cpu$forwading$cur_rs2;
   cpu$forwading$cur_rs2 = (cpu$forwading$hs_in ? cpu$decode$rs2_r : cpu$forwading$rs2_r);
@@ -13774,7 +13774,7 @@ void DiffNewTop::step634() {
     activeFlags[641] = true;
   }
 }
-void DiffNewTop::step635() {
+void Diffnewtop::step635() {
   activeFlags[635] = false;
   uint8_t cpu$forwading$_T_24$oldVal = cpu$forwading$_T_24;
   cpu$forwading$_T_24 = (cpu$forwading$cur_rs2 == 0x0);
@@ -13784,7 +13784,7 @@ void DiffNewTop::step635() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step636() {
+void Diffnewtop::step636() {
   activeFlags[636] = false;
   uint8_t cpu$forwading$_T_27$oldVal = cpu$forwading$_T_27;
   cpu$forwading$_T_27 =
@@ -13795,7 +13795,7 @@ void DiffNewTop::step636() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step637() {
+void Diffnewtop::step637() {
   activeFlags[637] = false;
   uint8_t cpu$forwading$_T_30$oldVal = cpu$forwading$_T_30;
   cpu$forwading$_T_30 = ((cpu$forwading$cur_rs2 == cpu$readregs$dst_r) & (cpu$readregs$_io_d_rr_state_T != 0x0));
@@ -13805,7 +13805,7 @@ void DiffNewTop::step637() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step638() {
+void Diffnewtop::step638() {
   activeFlags[638] = false;
   uint8_t cpu$forwading$_T_34$oldVal = cpu$forwading$_T_34;
   cpu$forwading$_T_34 = ((cpu$forwading$cur_rs2 == cpu$execute$dst_r) & (cpu$execute$io$d_ex$state != 0x0));
@@ -13815,7 +13815,7 @@ void DiffNewTop::step638() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step639() {
+void Diffnewtop::step639() {
   activeFlags[639] = false;
   uint8_t cpu$forwading$_T_38$oldVal = cpu$forwading$_T_38;
   cpu$forwading$_T_38 = ((cpu$forwading$cur_rs2 == cpu$memory$dst1_r) & (cpu$memory$io$d_mem1$state != 0x0));
@@ -13825,7 +13825,7 @@ void DiffNewTop::step639() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step640() {
+void Diffnewtop::step640() {
   activeFlags[640] = false;
   uint8_t cpu$forwading$_T_42$oldVal = cpu$forwading$_T_42;
   cpu$forwading$_T_42 = ((cpu$forwading$cur_rs2 == cpu$memory$dst2_r) & (cpu$memory$io$d_mem2$state != 0x0));
@@ -13835,7 +13835,7 @@ void DiffNewTop::step640() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step641() {
+void Diffnewtop::step641() {
   activeFlags[641] = false;
   uint8_t cpu$forwading$_T_46$oldVal = cpu$forwading$_T_46;
   cpu$forwading$_T_46 = ((cpu$forwading$cur_rs2 == cpu$memory$dst3_r) & (cpu$memory$io$d_mem3$state != 0x0));
@@ -13845,7 +13845,7 @@ void DiffNewTop::step641() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step642() {
+void Diffnewtop::step642() {
   activeFlags[642] = false;
   uint8_t cpu$forwading$rs2_wait$oldVal = cpu$forwading$rs2_wait;
   cpu$forwading$rs2_wait =
@@ -13870,7 +13870,7 @@ void DiffNewTop::step642() {
     activeFlags[657] = true;
   }
 }
-void DiffNewTop::step643() {
+void Diffnewtop::step643() {
   activeFlags[643] = false;
   uint8_t cpu$forwading$_T_51$oldVal = cpu$forwading$_T_51;
   cpu$forwading$_T_51 =
@@ -13896,7 +13896,7 @@ void DiffNewTop::step643() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step645() {
+void Diffnewtop::step645() {
   activeFlags[645] = false;
   uint8_t cpu$forwading$cur_rrs1$oldVal = cpu$forwading$cur_rrs1;
   cpu$forwading$cur_rrs1 = (cpu$forwading$hs_in ? cpu$decode$rrs1_r : cpu$forwading$rrs1_r);
@@ -13906,7 +13906,7 @@ void DiffNewTop::step645() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step647() {
+void Diffnewtop::step647() {
   activeFlags[647] = false;
   uint8_t cpu$forwading$cur_rs1$oldVal = cpu$forwading$cur_rs1;
   cpu$forwading$cur_rs1 = (cpu$forwading$hs_in ? cpu$decode$rs1_r : cpu$forwading$rs1_r);
@@ -13920,7 +13920,7 @@ void DiffNewTop::step647() {
     activeFlags[654] = true;
   }
 }
-void DiffNewTop::step648() {
+void Diffnewtop::step648() {
   activeFlags[648] = false;
   uint8_t cpu$forwading$_T$oldVal = cpu$forwading$_T;
   cpu$forwading$_T = (cpu$forwading$cur_rs1 == 0x0);
@@ -13930,7 +13930,7 @@ void DiffNewTop::step648() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step649() {
+void Diffnewtop::step649() {
   activeFlags[649] = false;
   uint8_t cpu$forwading$_T_3$oldVal = cpu$forwading$_T_3;
   cpu$forwading$_T_3 =
@@ -13941,7 +13941,7 @@ void DiffNewTop::step649() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step650() {
+void Diffnewtop::step650() {
   activeFlags[650] = false;
   uint8_t cpu$forwading$_T_6$oldVal = cpu$forwading$_T_6;
   cpu$forwading$_T_6 = ((cpu$forwading$cur_rs1 == cpu$readregs$dst_r) & (cpu$readregs$_io_d_rr_state_T != 0x0));
@@ -13951,7 +13951,7 @@ void DiffNewTop::step650() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step651() {
+void Diffnewtop::step651() {
   activeFlags[651] = false;
   uint8_t cpu$forwading$_T_10$oldVal = cpu$forwading$_T_10;
   cpu$forwading$_T_10 = ((cpu$forwading$cur_rs1 == cpu$execute$dst_r) & (cpu$execute$io$d_ex$state != 0x0));
@@ -13961,7 +13961,7 @@ void DiffNewTop::step651() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step652() {
+void Diffnewtop::step652() {
   activeFlags[652] = false;
   uint8_t cpu$forwading$_T_14$oldVal = cpu$forwading$_T_14;
   cpu$forwading$_T_14 = ((cpu$forwading$cur_rs1 == cpu$memory$dst1_r) & (cpu$memory$io$d_mem1$state != 0x0));
@@ -13971,7 +13971,7 @@ void DiffNewTop::step652() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step653() {
+void Diffnewtop::step653() {
   activeFlags[653] = false;
   uint8_t cpu$forwading$_T_18$oldVal = cpu$forwading$_T_18;
   cpu$forwading$_T_18 = ((cpu$forwading$cur_rs1 == cpu$memory$dst2_r) & (cpu$memory$io$d_mem2$state != 0x0));
@@ -13981,7 +13981,7 @@ void DiffNewTop::step653() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step654() {
+void Diffnewtop::step654() {
   activeFlags[654] = false;
   uint8_t cpu$forwading$_T_22$oldVal = cpu$forwading$_T_22;
   cpu$forwading$_T_22 = ((cpu$forwading$cur_rs1 == cpu$memory$dst3_r) & (cpu$memory$io$d_mem3$state != 0x0));
@@ -13991,7 +13991,7 @@ void DiffNewTop::step654() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step655() {
+void Diffnewtop::step655() {
   activeFlags[655] = false;
   uint8_t cpu$forwading$rs1_wait$oldVal = cpu$forwading$rs1_wait;
   cpu$forwading$rs1_wait =
@@ -14016,7 +14016,7 @@ void DiffNewTop::step655() {
     activeFlags[657] = true;
   }
 }
-void DiffNewTop::step656() {
+void Diffnewtop::step656() {
   activeFlags[656] = false;
   uint8_t cpu$forwading$_T_59$oldVal = cpu$forwading$_T_59;
   cpu$forwading$_T_59 = (cpu$forwading$hs_in & (cpu$forwading$rs1_wait | cpu$forwading$rs2_wait));
@@ -14025,7 +14025,7 @@ void DiffNewTop::step656() {
     activeFlags[1394] = true;
   }
 }
-void DiffNewTop::step657() {
+void Diffnewtop::step657() {
   activeFlags[657] = false;
   uint8_t cpu$forwading$_T_63$oldVal = cpu$forwading$_T_63;
   cpu$forwading$_T_63 = ((cpu$forwading$rs1_wait == 0x0) & (cpu$forwading$rs2_wait == 0x0));
@@ -14034,7 +14034,7 @@ void DiffNewTop::step657() {
     activeFlags[1394] = true;
   }
 }
-void DiffNewTop::step658() {
+void Diffnewtop::step658() {
   activeFlags[658] = false;
   uint8_t cpu$forwading$_T_50$oldVal = cpu$forwading$_T_50;
   cpu$forwading$_T_50 =
@@ -14060,7 +14060,7 @@ void DiffNewTop::step658() {
     activeFlags[957] = true;
   }
 }
-void DiffNewTop::step659() {
+void Diffnewtop::step659() {
   activeFlags[659] = false;
   uint8_t cpu$decode$drop_in$oldVal = cpu$decode$drop_in;
   cpu$decode$drop_in = (cpu$decode$drop_r | cpu$forwading$_io_id2df_drop_T);
@@ -14072,7 +14072,7 @@ void DiffNewTop::step659() {
     activeFlags[937] = true;
   }
 }
-void DiffNewTop::step660() {
+void Diffnewtop::step660() {
   activeFlags[660] = false;
   uint8_t cpu$fetch$_T_28$oldVal = cpu$fetch$_T_28;
   cpu$fetch$_T_28 = (cpu$decode$drop_in == 0x0);
@@ -14095,7 +14095,7 @@ void DiffNewTop::step660() {
     activeFlags[1392] = true;
   }
 }
-void DiffNewTop::step663() {
+void Diffnewtop::step663() {
   activeFlags[663] = false;
   uint8_t cpu$decode$_instType_T_1$oldVal = cpu$decode$_instType_T_1;
   cpu$decode$_instType_T_1 = (0x37 == (cpu$fetch$inst_r & 0x7f));
@@ -14110,7 +14110,7 @@ void DiffNewTop::step663() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step664() {
+void Diffnewtop::step664() {
   activeFlags[664] = false;
   uint8_t cpu$decode$_instType_T_3$oldVal = cpu$decode$_instType_T_3;
   cpu$decode$_instType_T_3 = (0x17 == (cpu$fetch$inst_r & 0x7f));
@@ -14125,7 +14125,7 @@ void DiffNewTop::step664() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step665() {
+void Diffnewtop::step665() {
   activeFlags[665] = false;
   uint8_t cpu$decode$_instType_T_5$oldVal = cpu$decode$_instType_T_5;
   cpu$decode$_instType_T_5 = (0x6f == (cpu$fetch$inst_r & 0x7f));
@@ -14140,7 +14140,7 @@ void DiffNewTop::step665() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step666() {
+void Diffnewtop::step666() {
   activeFlags[666] = false;
   uint8_t cpu$decode$_instType_T_7$oldVal = cpu$decode$_instType_T_7;
   cpu$decode$_instType_T_7 = (0x67 == (cpu$fetch$inst_r & 0x707f));
@@ -14155,7 +14155,7 @@ void DiffNewTop::step666() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step667() {
+void Diffnewtop::step667() {
   activeFlags[667] = false;
   uint8_t cpu$decode$_instType_T_9$oldVal = cpu$decode$_instType_T_9;
   cpu$decode$_instType_T_9 = (0x63 == (cpu$fetch$inst_r & 0x707f));
@@ -14170,7 +14170,7 @@ void DiffNewTop::step667() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step668() {
+void Diffnewtop::step668() {
   activeFlags[668] = false;
   uint8_t cpu$decode$_instType_T_11$oldVal = cpu$decode$_instType_T_11;
   cpu$decode$_instType_T_11 = (0x1063 == (cpu$fetch$inst_r & 0x707f));
@@ -14185,7 +14185,7 @@ void DiffNewTop::step668() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step669() {
+void Diffnewtop::step669() {
   activeFlags[669] = false;
   uint8_t cpu$decode$_instType_T_13$oldVal = cpu$decode$_instType_T_13;
   cpu$decode$_instType_T_13 = (0x4063 == (cpu$fetch$inst_r & 0x707f));
@@ -14200,7 +14200,7 @@ void DiffNewTop::step669() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step670() {
+void Diffnewtop::step670() {
   activeFlags[670] = false;
   uint8_t cpu$decode$_instType_T_15$oldVal = cpu$decode$_instType_T_15;
   cpu$decode$_instType_T_15 = (0x5063 == (cpu$fetch$inst_r & 0x707f));
@@ -14215,7 +14215,7 @@ void DiffNewTop::step670() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step671() {
+void Diffnewtop::step671() {
   activeFlags[671] = false;
   uint8_t cpu$decode$_instType_T_17$oldVal = cpu$decode$_instType_T_17;
   cpu$decode$_instType_T_17 = (0x6063 == (cpu$fetch$inst_r & 0x707f));
@@ -14230,7 +14230,7 @@ void DiffNewTop::step671() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step672() {
+void Diffnewtop::step672() {
   activeFlags[672] = false;
   uint8_t cpu$decode$_instType_T_19$oldVal = cpu$decode$_instType_T_19;
   cpu$decode$_instType_T_19 = (0x7063 == (cpu$fetch$inst_r & 0x707f));
@@ -14245,7 +14245,7 @@ void DiffNewTop::step672() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step673() {
+void Diffnewtop::step673() {
   activeFlags[673] = false;
   uint8_t cpu$decode$_instType_T_21$oldVal = cpu$decode$_instType_T_21;
   cpu$decode$_instType_T_21 = (0x3 == (cpu$fetch$inst_r & 0x707f));
@@ -14260,7 +14260,7 @@ void DiffNewTop::step673() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step674() {
+void Diffnewtop::step674() {
   activeFlags[674] = false;
   uint8_t cpu$decode$_instType_T_23$oldVal = cpu$decode$_instType_T_23;
   cpu$decode$_instType_T_23 = (0x1003 == (cpu$fetch$inst_r & 0x707f));
@@ -14275,7 +14275,7 @@ void DiffNewTop::step674() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step675() {
+void Diffnewtop::step675() {
   activeFlags[675] = false;
   uint8_t cpu$decode$_instType_T_25$oldVal = cpu$decode$_instType_T_25;
   cpu$decode$_instType_T_25 = (0x2003 == (cpu$fetch$inst_r & 0x707f));
@@ -14290,7 +14290,7 @@ void DiffNewTop::step675() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step676() {
+void Diffnewtop::step676() {
   activeFlags[676] = false;
   uint8_t cpu$decode$_instType_T_27$oldVal = cpu$decode$_instType_T_27;
   cpu$decode$_instType_T_27 = (0x3003 == (cpu$fetch$inst_r & 0x707f));
@@ -14305,7 +14305,7 @@ void DiffNewTop::step676() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step677() {
+void Diffnewtop::step677() {
   activeFlags[677] = false;
   uint8_t cpu$decode$_instType_T_29$oldVal = cpu$decode$_instType_T_29;
   cpu$decode$_instType_T_29 = (0x4003 == (cpu$fetch$inst_r & 0x707f));
@@ -14320,7 +14320,7 @@ void DiffNewTop::step677() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step678() {
+void Diffnewtop::step678() {
   activeFlags[678] = false;
   uint8_t cpu$decode$_instType_T_31$oldVal = cpu$decode$_instType_T_31;
   cpu$decode$_instType_T_31 = (0x5003 == (cpu$fetch$inst_r & 0x707f));
@@ -14335,7 +14335,7 @@ void DiffNewTop::step678() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step679() {
+void Diffnewtop::step679() {
   activeFlags[679] = false;
   uint8_t cpu$decode$_instType_T_33$oldVal = cpu$decode$_instType_T_33;
   cpu$decode$_instType_T_33 = (0x6003 == (cpu$fetch$inst_r & 0x707f));
@@ -14350,7 +14350,7 @@ void DiffNewTop::step679() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step680() {
+void Diffnewtop::step680() {
   activeFlags[680] = false;
   uint8_t cpu$decode$_instType_T_35$oldVal = cpu$decode$_instType_T_35;
   cpu$decode$_instType_T_35 = (0x23 == (cpu$fetch$inst_r & 0x707f));
@@ -14365,7 +14365,7 @@ void DiffNewTop::step680() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step681() {
+void Diffnewtop::step681() {
   activeFlags[681] = false;
   uint8_t cpu$decode$_instType_T_37$oldVal = cpu$decode$_instType_T_37;
   cpu$decode$_instType_T_37 = (0x1023 == (cpu$fetch$inst_r & 0x707f));
@@ -14380,7 +14380,7 @@ void DiffNewTop::step681() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step682() {
+void Diffnewtop::step682() {
   activeFlags[682] = false;
   uint8_t cpu$decode$_instType_T_39$oldVal = cpu$decode$_instType_T_39;
   cpu$decode$_instType_T_39 = (0x2023 == (cpu$fetch$inst_r & 0x707f));
@@ -14395,7 +14395,7 @@ void DiffNewTop::step682() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step683() {
+void Diffnewtop::step683() {
   activeFlags[683] = false;
   uint8_t cpu$decode$_instType_T_41$oldVal = cpu$decode$_instType_T_41;
   cpu$decode$_instType_T_41 = (0x3023 == (cpu$fetch$inst_r & 0x707f));
@@ -14410,7 +14410,7 @@ void DiffNewTop::step683() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step684() {
+void Diffnewtop::step684() {
   activeFlags[684] = false;
   uint8_t cpu$decode$_instType_T_43$oldVal = cpu$decode$_instType_T_43;
   cpu$decode$_instType_T_43 = (0x13 == (cpu$fetch$inst_r & 0x707f));
@@ -14425,7 +14425,7 @@ void DiffNewTop::step684() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step685() {
+void Diffnewtop::step685() {
   activeFlags[685] = false;
   uint8_t cpu$decode$_instType_T_45$oldVal = cpu$decode$_instType_T_45;
   cpu$decode$_instType_T_45 = (0x2013 == (cpu$fetch$inst_r & 0x707f));
@@ -14440,7 +14440,7 @@ void DiffNewTop::step685() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step686() {
+void Diffnewtop::step686() {
   activeFlags[686] = false;
   uint8_t cpu$decode$_instType_T_47$oldVal = cpu$decode$_instType_T_47;
   cpu$decode$_instType_T_47 = (0x3013 == (cpu$fetch$inst_r & 0x707f));
@@ -14455,7 +14455,7 @@ void DiffNewTop::step686() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step687() {
+void Diffnewtop::step687() {
   activeFlags[687] = false;
   uint8_t cpu$decode$_instType_T_49$oldVal = cpu$decode$_instType_T_49;
   cpu$decode$_instType_T_49 = (0x4013 == (cpu$fetch$inst_r & 0x707f));
@@ -14470,7 +14470,7 @@ void DiffNewTop::step687() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step688() {
+void Diffnewtop::step688() {
   activeFlags[688] = false;
   uint8_t cpu$decode$_instType_T_51$oldVal = cpu$decode$_instType_T_51;
   cpu$decode$_instType_T_51 = (0x6013 == (cpu$fetch$inst_r & 0x707f));
@@ -14485,7 +14485,7 @@ void DiffNewTop::step688() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step689() {
+void Diffnewtop::step689() {
   activeFlags[689] = false;
   uint8_t cpu$decode$_instType_T_53$oldVal = cpu$decode$_instType_T_53;
   cpu$decode$_instType_T_53 = (0x7013 == (cpu$fetch$inst_r & 0x707f));
@@ -14500,7 +14500,7 @@ void DiffNewTop::step689() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step690() {
+void Diffnewtop::step690() {
   activeFlags[690] = false;
   uint8_t cpu$decode$_instType_T_55$oldVal = cpu$decode$_instType_T_55;
   cpu$decode$_instType_T_55 = (0x1013 == (cpu$fetch$inst_r & 0xfc00707f));
@@ -14515,7 +14515,7 @@ void DiffNewTop::step690() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step691() {
+void Diffnewtop::step691() {
   activeFlags[691] = false;
   uint8_t cpu$decode$_instType_T_57$oldVal = cpu$decode$_instType_T_57;
   cpu$decode$_instType_T_57 = (0x5013 == (cpu$fetch$inst_r & 0xfc00707f));
@@ -14530,7 +14530,7 @@ void DiffNewTop::step691() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step692() {
+void Diffnewtop::step692() {
   activeFlags[692] = false;
   uint8_t cpu$decode$_instType_T_59$oldVal = cpu$decode$_instType_T_59;
   cpu$decode$_instType_T_59 = (0x40005013 == (cpu$fetch$inst_r & 0xfc00707f));
@@ -14545,7 +14545,7 @@ void DiffNewTop::step692() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step693() {
+void Diffnewtop::step693() {
   activeFlags[693] = false;
   uint8_t cpu$decode$_instType_T_61$oldVal = cpu$decode$_instType_T_61;
   cpu$decode$_instType_T_61 = (0x33 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14560,7 +14560,7 @@ void DiffNewTop::step693() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step694() {
+void Diffnewtop::step694() {
   activeFlags[694] = false;
   uint8_t cpu$decode$_instType_T_63$oldVal = cpu$decode$_instType_T_63;
   cpu$decode$_instType_T_63 = (0x40000033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14575,7 +14575,7 @@ void DiffNewTop::step694() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step695() {
+void Diffnewtop::step695() {
   activeFlags[695] = false;
   uint8_t cpu$decode$_instType_T_65$oldVal = cpu$decode$_instType_T_65;
   cpu$decode$_instType_T_65 = (0x1033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14590,7 +14590,7 @@ void DiffNewTop::step695() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step696() {
+void Diffnewtop::step696() {
   activeFlags[696] = false;
   uint8_t cpu$decode$_instType_T_67$oldVal = cpu$decode$_instType_T_67;
   cpu$decode$_instType_T_67 = (0x2033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14605,7 +14605,7 @@ void DiffNewTop::step696() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step697() {
+void Diffnewtop::step697() {
   activeFlags[697] = false;
   uint8_t cpu$decode$_instType_T_69$oldVal = cpu$decode$_instType_T_69;
   cpu$decode$_instType_T_69 = (0x3033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14620,7 +14620,7 @@ void DiffNewTop::step697() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step698() {
+void Diffnewtop::step698() {
   activeFlags[698] = false;
   uint8_t cpu$decode$_instType_T_71$oldVal = cpu$decode$_instType_T_71;
   cpu$decode$_instType_T_71 = (0x4033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14635,7 +14635,7 @@ void DiffNewTop::step698() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step699() {
+void Diffnewtop::step699() {
   activeFlags[699] = false;
   uint8_t cpu$decode$_instType_T_73$oldVal = cpu$decode$_instType_T_73;
   cpu$decode$_instType_T_73 = (0x5033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14650,7 +14650,7 @@ void DiffNewTop::step699() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step700() {
+void Diffnewtop::step700() {
   activeFlags[700] = false;
   uint8_t cpu$decode$_instType_T_75$oldVal = cpu$decode$_instType_T_75;
   cpu$decode$_instType_T_75 = (0x40005033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14665,7 +14665,7 @@ void DiffNewTop::step700() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step701() {
+void Diffnewtop::step701() {
   activeFlags[701] = false;
   uint8_t cpu$decode$_instType_T_77$oldVal = cpu$decode$_instType_T_77;
   cpu$decode$_instType_T_77 = (0x6033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14680,7 +14680,7 @@ void DiffNewTop::step701() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step702() {
+void Diffnewtop::step702() {
   activeFlags[702] = false;
   uint8_t cpu$decode$_instType_T_79$oldVal = cpu$decode$_instType_T_79;
   cpu$decode$_instType_T_79 = (0x7033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14695,7 +14695,7 @@ void DiffNewTop::step702() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step703() {
+void Diffnewtop::step703() {
   activeFlags[703] = false;
   uint8_t cpu$decode$_instType_T_81$oldVal = cpu$decode$_instType_T_81;
   cpu$decode$_instType_T_81 = (0x2000033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14710,7 +14710,7 @@ void DiffNewTop::step703() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step704() {
+void Diffnewtop::step704() {
   activeFlags[704] = false;
   uint8_t cpu$decode$_instType_T_83$oldVal = cpu$decode$_instType_T_83;
   cpu$decode$_instType_T_83 = (0x2001033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14725,7 +14725,7 @@ void DiffNewTop::step704() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step705() {
+void Diffnewtop::step705() {
   activeFlags[705] = false;
   uint8_t cpu$decode$_instType_T_85$oldVal = cpu$decode$_instType_T_85;
   cpu$decode$_instType_T_85 = (0x2003033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14740,7 +14740,7 @@ void DiffNewTop::step705() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step706() {
+void Diffnewtop::step706() {
   activeFlags[706] = false;
   uint8_t cpu$decode$_instType_T_87$oldVal = cpu$decode$_instType_T_87;
   cpu$decode$_instType_T_87 = (0x2002033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14755,7 +14755,7 @@ void DiffNewTop::step706() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step707() {
+void Diffnewtop::step707() {
   activeFlags[707] = false;
   uint8_t cpu$decode$_instType_T_89$oldVal = cpu$decode$_instType_T_89;
   cpu$decode$_instType_T_89 = (0x2004033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14770,7 +14770,7 @@ void DiffNewTop::step707() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step708() {
+void Diffnewtop::step708() {
   activeFlags[708] = false;
   uint8_t cpu$decode$_instType_T_91$oldVal = cpu$decode$_instType_T_91;
   cpu$decode$_instType_T_91 = (0x2005033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14785,7 +14785,7 @@ void DiffNewTop::step708() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step709() {
+void Diffnewtop::step709() {
   activeFlags[709] = false;
   uint8_t cpu$decode$_instType_T_93$oldVal = cpu$decode$_instType_T_93;
   cpu$decode$_instType_T_93 = (0x2006033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14800,7 +14800,7 @@ void DiffNewTop::step709() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step710() {
+void Diffnewtop::step710() {
   activeFlags[710] = false;
   uint8_t cpu$decode$_instType_T_95$oldVal = cpu$decode$_instType_T_95;
   cpu$decode$_instType_T_95 = (0x2007033 == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14815,7 +14815,7 @@ void DiffNewTop::step710() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step711() {
+void Diffnewtop::step711() {
   activeFlags[711] = false;
   uint8_t cpu$decode$_instType_T_97$oldVal = cpu$decode$_instType_T_97;
   cpu$decode$_instType_T_97 = (0x200003b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14830,7 +14830,7 @@ void DiffNewTop::step711() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step712() {
+void Diffnewtop::step712() {
   activeFlags[712] = false;
   uint8_t cpu$decode$_instType_T_99$oldVal = cpu$decode$_instType_T_99;
   cpu$decode$_instType_T_99 = (0x200403b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14845,7 +14845,7 @@ void DiffNewTop::step712() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step713() {
+void Diffnewtop::step713() {
   activeFlags[713] = false;
   uint8_t cpu$decode$_instType_T_101$oldVal = cpu$decode$_instType_T_101;
   cpu$decode$_instType_T_101 = (0x200503b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14860,7 +14860,7 @@ void DiffNewTop::step713() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step714() {
+void Diffnewtop::step714() {
   activeFlags[714] = false;
   uint8_t cpu$decode$_instType_T_103$oldVal = cpu$decode$_instType_T_103;
   cpu$decode$_instType_T_103 = (0x200603b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14875,7 +14875,7 @@ void DiffNewTop::step714() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step715() {
+void Diffnewtop::step715() {
   activeFlags[715] = false;
   uint8_t cpu$decode$_instType_T_105$oldVal = cpu$decode$_instType_T_105;
   cpu$decode$_instType_T_105 = (0x200703b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14890,7 +14890,7 @@ void DiffNewTop::step715() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step716() {
+void Diffnewtop::step716() {
   activeFlags[716] = false;
   uint8_t cpu$decode$_instType_T_107$oldVal = cpu$decode$_instType_T_107;
   cpu$decode$_instType_T_107 = (0x1b == (cpu$fetch$inst_r & 0x707f));
@@ -14905,7 +14905,7 @@ void DiffNewTop::step716() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step717() {
+void Diffnewtop::step717() {
   activeFlags[717] = false;
   uint8_t cpu$decode$_instType_T_109$oldVal = cpu$decode$_instType_T_109;
   cpu$decode$_instType_T_109 = (0x101b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14920,7 +14920,7 @@ void DiffNewTop::step717() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step718() {
+void Diffnewtop::step718() {
   activeFlags[718] = false;
   uint8_t cpu$decode$_instType_T_111$oldVal = cpu$decode$_instType_T_111;
   cpu$decode$_instType_T_111 = (0x501b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14935,7 +14935,7 @@ void DiffNewTop::step718() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step719() {
+void Diffnewtop::step719() {
   activeFlags[719] = false;
   uint8_t cpu$decode$_instType_T_113$oldVal = cpu$decode$_instType_T_113;
   cpu$decode$_instType_T_113 = (0x4000501b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14950,7 +14950,7 @@ void DiffNewTop::step719() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step720() {
+void Diffnewtop::step720() {
   activeFlags[720] = false;
   uint8_t cpu$decode$_instType_T_115$oldVal = cpu$decode$_instType_T_115;
   cpu$decode$_instType_T_115 = (0x3b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14965,7 +14965,7 @@ void DiffNewTop::step720() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step721() {
+void Diffnewtop::step721() {
   activeFlags[721] = false;
   uint8_t cpu$decode$_instType_T_117$oldVal = cpu$decode$_instType_T_117;
   cpu$decode$_instType_T_117 = (0x4000003b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14980,7 +14980,7 @@ void DiffNewTop::step721() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step722() {
+void Diffnewtop::step722() {
   activeFlags[722] = false;
   uint8_t cpu$decode$_instType_T_119$oldVal = cpu$decode$_instType_T_119;
   cpu$decode$_instType_T_119 = (0x103b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -14995,7 +14995,7 @@ void DiffNewTop::step722() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step723() {
+void Diffnewtop::step723() {
   activeFlags[723] = false;
   uint8_t cpu$decode$_instType_T_121$oldVal = cpu$decode$_instType_T_121;
   cpu$decode$_instType_T_121 = (0x503b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -15010,7 +15010,7 @@ void DiffNewTop::step723() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step724() {
+void Diffnewtop::step724() {
   activeFlags[724] = false;
   uint8_t cpu$decode$_instType_T_123$oldVal = cpu$decode$_instType_T_123;
   cpu$decode$_instType_T_123 = (0x4000503b == (cpu$fetch$inst_r & 0xfe00707f));
@@ -15025,7 +15025,7 @@ void DiffNewTop::step724() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step725() {
+void Diffnewtop::step725() {
   activeFlags[725] = false;
   uint8_t cpu$decode$_instType_T_125$oldVal = cpu$decode$_instType_T_125;
   cpu$decode$_instType_T_125 = (0x1073 == (cpu$fetch$inst_r & 0x707f));
@@ -15040,7 +15040,7 @@ void DiffNewTop::step725() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step726() {
+void Diffnewtop::step726() {
   activeFlags[726] = false;
   uint8_t cpu$decode$_instType_T_127$oldVal = cpu$decode$_instType_T_127;
   cpu$decode$_instType_T_127 = (0x2073 == (cpu$fetch$inst_r & 0x707f));
@@ -15055,7 +15055,7 @@ void DiffNewTop::step726() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step727() {
+void Diffnewtop::step727() {
   activeFlags[727] = false;
   uint8_t cpu$decode$_instType_T_129$oldVal = cpu$decode$_instType_T_129;
   cpu$decode$_instType_T_129 = (0x3073 == (cpu$fetch$inst_r & 0x707f));
@@ -15070,7 +15070,7 @@ void DiffNewTop::step727() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step728() {
+void Diffnewtop::step728() {
   activeFlags[728] = false;
   uint8_t cpu$decode$_instType_T_131$oldVal = cpu$decode$_instType_T_131;
   cpu$decode$_instType_T_131 = (0x5073 == (cpu$fetch$inst_r & 0x707f));
@@ -15085,7 +15085,7 @@ void DiffNewTop::step728() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step729() {
+void Diffnewtop::step729() {
   activeFlags[729] = false;
   uint8_t cpu$decode$_instType_T_133$oldVal = cpu$decode$_instType_T_133;
   cpu$decode$_instType_T_133 = (0x6073 == (cpu$fetch$inst_r & 0x707f));
@@ -15100,7 +15100,7 @@ void DiffNewTop::step729() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step730() {
+void Diffnewtop::step730() {
   activeFlags[730] = false;
   uint8_t cpu$decode$_instType_T_135$oldVal = cpu$decode$_instType_T_135;
   cpu$decode$_instType_T_135 = (0x7073 == (cpu$fetch$inst_r & 0x707f));
@@ -15115,7 +15115,7 @@ void DiffNewTop::step730() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step731() {
+void Diffnewtop::step731() {
   activeFlags[731] = false;
   uint8_t cpu$decode$_instType_T_137$oldVal = cpu$decode$_instType_T_137;
   cpu$decode$_instType_T_137 = (0x1000202f == (cpu$fetch$inst_r & 0xf9f0707f));
@@ -15130,7 +15130,7 @@ void DiffNewTop::step731() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step732() {
+void Diffnewtop::step732() {
   activeFlags[732] = false;
   uint8_t cpu$decode$_instType_T_139$oldVal = cpu$decode$_instType_T_139;
   cpu$decode$_instType_T_139 = (0x1800202f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15145,7 +15145,7 @@ void DiffNewTop::step732() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step733() {
+void Diffnewtop::step733() {
   activeFlags[733] = false;
   uint8_t cpu$decode$_instType_T_141$oldVal = cpu$decode$_instType_T_141;
   cpu$decode$_instType_T_141 = (0x800202f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15160,7 +15160,7 @@ void DiffNewTop::step733() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step734() {
+void Diffnewtop::step734() {
   activeFlags[734] = false;
   uint8_t cpu$decode$_instType_T_143$oldVal = cpu$decode$_instType_T_143;
   cpu$decode$_instType_T_143 = (0x202f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15175,7 +15175,7 @@ void DiffNewTop::step734() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step735() {
+void Diffnewtop::step735() {
   activeFlags[735] = false;
   uint8_t cpu$decode$_instType_T_145$oldVal = cpu$decode$_instType_T_145;
   cpu$decode$_instType_T_145 = (0x2000202f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15190,7 +15190,7 @@ void DiffNewTop::step735() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step736() {
+void Diffnewtop::step736() {
   activeFlags[736] = false;
   uint8_t cpu$decode$_instType_T_147$oldVal = cpu$decode$_instType_T_147;
   cpu$decode$_instType_T_147 = (0x6000202f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15205,7 +15205,7 @@ void DiffNewTop::step736() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step737() {
+void Diffnewtop::step737() {
   activeFlags[737] = false;
   uint8_t cpu$decode$_instType_T_149$oldVal = cpu$decode$_instType_T_149;
   cpu$decode$_instType_T_149 = (0x4000202f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15220,7 +15220,7 @@ void DiffNewTop::step737() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step738() {
+void Diffnewtop::step738() {
   activeFlags[738] = false;
   uint8_t cpu$decode$_instType_T_151$oldVal = cpu$decode$_instType_T_151;
   cpu$decode$_instType_T_151 = (0x8000202f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15235,7 +15235,7 @@ void DiffNewTop::step738() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step739() {
+void Diffnewtop::step739() {
   activeFlags[739] = false;
   uint8_t cpu$decode$_instType_T_153$oldVal = cpu$decode$_instType_T_153;
   cpu$decode$_instType_T_153 = (0xa000202f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15250,7 +15250,7 @@ void DiffNewTop::step739() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step740() {
+void Diffnewtop::step740() {
   activeFlags[740] = false;
   uint8_t cpu$decode$_instType_T_155$oldVal = cpu$decode$_instType_T_155;
   cpu$decode$_instType_T_155 = (0xc000202f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15265,7 +15265,7 @@ void DiffNewTop::step740() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step741() {
+void Diffnewtop::step741() {
   activeFlags[741] = false;
   uint8_t cpu$decode$_instType_T_157$oldVal = cpu$decode$_instType_T_157;
   cpu$decode$_instType_T_157 = (0xe000202f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15280,7 +15280,7 @@ void DiffNewTop::step741() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step742() {
+void Diffnewtop::step742() {
   activeFlags[742] = false;
   uint8_t cpu$decode$_instType_T_159$oldVal = cpu$decode$_instType_T_159;
   cpu$decode$_instType_T_159 = (0x1000302f == (cpu$fetch$inst_r & 0xf9f0707f));
@@ -15295,7 +15295,7 @@ void DiffNewTop::step742() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step743() {
+void Diffnewtop::step743() {
   activeFlags[743] = false;
   uint8_t cpu$decode$_instType_T_161$oldVal = cpu$decode$_instType_T_161;
   cpu$decode$_instType_T_161 = (0x1800302f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15310,7 +15310,7 @@ void DiffNewTop::step743() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step744() {
+void Diffnewtop::step744() {
   activeFlags[744] = false;
   uint8_t cpu$decode$_instType_T_163$oldVal = cpu$decode$_instType_T_163;
   cpu$decode$_instType_T_163 = (0x800302f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15325,7 +15325,7 @@ void DiffNewTop::step744() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step745() {
+void Diffnewtop::step745() {
   activeFlags[745] = false;
   uint8_t cpu$decode$_instType_T_165$oldVal = cpu$decode$_instType_T_165;
   cpu$decode$_instType_T_165 = (0x302f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15340,7 +15340,7 @@ void DiffNewTop::step745() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step746() {
+void Diffnewtop::step746() {
   activeFlags[746] = false;
   uint8_t cpu$decode$_instType_T_167$oldVal = cpu$decode$_instType_T_167;
   cpu$decode$_instType_T_167 = (0x4000302f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15355,7 +15355,7 @@ void DiffNewTop::step746() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step747() {
+void Diffnewtop::step747() {
   activeFlags[747] = false;
   uint8_t cpu$decode$_instType_T_169$oldVal = cpu$decode$_instType_T_169;
   cpu$decode$_instType_T_169 = (0x2000302f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15370,7 +15370,7 @@ void DiffNewTop::step747() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step748() {
+void Diffnewtop::step748() {
   activeFlags[748] = false;
   uint8_t cpu$decode$_instType_T_171$oldVal = cpu$decode$_instType_T_171;
   cpu$decode$_instType_T_171 = (0x6000302f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15385,7 +15385,7 @@ void DiffNewTop::step748() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step749() {
+void Diffnewtop::step749() {
   activeFlags[749] = false;
   uint8_t cpu$decode$_instType_T_173$oldVal = cpu$decode$_instType_T_173;
   cpu$decode$_instType_T_173 = (0x8000302f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15400,7 +15400,7 @@ void DiffNewTop::step749() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step750() {
+void Diffnewtop::step750() {
   activeFlags[750] = false;
   uint8_t cpu$decode$_instType_T_175$oldVal = cpu$decode$_instType_T_175;
   cpu$decode$_instType_T_175 = (0xa000302f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15415,7 +15415,7 @@ void DiffNewTop::step750() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step751() {
+void Diffnewtop::step751() {
   activeFlags[751] = false;
   uint8_t cpu$decode$_instType_T_177$oldVal = cpu$decode$_instType_T_177;
   cpu$decode$_instType_T_177 = (0xc000302f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15430,7 +15430,7 @@ void DiffNewTop::step751() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step752() {
+void Diffnewtop::step752() {
   activeFlags[752] = false;
   uint8_t cpu$decode$_instType_T_179$oldVal = cpu$decode$_instType_T_179;
   cpu$decode$_instType_T_179 = (0xe000302f == (cpu$fetch$inst_r & 0xf800707f));
@@ -15445,7 +15445,7 @@ void DiffNewTop::step752() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step753() {
+void Diffnewtop::step753() {
   activeFlags[753] = false;
   uint8_t cpu$decode$_instType_T_181$oldVal = cpu$decode$_instType_T_181;
   cpu$decode$_instType_T_181 = (0xf == (cpu$fetch$inst_r & 0xf00fffff));
@@ -15460,7 +15460,7 @@ void DiffNewTop::step753() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step754() {
+void Diffnewtop::step754() {
   activeFlags[754] = false;
   uint8_t cpu$decode$_instType_T_183$oldVal = cpu$decode$_instType_T_183;
   cpu$decode$_instType_T_183 = (0x100f == (cpu$fetch$inst_r & 0xffffffff));
@@ -15475,7 +15475,7 @@ void DiffNewTop::step754() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step755() {
+void Diffnewtop::step755() {
   activeFlags[755] = false;
   uint8_t cpu$decode$_instType_T_185$oldVal = cpu$decode$_instType_T_185;
   cpu$decode$_instType_T_185 = (0x12000073 == (cpu$fetch$inst_r & 0xfe007fff));
@@ -15490,7 +15490,7 @@ void DiffNewTop::step755() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step756() {
+void Diffnewtop::step756() {
   activeFlags[756] = false;
   uint8_t cpu$decode$_instType_T_187$oldVal = cpu$decode$_instType_T_187;
   cpu$decode$_instType_T_187 = (0x10500073 == (cpu$fetch$inst_r & 0xffffffff));
@@ -15505,7 +15505,7 @@ void DiffNewTop::step756() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step757() {
+void Diffnewtop::step757() {
   activeFlags[757] = false;
   uint8_t cpu$decode$_instType_T_189$oldVal = cpu$decode$_instType_T_189;
   cpu$decode$_instType_T_189 = (0x6b == (cpu$fetch$inst_r & 0xffffffff));
@@ -15520,7 +15520,7 @@ void DiffNewTop::step757() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step758() {
+void Diffnewtop::step758() {
   activeFlags[758] = false;
   uint8_t cpu$decode$instType_0$oldVal = cpu$decode$instType_0;
 cpu$decode$instType_0 = (cpu$decode$_instType_T_1? 0x5 : (cpu$decode$_instType_T_3? 0x5 : (cpu$decode$_instType_T_5? 0x6 : (cpu$decode$_instType_T_7? 0x2 : (cpu$decode$_instType_T_9? 0x4 : (cpu$decode$_instType_T_11? 0x4 : (cpu$decode$_instType_T_13? 0x4 : (cpu$decode$_instType_T_15? 0x4 : (cpu$decode$_instType_T_17? 0x4 : (cpu$decode$_instType_T_19? 0x4 : (cpu$decode$_instType_T_21? 0x2 : (cpu$decode$_instType_T_23? 0x2 : (cpu$decode$_instType_T_25? 0x2 : (cpu$decode$_instType_T_27? 0x2 : (cpu$decode$_instType_T_29? 0x2 : (cpu$decode$_instType_T_31? 0x2 : (cpu$decode$_instType_T_33? 0x2 : (cpu$decode$_instType_T_35? 0x3 : (cpu$decode$_instType_T_37? 0x3 : (cpu$decode$_instType_T_39? 0x3 : (cpu$decode$_instType_T_41? 0x3 : (cpu$decode$_instType_T_43? 0x2 : (cpu$decode$_instType_T_45? 0x2 : (cpu$decode$_instType_T_47? 0x2 : (cpu$decode$_instType_T_49? 0x2 : (cpu$decode$_instType_T_51? 0x2 : (cpu$decode$_instType_T_53? 0x2 : (cpu$decode$_instType_T_55? 0x2 : (cpu$decode$_instType_T_57? 0x2 : (cpu$decode$_instType_T_59? 0x2 : (cpu$decode$_instType_T_61? 0x1 : (cpu$decode$_instType_T_63? 0x1 : (cpu$decode$_instType_T_65? 0x1 : (cpu$decode$_instType_T_67? 0x1 : (cpu$decode$_instType_T_69? 0x1 : (cpu$decode$_instType_T_71? 0x1 : (cpu$decode$_instType_T_73? 0x1 : (cpu$decode$_instType_T_75? 0x1 : (cpu$decode$_instType_T_77? 0x1 : (cpu$decode$_instType_T_79? 0x1 : (cpu$decode$_instType_T_81? 0x1 : (cpu$decode$_instType_T_83? 0x1 : (cpu$decode$_instType_T_85? 0x1 : (cpu$decode$_instType_T_87? 0x1 : (cpu$decode$_instType_T_89? 0x1 : (cpu$decode$_instType_T_91? 0x1 : (cpu$decode$_instType_T_93? 0x1 : (cpu$decode$_instType_T_95? 0x1 : (cpu$decode$_instType_T_97? 0x1 : (cpu$decode$_instType_T_99? 0x1 : (cpu$decode$_instType_T_101? 0x1 : (cpu$decode$_instType_T_103? 0x1 : (cpu$decode$_instType_T_105? 0x1 : (cpu$decode$_instType_T_107? 0x2 : (cpu$decode$_instType_T_109? 0x2 : (cpu$decode$_instType_T_111? 0x2 : (cpu$decode$_instType_T_113? 0x2 : (cpu$decode$_instType_T_115? 0x1 : (cpu$decode$_instType_T_117? 0x1 : (cpu$decode$_instType_T_119? 0x1 : (cpu$decode$_instType_T_121? 0x1 : (cpu$decode$_instType_T_123? 0x1 : (cpu$decode$_instType_T_125? 0x2 : (cpu$decode$_instType_T_127? 0x2 : (cpu$decode$_instType_T_129? 0x2 : (cpu$decode$_instType_T_131? 0x2 : (cpu$decode$_instType_T_133? 0x2 : (cpu$decode$_instType_T_135? 0x2 : (cpu$decode$_instType_T_137? 0x1 : (cpu$decode$_instType_T_139? 0x1 : (cpu$decode$_instType_T_141? 0x1 : (cpu$decode$_instType_T_143? 0x1 : (cpu$decode$_instType_T_145? 0x1 : (cpu$decode$_instType_T_147? 0x1 : (cpu$decode$_instType_T_149? 0x1 : (cpu$decode$_instType_T_151? 0x1 : (cpu$decode$_instType_T_153? 0x1 : (cpu$decode$_instType_T_155? 0x1 : (cpu$decode$_instType_T_157? 0x1 : (cpu$decode$_instType_T_159? 0x1 : (cpu$decode$_instType_T_161? 0x1 : (cpu$decode$_instType_T_163? 0x1 : (cpu$decode$_instType_T_165? 0x1 : (cpu$decode$_instType_T_167? 0x1 : (cpu$decode$_instType_T_169? 0x1 : (cpu$decode$_instType_T_171? 0x1 : (cpu$decode$_instType_T_173? 0x1 : (cpu$decode$_instType_T_175? 0x1 : (cpu$decode$_instType_T_177? 0x1 : (cpu$decode$_instType_T_179? 0x1 : (cpu$decode$_instType_T_181? 0x0 : (cpu$decode$_instType_T_183? 0x0 : (cpu$decode$_instType_T_185? 0x0 : (cpu$decode$_instType_T_187? 0x0 : (cpu$decode$_instType_T_189? 0x0 : 0x7)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
@@ -15535,7 +15535,7 @@ if (cpu$decode$instType_0$oldVal != cpu$decode$instType_0) {
   activeFlags[841] = true;
 }
 }
-void DiffNewTop::step759() {
+void Diffnewtop::step759() {
   activeFlags[759] = false;
   uint8_t cpu$decode$_T_12$oldVal = cpu$decode$_T_12;
   cpu$decode$_T_12 = (cpu$decode$instType_0 == 0x1);
@@ -15545,7 +15545,7 @@ void DiffNewTop::step759() {
     activeFlags[1371] = true;
   }
 }
-void DiffNewTop::step760() {
+void Diffnewtop::step760() {
   activeFlags[760] = false;
   uint8_t cpu$decode$_T_13$oldVal = cpu$decode$_T_13;
   cpu$decode$_T_13 = (cpu$decode$instType_0 == 0x2);
@@ -15561,7 +15561,7 @@ void DiffNewTop::step760() {
     activeFlags[1393] = true;
   }
 }
-void DiffNewTop::step761() {
+void Diffnewtop::step761() {
   activeFlags[761] = false;
   uint8_t cpu$decode$_T_14$oldVal = cpu$decode$_T_14;
   cpu$decode$_T_14 = (cpu$decode$instType_0 == 0x3);
@@ -15572,7 +15572,7 @@ void DiffNewTop::step761() {
     activeFlags[1374] = true;
   }
 }
-void DiffNewTop::step762() {
+void Diffnewtop::step762() {
   activeFlags[762] = false;
   uint8_t cpu$decode$_T_15$oldVal = cpu$decode$_T_15;
   cpu$decode$_T_15 = (cpu$decode$instType_0 == 0x4);
@@ -15584,7 +15584,7 @@ void DiffNewTop::step762() {
     activeFlags[1378] = true;
   }
 }
-void DiffNewTop::step763() {
+void Diffnewtop::step763() {
   activeFlags[763] = false;
   uint8_t cpu$decode$_T_16$oldVal = cpu$decode$_T_16;
   cpu$decode$_T_16 = (cpu$decode$instType_0 == 0x5);
@@ -15593,7 +15593,7 @@ void DiffNewTop::step763() {
     activeFlags[1377] = true;
   }
 }
-void DiffNewTop::step764() {
+void Diffnewtop::step764() {
   activeFlags[764] = false;
   uint8_t cpu$decode$_T_17$oldVal = cpu$decode$_T_17;
   cpu$decode$_T_17 = (cpu$decode$instType_0 == 0x6);
@@ -15604,7 +15604,7 @@ void DiffNewTop::step764() {
     activeFlags[1377] = true;
   }
 }
-void DiffNewTop::step765() {
+void Diffnewtop::step765() {
   activeFlags[765] = false;
   uint8_t cpu$decode$jmp_indi$oldVal = cpu$decode$jmp_indi;
   cpu$decode$jmp_indi =
@@ -15641,7 +15641,7 @@ void DiffNewTop::step765() {
     activeFlags[1393] = true;
   }
 }
-void DiffNewTop::step766() {
+void Diffnewtop::step766() {
   activeFlags[766] = false;
   uint8_t cpu$decode$instType_6$oldVal = cpu$decode$instType_6;
 cpu$decode$instType_6 = (cpu$decode$_instType_T_1? 0x0 : (cpu$decode$_instType_T_3? 0x0 : (cpu$decode$_instType_T_5? 0x0 : (cpu$decode$_instType_T_7? 0x0 : (cpu$decode$_instType_T_9? 0x0 : (cpu$decode$_instType_T_11? 0x0 : (cpu$decode$_instType_T_13? 0x0 : (cpu$decode$_instType_T_15? 0x0 : (cpu$decode$_instType_T_17? 0x0 : (cpu$decode$_instType_T_19? 0x0 : (cpu$decode$_instType_T_21? 0x0 : (cpu$decode$_instType_T_23? 0x0 : (cpu$decode$_instType_T_25? 0x0 : (cpu$decode$_instType_T_27? 0x0 : (cpu$decode$_instType_T_29? 0x0 : (cpu$decode$_instType_T_31? 0x0 : (cpu$decode$_instType_T_33? 0x0 : (cpu$decode$_instType_T_35? 0x0 : (cpu$decode$_instType_T_37? 0x0 : (cpu$decode$_instType_T_39? 0x0 : (cpu$decode$_instType_T_41? 0x0 : (cpu$decode$_instType_T_43? 0x0 : (cpu$decode$_instType_T_45? 0x0 : (cpu$decode$_instType_T_47? 0x0 : (cpu$decode$_instType_T_49? 0x0 : (cpu$decode$_instType_T_51? 0x0 : (cpu$decode$_instType_T_53? 0x0 : (cpu$decode$_instType_T_55? 0x0 : (cpu$decode$_instType_T_57? 0x0 : (cpu$decode$_instType_T_59? 0x0 : (cpu$decode$_instType_T_61? 0x0 : (cpu$decode$_instType_T_63? 0x0 : (cpu$decode$_instType_T_65? 0x0 : (cpu$decode$_instType_T_67? 0x0 : (cpu$decode$_instType_T_69? 0x0 : (cpu$decode$_instType_T_71? 0x0 : (cpu$decode$_instType_T_73? 0x0 : (cpu$decode$_instType_T_75? 0x0 : (cpu$decode$_instType_T_77? 0x0 : (cpu$decode$_instType_T_79? 0x0 : (cpu$decode$_instType_T_81? 0x0 : (cpu$decode$_instType_T_83? 0x0 : (cpu$decode$_instType_T_85? 0x0 : (cpu$decode$_instType_T_87? 0x0 : (cpu$decode$_instType_T_89? 0x0 : (cpu$decode$_instType_T_91? 0x0 : (cpu$decode$_instType_T_93? 0x0 : (cpu$decode$_instType_T_95? 0x0 : (cpu$decode$_instType_T_97? 0x0 : (cpu$decode$_instType_T_99? 0x0 : (cpu$decode$_instType_T_101? 0x0 : (cpu$decode$_instType_T_103? 0x0 : (cpu$decode$_instType_T_105? 0x0 : (cpu$decode$_instType_T_107? 0x0 : (cpu$decode$_instType_T_109? 0x0 : (cpu$decode$_instType_T_111? 0x0 : (cpu$decode$_instType_T_113? 0x0 : (cpu$decode$_instType_T_115? 0x0 : (cpu$decode$_instType_T_117? 0x0 : (cpu$decode$_instType_T_119? 0x0 : (cpu$decode$_instType_T_121? 0x0 : (cpu$decode$_instType_T_123? 0x0 : (cpu$decode$_instType_T_125? 0x1 : (cpu$decode$_instType_T_127? 0x1 : (cpu$decode$_instType_T_129? 0x1 : (cpu$decode$_instType_T_131? 0x1 : (cpu$decode$_instType_T_133? 0x1 : (cpu$decode$_instType_T_135? 0x1 : 0x0))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
@@ -15650,7 +15650,7 @@ if (cpu$decode$instType_6$oldVal != cpu$decode$instType_6) {
   activeFlags[1379] = true;
 }
 }
-void DiffNewTop::step767() {
+void Diffnewtop::step767() {
   activeFlags[767] = false;
   uint8_t cpu$decode$rs2_is_csr$oldVal = cpu$decode$rs2_is_csr;
   cpu$decode$rs2_is_csr = (cpu$decode$instType_6 == 0x1);
@@ -15665,7 +15665,7 @@ void DiffNewTop::step767() {
     activeFlags[1393] = true;
   }
 }
-void DiffNewTop::step768() {
+void Diffnewtop::step768() {
   activeFlags[768] = false;
   uint16_t cpu$decode$_instType_c_T$oldVal = cpu$decode$_instType_c_T;
   cpu$decode$_instType_c_T = ((cpu$fetch$inst_r >> 0) & 0xffff);
@@ -15703,7 +15703,7 @@ void DiffNewTop::step768() {
     activeFlags[799] = true;
   }
 }
-void DiffNewTop::step769() {
+void Diffnewtop::step769() {
   activeFlags[769] = false;
   uint8_t cpu$decode$_instType_c_T_2$oldVal = cpu$decode$_instType_c_T_2;
   cpu$decode$_instType_c_T_2 = (0x0 == (cpu$decode$_instType_c_T & 0xe003));
@@ -15716,7 +15716,7 @@ void DiffNewTop::step769() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step770() {
+void Diffnewtop::step770() {
   activeFlags[770] = false;
   uint8_t cpu$decode$_instType_c_T_4$oldVal = cpu$decode$_instType_c_T_4;
   cpu$decode$_instType_c_T_4 = (0x4000 == (cpu$decode$_instType_c_T & 0xe003));
@@ -15729,7 +15729,7 @@ void DiffNewTop::step770() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step771() {
+void Diffnewtop::step771() {
   activeFlags[771] = false;
   uint8_t cpu$decode$_instType_c_T_6$oldVal = cpu$decode$_instType_c_T_6;
   cpu$decode$_instType_c_T_6 = (0x6000 == (cpu$decode$_instType_c_T & 0xe003));
@@ -15742,7 +15742,7 @@ void DiffNewTop::step771() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step772() {
+void Diffnewtop::step772() {
   activeFlags[772] = false;
   uint8_t cpu$decode$_instType_c_T_8$oldVal = cpu$decode$_instType_c_T_8;
   cpu$decode$_instType_c_T_8 = (0xc000 == (cpu$decode$_instType_c_T & 0xe003));
@@ -15755,7 +15755,7 @@ void DiffNewTop::step772() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step773() {
+void Diffnewtop::step773() {
   activeFlags[773] = false;
   uint8_t cpu$decode$_instType_c_T_10$oldVal = cpu$decode$_instType_c_T_10;
   cpu$decode$_instType_c_T_10 = (0xe000 == (cpu$decode$_instType_c_T & 0xe003));
@@ -15768,7 +15768,7 @@ void DiffNewTop::step773() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step774() {
+void Diffnewtop::step774() {
   activeFlags[774] = false;
   uint8_t cpu$decode$_instType_c_T_12$oldVal = cpu$decode$_instType_c_T_12;
   cpu$decode$_instType_c_T_12 = (0x1 == (cpu$decode$_instType_c_T & 0xe003));
@@ -15781,7 +15781,7 @@ void DiffNewTop::step774() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step775() {
+void Diffnewtop::step775() {
   activeFlags[775] = false;
   uint8_t cpu$decode$_instType_c_T_14$oldVal = cpu$decode$_instType_c_T_14;
   cpu$decode$_instType_c_T_14 = (0x2001 == (cpu$decode$_instType_c_T & 0xe003));
@@ -15794,7 +15794,7 @@ void DiffNewTop::step775() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step776() {
+void Diffnewtop::step776() {
   activeFlags[776] = false;
   uint8_t cpu$decode$_instType_c_T_16$oldVal = cpu$decode$_instType_c_T_16;
   cpu$decode$_instType_c_T_16 = (0x4001 == (cpu$decode$_instType_c_T & 0xe003));
@@ -15807,7 +15807,7 @@ void DiffNewTop::step776() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step777() {
+void Diffnewtop::step777() {
   activeFlags[777] = false;
   uint8_t cpu$decode$_instType_c_T_18$oldVal = cpu$decode$_instType_c_T_18;
   cpu$decode$_instType_c_T_18 = (0x6101 == (cpu$decode$_instType_c_T & 0xef83));
@@ -15820,7 +15820,7 @@ void DiffNewTop::step777() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step778() {
+void Diffnewtop::step778() {
   activeFlags[778] = false;
   uint8_t cpu$decode$_instType_c_T_20$oldVal = cpu$decode$_instType_c_T_20;
   cpu$decode$_instType_c_T_20 = (0x6001 == (cpu$decode$_instType_c_T & 0xe003));
@@ -15833,7 +15833,7 @@ void DiffNewTop::step778() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step779() {
+void Diffnewtop::step779() {
   activeFlags[779] = false;
   uint8_t cpu$decode$_instType_c_T_22$oldVal = cpu$decode$_instType_c_T_22;
   cpu$decode$_instType_c_T_22 = (0x8001 == (cpu$decode$_instType_c_T & 0xec03));
@@ -15846,7 +15846,7 @@ void DiffNewTop::step779() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step780() {
+void Diffnewtop::step780() {
   activeFlags[780] = false;
   uint8_t cpu$decode$_instType_c_T_24$oldVal = cpu$decode$_instType_c_T_24;
   cpu$decode$_instType_c_T_24 = (0x8401 == (cpu$decode$_instType_c_T & 0xec03));
@@ -15859,7 +15859,7 @@ void DiffNewTop::step780() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step781() {
+void Diffnewtop::step781() {
   activeFlags[781] = false;
   uint8_t cpu$decode$_instType_c_T_26$oldVal = cpu$decode$_instType_c_T_26;
   cpu$decode$_instType_c_T_26 = (0x8801 == (cpu$decode$_instType_c_T & 0xec03));
@@ -15872,7 +15872,7 @@ void DiffNewTop::step781() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step782() {
+void Diffnewtop::step782() {
   activeFlags[782] = false;
   uint8_t cpu$decode$_instType_c_T_28$oldVal = cpu$decode$_instType_c_T_28;
   cpu$decode$_instType_c_T_28 = (0x8c01 == (cpu$decode$_instType_c_T & 0xfc63));
@@ -15885,7 +15885,7 @@ void DiffNewTop::step782() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step783() {
+void Diffnewtop::step783() {
   activeFlags[783] = false;
   uint8_t cpu$decode$_instType_c_T_30$oldVal = cpu$decode$_instType_c_T_30;
   cpu$decode$_instType_c_T_30 = (0x8c21 == (cpu$decode$_instType_c_T & 0xfc63));
@@ -15898,7 +15898,7 @@ void DiffNewTop::step783() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step784() {
+void Diffnewtop::step784() {
   activeFlags[784] = false;
   uint8_t cpu$decode$_instType_c_T_32$oldVal = cpu$decode$_instType_c_T_32;
   cpu$decode$_instType_c_T_32 = (0x8c41 == (cpu$decode$_instType_c_T & 0xfc63));
@@ -15911,7 +15911,7 @@ void DiffNewTop::step784() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step785() {
+void Diffnewtop::step785() {
   activeFlags[785] = false;
   uint8_t cpu$decode$_instType_c_T_34$oldVal = cpu$decode$_instType_c_T_34;
   cpu$decode$_instType_c_T_34 = (0x8c61 == (cpu$decode$_instType_c_T & 0xfc63));
@@ -15924,7 +15924,7 @@ void DiffNewTop::step785() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step786() {
+void Diffnewtop::step786() {
   activeFlags[786] = false;
   uint8_t cpu$decode$_instType_c_T_36$oldVal = cpu$decode$_instType_c_T_36;
   cpu$decode$_instType_c_T_36 = (0x9c01 == (cpu$decode$_instType_c_T & 0xfc63));
@@ -15937,7 +15937,7 @@ void DiffNewTop::step786() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step787() {
+void Diffnewtop::step787() {
   activeFlags[787] = false;
   uint8_t cpu$decode$_instType_c_T_38$oldVal = cpu$decode$_instType_c_T_38;
   cpu$decode$_instType_c_T_38 = (0x9c21 == (cpu$decode$_instType_c_T & 0xfc63));
@@ -15950,7 +15950,7 @@ void DiffNewTop::step787() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step788() {
+void Diffnewtop::step788() {
   activeFlags[788] = false;
   uint8_t cpu$decode$_instType_c_T_40$oldVal = cpu$decode$_instType_c_T_40;
   cpu$decode$_instType_c_T_40 = (0xa001 == (cpu$decode$_instType_c_T & 0xe003));
@@ -15963,7 +15963,7 @@ void DiffNewTop::step788() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step789() {
+void Diffnewtop::step789() {
   activeFlags[789] = false;
   uint8_t cpu$decode$_instType_c_T_42$oldVal = cpu$decode$_instType_c_T_42;
   cpu$decode$_instType_c_T_42 = (0xc001 == (cpu$decode$_instType_c_T & 0xe003));
@@ -15976,7 +15976,7 @@ void DiffNewTop::step789() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step790() {
+void Diffnewtop::step790() {
   activeFlags[790] = false;
   uint8_t cpu$decode$_instType_c_T_44$oldVal = cpu$decode$_instType_c_T_44;
   cpu$decode$_instType_c_T_44 = (0xe001 == (cpu$decode$_instType_c_T & 0xe003));
@@ -15989,7 +15989,7 @@ void DiffNewTop::step790() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step791() {
+void Diffnewtop::step791() {
   activeFlags[791] = false;
   uint8_t cpu$decode$_instType_c_T_46$oldVal = cpu$decode$_instType_c_T_46;
   cpu$decode$_instType_c_T_46 = (0x2 == (cpu$decode$_instType_c_T & 0xe003));
@@ -16002,7 +16002,7 @@ void DiffNewTop::step791() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step792() {
+void Diffnewtop::step792() {
   activeFlags[792] = false;
   uint8_t cpu$decode$_instType_c_T_48$oldVal = cpu$decode$_instType_c_T_48;
   cpu$decode$_instType_c_T_48 = (0x4002 == (cpu$decode$_instType_c_T & 0xe003));
@@ -16015,7 +16015,7 @@ void DiffNewTop::step792() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step793() {
+void Diffnewtop::step793() {
   activeFlags[793] = false;
   uint8_t cpu$decode$_instType_c_T_50$oldVal = cpu$decode$_instType_c_T_50;
   cpu$decode$_instType_c_T_50 = (0x6002 == (cpu$decode$_instType_c_T & 0xe003));
@@ -16028,7 +16028,7 @@ void DiffNewTop::step793() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step794() {
+void Diffnewtop::step794() {
   activeFlags[794] = false;
   uint8_t cpu$decode$_instType_c_T_52$oldVal = cpu$decode$_instType_c_T_52;
   cpu$decode$_instType_c_T_52 = (0x8002 == (cpu$decode$_instType_c_T & 0xf07f));
@@ -16041,7 +16041,7 @@ void DiffNewTop::step794() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step795() {
+void Diffnewtop::step795() {
   activeFlags[795] = false;
   uint8_t cpu$decode$_instType_c_T_54$oldVal = cpu$decode$_instType_c_T_54;
   cpu$decode$_instType_c_T_54 = (0x8002 == (cpu$decode$_instType_c_T & 0xf003));
@@ -16054,7 +16054,7 @@ void DiffNewTop::step795() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step796() {
+void Diffnewtop::step796() {
   activeFlags[796] = false;
   uint8_t cpu$decode$_instType_c_T_56$oldVal = cpu$decode$_instType_c_T_56;
   cpu$decode$_instType_c_T_56 = (0x9002 == (cpu$decode$_instType_c_T & 0xf07f));
@@ -16067,7 +16067,7 @@ void DiffNewTop::step796() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step797() {
+void Diffnewtop::step797() {
   activeFlags[797] = false;
   uint8_t cpu$decode$_instType_c_T_58$oldVal = cpu$decode$_instType_c_T_58;
   cpu$decode$_instType_c_T_58 = (0x9002 == (cpu$decode$_instType_c_T & 0xf003));
@@ -16080,7 +16080,7 @@ void DiffNewTop::step797() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step798() {
+void Diffnewtop::step798() {
   activeFlags[798] = false;
   uint8_t cpu$decode$_instType_c_T_60$oldVal = cpu$decode$_instType_c_T_60;
   cpu$decode$_instType_c_T_60 = (0xc002 == (cpu$decode$_instType_c_T & 0xe003));
@@ -16093,7 +16093,7 @@ void DiffNewTop::step798() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step799() {
+void Diffnewtop::step799() {
   activeFlags[799] = false;
   uint8_t cpu$decode$_instType_c_T_62$oldVal = cpu$decode$_instType_c_T_62;
   cpu$decode$_instType_c_T_62 = (0xe002 == (cpu$decode$_instType_c_T & 0xe003));
@@ -16106,7 +16106,7 @@ void DiffNewTop::step799() {
     activeFlags[1383] = true;
   }
 }
-void DiffNewTop::step800() {
+void Diffnewtop::step800() {
   activeFlags[800] = false;
   uint8_t cpu$decode$instType_c_0$oldVal = cpu$decode$instType_c_0;
   cpu$decode$instType_c_0 = (cpu$decode$_instType_c_T_2
@@ -16169,7 +16169,7 @@ void DiffNewTop::step800() {
     activeFlags[842] = true;
   }
 }
-void DiffNewTop::step801() {
+void Diffnewtop::step801() {
   activeFlags[801] = false;
   uint8_t cpu$decode$_T_47$oldVal = cpu$decode$_T_47;
   cpu$decode$_T_47 = (cpu$decode$instType_c_0 == 0x1);
@@ -16182,7 +16182,7 @@ void DiffNewTop::step801() {
     activeFlags[1376] = true;
   }
 }
-void DiffNewTop::step802() {
+void Diffnewtop::step802() {
   activeFlags[802] = false;
   uint8_t cpu$decode$_T_52$oldVal = cpu$decode$_T_52;
   cpu$decode$_T_52 = (cpu$decode$instType_c_0 == 0x2);
@@ -16192,7 +16192,7 @@ void DiffNewTop::step802() {
     activeFlags[1376] = true;
   }
 }
-void DiffNewTop::step803() {
+void Diffnewtop::step803() {
   activeFlags[803] = false;
   uint8_t cpu$decode$_T_58$oldVal = cpu$decode$_T_58;
   cpu$decode$_T_58 = (cpu$decode$instType_c_0 == 0x3);
@@ -16205,7 +16205,7 @@ void DiffNewTop::step803() {
     activeFlags[1374] = true;
   }
 }
-void DiffNewTop::step804() {
+void Diffnewtop::step804() {
   activeFlags[804] = false;
   uint8_t cpu$decode$_T_59$oldVal = cpu$decode$_T_59;
   cpu$decode$_T_59 = (cpu$decode$instType_c_0 == 0x4);
@@ -16216,7 +16216,7 @@ void DiffNewTop::step804() {
     activeFlags[1376] = true;
   }
 }
-void DiffNewTop::step805() {
+void Diffnewtop::step805() {
   activeFlags[805] = false;
   uint8_t cpu$decode$_T_60$oldVal = cpu$decode$_T_60;
   cpu$decode$_T_60 = (cpu$decode$instType_c_0 == 0x5);
@@ -16227,7 +16227,7 @@ void DiffNewTop::step805() {
     activeFlags[1376] = true;
   }
 }
-void DiffNewTop::step806() {
+void Diffnewtop::step806() {
   activeFlags[806] = false;
   uint8_t cpu$decode$_T_61$oldVal = cpu$decode$_T_61;
   cpu$decode$_T_61 = (cpu$decode$instType_c_0 == 0x6);
@@ -16241,7 +16241,7 @@ void DiffNewTop::step806() {
     activeFlags[1375] = true;
   }
 }
-void DiffNewTop::step807() {
+void Diffnewtop::step807() {
   activeFlags[807] = false;
   uint8_t cpu$decode$_T_64$oldVal = cpu$decode$_T_64;
   cpu$decode$_T_64 = (cpu$decode$instType_c_0 == 0x7);
@@ -16255,7 +16255,7 @@ void DiffNewTop::step807() {
     activeFlags[1378] = true;
   }
 }
-void DiffNewTop::step808() {
+void Diffnewtop::step808() {
   activeFlags[808] = false;
   uint8_t cpu$decode$_T_69$oldVal = cpu$decode$_T_69;
   cpu$decode$_T_69 = (cpu$decode$instType_c_0 == 0x8);
@@ -16265,7 +16265,7 @@ void DiffNewTop::step808() {
     activeFlags[1377] = true;
   }
 }
-void DiffNewTop::step809() {
+void Diffnewtop::step809() {
   activeFlags[809] = false;
   uint8_t cpu$decode$is_compress$oldVal = cpu$decode$is_compress;
   cpu$decode$is_compress = (((cpu$fetch$inst_r >> 0) & 0x3) != 0x3);
@@ -16274,7 +16274,7 @@ void DiffNewTop::step809() {
     activeFlags[847] = true;
   }
 }
-void DiffNewTop::step810() {
+void Diffnewtop::step810() {
   activeFlags[810] = false;
   uint64_t cpu$decode$imm$oldVal = cpu$decode$imm;
   cpu$decode$imm =
@@ -16313,7 +16313,7 @@ void DiffNewTop::step810() {
     activeFlags[1377] = true;
   }
 }
-void DiffNewTop::step811() {
+void Diffnewtop::step811() {
   activeFlags[811] = false;
   uint8_t cpu$decode$_T_19$oldVal = cpu$decode$_T_19;
   cpu$decode$_T_19 = (0x73 == (cpu$fetch$inst_r & 0xffffffff));
@@ -16329,7 +16329,7 @@ void DiffNewTop::step811() {
     activeFlags[1393] = true;
   }
 }
-void DiffNewTop::step812() {
+void Diffnewtop::step812() {
   activeFlags[812] = false;
   uint8_t cpu$decode$_T_21$oldVal = cpu$decode$_T_21;
   cpu$decode$_T_21 = (0x10200073 == (cpu$fetch$inst_r & 0xffffffff));
@@ -16346,7 +16346,7 @@ void DiffNewTop::step812() {
     activeFlags[1393] = true;
   }
 }
-void DiffNewTop::step813() {
+void Diffnewtop::step813() {
   activeFlags[813] = false;
   uint8_t cpu$decode$_T_23$oldVal = cpu$decode$_T_23;
   cpu$decode$_T_23 = (0x30200073 == (cpu$fetch$inst_r & 0xffffffff));
@@ -16363,7 +16363,7 @@ void DiffNewTop::step813() {
     activeFlags[1393] = true;
   }
 }
-void DiffNewTop::step814() {
+void Diffnewtop::step814() {
   activeFlags[814] = false;
   uint8_t cpu$decode$_T_25$oldVal = cpu$decode$_T_25;
   cpu$decode$_T_25 = (0x100f == (cpu$fetch$inst_r & 0xffffffff));
@@ -16374,7 +16374,7 @@ void DiffNewTop::step814() {
     activeFlags[1393] = true;
   }
 }
-void DiffNewTop::step815() {
+void Diffnewtop::step815() {
   activeFlags[815] = false;
   uint8_t cpu$decode$_T_27$oldVal = cpu$decode$_T_27;
   cpu$decode$_T_27 = (0x12000073 == (cpu$fetch$inst_r & 0xfe007fff));
@@ -16385,7 +16385,7 @@ void DiffNewTop::step815() {
     activeFlags[1393] = true;
   }
 }
-void DiffNewTop::step816() {
+void Diffnewtop::step816() {
   activeFlags[816] = false;
   uint16_t cpu$decode$inst_c$oldVal = cpu$decode$inst_c;
   cpu$decode$inst_c = ((cpu$fetch$inst_r >> 0) & 0xffff);
@@ -16403,7 +16403,7 @@ void DiffNewTop::step816() {
     activeFlags[1386] = true;
   }
 }
-void DiffNewTop::step817() {
+void Diffnewtop::step817() {
   activeFlags[817] = false;
   uint64_t cpu$decode$imm_c$oldVal = cpu$decode$imm_c;
   cpu$decode$imm_c = ((
@@ -17187,7 +17187,7 @@ void DiffNewTop::step817() {
     activeFlags[1376] = true;
   }
 }
-void DiffNewTop::step818() {
+void Diffnewtop::step818() {
   activeFlags[818] = false;
   uint8_t cpu$decode$_T_49$oldVal = cpu$decode$_T_49;
   cpu$decode$_T_49 = (0x8002 == (cpu$decode$inst_c & 0xf07f));
@@ -17196,7 +17196,7 @@ void DiffNewTop::step818() {
     activeFlags[1374] = true;
   }
 }
-void DiffNewTop::step819() {
+void Diffnewtop::step819() {
   activeFlags[819] = false;
   uint8_t cpu$decode$_T_51$oldVal = cpu$decode$_T_51;
   cpu$decode$_T_51 = (0x9002 == (cpu$decode$inst_c & 0xf07f));
@@ -17208,7 +17208,7 @@ void DiffNewTop::step819() {
     activeFlags[1376] = true;
   }
 }
-void DiffNewTop::step820() {
+void Diffnewtop::step820() {
   activeFlags[820] = false;
   uint8_t cpu$decode$_T_66$oldVal = cpu$decode$_T_66;
   cpu$decode$_T_66 = (0xc001 == (cpu$decode$inst_c & 0xe003));
@@ -17218,7 +17218,7 @@ void DiffNewTop::step820() {
     activeFlags[1378] = true;
   }
 }
-void DiffNewTop::step821() {
+void Diffnewtop::step821() {
   activeFlags[821] = false;
   uint8_t cpu$decode$_T_68$oldVal = cpu$decode$_T_68;
   cpu$decode$_T_68 = (0xe001 == (cpu$decode$inst_c & 0xe003));
@@ -17228,7 +17228,7 @@ void DiffNewTop::step821() {
     activeFlags[1378] = true;
   }
 }
-void DiffNewTop::step825() {
+void Diffnewtop::step825() {
   activeFlags[825] = false;
   uint8_t cpu$fetch$_T_15$oldVal = cpu$fetch$_T_15;
   cpu$fetch$_T_15 = ((cpu$fetch$buf_bitmap == 0x3) | cpu$fetch$excep_buf$en);
@@ -17247,7 +17247,7 @@ void DiffNewTop::step825() {
     activeFlags[1216] = true;
   }
 }
-void DiffNewTop::step826() {
+void Diffnewtop::step826() {
   activeFlags[826] = false;
   uint8_t cpu$fetch$_T_20$oldVal = cpu$fetch$_T_20;
   cpu$fetch$_T_20 = ((cpu$fetch$buf_bitmap >> 0) & 0x1);
@@ -17259,19 +17259,19 @@ void DiffNewTop::step826() {
     activeFlags[1216] = true;
   }
 }
-void DiffNewTop::step827() {
+void Diffnewtop::step827() {
   activeFlags[827] = false;
   uint8_t cpu$fetch$_T_21$oldVal = cpu$fetch$_T_21;
   cpu$fetch$_T_21 = (cpu$fetch$buf_bitmap == 0x3);
   if (cpu$fetch$_T_21$oldVal != cpu$fetch$_T_21) { activeFlags[836] = true; }
 }
-void DiffNewTop::step828() {
+void Diffnewtop::step828() {
   activeFlags[828] = false;
   uint8_t cpu$fetch$_T_22$oldVal = cpu$fetch$_T_22;
   cpu$fetch$_T_22 = (cpu$fetch$buf_bitmap == 0x1);
   if (cpu$fetch$_T_22$oldVal != cpu$fetch$_T_22) { activeFlags[836] = true; }
 }
-void DiffNewTop::step832() {
+void Diffnewtop::step832() {
   activeFlags[832] = false;
   uint64_t cpu$fetch$buf_offset$oldVal = cpu$fetch$buf_offset;
   cpu$fetch$buf_offset = ((cpu$fetch$next_pc_r - cpu$fetch$buf_start_pc) & 0xffffffffffffffff);
@@ -17282,7 +17282,7 @@ void DiffNewTop::step832() {
     activeFlags[1188] = true;
   }
 }
-void DiffNewTop::step833() {
+void Diffnewtop::step833() {
   activeFlags[833] = false;
   uint32_t cpu$fetch$top_inst32$oldVal = cpu$fetch$top_inst32;
   cpu$fetch$top_inst32 = (cpu$fetch$inst_buf >> ((uint128_t)((cpu$fetch$buf_offset >> 0) & 0x7) << 3 | 0x0));
@@ -17292,19 +17292,19 @@ void DiffNewTop::step833() {
     activeFlags[1188] = true;
   }
 }
-void DiffNewTop::step834() {
+void Diffnewtop::step834() {
   activeFlags[834] = false;
   uint8_t cpu$fetch$_T_26$oldVal = cpu$fetch$_T_26;
   cpu$fetch$_T_26 = ((cpu$fetch$buf_offset == 0x6) & (((cpu$fetch$top_inst32 >> 0) & 0x3) != 0x3));
   if (cpu$fetch$_T_26$oldVal != cpu$fetch$_T_26) { activeFlags[836] = true; }
 }
-void DiffNewTop::step835() {
+void Diffnewtop::step835() {
   activeFlags[835] = false;
   uint8_t cpu$fetch$_T_27$oldVal = cpu$fetch$_T_27;
   cpu$fetch$_T_27 = (cpu$fetch$buf_offset <= 0x4);
   if (cpu$fetch$_T_27$oldVal != cpu$fetch$_T_27) { activeFlags[836] = true; }
 }
-void DiffNewTop::step836() {
+void Diffnewtop::step836() {
   activeFlags[836] = false;
   uint8_t cpu$fetch$inst_valid$oldVal = cpu$fetch$inst_valid;
   cpu$fetch$inst_valid =
@@ -17338,7 +17338,7 @@ void DiffNewTop::step836() {
     activeFlags[948] = true;
   }
 }
-void DiffNewTop::step837() {
+void Diffnewtop::step837() {
   activeFlags[837] = false;
   uint64_t cpu$fetch$next_pc_w$oldVal = cpu$fetch$next_pc_w;
   cpu$fetch$next_pc_w =
@@ -17348,7 +17348,7 @@ void DiffNewTop::step837() {
     activeFlags[942] = true;
   }
 }
-void DiffNewTop::step838() {
+void Diffnewtop::step838() {
   activeFlags[838] = false;
   uint8_t cpu$fetch$_T_37$oldVal = cpu$fetch$_T_37;
   cpu$fetch$_T_37 =
@@ -17359,7 +17359,7 @@ void DiffNewTop::step838() {
     activeFlags[945] = true;
   }
 }
-void DiffNewTop::step839() {
+void Diffnewtop::step839() {
   activeFlags[839] = false;
   uint8_t cpu$fetch$_T_38$oldVal = cpu$fetch$_T_38;
   cpu$fetch$_T_38 = (cpu$fetch$inst_valid == 0x0);
@@ -17370,7 +17370,7 @@ void DiffNewTop::step839() {
     activeFlags[1392] = true;
   }
 }
-void DiffNewTop::step841() {
+void Diffnewtop::step841() {
   activeFlags[841] = false;
   uint8_t cpu$decode$_T_11$oldVal = cpu$decode$_T_11;
   cpu$decode$_T_11 = ((cpu$decode$instType_0 == 0x7) & (cpu$fetch$excep3_r$en == 0x0));
@@ -17385,7 +17385,7 @@ void DiffNewTop::step841() {
     activeFlags[1393] = true;
   }
 }
-void DiffNewTop::step842() {
+void Diffnewtop::step842() {
   activeFlags[842] = false;
   uint8_t cpu$decode$_T_46$oldVal = cpu$decode$_T_46;
   cpu$decode$_T_46 = ((cpu$decode$instType_c_0 == 0x0) & (cpu$fetch$excep3_r$en == 0x0));
@@ -17400,7 +17400,7 @@ void DiffNewTop::step842() {
     activeFlags[1393] = true;
   }
 }
-void DiffNewTop::step843() {
+void Diffnewtop::step843() {
   activeFlags[843] = false;
   uint8_t cpu$decode$io$if2id$ready$oldVal = cpu$decode$io$if2id$ready;
   cpu$decode$io$if2id$ready =
@@ -17412,7 +17412,7 @@ void DiffNewTop::step843() {
     activeFlags[845] = true;
   }
 }
-void DiffNewTop::step844() {
+void Diffnewtop::step844() {
   activeFlags[844] = false;
   uint8_t cpu$fetch$hs_out$oldVal = cpu$fetch$hs_out;
   cpu$fetch$hs_out = (cpu$decode$io$if2id$ready & cpu$fetch$valid3_r);
@@ -17421,7 +17421,7 @@ void DiffNewTop::step844() {
     activeFlags[940] = true;
   }
 }
-void DiffNewTop::step845() {
+void Diffnewtop::step845() {
   activeFlags[845] = false;
   uint8_t cpu$decode$hs_in$oldVal = cpu$decode$hs_in;
   cpu$decode$hs_in = (cpu$decode$io$if2id$ready & cpu$fetch$valid3_r);
@@ -17432,7 +17432,7 @@ void DiffNewTop::step845() {
     activeFlags[954] = true;
   }
 }
-void DiffNewTop::step846() {
+void Diffnewtop::step846() {
   activeFlags[846] = false;
   uint8_t cpu$decode$_T_8$oldVal = cpu$decode$_T_8;
   cpu$decode$_T_8 = ((cpu$decode$hs_in & (cpu$decode$is_compress ^ 0x1)) & (cpu$fetch$excep3_r$en == 0x0));
@@ -17467,7 +17467,7 @@ void DiffNewTop::step846() {
     activeFlags[1393] = true;
   }
 }
-void DiffNewTop::step847() {
+void Diffnewtop::step847() {
   activeFlags[847] = false;
   uint8_t cpu$decode$_T_43$oldVal = cpu$decode$_T_43;
   cpu$decode$_T_43 = ((cpu$decode$hs_in & cpu$decode$is_compress) & (cpu$fetch$excep3_r$en == 0x0));
@@ -17502,7 +17502,7 @@ void DiffNewTop::step847() {
     activeFlags[1393] = true;
   }
 }
-void DiffNewTop::step848() {
+void Diffnewtop::step848() {
   activeFlags[848] = false;
   uint8_t cpu$decode$_T_70$oldVal = cpu$decode$_T_70;
   cpu$decode$_T_70 = (cpu$decode$hs_in & cpu$fetch$excep3_r$en);
@@ -17529,7 +17529,7 @@ void DiffNewTop::step848() {
     activeFlags[1386] = true;
   }
 }
-void DiffNewTop::step849() {
+void Diffnewtop::step849() {
   activeFlags[849] = false;
   uint8_t cpu$fetch$_T_32$oldVal = cpu$fetch$_T_32;
   cpu$fetch$_T_32 =
@@ -17553,7 +17553,7 @@ void DiffNewTop::step849() {
     activeFlags[1392] = true;
   }
 }
-void DiffNewTop::step851() {
+void Diffnewtop::step851() {
   activeFlags[851] = false;
   uint8_t cpu$fetch$_T_16$oldVal = cpu$fetch$_T_16;
   cpu$fetch$_T_16 = (cpu$fetch$excep2_r$en & cpu$fetch$valid2_r);
@@ -17572,7 +17572,7 @@ void DiffNewTop::step851() {
     activeFlags[1216] = true;
   }
 }
-void DiffNewTop::step852() {
+void Diffnewtop::step852() {
   activeFlags[852] = false;
   uint8_t cpu$fetch$_T_19$oldVal = cpu$fetch$_T_19;
   cpu$fetch$_T_19 = ((cpu$fetch$valid2_r & cpu$fetchCrossbar$io$instIO$rvalid) & (cpu$fetch$reset_ic == 0x0));
@@ -17585,7 +17585,7 @@ void DiffNewTop::step852() {
     activeFlags[1216] = true;
   }
 }
-void DiffNewTop::step854() {
+void Diffnewtop::step854() {
   activeFlags[854] = false;
   uint8_t cpu$fetch$drop3_in$oldVal = cpu$fetch$drop3_in;
   cpu$fetch$drop3_in = (cpu$fetch$drop3_r | cpu$decode$drop_in);
@@ -17596,7 +17596,7 @@ void DiffNewTop::step854() {
     activeFlags[937] = true;
   }
 }
-void DiffNewTop::step855() {
+void Diffnewtop::step855() {
   activeFlags[855] = false;
   uint8_t cpu$fetch$_T_11$oldVal = cpu$fetch$_T_11;
   cpu$fetch$_T_11 = (cpu$fetch$drop3_in == 0x0);
@@ -17614,7 +17614,7 @@ void DiffNewTop::step855() {
     activeFlags[1389] = true;
   }
 }
-void DiffNewTop::step856() {
+void Diffnewtop::step856() {
   activeFlags[856] = false;
   uint8_t cpu$fetch$_T_13$oldVal = cpu$fetch$_T_13;
   cpu$fetch$_T_13 = (cpu$fetch$drop3_in == 0x0);
@@ -17634,7 +17634,7 @@ void DiffNewTop::step856() {
     activeFlags[1216] = true;
   }
 }
-void DiffNewTop::step857() {
+void Diffnewtop::step857() {
   activeFlags[857] = false;
   uint8_t cpu$fetch$hs2$oldVal = cpu$fetch$hs2;
   cpu$fetch$hs2 =
@@ -17644,7 +17644,7 @@ void DiffNewTop::step857() {
     activeFlags[939] = true;
   }
 }
-void DiffNewTop::step858() {
+void Diffnewtop::step858() {
   activeFlags[858] = false;
   uint8_t cpu$fetch$drop2_in$oldVal = cpu$fetch$drop2_in;
   cpu$fetch$drop2_in = (cpu$fetch$drop2_r | cpu$fetch$drop3_in);
@@ -17655,7 +17655,7 @@ void DiffNewTop::step858() {
     activeFlags[938] = true;
   }
 }
-void DiffNewTop::step859() {
+void Diffnewtop::step859() {
   activeFlags[859] = false;
   uint8_t cpu$fetch$hs1$oldVal = cpu$fetch$hs1;
   cpu$fetch$hs1 =
@@ -17677,7 +17677,7 @@ void DiffNewTop::step859() {
     activeFlags[1160] = true;
   }
 }
-void DiffNewTop::step860() {
+void Diffnewtop::step860() {
   activeFlags[860] = false;
   uint8_t cpu$fetch$_T_12$oldVal = cpu$fetch$_T_12;
   cpu$fetch$_T_12 = (cpu$fetch$hs1 == 0x0);
@@ -17692,7 +17692,7 @@ void DiffNewTop::step860() {
     activeFlags[1218] = true;
   }
 }
-void DiffNewTop::step861() {
+void Diffnewtop::step861() {
   activeFlags[861] = false;
   uint32_t cpu$fetch$_io_instRead_addr_T$oldVal = cpu$fetch$_io_instRead_addr_T;
   cpu$fetch$_io_instRead_addr_T = (cpu$fetch$hs1 ? cpu$tlb_if$out_paddr_r : cpu$fetch$paddr2_r);
@@ -17705,7 +17705,7 @@ void DiffNewTop::step861() {
     activeFlags[1136] = true;
   }
 }
-void DiffNewTop::step862() {
+void Diffnewtop::step862() {
   activeFlags[862] = false;
   uint8_t cpu$fetchCrossbar$inp_mem$oldVal = cpu$fetchCrossbar$inp_mem;
   cpu$fetchCrossbar$inp_mem = ((cpu$fetch$_io_instRead_addr_T >> 31) & 0x1);
@@ -17714,7 +17714,7 @@ void DiffNewTop::step862() {
     activeFlags[896] = true;
   }
 }
-void DiffNewTop::step863() {
+void Diffnewtop::step863() {
   activeFlags[863] = false;
   uint8_t cpu$fetch$_io_instRead_arvalid_T_4$oldVal = cpu$fetch$_io_instRead_arvalid_T_4;
   cpu$fetch$_io_instRead_arvalid_T_4 =
@@ -17726,7 +17726,7 @@ void DiffNewTop::step863() {
     activeFlags[1037] = true;
   }
 }
-void DiffNewTop::step864() {
+void Diffnewtop::step864() {
   activeFlags[864] = false;
   uint8_t cpu$icache$hs_in$oldVal = cpu$icache$hs_in;
   cpu$icache$hs_in = ((((cpu$fetch$_io_instRead_arvalid_T_4 ? (cpu$fetchCrossbar$inp_mem ? 0x1 : 0x0) : 0x0) &
@@ -17742,7 +17742,7 @@ void DiffNewTop::step864() {
     activeFlags[1000] = true;
   }
 }
-void DiffNewTop::step865() {
+void Diffnewtop::step865() {
   activeFlags[865] = false;
   uint32_t cpu$icache$cur_addr$oldVal = cpu$icache$cur_addr;
   cpu$icache$cur_addr = (cpu$icache$hs_in ? cpu$fetch$_io_instRead_addr_T : cpu$icache$addr_r);
@@ -17752,7 +17752,7 @@ void DiffNewTop::step865() {
     activeFlags[1004] = true;
   }
 }
-void DiffNewTop::step866() {
+void Diffnewtop::step866() {
   activeFlags[866] = false;
   cpu$icache$cache_hit_vec[3] =
       ((cpu$icache$tag[3][((cpu$icache$cur_addr >> 6) & 0xf)] == ((cpu$icache$cur_addr >> 10) & 0x3fffff)) &
@@ -17769,7 +17769,7 @@ void DiffNewTop::step866() {
   activeFlags[867] = true;
   activeFlags[868] = true;
 }
-void DiffNewTop::step867() {
+void Diffnewtop::step867() {
   activeFlags[867] = false;
   uint8_t cpu$icache$cacheHit$oldVal = cpu$icache$cacheHit;
   cpu$icache$cacheHit =
@@ -17784,7 +17784,7 @@ void DiffNewTop::step867() {
     activeFlags[1127] = true;
   }
 }
-void DiffNewTop::step868() {
+void Diffnewtop::step868() {
   activeFlags[868] = false;
   uint8_t cpu$icache$matchWay$oldVal = cpu$icache$matchWay;
   cpu$icache$matchWay =
@@ -17811,7 +17811,7 @@ void DiffNewTop::step868() {
     activeFlags[1000] = true;
   }
 }
-void DiffNewTop::step869() {
+void Diffnewtop::step869() {
   activeFlags[869] = false;
   uint8_t cpu$icache$cur_way$oldVal = cpu$icache$cur_way;
   cpu$icache$cur_way = (cpu$icache$hs_in ? cpu$icache$matchWay : cpu$icache$matchWay_r);
@@ -17823,7 +17823,7 @@ void DiffNewTop::step869() {
     activeFlags[878] = true;
   }
 }
-void DiffNewTop::step870() {
+void Diffnewtop::step870() {
   activeFlags[870] = false;
   cpu$icache$data$wen[3] = 0x0;
   cpu$icache$data$wen[2] = 0x0;
@@ -17839,7 +17839,7 @@ void DiffNewTop::step870() {
   activeFlags[887] = true;
   activeFlags[891] = true;
 }
-void DiffNewTop::step871() {
+void Diffnewtop::step871() {
   activeFlags[871] = false;
   cpu$icache$data$wdata[3] = 0x0;
   cpu$icache$data$wdata[2] = 0x0;
@@ -17852,7 +17852,7 @@ void DiffNewTop::step871() {
   activeFlags[889] = true;
   activeFlags[893] = true;
 }
-void DiffNewTop::step872() {
+void Diffnewtop::step872() {
   activeFlags[872] = false;
   cpu$icache$data$mask[3] = 0x0;
   cpu$icache$data$mask[2] = 0x0;
@@ -17864,7 +17864,7 @@ void DiffNewTop::step872() {
   activeFlags[889] = true;
   activeFlags[893] = true;
 }
-void DiffNewTop::step873() {
+void Diffnewtop::step873() {
   activeFlags[873] = false;
   cpu$icache$data$addr[3] = 0x0;
   cpu$icache$data$addr[2] = 0x0;
@@ -17879,7 +17879,7 @@ void DiffNewTop::step873() {
   activeFlags[876] = true;
   activeFlags[877] = true;
 }
-void DiffNewTop::step874() {
+void Diffnewtop::step874() {
   activeFlags[874] = false;
   uint8_t cpu$icache$Ram_bw$io$addr$oldVal = cpu$icache$Ram_bw$io$addr;
   cpu$icache$Ram_bw$io$addr = cpu$icache$data$addr[0];
@@ -17889,7 +17889,7 @@ void DiffNewTop::step874() {
     activeFlags[882] = true;
   }
 }
-void DiffNewTop::step875() {
+void Diffnewtop::step875() {
   activeFlags[875] = false;
   uint8_t cpu$icache$Ram_bw_1$io$addr$oldVal = cpu$icache$Ram_bw_1$io$addr;
   cpu$icache$Ram_bw_1$io$addr = cpu$icache$data$addr[1];
@@ -17899,7 +17899,7 @@ void DiffNewTop::step875() {
     activeFlags[886] = true;
   }
 }
-void DiffNewTop::step876() {
+void Diffnewtop::step876() {
   activeFlags[876] = false;
   uint8_t cpu$icache$Ram_bw_2$io$addr$oldVal = cpu$icache$Ram_bw_2$io$addr;
   cpu$icache$Ram_bw_2$io$addr = cpu$icache$data$addr[2];
@@ -17909,7 +17909,7 @@ void DiffNewTop::step876() {
     activeFlags[890] = true;
   }
 }
-void DiffNewTop::step877() {
+void Diffnewtop::step877() {
   activeFlags[877] = false;
   uint8_t cpu$icache$Ram_bw_3$io$addr$oldVal = cpu$icache$Ram_bw_3$io$addr;
   cpu$icache$Ram_bw_3$io$addr = cpu$icache$data$addr[3];
@@ -17919,7 +17919,7 @@ void DiffNewTop::step877() {
     activeFlags[894] = true;
   }
 }
-void DiffNewTop::step878() {
+void Diffnewtop::step878() {
   activeFlags[878] = false;
   cpu$icache$data$cen[3] = 0x0;
   cpu$icache$data$cen[2] = 0x0;
@@ -17931,7 +17931,7 @@ void DiffNewTop::step878() {
   activeFlags[887] = true;
   activeFlags[891] = true;
 }
-void DiffNewTop::step879() {
+void Diffnewtop::step879() {
   activeFlags[879] = false;
   uint8_t cpu$icache$Ram_bw$ram$_T_2$oldVal = cpu$icache$Ram_bw$ram$_T_2;
   cpu$icache$Ram_bw$ram$_T_2 = (((cpu$icache$data$cen[0] ^ 0x1) == 0x0) & ((cpu$icache$data$wen[0] ^ 0x1) == 0x0));
@@ -17942,7 +17942,7 @@ void DiffNewTop::step879() {
     activeFlags[1125] = true;
   }
 }
-void DiffNewTop::step880() {
+void Diffnewtop::step880() {
   activeFlags[880] = false;
   uint128_t cpu$icache$Ram_bw$ram$ram$MPORT_1$data$oldVal = cpu$icache$Ram_bw$ram$ram$MPORT_1$data;
   cpu$icache$Ram_bw$ram$ram$MPORT_1$addr = (cpu$icache$Ram_bw$ram$_T_2 ? cpu$icache$Ram_bw$io$addr : 0x0);
@@ -17953,7 +17953,7 @@ void DiffNewTop::step880() {
     activeFlags[881] = true;
   }
 }
-void DiffNewTop::step881() {
+void Diffnewtop::step881() {
   activeFlags[881] = false;
   cpu$icache$Ram_bw$ram$ram$MPORT$addr = (cpu$icache$Ram_bw$ram$_T_2 ? cpu$icache$Ram_bw$io$addr : 0x0);
   cpu$icache$Ram_bw$ram$ram$MPORT$en = (cpu$icache$Ram_bw$ram$_T_2 ? 0x1 : 0x0);
@@ -17967,7 +17967,7 @@ void DiffNewTop::step881() {
            : 0x0);
   cpu$icache$Ram_bw$ram$ram$MPORT$mask = (cpu$icache$Ram_bw$ram$_T_2 ? 0x1 : 0x0);
 }
-void DiffNewTop::step882() {
+void Diffnewtop::step882() {
   activeFlags[882] = false;
   uint128_t cpu$icache$Ram_bw$ram$ram$output_MPORT$data$oldVal = cpu$icache$Ram_bw$ram$ram$output_MPORT$data;
   cpu$icache$Ram_bw$ram$ram$output_MPORT$addr = (cpu$icache$Ram_bw$ram$_T_2 ? 0x0 : cpu$icache$Ram_bw$io$addr);
@@ -17978,7 +17978,7 @@ void DiffNewTop::step882() {
     activeFlags[1125] = true;
   }
 }
-void DiffNewTop::step883() {
+void Diffnewtop::step883() {
   activeFlags[883] = false;
   uint8_t cpu$icache$Ram_bw_1$ram$_T_2$oldVal = cpu$icache$Ram_bw_1$ram$_T_2;
   cpu$icache$Ram_bw_1$ram$_T_2 = (((cpu$icache$data$cen[1] ^ 0x1) == 0x0) & ((cpu$icache$data$wen[1] ^ 0x1) == 0x0));
@@ -17989,7 +17989,7 @@ void DiffNewTop::step883() {
     activeFlags[1124] = true;
   }
 }
-void DiffNewTop::step884() {
+void Diffnewtop::step884() {
   activeFlags[884] = false;
   uint128_t cpu$icache$Ram_bw_1$ram$ram$MPORT_1$data$oldVal = cpu$icache$Ram_bw_1$ram$ram$MPORT_1$data;
   cpu$icache$Ram_bw_1$ram$ram$MPORT_1$addr = (cpu$icache$Ram_bw_1$ram$_T_2 ? cpu$icache$Ram_bw_1$io$addr : 0x0);
@@ -18000,7 +18000,7 @@ void DiffNewTop::step884() {
     activeFlags[885] = true;
   }
 }
-void DiffNewTop::step885() {
+void Diffnewtop::step885() {
   activeFlags[885] = false;
   cpu$icache$Ram_bw_1$ram$ram$MPORT$addr = (cpu$icache$Ram_bw_1$ram$_T_2 ? cpu$icache$Ram_bw_1$io$addr : 0x0);
   cpu$icache$Ram_bw_1$ram$ram$MPORT$en = (cpu$icache$Ram_bw_1$ram$_T_2 ? 0x1 : 0x0);
@@ -18014,7 +18014,7 @@ void DiffNewTop::step885() {
            : 0x0);
   cpu$icache$Ram_bw_1$ram$ram$MPORT$mask = (cpu$icache$Ram_bw_1$ram$_T_2 ? 0x1 : 0x0);
 }
-void DiffNewTop::step886() {
+void Diffnewtop::step886() {
   activeFlags[886] = false;
   uint128_t cpu$icache$Ram_bw_1$ram$ram$output_MPORT$data$oldVal = cpu$icache$Ram_bw_1$ram$ram$output_MPORT$data;
   cpu$icache$Ram_bw_1$ram$ram$output_MPORT$addr = (cpu$icache$Ram_bw_1$ram$_T_2 ? 0x0 : cpu$icache$Ram_bw_1$io$addr);
@@ -18026,7 +18026,7 @@ void DiffNewTop::step886() {
     activeFlags[1124] = true;
   }
 }
-void DiffNewTop::step887() {
+void Diffnewtop::step887() {
   activeFlags[887] = false;
   uint8_t cpu$icache$Ram_bw_2$ram$_T_2$oldVal = cpu$icache$Ram_bw_2$ram$_T_2;
   cpu$icache$Ram_bw_2$ram$_T_2 = (((cpu$icache$data$cen[2] ^ 0x1) == 0x0) & ((cpu$icache$data$wen[2] ^ 0x1) == 0x0));
@@ -18037,7 +18037,7 @@ void DiffNewTop::step887() {
     activeFlags[1123] = true;
   }
 }
-void DiffNewTop::step888() {
+void Diffnewtop::step888() {
   activeFlags[888] = false;
   uint128_t cpu$icache$Ram_bw_2$ram$ram$MPORT_1$data$oldVal = cpu$icache$Ram_bw_2$ram$ram$MPORT_1$data;
   cpu$icache$Ram_bw_2$ram$ram$MPORT_1$addr = (cpu$icache$Ram_bw_2$ram$_T_2 ? cpu$icache$Ram_bw_2$io$addr : 0x0);
@@ -18048,7 +18048,7 @@ void DiffNewTop::step888() {
     activeFlags[889] = true;
   }
 }
-void DiffNewTop::step889() {
+void Diffnewtop::step889() {
   activeFlags[889] = false;
   cpu$icache$Ram_bw_2$ram$ram$MPORT$addr = (cpu$icache$Ram_bw_2$ram$_T_2 ? cpu$icache$Ram_bw_2$io$addr : 0x0);
   cpu$icache$Ram_bw_2$ram$ram$MPORT$en = (cpu$icache$Ram_bw_2$ram$_T_2 ? 0x1 : 0x0);
@@ -18062,7 +18062,7 @@ void DiffNewTop::step889() {
            : 0x0);
   cpu$icache$Ram_bw_2$ram$ram$MPORT$mask = (cpu$icache$Ram_bw_2$ram$_T_2 ? 0x1 : 0x0);
 }
-void DiffNewTop::step890() {
+void Diffnewtop::step890() {
   activeFlags[890] = false;
   uint128_t cpu$icache$Ram_bw_2$ram$ram$output_MPORT$data$oldVal = cpu$icache$Ram_bw_2$ram$ram$output_MPORT$data;
   cpu$icache$Ram_bw_2$ram$ram$output_MPORT$addr = (cpu$icache$Ram_bw_2$ram$_T_2 ? 0x0 : cpu$icache$Ram_bw_2$io$addr);
@@ -18074,7 +18074,7 @@ void DiffNewTop::step890() {
     activeFlags[1123] = true;
   }
 }
-void DiffNewTop::step891() {
+void Diffnewtop::step891() {
   activeFlags[891] = false;
   uint8_t cpu$icache$Ram_bw_3$ram$_T_2$oldVal = cpu$icache$Ram_bw_3$ram$_T_2;
   cpu$icache$Ram_bw_3$ram$_T_2 = (((cpu$icache$data$cen[3] ^ 0x1) == 0x0) & ((cpu$icache$data$wen[3] ^ 0x1) == 0x0));
@@ -18085,7 +18085,7 @@ void DiffNewTop::step891() {
     activeFlags[1122] = true;
   }
 }
-void DiffNewTop::step892() {
+void Diffnewtop::step892() {
   activeFlags[892] = false;
   uint128_t cpu$icache$Ram_bw_3$ram$ram$MPORT_1$data$oldVal = cpu$icache$Ram_bw_3$ram$ram$MPORT_1$data;
   cpu$icache$Ram_bw_3$ram$ram$MPORT_1$addr = (cpu$icache$Ram_bw_3$ram$_T_2 ? cpu$icache$Ram_bw_3$io$addr : 0x0);
@@ -18096,7 +18096,7 @@ void DiffNewTop::step892() {
     activeFlags[893] = true;
   }
 }
-void DiffNewTop::step893() {
+void Diffnewtop::step893() {
   activeFlags[893] = false;
   cpu$icache$Ram_bw_3$ram$ram$MPORT$addr = (cpu$icache$Ram_bw_3$ram$_T_2 ? cpu$icache$Ram_bw_3$io$addr : 0x0);
   cpu$icache$Ram_bw_3$ram$ram$MPORT$en = (cpu$icache$Ram_bw_3$ram$_T_2 ? 0x1 : 0x0);
@@ -18110,7 +18110,7 @@ void DiffNewTop::step893() {
            : 0x0);
   cpu$icache$Ram_bw_3$ram$ram$MPORT$mask = (cpu$icache$Ram_bw_3$ram$_T_2 ? 0x1 : 0x0);
 }
-void DiffNewTop::step894() {
+void Diffnewtop::step894() {
   activeFlags[894] = false;
   uint128_t cpu$icache$Ram_bw_3$ram$ram$output_MPORT$data$oldVal = cpu$icache$Ram_bw_3$ram$ram$output_MPORT$data;
   cpu$icache$Ram_bw_3$ram$ram$output_MPORT$addr = (cpu$icache$Ram_bw_3$ram$_T_2 ? 0x0 : cpu$icache$Ram_bw_3$io$addr);
@@ -18122,7 +18122,7 @@ void DiffNewTop::step894() {
     activeFlags[1122] = true;
   }
 }
-void DiffNewTop::step895() {
+void Diffnewtop::step895() {
   activeFlags[895] = false;
   uint8_t cpu$icache$_T_8$oldVal = cpu$icache$_T_8;
   cpu$icache$_T_8 = ((cpu$icache$hs_in == 0x0) & (cpu$icache$wait_r == 0x0));
@@ -18134,7 +18134,7 @@ void DiffNewTop::step895() {
     activeFlags[1127] = true;
   }
 }
-void DiffNewTop::step896() {
+void Diffnewtop::step896() {
   activeFlags[896] = false;
   uint8_t cpu$split64to32$_T_1$oldVal = cpu$split64to32$_T_1;
   cpu$split64to32$_T_1 = ((cpu$fetch$_io_instRead_arvalid_T_4 ? (cpu$fetchCrossbar$inp_mem ? 0x0 : 0x7) : 0x0) != 0x0);
@@ -18147,7 +18147,7 @@ void DiffNewTop::step896() {
     activeFlags[1136] = true;
   }
 }
-void DiffNewTop::step897() {
+void Diffnewtop::step897() {
   activeFlags[897] = false;
   uint32_t cpu$split64to32$io$data_out$addr$oldVal = cpu$split64to32$io$data_out$addr;
   cpu$split64to32$io$data_out$addr =
@@ -18162,7 +18162,7 @@ void DiffNewTop::step897() {
     activeFlags[1135] = true;
   }
 }
-void DiffNewTop::step898() {
+void Diffnewtop::step898() {
   activeFlags[898] = false;
   uint8_t cpu$split64to32$io$data_out$dc_mode$oldVal = cpu$split64to32$io$data_out$dc_mode;
   cpu$split64to32$io$data_out$dc_mode =
@@ -18176,7 +18176,7 @@ void DiffNewTop::step898() {
     activeFlags[1137] = true;
   }
 }
-void DiffNewTop::step899() {
+void Diffnewtop::step899() {
   activeFlags[899] = false;
   uint8_t cpu$flash2Axi$_T_3$oldVal = cpu$flash2Axi$_T_3;
   cpu$flash2Axi$_T_3 = (((cpu$split64to32$io$data_out$dc_mode >> 3) & 0x1) == 0x1);
@@ -18191,7 +18191,7 @@ void DiffNewTop::step899() {
     activeFlags[1135] = true;
   }
 }
-void DiffNewTop::step900() {
+void Diffnewtop::step900() {
   activeFlags[900] = false;
   uint8_t cpu$flash2Axi$_T_5$oldVal = cpu$flash2Axi$_T_5;
   cpu$flash2Axi$_T_5 = (((cpu$split64to32$io$data_out$dc_mode >> 2) & 0x1) == 0x1);
@@ -18202,7 +18202,7 @@ void DiffNewTop::step900() {
     activeFlags[1132] = true;
   }
 }
-void DiffNewTop::step901() {
+void Diffnewtop::step901() {
   activeFlags[901] = false;
   uint8_t cpu$split64to32$hs_out$oldVal = cpu$split64to32$hs_out;
   cpu$split64to32$hs_out = ((cpu$split64to32$io$data_out$dc_mode != 0x0) & (cpu$flash2Axi$state == 0x0));
@@ -18212,7 +18212,7 @@ void DiffNewTop::step901() {
     activeFlags[1094] = true;
   }
 }
-void DiffNewTop::step902() {
+void Diffnewtop::step902() {
   activeFlags[902] = false;
   uint8_t cpu$split64to32$_T_3$oldVal = cpu$split64to32$_T_3;
   cpu$split64to32$_T_3 = (cpu$split64to32$hs_out & (cpu$split64to32$io$data_out$dc_mode != 0x7));
@@ -18222,7 +18222,7 @@ void DiffNewTop::step902() {
     activeFlags[1136] = true;
   }
 }
-void DiffNewTop::step903() {
+void Diffnewtop::step903() {
   activeFlags[903] = false;
   uint8_t cpu$fetch$drop1_in$oldVal = cpu$fetch$drop1_in;
   cpu$fetch$drop1_in = (cpu$fetch$drop1_r | cpu$fetch$drop2_in);
@@ -18231,7 +18231,7 @@ void DiffNewTop::step903() {
     activeFlags[937] = true;
   }
 }
-void DiffNewTop::step904() {
+void Diffnewtop::step904() {
   activeFlags[904] = false;
   uint8_t cpu$fetch$hs_in$oldVal = cpu$fetch$hs_in;
   cpu$fetch$hs_in = ((cpu$fetch$state == 0x0) & (cpu$fetch$drop1_in == 0x0));
@@ -18247,7 +18247,7 @@ void DiffNewTop::step904() {
     activeFlags[1224] = true;
   }
 }
-void DiffNewTop::step905() {
+void Diffnewtop::step905() {
   activeFlags[905] = false;
   uint8_t cpu$fetch$_io_va2pa_vvalid_T_1$oldVal = cpu$fetch$_io_va2pa_vvalid_T_1;
   cpu$fetch$_io_va2pa_vvalid_T_1 = (cpu$fetch$hs_in & (cpu$csrs$intr_out_r$en == 0x0));
@@ -18258,7 +18258,7 @@ void DiffNewTop::step905() {
     activeFlags[1149] = true;
   }
 }
-void DiffNewTop::step906() {
+void Diffnewtop::step906() {
   activeFlags[906] = false;
   uint8_t cpu$tlb_if$_io_va2pa_ready_T_5$oldVal = cpu$tlb_if$_io_va2pa_ready_T_5;
   cpu$tlb_if$_io_va2pa_ready_T_5 =
@@ -18269,7 +18269,7 @@ void DiffNewTop::step906() {
     activeFlags[1149] = true;
   }
 }
-void DiffNewTop::step907() {
+void Diffnewtop::step907() {
   activeFlags[907] = false;
   uint8_t cpu$tlb_if$handshake$oldVal = cpu$tlb_if$handshake;
   cpu$tlb_if$handshake = (cpu$fetch$_io_va2pa_vvalid_T_1 & cpu$tlb_if$_io_va2pa_ready_T_5);
@@ -18279,7 +18279,7 @@ void DiffNewTop::step907() {
     activeFlags[1149] = true;
   }
 }
-void DiffNewTop::step908() {
+void Diffnewtop::step908() {
   activeFlags[908] = false;
   uint8_t cpu$tlb_if$cur_m_type$oldVal = cpu$tlb_if$cur_m_type;
   cpu$tlb_if$cur_m_type = (cpu$tlb_if$handshake ? 0x1 : cpu$tlb_if$m_type_r);
@@ -18288,7 +18288,7 @@ void DiffNewTop::step908() {
     activeFlags[934] = true;
   }
 }
-void DiffNewTop::step909() {
+void Diffnewtop::step909() {
   activeFlags[909] = false;
   uint16_t cpu$tlb_if$ad$oldVal = cpu$tlb_if$ad;
   cpu$tlb_if$ad = ((cpu$tlb_if$cur_m_type == 0x3) ? 0xc0 : 0x40);
@@ -18298,7 +18298,7 @@ void DiffNewTop::step909() {
     activeFlags[1141] = true;
   }
 }
-void DiffNewTop::step910() {
+void Diffnewtop::step910() {
   activeFlags[910] = false;
   uint8_t cpu$tlb_if$_T_55$oldVal = cpu$tlb_if$_T_55;
   cpu$tlb_if$_T_55 = (cpu$tlb_if$handshake == 0x0);
@@ -18320,7 +18320,7 @@ void DiffNewTop::step910() {
     activeFlags[1148] = true;
   }
 }
-void DiffNewTop::step911() {
+void Diffnewtop::step911() {
   activeFlags[911] = false;
   uint64_t cpu$fetch$cur_pc$oldVal = cpu$fetch$cur_pc;
   cpu$fetch$cur_pc = (cpu$fetch$hs1 ? ((cpu$fetch$pc + 0x8) & 0xffffffffffffffff) : cpu$fetch$pc);
@@ -18336,7 +18336,7 @@ void DiffNewTop::step911() {
     activeFlags[1162] = true;
   }
 }
-void DiffNewTop::step912() {
+void Diffnewtop::step912() {
   activeFlags[912] = false;
   uint64_t cpu$tlb_if$inp_tag$oldVal = cpu$tlb_if$inp_tag;
   cpu$tlb_if$inp_tag = ((cpu$fetch$cur_pc >> 12) & 0xfffffffffffff);
@@ -18359,7 +18359,7 @@ void DiffNewTop::step912() {
     activeFlags[928] = true;
   }
 }
-void DiffNewTop::step913() {
+void Diffnewtop::step913() {
   activeFlags[913] = false;
   uint8_t cpu$tlb_if$_T_3$oldVal = cpu$tlb_if$_T_3;
   cpu$tlb_if$_T_3 =
@@ -18379,7 +18379,7 @@ void DiffNewTop::step913() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step914() {
+void Diffnewtop::step914() {
   activeFlags[914] = false;
   uint8_t cpu$tlb_if$_T_6$oldVal = cpu$tlb_if$_T_6;
   cpu$tlb_if$_T_6 =
@@ -18399,7 +18399,7 @@ void DiffNewTop::step914() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step915() {
+void Diffnewtop::step915() {
   activeFlags[915] = false;
   uint8_t cpu$tlb_if$_T_9$oldVal = cpu$tlb_if$_T_9;
   cpu$tlb_if$_T_9 =
@@ -18419,7 +18419,7 @@ void DiffNewTop::step915() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step916() {
+void Diffnewtop::step916() {
   activeFlags[916] = false;
   uint8_t cpu$tlb_if$_T_12$oldVal = cpu$tlb_if$_T_12;
   cpu$tlb_if$_T_12 =
@@ -18439,7 +18439,7 @@ void DiffNewTop::step916() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step917() {
+void Diffnewtop::step917() {
   activeFlags[917] = false;
   uint8_t cpu$tlb_if$_T_15$oldVal = cpu$tlb_if$_T_15;
   cpu$tlb_if$_T_15 =
@@ -18459,7 +18459,7 @@ void DiffNewTop::step917() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step918() {
+void Diffnewtop::step918() {
   activeFlags[918] = false;
   uint8_t cpu$tlb_if$_T_18$oldVal = cpu$tlb_if$_T_18;
   cpu$tlb_if$_T_18 =
@@ -18479,7 +18479,7 @@ void DiffNewTop::step918() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step919() {
+void Diffnewtop::step919() {
   activeFlags[919] = false;
   uint8_t cpu$tlb_if$_T_21$oldVal = cpu$tlb_if$_T_21;
   cpu$tlb_if$_T_21 =
@@ -18499,7 +18499,7 @@ void DiffNewTop::step919() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step920() {
+void Diffnewtop::step920() {
   activeFlags[920] = false;
   uint8_t cpu$tlb_if$_T_24$oldVal = cpu$tlb_if$_T_24;
   cpu$tlb_if$_T_24 =
@@ -18519,7 +18519,7 @@ void DiffNewTop::step920() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step921() {
+void Diffnewtop::step921() {
   activeFlags[921] = false;
   uint8_t cpu$tlb_if$_T_27$oldVal = cpu$tlb_if$_T_27;
   cpu$tlb_if$_T_27 =
@@ -18539,7 +18539,7 @@ void DiffNewTop::step921() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step922() {
+void Diffnewtop::step922() {
   activeFlags[922] = false;
   uint8_t cpu$tlb_if$_T_30$oldVal = cpu$tlb_if$_T_30;
   cpu$tlb_if$_T_30 =
@@ -18559,7 +18559,7 @@ void DiffNewTop::step922() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step923() {
+void Diffnewtop::step923() {
   activeFlags[923] = false;
   uint8_t cpu$tlb_if$_T_33$oldVal = cpu$tlb_if$_T_33;
   cpu$tlb_if$_T_33 =
@@ -18579,7 +18579,7 @@ void DiffNewTop::step923() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step924() {
+void Diffnewtop::step924() {
   activeFlags[924] = false;
   uint8_t cpu$tlb_if$_T_36$oldVal = cpu$tlb_if$_T_36;
   cpu$tlb_if$_T_36 =
@@ -18599,7 +18599,7 @@ void DiffNewTop::step924() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step925() {
+void Diffnewtop::step925() {
   activeFlags[925] = false;
   uint8_t cpu$tlb_if$_T_39$oldVal = cpu$tlb_if$_T_39;
   cpu$tlb_if$_T_39 =
@@ -18619,7 +18619,7 @@ void DiffNewTop::step925() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step926() {
+void Diffnewtop::step926() {
   activeFlags[926] = false;
   uint8_t cpu$tlb_if$_T_42$oldVal = cpu$tlb_if$_T_42;
   cpu$tlb_if$_T_42 =
@@ -18639,7 +18639,7 @@ void DiffNewTop::step926() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step927() {
+void Diffnewtop::step927() {
   activeFlags[927] = false;
   uint8_t cpu$tlb_if$_T_45$oldVal = cpu$tlb_if$_T_45;
   cpu$tlb_if$_T_45 =
@@ -18659,7 +18659,7 @@ void DiffNewTop::step927() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step928() {
+void Diffnewtop::step928() {
   activeFlags[928] = false;
   uint8_t cpu$tlb_if$_T_48$oldVal = cpu$tlb_if$_T_48;
   cpu$tlb_if$_T_48 =
@@ -18679,7 +18679,7 @@ void DiffNewTop::step928() {
     activeFlags[1139] = true;
   }
 }
-void DiffNewTop::step929() {
+void Diffnewtop::step929() {
   activeFlags[929] = false;
   uint8_t cpu$tlb_if$tlbMsg$tlbHit$oldVal = cpu$tlb_if$tlbMsg$tlbHit;
   cpu$tlb_if$tlbMsg$tlbHit =
@@ -18736,7 +18736,7 @@ void DiffNewTop::step929() {
     activeFlags[1148] = true;
   }
 }
-void DiffNewTop::step930() {
+void Diffnewtop::step930() {
   activeFlags[930] = false;
   uint8_t cpu$tlb_if$_T_62$oldVal = cpu$tlb_if$_T_62;
   cpu$tlb_if$_T_62 = (cpu$tlb_if$tlbMsg$tlbHit == 0x0);
@@ -18753,7 +18753,7 @@ void DiffNewTop::step930() {
     activeFlags[1148] = true;
   }
 }
-void DiffNewTop::step931() {
+void Diffnewtop::step931() {
   activeFlags[931] = false;
   uint32_t cpu$tlb_if$tlbMsg$tlbPa$oldVal = cpu$tlb_if$tlbMsg$tlbPa;
   cpu$tlb_if$tlbMsg$tlbPa =
@@ -18798,7 +18798,7 @@ void DiffNewTop::step931() {
     activeFlags[1141] = true;
   }
 }
-void DiffNewTop::step932() {
+void Diffnewtop::step932() {
   activeFlags[932] = false;
   uint16_t cpu$tlb_if$tlbMsg$tlbInfo$oldVal = cpu$tlb_if$tlbMsg$tlbInfo;
   cpu$tlb_if$tlbMsg$tlbInfo =
@@ -18845,7 +18845,7 @@ void DiffNewTop::step932() {
     activeFlags[1141] = true;
   }
 }
-void DiffNewTop::step933() {
+void Diffnewtop::step933() {
   activeFlags[933] = false;
   uint8_t cpu$tlb_if$_T_61$oldVal = cpu$tlb_if$_T_61;
   cpu$tlb_if$_T_61 = (((cpu$tlb_if$ad & cpu$tlb_if$tlbMsg$tlbInfo) != cpu$tlb_if$ad) & cpu$tlb_if$is_Sv39);
@@ -18857,7 +18857,7 @@ void DiffNewTop::step933() {
     activeFlags[1141] = true;
   }
 }
-void DiffNewTop::step934() {
+void Diffnewtop::step934() {
   activeFlags[934] = false;
   uint8_t cpu$tlb_if$_T_58$oldVal = cpu$tlb_if$_T_58;
   cpu$tlb_if$_T_58 = ((((((((cpu$fetch$cur_pc >> 38) & 0x1) >> 0) & 0x1) ? 0x1ffffff : 0x0) ==
@@ -18886,7 +18886,7 @@ void DiffNewTop::step934() {
     activeFlags[1148] = true;
   }
 }
-void DiffNewTop::step935() {
+void Diffnewtop::step935() {
   activeFlags[935] = false;
   uint8_t cpu$tlb_if$_T_67$oldVal = cpu$tlb_if$_T_67;
   cpu$tlb_if$_T_67 =
@@ -18900,7 +18900,7 @@ void DiffNewTop::step935() {
     activeFlags[1144] = true;
   }
 }
-void DiffNewTop::step936() {
+void Diffnewtop::step936() {
   activeFlags[936] = false;
   uint8_t cpu$fetch$drop2_r$oldVal = cpu$fetch$drop2_r;
   cpu$fetch$drop2_r =
@@ -18910,7 +18910,7 @@ void DiffNewTop::step936() {
                     : 0x0));
   if (cpu$fetch$drop2_r$oldVal != cpu$fetch$drop2_r) { activeFlags[858] = true; }
 }
-void DiffNewTop::step937() {
+void Diffnewtop::step937() {
   activeFlags[937] = false;
   cpu$fetch$state$next =
       (reset ? 0x0
@@ -18949,7 +18949,7 @@ void DiffNewTop::step937() {
     activeFlags[937] = true;
   }
 }
-void DiffNewTop::step938() {
+void Diffnewtop::step938() {
   activeFlags[938] = false;
   uint8_t cpu$fetch$valid1_r$oldVal = cpu$fetch$valid1_r;
   cpu$fetch$valid1_r =
@@ -18958,7 +18958,7 @@ void DiffNewTop::step938() {
                                             : 0x0));
   if (cpu$fetch$valid1_r$oldVal != cpu$fetch$valid1_r) { activeFlags[859] = true; }
 }
-void DiffNewTop::step939() {
+void Diffnewtop::step939() {
   activeFlags[939] = false;
   cpu$fetch$valid2_r$next =
       (reset ? 0x0 : (cpu$fetch$_T_11 ? (cpu$fetch$hs1 ? 0x1 : (cpu$fetch$hs2 ? 0x0 : cpu$fetch$valid2_r)) : 0x0));
@@ -18969,7 +18969,7 @@ void DiffNewTop::step939() {
     activeFlags[863] = true;
   }
 }
-void DiffNewTop::step940() {
+void Diffnewtop::step940() {
   activeFlags[940] = false;
   uint8_t cpu$fetch$valid3_r$oldVal = cpu$fetch$valid3_r;
   cpu$fetch$valid3_r =
@@ -18981,7 +18981,7 @@ void DiffNewTop::step940() {
     activeFlags[849] = true;
   }
 }
-void DiffNewTop::step941() {
+void Diffnewtop::step941() {
   activeFlags[941] = false;
   cpu$fetch$excep3_r$en$next =
       (reset ? 0x0
@@ -18996,7 +18996,7 @@ void DiffNewTop::step941() {
     activeFlags[848] = true;
   }
 }
-void DiffNewTop::step942() {
+void Diffnewtop::step942() {
   activeFlags[942] = false;
   cpu$fetch$next_pc_r$next =
       (reset
@@ -19030,7 +19030,7 @@ void DiffNewTop::step942() {
     activeFlags[837] = true;
   }
 }
-void DiffNewTop::step943() {
+void Diffnewtop::step943() {
   activeFlags[943] = false;
   cpu$fetch$inst_buf$next =
       (reset
@@ -19276,7 +19276,7 @@ void DiffNewTop::step943() {
     activeFlags[943] = true;
   }
 }
-void DiffNewTop::step944() {
+void Diffnewtop::step944() {
   activeFlags[944] = false;
   cpu$fetch$buf_start_pc$next =
       (reset
@@ -19329,7 +19329,7 @@ void DiffNewTop::step944() {
     activeFlags[944] = true;
   }
 }
-void DiffNewTop::step945() {
+void Diffnewtop::step945() {
   activeFlags[945] = false;
   cpu$fetch$buf_bitmap$next =
       (reset
@@ -19383,7 +19383,7 @@ void DiffNewTop::step945() {
     activeFlags[945] = true;
   }
 }
-void DiffNewTop::step946() {
+void Diffnewtop::step946() {
   activeFlags[946] = false;
   cpu$fetch$excep_buf$tval$next =
       (reset ? 0x0
@@ -19392,7 +19392,7 @@ void DiffNewTop::step946() {
                                        : (cpu$fetch$_T_16 ? cpu$fetch$excep2_r$tval : cpu$fetch$excep_buf$tval))
                     : cpu$fetch$excep_buf$tval));
 }
-void DiffNewTop::step947() {
+void Diffnewtop::step947() {
   activeFlags[947] = false;
   cpu$fetch$excep_buf$en$next =
       (reset
@@ -19419,7 +19419,7 @@ void DiffNewTop::step947() {
     activeFlags[941] = true;
   }
 }
-void DiffNewTop::step948() {
+void Diffnewtop::step948() {
   activeFlags[948] = false;
   cpu$fetch$inst_r$next =
       (reset
@@ -19533,7 +19533,7 @@ void DiffNewTop::step948() {
     activeFlags[816] = true;
   }
 }
-void DiffNewTop::step949() {
+void Diffnewtop::step949() {
   activeFlags[949] = false;
   cpu$fetch$reset_ic$next =
       (reset ? 0x0
@@ -19545,7 +19545,7 @@ void DiffNewTop::step949() {
     activeFlags[949] = true;
   }
 }
-void DiffNewTop::step950() {
+void Diffnewtop::step950() {
   activeFlags[950] = false;
   cpu$decode$rs1_r$next =
       (reset
@@ -19569,12 +19569,12 @@ void DiffNewTop::step950() {
                   : (cpu$decode$_T_8 ? ((cpu$fetch$inst_r >> 15) & 0x1f) : cpu$decode$rs1_r)));
   if (cpu$decode$rs1_r != cpu$decode$rs1_r$next) { activeFlags[647] = true; }
 }
-void DiffNewTop::step951() {
+void Diffnewtop::step951() {
   activeFlags[951] = false;
 cpu$decode$rrs1_r$next = (reset? 0x0 : (cpu$decode$_T_70? 0x0 : (cpu$decode$_T_43? (cpu$decode$_T_64? 0x1 : (cpu$decode$_T_61? 0x1 : (cpu$decode$_T_60? 0x1 : (cpu$decode$_T_59? 0x1 : (cpu$decode$_T_58? 0x1 : (cpu$decode$_T_52? 0x1 : (cpu$decode$_T_47? 0x1 : 0x0))))))) : (cpu$decode$_T_8? (cpu$decode$_T_15? 0x1 : (cpu$decode$_T_14? 0x1 : (cpu$decode$_T_13? (cpu$decode$jmp_indi? 0x1 : (cpu$decode$rs2_is_csr? (((cpu$decode$_instType_T_1? 0x0 : (cpu$decode$_instType_T_3? 0x0 : (cpu$decode$_instType_T_5? 0x0 : (cpu$decode$_instType_T_7? 0x0 : (cpu$decode$_instType_T_9? 0x0 : (cpu$decode$_instType_T_11? 0x0 : (cpu$decode$_instType_T_13? 0x0 : (cpu$decode$_instType_T_15? 0x0 : (cpu$decode$_instType_T_17? 0x0 : (cpu$decode$_instType_T_19? 0x0 : (cpu$decode$_instType_T_21? 0x0 : (cpu$decode$_instType_T_23? 0x0 : (cpu$decode$_instType_T_25? 0x0 : (cpu$decode$_instType_T_27? 0x0 : (cpu$decode$_instType_T_29? 0x0 : (cpu$decode$_instType_T_31? 0x0 : (cpu$decode$_instType_T_33? 0x0 : (cpu$decode$_instType_T_35? 0x0 : (cpu$decode$_instType_T_37? 0x0 : (cpu$decode$_instType_T_39? 0x0 : (cpu$decode$_instType_T_41? 0x0 : (cpu$decode$_instType_T_43? 0x0 : (cpu$decode$_instType_T_45? 0x0 : (cpu$decode$_instType_T_47? 0x0 : (cpu$decode$_instType_T_49? 0x0 : (cpu$decode$_instType_T_51? 0x0 : (cpu$decode$_instType_T_53? 0x0 : (cpu$decode$_instType_T_55? 0x0 : (cpu$decode$_instType_T_57? 0x0 : (cpu$decode$_instType_T_59? 0x0 : (cpu$decode$_instType_T_61? 0x0 : (cpu$decode$_instType_T_63? 0x0 : (cpu$decode$_instType_T_65? 0x0 : (cpu$decode$_instType_T_67? 0x0 : (cpu$decode$_instType_T_69? 0x0 : (cpu$decode$_instType_T_71? 0x0 : (cpu$decode$_instType_T_73? 0x0 : (cpu$decode$_instType_T_75? 0x0 : (cpu$decode$_instType_T_77? 0x0 : (cpu$decode$_instType_T_79? 0x0 : (cpu$decode$_instType_T_81? 0x0 : (cpu$decode$_instType_T_83? 0x0 : (cpu$decode$_instType_T_85? 0x0 : (cpu$decode$_instType_T_87? 0x0 : (cpu$decode$_instType_T_89? 0x0 : (cpu$decode$_instType_T_91? 0x0 : (cpu$decode$_instType_T_93? 0x0 : (cpu$decode$_instType_T_95? 0x0 : (cpu$decode$_instType_T_97? 0x0 : (cpu$decode$_instType_T_99? 0x0 : (cpu$decode$_instType_T_101? 0x0 : (cpu$decode$_instType_T_103? 0x0 : (cpu$decode$_instType_T_105? 0x0 : (cpu$decode$_instType_T_107? 0x0 : (cpu$decode$_instType_T_109? 0x0 : (cpu$decode$_instType_T_111? 0x0 : (cpu$decode$_instType_T_113? 0x0 : (cpu$decode$_instType_T_115? 0x0 : (cpu$decode$_instType_T_117? 0x0 : (cpu$decode$_instType_T_119? 0x0 : (cpu$decode$_instType_T_121? 0x0 : (cpu$decode$_instType_T_123? 0x0 : (cpu$decode$_instType_T_125? 0x0 : (cpu$decode$_instType_T_127? 0x0 : (cpu$decode$_instType_T_129? 0x0 : (cpu$decode$_instType_T_131? 0x1 : (cpu$decode$_instType_T_133? 0x1 : (cpu$decode$_instType_T_135? 0x1 : 0x0))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))==0x1)==0x0) : 0x1)) : (cpu$decode$_T_12? 0x1 : 0x0)))) : cpu$decode$rrs1_r))));
 if (cpu$decode$rrs1_r != cpu$decode$rrs1_r$next) { activeFlags[645] = true; }
 }
-void DiffNewTop::step952() {
+void Diffnewtop::step952() {
   activeFlags[952] = false;
   cpu$decode$rs2_r$next =
       (reset ? 0x0
@@ -19593,7 +19593,7 @@ void DiffNewTop::step952() {
                            : cpu$decode$rs2_r)));
   if (cpu$decode$rs2_r != cpu$decode$rs2_r$next) { activeFlags[634] = true; }
 }
-void DiffNewTop::step953() {
+void Diffnewtop::step953() {
   activeFlags[953] = false;
   cpu$decode$rrs2_r$next =
       (reset
@@ -19618,7 +19618,7 @@ void DiffNewTop::step953() {
                                 : cpu$decode$rrs2_r))));
   if (cpu$decode$rrs2_r != cpu$decode$rrs2_r$next) { activeFlags[632] = true; }
 }
-void DiffNewTop::step954() {
+void Diffnewtop::step954() {
   activeFlags[954] = false;
   uint8_t cpu$decode$valid_r$oldVal = cpu$decode$valid_r;
   cpu$decode$valid_r = (reset ? 0x0
@@ -19632,7 +19632,7 @@ void DiffNewTop::step954() {
     activeFlags[843] = true;
   }
 }
-void DiffNewTop::step955() {
+void Diffnewtop::step955() {
   activeFlags[955] = false;
   uint8_t cpu$forwading$rs1_r$oldVal = cpu$forwading$rs1_r;
   cpu$forwading$rs1_r = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$rs1_r : cpu$forwading$rs1_r));
@@ -19641,7 +19641,7 @@ void DiffNewTop::step955() {
     activeFlags[647] = true;
   }
 }
-void DiffNewTop::step956() {
+void Diffnewtop::step956() {
   activeFlags[956] = false;
   uint8_t cpu$forwading$rrs1_r$oldVal = cpu$forwading$rrs1_r;
   cpu$forwading$rrs1_r =
@@ -19654,7 +19654,7 @@ void DiffNewTop::step956() {
     activeFlags[645] = true;
   }
 }
-void DiffNewTop::step957() {
+void Diffnewtop::step957() {
   activeFlags[957] = false;
   uint64_t cpu$forwading$rs1_d_r$oldVal = cpu$forwading$rs1_d_r;
   cpu$forwading$rs1_d_r =
@@ -19685,7 +19685,7 @@ void DiffNewTop::step957() {
                     : (cpu$forwading$hs_in ? cpu$decode$rs1_d_r : cpu$forwading$rs1_d_r)));
   if (cpu$forwading$rs1_d_r$oldVal != cpu$forwading$rs1_d_r) { activeFlags[623] = true; }
 }
-void DiffNewTop::step958() {
+void Diffnewtop::step958() {
   activeFlags[958] = false;
   cpu$forwading$rs2_r$next = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$rs2_r : cpu$forwading$rs2_r));
   if (cpu$forwading$rs2_r != cpu$forwading$rs2_r$next) {
@@ -19722,7 +19722,7 @@ void DiffNewTop::step958() {
     activeFlags[634] = true;
   }
 }
-void DiffNewTop::step959() {
+void Diffnewtop::step959() {
   activeFlags[959] = false;
   uint8_t cpu$forwading$rrs2_r$oldVal = cpu$forwading$rrs2_r;
   cpu$forwading$rrs2_r =
@@ -19735,7 +19735,7 @@ void DiffNewTop::step959() {
     activeFlags[632] = true;
   }
 }
-void DiffNewTop::step960() {
+void Diffnewtop::step960() {
   activeFlags[960] = false;
   uint64_t cpu$forwading$rs2_d_r$oldVal = cpu$forwading$rs2_d_r;
   cpu$forwading$rs2_d_r =
@@ -19766,7 +19766,7 @@ void DiffNewTop::step960() {
                     : (cpu$forwading$hs_in ? cpu$decode$rs2_d_r : cpu$forwading$rs2_d_r)));
   if (cpu$forwading$rs2_d_r$oldVal != cpu$forwading$rs2_d_r) { activeFlags[625] = true; }
 }
-void DiffNewTop::step961() {
+void Diffnewtop::step961() {
   activeFlags[961] = false;
   uint8_t cpu$forwading$valid_r$oldVal = cpu$forwading$valid_r;
   cpu$forwading$valid_r =
@@ -19798,7 +19798,7 @@ void DiffNewTop::step961() {
     activeFlags[649] = true;
   }
 }
-void DiffNewTop::step962() {
+void Diffnewtop::step962() {
   activeFlags[962] = false;
   uint8_t cpu$forwading$pre_dst$oldVal = cpu$forwading$pre_dst;
   cpu$forwading$pre_dst = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$dst_r : cpu$forwading$pre_dst));
@@ -19807,7 +19807,7 @@ void DiffNewTop::step962() {
     activeFlags[649] = true;
   }
 }
-void DiffNewTop::step963() {
+void Diffnewtop::step963() {
   activeFlags[963] = false;
   uint8_t cpu$forwading$pre_wr$oldVal = cpu$forwading$pre_wr;
   cpu$forwading$pre_wr = (reset ? 0x0
@@ -19818,13 +19818,13 @@ void DiffNewTop::step963() {
     activeFlags[649] = true;
   }
 }
-void DiffNewTop::step964() {
+void Diffnewtop::step964() {
   activeFlags[964] = false;
   uint8_t cpu$readregs$drop_r$oldVal = cpu$readregs$drop_r;
   cpu$readregs$drop_r = (reset ? 0x0 : (cpu$readregs$hs_in ? (cpu$readregs$_T ? 0x1 : 0x0) : 0x0));
   if (cpu$readregs$drop_r$oldVal != cpu$readregs$drop_r) { activeFlags[586] = true; }
 }
-void DiffNewTop::step965() {
+void Diffnewtop::step965() {
   activeFlags[965] = false;
   uint64_t cpu$readregs$rs1_d_r$oldVal = cpu$readregs$rs1_d_r;
   cpu$readregs$rs1_d_r =
@@ -19841,7 +19841,7 @@ void DiffNewTop::step965() {
     activeFlags[585] = true;
   }
 }
-void DiffNewTop::step966() {
+void Diffnewtop::step966() {
   activeFlags[966] = false;
   uint64_t cpu$readregs$rs2_d_r$oldVal = cpu$readregs$rs2_d_r;
   cpu$readregs$rs2_d_r =
@@ -19859,7 +19859,7 @@ void DiffNewTop::step966() {
     activeFlags[585] = true;
   }
 }
-void DiffNewTop::step967() {
+void Diffnewtop::step967() {
   activeFlags[967] = false;
   cpu$readregs$dst_r$next = (reset ? 0x0 : (cpu$readregs$hs_in ? cpu$forwading$dst_r : cpu$readregs$dst_r));
   if (cpu$readregs$dst_r != cpu$readregs$dst_r$next) {
@@ -19867,7 +19867,7 @@ void DiffNewTop::step967() {
     activeFlags[650] = true;
   }
 }
-void DiffNewTop::step968() {
+void Diffnewtop::step968() {
   activeFlags[968] = false;
   uint8_t cpu$execute$drop_r$oldVal = cpu$execute$drop_r;
   cpu$execute$drop_r =
@@ -19877,7 +19877,7 @@ void DiffNewTop::step968() {
                                 : (cpu$execute$hs_in ? (cpu$execute$_T_1 ? 0x1 : 0x0) : 0x0)));
   if (cpu$execute$drop_r$oldVal != cpu$execute$drop_r) { activeFlags[560] = true; }
 }
-void DiffNewTop::step969() {
+void Diffnewtop::step969() {
   activeFlags[969] = false;
   cpu$execute$alu$multiplier$valid_r$next =
       (reset ? 0x0
@@ -19889,7 +19889,7 @@ void DiffNewTop::step969() {
     activeFlags[579] = true;
   }
 }
-void DiffNewTop::step970() {
+void Diffnewtop::step970() {
   activeFlags[970] = false;
   cpu$execute$alu$divider$val1$next =
       (reset ? 0x0
@@ -19914,7 +19914,7 @@ void DiffNewTop::step970() {
     activeFlags[970] = true;
   }
 }
-void DiffNewTop::step971() {
+void Diffnewtop::step971() {
   activeFlags[971] = false;
   cpu$execute$alu$divider$iter$next =
       (reset ? 0x0
@@ -19929,7 +19929,7 @@ void DiffNewTop::step971() {
     activeFlags[971] = true;
   }
 }
-void DiffNewTop::step972() {
+void Diffnewtop::step972() {
   activeFlags[972] = false;
   uint8_t cpu$execute$alu$divider$state$oldVal = cpu$execute$alu$divider$state;
   cpu$execute$alu$divider$state =
@@ -19943,7 +19943,7 @@ void DiffNewTop::step972() {
     activeFlags[551] = true;
   }
 }
-void DiffNewTop::step973() {
+void Diffnewtop::step973() {
   activeFlags[973] = false;
   cpu$execute$ctrl_r$dcMode$next =
       (reset ? 0x0
@@ -19954,7 +19954,7 @@ void DiffNewTop::step973() {
     activeFlags[544] = true;
   }
 }
-void DiffNewTop::step974() {
+void Diffnewtop::step974() {
   activeFlags[974] = false;
   cpu$execute$ctrl_r$writeRegEn$next =
       (reset ? 0x0
@@ -19962,13 +19962,13 @@ void DiffNewTop::step974() {
                                   : cpu$execute$ctrl_r$writeRegEn));
   if (cpu$execute$ctrl_r$writeRegEn != cpu$execute$ctrl_r$writeRegEn$next) { activeFlags[544] = true; }
 }
-void DiffNewTop::step975() {
+void Diffnewtop::step975() {
   activeFlags[975] = false;
   cpu$execute$indi_r$next =
       (reset ? 0x0 : (cpu$execute$hs_in ? (cpu$execute$_T_1 ? 0x0 : cpu$readregs$indi_r) : cpu$execute$indi_r));
   if (cpu$execute$indi_r != cpu$execute$indi_r$next) { activeFlags[544] = true; }
 }
-void DiffNewTop::step976() {
+void Diffnewtop::step976() {
   activeFlags[976] = false;
   uint8_t cpu$execute$valid_r$oldVal = cpu$execute$valid_r;
   cpu$execute$valid_r =
@@ -19997,7 +19997,7 @@ void DiffNewTop::step976() {
     activeFlags[544] = true;
   }
 }
-void DiffNewTop::step977() {
+void Diffnewtop::step977() {
   activeFlags[977] = false;
   cpu$execute$state$next =
       (reset
@@ -20016,19 +20016,19 @@ void DiffNewTop::step977() {
     activeFlags[544] = true;
   }
 }
-void DiffNewTop::step978() {
+void Diffnewtop::step978() {
   activeFlags[978] = false;
   uint8_t cpu$memory$drop2_r$oldVal = cpu$memory$drop2_r;
   cpu$memory$drop2_r =
       (reset ? 0x0 : (cpu$memory$_T_24 ? (cpu$memory$hs1 ? (cpu$memory$_T_26 ? 0x1 : 0x0) : 0x0) : 0x0));
   if (cpu$memory$drop2_r$oldVal != cpu$memory$drop2_r) { activeFlags[330] = true; }
 }
-void DiffNewTop::step979() {
+void Diffnewtop::step979() {
   activeFlags[979] = false;
   cpu$memory$excep1_r$en$next = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$excep_r$en : cpu$memory$excep1_r$en));
   if (cpu$memory$excep1_r$en != cpu$memory$excep1_r$en$next) { activeFlags[325] = true; }
 }
-void DiffNewTop::step980() {
+void Diffnewtop::step980() {
   activeFlags[980] = false;
   cpu$memory$ctrl1_r$dcMode$next =
       (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$ctrl_r$dcMode : cpu$memory$ctrl1_r$dcMode));
@@ -20038,7 +20038,7 @@ void DiffNewTop::step980() {
     activeFlags[537] = true;
   }
 }
-void DiffNewTop::step981() {
+void Diffnewtop::step981() {
   activeFlags[981] = false;
   uint8_t cpu$memory$indi1_r$oldVal = cpu$memory$indi1_r;
   cpu$memory$indi1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$indi_r : cpu$memory$indi1_r));
@@ -20049,7 +20049,7 @@ void DiffNewTop::step981() {
     activeFlags[326] = true;
   }
 }
-void DiffNewTop::step982() {
+void Diffnewtop::step982() {
   activeFlags[982] = false;
   uint8_t cpu$memory$valid1_r$oldVal = cpu$memory$valid1_r;
   cpu$memory$valid1_r =
@@ -20060,7 +20060,7 @@ void DiffNewTop::step982() {
     activeFlags[502] = true;
   }
 }
-void DiffNewTop::step983() {
+void Diffnewtop::step983() {
   activeFlags[983] = false;
   cpu$memory$is_tlb_r$next =
       (reset ? 0x0
@@ -20072,7 +20072,7 @@ void DiffNewTop::step983() {
     activeFlags[533] = true;
   }
 }
-void DiffNewTop::step984() {
+void Diffnewtop::step984() {
   activeFlags[984] = false;
   cpu$memory$ctrl2_r$dcMode$next =
       (reset
@@ -20115,12 +20115,12 @@ void DiffNewTop::step984() {
     activeFlags[348] = true;
   }
 }
-void DiffNewTop::step985() {
+void Diffnewtop::step985() {
   activeFlags[985] = false;
   cpu$memory$paddr2_r$next = (reset ? 0x0 : (cpu$memory$hs1 ? cpu$tlb_mem$out_paddr_r : cpu$memory$paddr2_r));
   if (cpu$memory$paddr2_r != cpu$memory$paddr2_r$next) { activeFlags[333] = true; }
 }
-void DiffNewTop::step986() {
+void Diffnewtop::step986() {
   activeFlags[986] = false;
   uint8_t cpu$memory$valid2_r$oldVal = cpu$memory$valid2_r;
   cpu$memory$valid2_r =
@@ -20132,7 +20132,7 @@ void DiffNewTop::step986() {
     activeFlags[348] = true;
   }
 }
-void DiffNewTop::step987() {
+void Diffnewtop::step987() {
   activeFlags[987] = false;
   uint8_t cpu$memory$dc_hs_r$oldVal = cpu$memory$dc_hs_r;
   cpu$memory$dc_hs_r =
@@ -20220,7 +20220,7 @@ void DiffNewTop::step987() {
                            : cpu$memory$dc_hs_r)));
   if (cpu$memory$dc_hs_r$oldVal != cpu$memory$dc_hs_r) { activeFlags[348] = true; }
 }
-void DiffNewTop::step988() {
+void Diffnewtop::step988() {
   activeFlags[988] = false;
   uint32_t cpu$memory$lr_addr_r$oldVal = cpu$memory$lr_addr_r;
   cpu$memory$lr_addr_r = (reset ? 0x0
@@ -20228,7 +20228,7 @@ void DiffNewTop::step988() {
                                                   : cpu$memory$lr_addr_r));
   if (cpu$memory$lr_addr_r$oldVal != cpu$memory$lr_addr_r) { activeFlags[318] = true; }
 }
-void DiffNewTop::step989() {
+void Diffnewtop::step989() {
   activeFlags[989] = false;
   uint8_t cpu$memory$lr_valid_r$oldVal = cpu$memory$lr_valid_r;
   cpu$memory$lr_valid_r =
@@ -20239,7 +20239,7 @@ void DiffNewTop::step989() {
                                : cpu$memory$lr_valid_r));
   if (cpu$memory$lr_valid_r$oldVal != cpu$memory$lr_valid_r) { activeFlags[318] = true; }
 }
-void DiffNewTop::step990() {
+void Diffnewtop::step990() {
   activeFlags[990] = false;
   uint8_t cpu$memory$drop_dc$oldVal = cpu$memory$drop_dc;
   cpu$memory$drop_dc =
@@ -20250,7 +20250,7 @@ void DiffNewTop::step990() {
                                         : (cpu$memory$is_dc_r & (cpu$memCrossbar$io$dataRW$rvalid == 0x0)))));
   if (cpu$memory$drop_dc$oldVal != cpu$memory$drop_dc) { activeFlags[329] = true; }
 }
-void DiffNewTop::step991() {
+void Diffnewtop::step991() {
   activeFlags[991] = false;
   cpu$memory$valid3_r$next =
       (reset ? 0x0
@@ -20263,7 +20263,7 @@ void DiffNewTop::step991() {
     activeFlags[329] = true;
   }
 }
-void DiffNewTop::step992() {
+void Diffnewtop::step992() {
   activeFlags[992] = false;
   if (reset) {
     memcpy(cpu$regs$regs, (const uint64_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -20277,7 +20277,7 @@ void DiffNewTop::step992() {
   activeFlags[623] = true;
   activeFlags[625] = true;
 }
-void DiffNewTop::step993() {
+void Diffnewtop::step993() {
   activeFlags[993] = false;
   cpu$csrs$priv$next =
       (reset ? 0x3
@@ -20295,7 +20295,7 @@ void DiffNewTop::step993() {
     activeFlags[952] = true;
   }
 }
-void DiffNewTop::step994() {
+void Diffnewtop::step994() {
   activeFlags[994] = false;
   cpu$csrs$mstatus$next =
       (reset
@@ -21589,7 +21589,7 @@ void DiffNewTop::step994() {
     activeFlags[994] = true;
   }
 }
-void DiffNewTop::step995() {
+void Diffnewtop::step995() {
   activeFlags[995] = false;
   cpu$csrs$mepc$next =
       (reset ? 0x0
@@ -21624,7 +21624,7 @@ void DiffNewTop::step995() {
                                                 : cpu$csrs$mepc))))));
   if (cpu$csrs$mepc != cpu$csrs$mepc$next) { activeFlags[625] = true; }
 }
-void DiffNewTop::step996() {
+void Diffnewtop::step996() {
   activeFlags[996] = false;
   cpu$csrs$mip$next =
       (reset ? 0x0
@@ -22211,7 +22211,7 @@ void DiffNewTop::step996() {
     activeFlags[996] = true;
   }
 }
-void DiffNewTop::step997() {
+void Diffnewtop::step997() {
   activeFlags[997] = false;
   cpu$csrs$sepc$next =
       (reset
@@ -22352,14 +22352,14 @@ void DiffNewTop::step997() {
                                                                                                                            : cpu$csrs$sepc)))))))))))))))));
   if (cpu$csrs$sepc != cpu$csrs$sepc$next) { activeFlags[625] = true; }
 }
-void DiffNewTop::step998() {
+void Diffnewtop::step998() {
   activeFlags[998] = false;
   uint8_t cpu$icache$valid_r$oldVal = cpu$icache$valid_r;
   cpu$icache$valid_r =
       (reset ? 0x0 : (cpu$icache$_T_5 ? (cpu$icache$_T_8 ? 0x0 : (cpu$icache$cacheHit ? 0x1 : 0x0)) : 0x0));
   if (cpu$icache$valid_r$oldVal != cpu$icache$valid_r) { activeFlags[251] = true; }
 }
-void DiffNewTop::step999() {
+void Diffnewtop::step999() {
   activeFlags[999] = false;
   cpu$icache$addr_r$next = (reset ? 0x0 : (cpu$icache$hs_in ? cpu$fetch$_io_instRead_addr_T : cpu$icache$addr_r));
   if (cpu$icache$addr_r != cpu$icache$addr_r$next) {
@@ -22368,7 +22368,7 @@ void DiffNewTop::step999() {
     activeFlags[943] = true;
   }
 }
-void DiffNewTop::step1000() {
+void Diffnewtop::step1000() {
   activeFlags[1000] = false;
   cpu$icache$matchWay_r$next = (reset ? 0x0 : (cpu$icache$hs_in ? cpu$icache$matchWay : cpu$icache$matchWay_r));
   if (cpu$icache$matchWay_r != cpu$icache$matchWay_r$next) {
@@ -22376,7 +22376,7 @@ void DiffNewTop::step1000() {
     activeFlags[943] = true;
   }
 }
-void DiffNewTop::step1001() {
+void Diffnewtop::step1001() {
   activeFlags[1001] = false;
   cpu$icache$matchWay_prng$state$next[1] = cpu$icache$matchWay_prng$state[0];
   cpu$icache$matchWay_prng$state$next[0] = (cpu$icache$matchWay_prng$state[1] ^ cpu$icache$matchWay_prng$state[0]);
@@ -22384,7 +22384,7 @@ void DiffNewTop::step1001() {
   activeFlags[868] = true;
   activeFlags[1001] = true;
 }
-void DiffNewTop::step1002() {
+void Diffnewtop::step1002() {
   activeFlags[1002] = false;
   uint8_t cpu$icache$state$oldVal = cpu$icache$state;
   cpu$icache$state =
@@ -22404,7 +22404,7 @@ void DiffNewTop::step1002() {
     activeFlags[873] = true;
   }
 }
-void DiffNewTop::step1003() {
+void Diffnewtop::step1003() {
   activeFlags[1003] = false;
   cpu$icache$raddrEn$next =
       (reset ? 0x0
@@ -22416,7 +22416,7 @@ void DiffNewTop::step1003() {
     activeFlags[381] = true;
   }
 }
-void DiffNewTop::step1004() {
+void Diffnewtop::step1004() {
   activeFlags[1004] = false;
   uint32_t cpu$icache$raddr$oldVal = cpu$icache$raddr;
   cpu$icache$raddr =
@@ -22427,7 +22427,7 @@ void DiffNewTop::step1004() {
                     : cpu$icache$raddr));
   if (cpu$icache$raddr$oldVal != cpu$icache$raddr) { activeFlags[367] = true; }
 }
-void DiffNewTop::step1005() {
+void Diffnewtop::step1005() {
   activeFlags[1005] = false;
   if (reset) {
     memcpy(cpu$dcache$tag, (const uint32_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -22450,7 +22450,7 @@ void DiffNewTop::step1005() {
   activeFlags[365] = true;
   activeFlags[367] = true;
 }
-void DiffNewTop::step1006() {
+void Diffnewtop::step1006() {
   activeFlags[1006] = false;
   if (reset) {
     memcpy(cpu$dcache$valid, (const uint8_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -22556,7 +22556,7 @@ void DiffNewTop::step1006() {
   activeFlags[238] = true;
   activeFlags[365] = true;
 }
-void DiffNewTop::step1007() {
+void Diffnewtop::step1007() {
   activeFlags[1007] = false;
   if (reset) {
     memcpy(cpu$dcache$dirty, (const uint8_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -22674,35 +22674,35 @@ void DiffNewTop::step1007() {
   activeFlags[238] = true;
   activeFlags[473] = true;
 }
-void DiffNewTop::step1008() {
+void Diffnewtop::step1008() {
   activeFlags[1008] = false;
   uint128_t cpu$dcache$Ram_bw$ram$output$oldVal = cpu$dcache$Ram_bw$ram$output;
   cpu$dcache$Ram_bw$ram$output =
       (reset ? 0x0 : (cpu$dcache$Ram_bw$ram$_T_2 ? 0x0 : cpu$dcache$Ram_bw$ram$ram$output_MPORT$data));
   if (cpu$dcache$Ram_bw$ram$output$oldVal != cpu$dcache$Ram_bw$ram$output) { activeFlags[163] = true; }
 }
-void DiffNewTop::step1009() {
+void Diffnewtop::step1009() {
   activeFlags[1009] = false;
   uint128_t cpu$dcache$Ram_bw_1$ram$output$oldVal = cpu$dcache$Ram_bw_1$ram$output;
   cpu$dcache$Ram_bw_1$ram$output =
       (reset ? 0x0 : (cpu$dcache$Ram_bw_1$ram$_T_2 ? 0x0 : cpu$dcache$Ram_bw_1$ram$ram$output_MPORT$data));
   if (cpu$dcache$Ram_bw_1$ram$output$oldVal != cpu$dcache$Ram_bw_1$ram$output) { activeFlags[163] = true; }
 }
-void DiffNewTop::step1010() {
+void Diffnewtop::step1010() {
   activeFlags[1010] = false;
   uint128_t cpu$dcache$Ram_bw_2$ram$output$oldVal = cpu$dcache$Ram_bw_2$ram$output;
   cpu$dcache$Ram_bw_2$ram$output =
       (reset ? 0x0 : (cpu$dcache$Ram_bw_2$ram$_T_2 ? 0x0 : cpu$dcache$Ram_bw_2$ram$ram$output_MPORT$data));
   if (cpu$dcache$Ram_bw_2$ram$output$oldVal != cpu$dcache$Ram_bw_2$ram$output) { activeFlags[163] = true; }
 }
-void DiffNewTop::step1011() {
+void Diffnewtop::step1011() {
   activeFlags[1011] = false;
   uint128_t cpu$dcache$Ram_bw_3$ram$output$oldVal = cpu$dcache$Ram_bw_3$ram$output;
   cpu$dcache$Ram_bw_3$ram$output =
       (reset ? 0x0 : (cpu$dcache$Ram_bw_3$ram$_T_2 ? 0x0 : cpu$dcache$Ram_bw_3$ram$ram$output_MPORT$data));
   if (cpu$dcache$Ram_bw_3$ram$output$oldVal != cpu$dcache$Ram_bw_3$ram$output) { activeFlags[163] = true; }
 }
-void DiffNewTop::step1012() {
+void Diffnewtop::step1012() {
   activeFlags[1012] = false;
   uint8_t cpu$dcache$wait_r$oldVal = cpu$dcache$wait_r;
   cpu$dcache$wait_r =
@@ -22726,7 +22726,7 @@ void DiffNewTop::step1012() {
     activeFlags[477] = true;
   }
 }
-void DiffNewTop::step1013() {
+void Diffnewtop::step1013() {
   activeFlags[1013] = false;
   cpu$dcache$valid_r$next =
       (reset
@@ -22741,7 +22741,7 @@ void DiffNewTop::step1013() {
     activeFlags[174] = true;
   }
 }
-void DiffNewTop::step1014() {
+void Diffnewtop::step1014() {
   activeFlags[1014] = false;
   cpu$dcache$flush_r$next =
       (reset
@@ -22771,7 +22771,7 @@ void DiffNewTop::step1014() {
     activeFlags[476] = true;
   }
 }
-void DiffNewTop::step1015() {
+void Diffnewtop::step1015() {
   activeFlags[1015] = false;
 cpu$dcache$matchWay_r$next = (reset? 0x0 : (cpu$dcache$_T_68? (cpu$dcache$hs_in? cpu$dcache$matchWay : cpu$dcache$matchWay_r) : (cpu$dcache$_T_74? (cpu$dcache$hs_in? cpu$dcache$matchWay : cpu$dcache$matchWay_r) : (cpu$dcache$_T_76? (cpu$dcache$hs_in? cpu$dcache$matchWay : cpu$dcache$matchWay_r) : (cpu$dcache$_T_79? (cpu$dcache$hs_in? cpu$dcache$matchWay : cpu$dcache$matchWay_r) : (cpu$dcache$_T_81? (cpu$dcache$hs_in? cpu$dcache$matchWay : cpu$dcache$matchWay_r) : (cpu$dcache$_T_83? (cpu$dcache$hs_in? cpu$dcache$matchWay : cpu$dcache$matchWay_r) : (cpu$dcache$_T_84? (cpu$dcache$flush_done? (cpu$dcache$hs_in? cpu$dcache$matchWay : cpu$dcache$matchWay_r) : (cpu$dcache$_T_63? 0x3 : (cpu$dcache$_T_62? 0x3 : (cpu$dcache$_T_61? 0x3 : (cpu$dcache$_T_60? 0x3 : (cpu$dcache$_T_59? 0x3 : (cpu$dcache$_T_58? 0x3 : (cpu$dcache$_T_57? 0x3 : (cpu$dcache$_T_56? 0x3 : (cpu$dcache$_T_55? 0x3 : (cpu$dcache$_T_54? 0x3 : (cpu$dcache$_T_53? 0x3 : (cpu$dcache$_T_52? 0x3 : (cpu$dcache$_T_51? 0x3 : (cpu$dcache$_T_50? 0x3 : (cpu$dcache$_T_49? 0x3 : (cpu$dcache$_T_48? 0x3 : (cpu$dcache$_T_47? 0x2 : (cpu$dcache$_T_46? 0x2 : (cpu$dcache$_T_45? 0x2 : (cpu$dcache$_T_44? 0x2 : (cpu$dcache$_T_43? 0x2 : (cpu$dcache$_T_42? 0x2 : (cpu$dcache$_T_41? 0x2 : (cpu$dcache$_T_40? 0x2 : (cpu$dcache$_T_39? 0x2 : (cpu$dcache$_T_38? 0x2 : (cpu$dcache$_T_37? 0x2 : (cpu$dcache$_T_36? 0x2 : (cpu$dcache$_T_35? 0x2 : (cpu$dcache$_T_34? 0x2 : (cpu$dcache$_T_33? 0x2 : (cpu$dcache$_T_32? 0x2 : (cpu$dcache$_T_31? 0x1 : (cpu$dcache$_T_30? 0x1 : (cpu$dcache$_T_29? 0x1 : (cpu$dcache$_T_28? 0x1 : (cpu$dcache$_T_27? 0x1 : (cpu$dcache$_T_26? 0x1 : (cpu$dcache$_T_25? 0x1 : (cpu$dcache$_T_24? 0x1 : (cpu$dcache$_T_23? 0x1 : (cpu$dcache$_T_22? 0x1 : (cpu$dcache$_T_21? 0x1 : (cpu$dcache$_T_20? 0x1 : (cpu$dcache$_T_19? 0x1 : (cpu$dcache$_T_18? 0x1 : (cpu$dcache$_T_17? 0x1 : (cpu$dcache$_T_16? 0x1 : 0x0))))))))))))))))))))))))))))))))))))))))))))))))) : (cpu$dcache$hs_in? cpu$dcache$matchWay : cpu$dcache$matchWay_r)))))))));
 if (cpu$dcache$matchWay_r != cpu$dcache$matchWay_r$next) {
@@ -22784,7 +22784,7 @@ if (cpu$dcache$matchWay_r != cpu$dcache$matchWay_r$next) {
   activeFlags[1007] = true;
 }
 }
-void DiffNewTop::step1016() {
+void Diffnewtop::step1016() {
   activeFlags[1016] = false;
   cpu$dcache$offset$next =
       (reset ? 0x0
@@ -22807,7 +22807,7 @@ void DiffNewTop::step1016() {
     activeFlags[1016] = true;
   }
 }
-void DiffNewTop::step1017() {
+void Diffnewtop::step1017() {
   activeFlags[1017] = false;
   cpu$dcache$blockIdx_r$next =
       (reset
@@ -22843,7 +22843,7 @@ void DiffNewTop::step1017() {
     activeFlags[1007] = true;
   }
 }
-void DiffNewTop::step1018() {
+void Diffnewtop::step1018() {
   activeFlags[1018] = false;
   cpu$dcache$matchWay_prng$state$next[1] = cpu$dcache$matchWay_prng$state[0];
   cpu$dcache$matchWay_prng$state$next[0] = (cpu$dcache$matchWay_prng$state[1] ^ cpu$dcache$matchWay_prng$state[0]);
@@ -22851,7 +22851,7 @@ void DiffNewTop::step1018() {
   activeFlags[465] = true;
   activeFlags[1018] = true;
 }
-void DiffNewTop::step1019() {
+void Diffnewtop::step1019() {
   activeFlags[1019] = false;
   cpu$dcache$axiRaddrEn$next =
       (reset ? 0x0
@@ -22868,7 +22868,7 @@ void DiffNewTop::step1019() {
     activeFlags[385] = true;
   }
 }
-void DiffNewTop::step1020() {
+void Diffnewtop::step1020() {
   activeFlags[1020] = false;
   uint8_t cpu$dcache$axiRdataEn$oldVal = cpu$dcache$axiRdataEn;
   cpu$dcache$axiRdataEn =
@@ -22883,7 +22883,7 @@ void DiffNewTop::step1020() {
                                                             : cpu$dcache$axiRdataEn))));
   if (cpu$dcache$axiRdataEn$oldVal != cpu$dcache$axiRdataEn) { activeFlags[393] = true; }
 }
-void DiffNewTop::step1021() {
+void Diffnewtop::step1021() {
   activeFlags[1021] = false;
   cpu$dcache$axiWaddrEn$next =
       (reset ? 0x0
@@ -22912,7 +22912,7 @@ void DiffNewTop::step1021() {
     activeFlags[373] = true;
   }
 }
-void DiffNewTop::step1022() {
+void Diffnewtop::step1022() {
   activeFlags[1022] = false;
   uint8_t cpu$dcache$axiWdataEn$oldVal = cpu$dcache$axiWdataEn;
   cpu$dcache$axiWdataEn =
@@ -22931,7 +22931,7 @@ void DiffNewTop::step1022() {
     activeFlags[400] = true;
   }
 }
-void DiffNewTop::step1023() {
+void Diffnewtop::step1023() {
   activeFlags[1023] = false;
   cpu$mem2Axi$waddrEn$next =
       (reset ? 0x0
@@ -22943,7 +22943,7 @@ void DiffNewTop::step1023() {
     activeFlags[375] = true;
   }
 }
-void DiffNewTop::step1024() {
+void Diffnewtop::step1024() {
   activeFlags[1024] = false;
   uint32_t cpu$mem2Axi$waddr$oldVal = cpu$mem2Axi$waddr;
   cpu$mem2Axi$waddr = (reset ? 0x0
@@ -22951,7 +22951,7 @@ void DiffNewTop::step1024() {
                                                : cpu$mem2Axi$waddr));
   if (cpu$mem2Axi$waddr$oldVal != cpu$mem2Axi$waddr) { activeFlags[367] = true; }
 }
-void DiffNewTop::step1025() {
+void Diffnewtop::step1025() {
   activeFlags[1025] = false;
   cpu$mem2Axi$offset$next =
       (reset ? 0x0
@@ -22975,7 +22975,7 @@ void DiffNewTop::step1025() {
     activeFlags[1025] = true;
   }
 }
-void DiffNewTop::step1026() {
+void Diffnewtop::step1026() {
   activeFlags[1026] = false;
   cpu$mem2Axi$wdataEn$next =
       (reset ? 0x0
@@ -22985,7 +22985,7 @@ void DiffNewTop::step1026() {
                                         : (cpu$mem2Axi$_T_8 ? 0x1 : (cpu$mem2Axi$_T_9 ? 0x0 : cpu$mem2Axi$wdataEn)))));
   if (cpu$mem2Axi$wdataEn != cpu$mem2Axi$wdataEn$next) { activeFlags[367] = true; }
 }
-void DiffNewTop::step1027() {
+void Diffnewtop::step1027() {
   activeFlags[1027] = false;
   cpu$mem2Axi$raddrEn$next =
       (reset
@@ -23004,7 +23004,7 @@ void DiffNewTop::step1027() {
     activeFlags[387] = true;
   }
 }
-void DiffNewTop::step1028() {
+void Diffnewtop::step1028() {
   activeFlags[1028] = false;
   uint32_t cpu$mem2Axi$raddr$oldVal = cpu$mem2Axi$raddr;
   cpu$mem2Axi$raddr =
@@ -23015,7 +23015,7 @@ void DiffNewTop::step1028() {
                     : cpu$mem2Axi$raddr));
   if (cpu$mem2Axi$raddr$oldVal != cpu$mem2Axi$raddr) { activeFlags[367] = true; }
 }
-void DiffNewTop::step1029() {
+void Diffnewtop::step1029() {
   activeFlags[1029] = false;
   cpu$mem2Axi$rdataEn$next =
       (reset ? 0x0
@@ -23035,13 +23035,13 @@ void DiffNewTop::step1029() {
     activeFlags[395] = true;
   }
 }
-void DiffNewTop::step1030() {
+void Diffnewtop::step1030() {
   activeFlags[1030] = false;
   uint8_t cpu$mem2Axi$out_valid$oldVal = cpu$mem2Axi$out_valid;
   cpu$mem2Axi$out_valid = (reset ? 0x0 : ((cpu$mem2Axi$state == 0x6) | (cpu$mem2Axi$state == 0x3)));
   if (cpu$mem2Axi$out_valid$oldVal != cpu$mem2Axi$out_valid) { activeFlags[174] = true; }
 }
-void DiffNewTop::step1031() {
+void Diffnewtop::step1031() {
   activeFlags[1031] = false;
   uint8_t cpu$flash2Axi$waddrEn$oldVal = cpu$flash2Axi$waddrEn;
   cpu$flash2Axi$waddrEn =
@@ -23054,7 +23054,7 @@ void DiffNewTop::step1031() {
     activeFlags[371] = true;
   }
 }
-void DiffNewTop::step1032() {
+void Diffnewtop::step1032() {
   activeFlags[1032] = false;
   cpu$flash2Axi$offset$next =
       (reset ? 0x0
@@ -23078,7 +23078,7 @@ void DiffNewTop::step1032() {
     activeFlags[1032] = true;
   }
 }
-void DiffNewTop::step1033() {
+void Diffnewtop::step1033() {
   activeFlags[1033] = false;
   cpu$flash2Axi$raddrEn$next =
       (reset ? 0x0
@@ -23097,7 +23097,7 @@ void DiffNewTop::step1033() {
     activeFlags[383] = true;
   }
 }
-void DiffNewTop::step1034() {
+void Diffnewtop::step1034() {
   activeFlags[1034] = false;
   cpu$flash2Axi$state$next =
       (reset
@@ -23128,7 +23128,7 @@ void DiffNewTop::step1034() {
     activeFlags[1034] = true;
   }
 }
-void DiffNewTop::step1035() {
+void Diffnewtop::step1035() {
   activeFlags[1035] = false;
   uint8_t cpu$crossBar$state$oldVal = cpu$crossBar$state;
   cpu$crossBar$state =
@@ -23230,7 +23230,7 @@ void DiffNewTop::step1035() {
     activeFlags[116] = true;
   }
 }
-void DiffNewTop::step1036() {
+void Diffnewtop::step1036() {
   activeFlags[1036] = false;
   uint8_t cpu$crossBar$selectMem_r$oldVal = cpu$crossBar$selectMem_r;
   cpu$crossBar$selectMem_r =
@@ -23242,7 +23242,7 @@ void DiffNewTop::step1036() {
                                                               : cpu$crossBar$selectMem_r))));
   if (cpu$crossBar$selectMem_r$oldVal != cpu$crossBar$selectMem_r) { activeFlags[157] = true; }
 }
-void DiffNewTop::step1037() {
+void Diffnewtop::step1037() {
   activeFlags[1037] = false;
   cpu$fetchCrossbar$pre_mem$next =
       (reset ? 0x0
@@ -23253,7 +23253,7 @@ void DiffNewTop::step1037() {
     activeFlags[943] = true;
   }
 }
-void DiffNewTop::step1038() {
+void Diffnewtop::step1038() {
   activeFlags[1038] = false;
   uint8_t cpu$split64to32$busy$oldVal = cpu$split64to32$busy;
   cpu$split64to32$busy =
@@ -23263,7 +23263,7 @@ void DiffNewTop::step1038() {
                     : cpu$split64to32$busy));
   if (cpu$split64to32$busy$oldVal != cpu$split64to32$busy) { activeFlags[117] = true; }
 }
-void DiffNewTop::step1039() {
+void Diffnewtop::step1039() {
   activeFlags[1039] = false;
   uint8_t cpu$split64to32$state$oldVal = cpu$split64to32$state;
   cpu$split64to32$state =
@@ -23277,7 +23277,7 @@ void DiffNewTop::step1039() {
     activeFlags[106] = true;
   }
 }
-void DiffNewTop::step1040() {
+void Diffnewtop::step1040() {
   activeFlags[1040] = false;
   uint8_t cpu$memCrossbar$pre_type$oldVal = cpu$memCrossbar$pre_type;
   cpu$memCrossbar$pre_type =
@@ -23292,7 +23292,7 @@ void DiffNewTop::step1040() {
     activeFlags[104] = true;
   }
 }
-void DiffNewTop::step1041() {
+void Diffnewtop::step1041() {
   activeFlags[1041] = false;
   if (reset) {
     memcpy(cpu$tlb_if$tag, (const uint64_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 16 * sizeof(uint64_t));
@@ -23337,7 +23337,7 @@ void DiffNewTop::step1041() {
   activeFlags[927] = true;
   activeFlags[928] = true;
 }
-void DiffNewTop::step1042() {
+void Diffnewtop::step1042() {
   activeFlags[1042] = false;
   if (reset) {
     memcpy(cpu$tlb_if$info, (const uint16_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 16 * sizeof(uint16_t));
@@ -23408,7 +23408,7 @@ void DiffNewTop::step1042() {
   }
   activeFlags[932] = true;
 }
-void DiffNewTop::step1043() {
+void Diffnewtop::step1043() {
   activeFlags[1043] = false;
   if (reset) {
     memcpy(cpu$tlb_if$pte_level$next, (const uint8_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -23451,7 +23451,7 @@ void DiffNewTop::step1043() {
   activeFlags[927] = true;
   activeFlags[928] = true;
 }
-void DiffNewTop::step1044() {
+void Diffnewtop::step1044() {
   activeFlags[1044] = false;
   if (reset) {
     memcpy(cpu$tlb_if$valid, (const uint8_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 16 * sizeof(uint8_t));
@@ -23565,7 +23565,7 @@ void DiffNewTop::step1044() {
   activeFlags[927] = true;
   activeFlags[928] = true;
 }
-void DiffNewTop::step1045() {
+void Diffnewtop::step1045() {
   activeFlags[1045] = false;
   cpu$tlb_if$pte_addr_r$next =
       (reset
@@ -23655,7 +23655,7 @@ void DiffNewTop::step1045() {
                   : cpu$tlb_if$pte_addr_r));
   if (cpu$tlb_if$pte_addr_r != cpu$tlb_if$pte_addr_r$next) { activeFlags[354] = true; }
 }
-void DiffNewTop::step1046() {
+void Diffnewtop::step1046() {
   activeFlags[1046] = false;
   uint8_t cpu$tlb_if$dc_mode_r$oldVal = cpu$tlb_if$dc_mode_r;
   cpu$tlb_if$dc_mode_r =
@@ -23687,7 +23687,7 @@ void DiffNewTop::step1046() {
     activeFlags[357] = true;
   }
 }
-void DiffNewTop::step1047() {
+void Diffnewtop::step1047() {
   activeFlags[1047] = false;
   cpu$tlb_if$out_valid_r$next =
       (reset ? 0x0
@@ -23707,7 +23707,7 @@ void DiffNewTop::step1047() {
     activeFlags[936] = true;
   }
 }
-void DiffNewTop::step1048() {
+void Diffnewtop::step1048() {
   activeFlags[1048] = false;
   cpu$tlb_if$out_excep_r$cause$next =
       (reset
@@ -23727,7 +23727,7 @@ void DiffNewTop::step1048() {
     activeFlags[262] = true;
   }
 }
-void DiffNewTop::step1049() {
+void Diffnewtop::step1049() {
   activeFlags[1049] = false;
   cpu$tlb_if$out_excep_r$en$next =
       (reset
@@ -23774,7 +23774,7 @@ void DiffNewTop::step1049() {
     activeFlags[936] = true;
   }
 }
-void DiffNewTop::step1050() {
+void Diffnewtop::step1050() {
   activeFlags[1050] = false;
   uint8_t cpu$tlb_if$state$oldVal = cpu$tlb_if$state;
   cpu$tlb_if$state =
@@ -23804,7 +23804,7 @@ void DiffNewTop::step1050() {
     activeFlags[906] = true;
   }
 }
-void DiffNewTop::step1051() {
+void Diffnewtop::step1051() {
   activeFlags[1051] = false;
   cpu$tlb_if$select_prng$state$next[3] = cpu$tlb_if$select_prng$state[2];
   cpu$tlb_if$select_prng$state$next[2] = cpu$tlb_if$select_prng$state[1];
@@ -23813,7 +23813,7 @@ void DiffNewTop::step1051() {
   if (reset) { memcpy(cpu$tlb_if$select_prng$state$next, (const uint8_t[]){1, 0, 0, 0}, 4 * sizeof(uint8_t)); }
   activeFlags[1051] = true;
 }
-void DiffNewTop::step1052() {
+void Diffnewtop::step1052() {
   activeFlags[1052] = false;
   if (reset) {
     memcpy(cpu$tlb_mem$tag, (const uint64_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 16 * sizeof(uint64_t));
@@ -23858,7 +23858,7 @@ void DiffNewTop::step1052() {
   activeFlags[523] = true;
   activeFlags[524] = true;
 }
-void DiffNewTop::step1053() {
+void Diffnewtop::step1053() {
   activeFlags[1053] = false;
   if (reset) {
     memcpy(cpu$tlb_mem$info, (const uint16_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 16 * sizeof(uint16_t));
@@ -23929,7 +23929,7 @@ void DiffNewTop::step1053() {
   }
   activeFlags[528] = true;
 }
-void DiffNewTop::step1054() {
+void Diffnewtop::step1054() {
   activeFlags[1054] = false;
   if (reset) {
     memcpy(cpu$tlb_mem$pte_level$next, (const uint8_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -23974,7 +23974,7 @@ void DiffNewTop::step1054() {
   activeFlags[523] = true;
   activeFlags[524] = true;
 }
-void DiffNewTop::step1055() {
+void Diffnewtop::step1055() {
   activeFlags[1055] = false;
   if (reset) {
     memcpy(cpu$tlb_mem$valid, (const uint8_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 16 * sizeof(uint8_t));
@@ -24088,7 +24088,7 @@ void DiffNewTop::step1055() {
   activeFlags[523] = true;
   activeFlags[524] = true;
 }
-void DiffNewTop::step1056() {
+void Diffnewtop::step1056() {
   activeFlags[1056] = false;
   cpu$tlb_mem$pte_addr_r$next =
       (reset
@@ -24181,7 +24181,7 @@ void DiffNewTop::step1056() {
                   : cpu$tlb_mem$pte_addr_r));
   if (cpu$tlb_mem$pte_addr_r != cpu$tlb_mem$pte_addr_r$next) { activeFlags[354] = true; }
 }
-void DiffNewTop::step1057() {
+void Diffnewtop::step1057() {
   activeFlags[1057] = false;
   uint8_t cpu$tlb_mem$dc_mode_r$oldVal = cpu$tlb_mem$dc_mode_r;
   cpu$tlb_mem$dc_mode_r =
@@ -24213,7 +24213,7 @@ void DiffNewTop::step1057() {
     activeFlags[359] = true;
   }
 }
-void DiffNewTop::step1058() {
+void Diffnewtop::step1058() {
   activeFlags[1058] = false;
   cpu$tlb_mem$out_valid_r$next =
       (reset ? 0x0
@@ -24232,7 +24232,7 @@ void DiffNewTop::step1058() {
     activeFlags[332] = true;
   }
 }
-void DiffNewTop::step1059() {
+void Diffnewtop::step1059() {
   activeFlags[1059] = false;
   cpu$tlb_mem$out_paddr_r$next =
       (reset ? 0x0
@@ -24387,7 +24387,7 @@ void DiffNewTop::step1059() {
     activeFlags[988] = true;
   }
 }
-void DiffNewTop::step1060() {
+void Diffnewtop::step1060() {
   activeFlags[1060] = false;
   cpu$tlb_mem$out_excep_r$cause$next =
       (reset
@@ -24419,7 +24419,7 @@ void DiffNewTop::step1060() {
     activeFlags[263] = true;
   }
 }
-void DiffNewTop::step1061() {
+void Diffnewtop::step1061() {
   activeFlags[1061] = false;
   cpu$tlb_mem$out_excep_r$en$next =
       (reset
@@ -24466,7 +24466,7 @@ void DiffNewTop::step1061() {
     activeFlags[332] = true;
   }
 }
-void DiffNewTop::step1062() {
+void Diffnewtop::step1062() {
   activeFlags[1062] = false;
   uint8_t cpu$tlb_mem$flush_r$oldVal = cpu$tlb_mem$flush_r;
   cpu$tlb_mem$flush_r = (reset ? 0x0 : (cpu$tlb_mem$_T_49 ? (cpu$tlb_mem$_T_50 ? 0x0 : 0x1) : cpu$tlb_mem$flush_r));
@@ -24475,7 +24475,7 @@ void DiffNewTop::step1062() {
     activeFlags[534] = true;
   }
 }
-void DiffNewTop::step1063() {
+void Diffnewtop::step1063() {
   activeFlags[1063] = false;
   uint8_t cpu$tlb_mem$m_type_r$oldVal = cpu$tlb_mem$m_type_r;
   cpu$tlb_mem$m_type_r =
@@ -24493,7 +24493,7 @@ void DiffNewTop::step1063() {
                     : cpu$tlb_mem$m_type_r));
   if (cpu$tlb_mem$m_type_r$oldVal != cpu$tlb_mem$m_type_r) { activeFlags[538] = true; }
 }
-void DiffNewTop::step1064() {
+void Diffnewtop::step1064() {
   activeFlags[1064] = false;
   cpu$tlb_mem$select_prng$state$next[3] = cpu$tlb_mem$select_prng$state[2];
   cpu$tlb_mem$select_prng$state$next[2] = cpu$tlb_mem$select_prng$state[1];
@@ -24502,7 +24502,7 @@ void DiffNewTop::step1064() {
   if (reset) { memcpy(cpu$tlb_mem$select_prng$state$next, (const uint8_t[]){1, 0, 0, 0}, 4 * sizeof(uint8_t)); }
   activeFlags[1064] = true;
 }
-void DiffNewTop::step1065() {
+void Diffnewtop::step1065() {
   activeFlags[1065] = false;
   cpu$tlb_mem$level$next =
       (reset ? 0x0
@@ -24529,7 +24529,7 @@ void DiffNewTop::step1065() {
     activeFlags[1065] = true;
   }
 }
-void DiffNewTop::step1066() {
+void Diffnewtop::step1066() {
   activeFlags[1066] = false;
   uint8_t cpu$dcSelector$pre_idx$oldVal = cpu$dcSelector$pre_idx;
   cpu$dcSelector$pre_idx =
@@ -24549,7 +24549,7 @@ void DiffNewTop::step1066() {
     activeFlags[174] = true;
   }
 }
-void DiffNewTop::step1067() {
+void Diffnewtop::step1067() {
   activeFlags[1067] = false;
   uint8_t cpu$dcSelector$busy$oldVal = cpu$dcSelector$busy;
   cpu$dcSelector$busy =
@@ -24567,7 +24567,7 @@ void DiffNewTop::step1067() {
                                                               : (cpu$dcache$valid_r ? 0x0 : cpu$dcSelector$busy)))))));
   if (cpu$dcSelector$busy$oldVal != cpu$dcSelector$busy) { activeFlags[159] = true; }
 }
-void DiffNewTop::step1068() {
+void Diffnewtop::step1068() {
   activeFlags[1068] = false;
   cpu$plic$priority$next =
       (reset ? 0x0
@@ -24578,7 +24578,7 @@ void DiffNewTop::step1068() {
     activeFlags[73] = true;
   }
 }
-void DiffNewTop::step1069() {
+void Diffnewtop::step1069() {
   activeFlags[1069] = false;
   cpu$plic$threshold2$next =
       (reset ? 0x0
@@ -24586,7 +24586,7 @@ void DiffNewTop::step1069() {
                               : cpu$plic$threshold2));
   if (cpu$plic$threshold2 != cpu$plic$threshold2$next) { activeFlags[72] = true; }
 }
-void DiffNewTop::step1070() {
+void Diffnewtop::step1070() {
   activeFlags[1070] = false;
   cpu$plic$claim1$next = (reset ? 0x0
                                 : (cpu$plic$_T_3 ? (cpu$memCrossbar$io$plicIO$arvalid
@@ -24594,7 +24594,7 @@ void DiffNewTop::step1070() {
                                                         : (cpu$plic$_io_intr_out_m_raise_T_2 ? 0x1 : cpu$plic$claim1))
                                                  : (cpu$plic$_io_intr_out_m_raise_T_2 ? 0x1 : cpu$plic$claim1)));
 }
-void DiffNewTop::step1071() {
+void Diffnewtop::step1071() {
   activeFlags[1071] = false;
   cpu$plic$claim2$next = (reset ? 0x0
                                 : (cpu$plic$_T_4 ? (cpu$memCrossbar$io$plicIO$arvalid
@@ -24602,7 +24602,7 @@ void DiffNewTop::step1071() {
                                                         : (cpu$plic$_io_intr_out_s_raise_T_2 ? 0x1 : cpu$plic$claim2))
                                                  : (cpu$plic$_io_intr_out_s_raise_T_2 ? 0x1 : cpu$plic$claim2)));
 }
-void DiffNewTop::step1072() {
+void Diffnewtop::step1072() {
   activeFlags[1072] = false;
   uint8_t cpu$dmaBridge$wready_r$oldVal = cpu$dmaBridge$wready_r;
   cpu$dmaBridge$wready_r =
@@ -24630,7 +24630,7 @@ void DiffNewTop::step1072() {
     activeFlags[59] = true;
   }
 }
-void DiffNewTop::step1073() {
+void Diffnewtop::step1073() {
   activeFlags[1073] = false;
   cpu$dmaBridge$bvalid_r$next =
       (reset ? 0x0
@@ -24654,7 +24654,7 @@ void DiffNewTop::step1073() {
                                                               : cpu$dmaBridge$bvalid_r))))))));
   if (cpu$dmaBridge$bvalid_r != cpu$dmaBridge$bvalid_r$next) { activeFlags[57] = true; }
 }
-void DiffNewTop::step1074() {
+void Diffnewtop::step1074() {
   activeFlags[1074] = false;
   uint8_t cpu$dmaBridge$rvalid_r$oldVal = cpu$dmaBridge$rvalid_r;
   cpu$dmaBridge$rvalid_r =
@@ -24670,7 +24670,7 @@ void DiffNewTop::step1074() {
     activeFlags[54] = true;
   }
 }
-void DiffNewTop::step1075() {
+void Diffnewtop::step1075() {
   activeFlags[1075] = false;
   cpu$dmaBridge$rlast_r$next =
       (reset ? 0x0
@@ -24681,7 +24681,7 @@ void DiffNewTop::step1075() {
                                                                 : (cpu$dmaBridge$_T_5 ? (cpu$dmaBridge$len_r == 0x0)
                                                                                       : cpu$dmaBridge$rlast_r)))));
 }
-void DiffNewTop::step1076() {
+void Diffnewtop::step1076() {
   activeFlags[1076] = false;
   cpu$dmaBridge$data_strb_r$next =
       (reset
@@ -24713,7 +24713,7 @@ void DiffNewTop::step1076() {
     activeFlags[1076] = true;
   }
 }
-void DiffNewTop::step1077() {
+void Diffnewtop::step1077() {
   activeFlags[1077] = false;
   cpu$dmaBridge$len_r$next =
       (reset ? 0x0
@@ -24745,7 +24745,7 @@ void DiffNewTop::step1077() {
     activeFlags[1077] = true;
   }
 }
-void DiffNewTop::step1078() {
+void Diffnewtop::step1078() {
   activeFlags[1078] = false;
   uint8_t mem$burstLen$oldVal = mem$burstLen;
   mem$burstLen =
@@ -24796,7 +24796,7 @@ void DiffNewTop::step1078() {
                   : mem$burstLen));
   if (mem$burstLen$oldVal != mem$burstLen) { activeFlags[45] = true; }
 }
-void DiffNewTop::step1079() {
+void Diffnewtop::step1079() {
   activeFlags[1079] = false;
   mem$offset$next =
       (reset
@@ -24818,7 +24818,7 @@ void DiffNewTop::step1079() {
     activeFlags[1079] = true;
   }
 }
-void DiffNewTop::step1080() {
+void Diffnewtop::step1080() {
   activeFlags[1080] = false;
   uint8_t mem$waReady$oldVal = mem$waReady;
   mem$waReady = (reset ? 0x0 : (mem$_T ? (mem$_T_1 ? 0x0 : 0x1) : mem$waReady));
@@ -24827,7 +24827,7 @@ void DiffNewTop::step1080() {
     activeFlags[401] = true;
   }
 }
-void DiffNewTop::step1081() {
+void Diffnewtop::step1081() {
   activeFlags[1081] = false;
   uint8_t mem$raReady$oldVal = mem$raReady;
   mem$raReady = (reset ? 0x0 : (mem$_T ? (mem$_T_2 ? 0x0 : 0x1) : mem$raReady));
@@ -24836,7 +24836,7 @@ void DiffNewTop::step1081() {
     activeFlags[418] = true;
   }
 }
-void DiffNewTop::step1082() {
+void Diffnewtop::step1082() {
   activeFlags[1082] = false;
   mem$rdValid$next =
       (reset ? 0x0
@@ -24847,7 +24847,7 @@ void DiffNewTop::step1082() {
     activeFlags[419] = true;
   }
 }
-void DiffNewTop::step1083() {
+void Diffnewtop::step1083() {
   activeFlags[1083] = false;
   uint8_t mmio$waready$oldVal = mmio$waready;
   mmio$waready = (reset ? 0x0 : (mmio$_T_1 ? (mmio$_T_2 ? 0x0 : 0x1) : mmio$waready));
@@ -24856,7 +24856,7 @@ void DiffNewTop::step1083() {
     activeFlags[420] = true;
   }
 }
-void DiffNewTop::step1084() {
+void Diffnewtop::step1084() {
   activeFlags[1084] = false;
   uint8_t mmio$raready$oldVal = mmio$raready;
   mmio$raready = (reset ? 0x0 : (mmio$_T_1 ? (mmio$_T_3 ? 0x0 : 0x1) : mmio$raready));
@@ -24865,7 +24865,7 @@ void DiffNewTop::step1084() {
     activeFlags[426] = true;
   }
 }
-void DiffNewTop::step1085() {
+void Diffnewtop::step1085() {
   activeFlags[1085] = false;
   mmio$rdvalid$next =
       (reset ? 0x0
@@ -24879,7 +24879,7 @@ void DiffNewTop::step1085() {
     activeFlags[464] = true;
   }
 }
-void DiffNewTop::step1086() {
+void Diffnewtop::step1086() {
   activeFlags[1086] = false;
   mmio$offset$next =
       (reset ? 0x0
@@ -24895,7 +24895,7 @@ void DiffNewTop::step1086() {
     activeFlags[1086] = true;
   }
 }
-void DiffNewTop::step1087() {
+void Diffnewtop::step1087() {
   activeFlags[1087] = false;
   uint8_t dma$state$oldVal = dma$state;
   dma$state =
@@ -24919,7 +24919,7 @@ void DiffNewTop::step1087() {
     activeFlags[12] = true;
   }
 }
-void DiffNewTop::step1088() {
+void Diffnewtop::step1088() {
   activeFlags[1088] = false;
   dma$awvalid_r$next =
       (reset ? 0x0
@@ -24929,7 +24929,7 @@ void DiffNewTop::step1088() {
                                                  : (dma$_T_9 ? (dma$_T_10 ? 0x0 : dma$awvalid_r) : dma$awvalid_r)))));
   if (dma$awvalid_r != dma$awvalid_r$next) { activeFlags[60] = true; }
 }
-void DiffNewTop::step1089() {
+void Diffnewtop::step1089() {
   activeFlags[1089] = false;
   uint8_t dma$wvalid_r$oldVal = dma$wvalid_r;
   dma$wvalid_r =
@@ -24947,14 +24947,14 @@ void DiffNewTop::step1089() {
     activeFlags[59] = true;
   }
 }
-void DiffNewTop::step1090() {
+void Diffnewtop::step1090() {
   activeFlags[1090] = false;
   dma$arvalid_r$next = (reset ? 0x0
                               : (dma$_T_2 ? (dma$enable_r ? 0x1 : dma$arvalid_r)
                                           : (dma$_T_3 ? (dma$_T_4 ? 0x0 : dma$arvalid_r) : dma$arvalid_r)));
   if (dma$arvalid_r != dma$arvalid_r$next) { activeFlags[55] = true; }
 }
-void DiffNewTop::step1091() {
+void Diffnewtop::step1091() {
   activeFlags[1091] = false;
   uint8_t dma$rready_r$oldVal = dma$rready_r;
   dma$rready_r =
@@ -24969,7 +24969,7 @@ void DiffNewTop::step1091() {
     activeFlags[54] = true;
   }
 }
-void DiffNewTop::step1092() {
+void Diffnewtop::step1092() {
   activeFlags[1092] = false;
   uint8_t cpu$tlb_if$wpte_hs_r$oldVal = cpu$tlb_if$wpte_hs_r;
   cpu$tlb_if$wpte_hs_r =
@@ -24987,7 +24987,7 @@ void DiffNewTop::step1092() {
                     : cpu$tlb_if$wpte_hs_r));
   if (cpu$tlb_if$wpte_hs_r$oldVal != cpu$tlb_if$wpte_hs_r) { activeFlags[1046] = true; }
 }
-void DiffNewTop::step1093() {
+void Diffnewtop::step1093() {
   activeFlags[1093] = false;
   if (reset) {
     memcpy(cpu$tlb_if$pte_addr, (const uint32_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -25015,7 +25015,7 @@ void DiffNewTop::step1093() {
   }
   activeFlags[1045] = true;
 }
-void DiffNewTop::step1094() {
+void Diffnewtop::step1094() {
   activeFlags[1094] = false;
   uint8_t cpu$split64to32$is_64$oldVal = cpu$split64to32$is_64;
   cpu$split64to32$is_64 =
@@ -25027,7 +25027,7 @@ void DiffNewTop::step1094() {
                     : cpu$split64to32$is_64));
   if (cpu$split64to32$is_64$oldVal != cpu$split64to32$is_64) { activeFlags[943] = true; }
 }
-void DiffNewTop::step1095() {
+void Diffnewtop::step1095() {
   activeFlags[1095] = false;
   uint32_t cpu$split64to32$data_buf$oldVal = cpu$split64to32$data_buf;
   cpu$split64to32$data_buf =
@@ -25038,7 +25038,7 @@ void DiffNewTop::step1095() {
                                                            : cpu$split64to32$data_buf)));
   if (cpu$split64to32$data_buf$oldVal != cpu$split64to32$data_buf) { activeFlags[943] = true; }
 }
-void DiffNewTop::step1096() {
+void Diffnewtop::step1096() {
   activeFlags[1096] = false;
   uint64_t cpu$flash2Axi$out_rdata$oldVal = cpu$flash2Axi$out_rdata;
   cpu$flash2Axi$out_rdata = (reset ? 0x0 : cpu$flash2Axi$rdata);
@@ -25047,7 +25047,7 @@ void DiffNewTop::step1096() {
     activeFlags[1095] = true;
   }
 }
-void DiffNewTop::step1097() {
+void Diffnewtop::step1097() {
   activeFlags[1097] = false;
   uint64_t cpu$flash2Axi$rdata$oldVal = cpu$flash2Axi$rdata;
   cpu$flash2Axi$rdata = (reset
@@ -25250,7 +25250,7 @@ void DiffNewTop::step1097() {
                                                                                                                                                                              : cpu$flash2Axi$rdata)))))));
   if (cpu$flash2Axi$rdata$oldVal != cpu$flash2Axi$rdata) { activeFlags[1096] = true; }
 }
-void DiffNewTop::step1098() {
+void Diffnewtop::step1098() {
   activeFlags[1098] = false;
   uint32_t cpu$flash2Axi$pre_addr$oldVal = cpu$flash2Axi$pre_addr;
   cpu$flash2Axi$pre_addr =
@@ -25261,7 +25261,7 @@ void DiffNewTop::step1098() {
                                  : cpu$flash2Axi$pre_addr));
   if (cpu$flash2Axi$pre_addr$oldVal != cpu$flash2Axi$pre_addr) { activeFlags[1097] = true; }
 }
-void DiffNewTop::step1099() {
+void Diffnewtop::step1099() {
   activeFlags[1099] = false;
   uint64_t cpu$memory$dst_d3_r$oldVal = cpu$memory$dst_d3_r;
   cpu$memory$dst_d3_r =
@@ -25282,13 +25282,13 @@ void DiffNewTop::step1099() {
     activeFlags[992] = true;
   }
 }
-void DiffNewTop::step1100() {
+void Diffnewtop::step1100() {
   activeFlags[1100] = false;
   uint64_t cpu$mem2Axi$out_rdata$oldVal = cpu$mem2Axi$out_rdata;
   cpu$mem2Axi$out_rdata = (reset ? 0x0 : cpu$mem2Axi$rdata);
   if (cpu$mem2Axi$out_rdata$oldVal != cpu$mem2Axi$out_rdata) { activeFlags[1099] = true; }
 }
-void DiffNewTop::step1101() {
+void Diffnewtop::step1101() {
   activeFlags[1101] = false;
   uint64_t cpu$mem2Axi$rdata$oldVal = cpu$mem2Axi$rdata;
   cpu$mem2Axi$rdata =
@@ -25478,7 +25478,7 @@ void DiffNewTop::step1101() {
                                                                   : cpu$mem2Axi$rdata)))))));
   if (cpu$mem2Axi$rdata$oldVal != cpu$mem2Axi$rdata) { activeFlags[1100] = true; }
 }
-void DiffNewTop::step1102() {
+void Diffnewtop::step1102() {
   activeFlags[1102] = false;
   uint64_t cpu$dcache$rdatabuf$oldVal = cpu$dcache$rdatabuf;
   cpu$dcache$rdatabuf =
@@ -25494,7 +25494,7 @@ void DiffNewTop::step1102() {
                                   : cpu$dcache$rdatabuf))));
   if (cpu$dcache$rdatabuf$oldVal != cpu$dcache$rdatabuf) { activeFlags[472] = true; }
 }
-void DiffNewTop::step1103() {
+void Diffnewtop::step1103() {
   activeFlags[1103] = false;
   uint64_t cpu$icache$databuf$oldVal = cpu$icache$databuf;
   cpu$icache$databuf =
@@ -25510,7 +25510,7 @@ void DiffNewTop::step1103() {
                                   : cpu$icache$databuf))));
   if (cpu$icache$databuf$oldVal != cpu$icache$databuf) { activeFlags[871] = true; }
 }
-void DiffNewTop::step1104() {
+void Diffnewtop::step1104() {
   activeFlags[1104] = false;
   uint64_t mmio$rdata$oldVal = mmio$rdata;
   mmio$rdata =
@@ -25598,7 +25598,7 @@ void DiffNewTop::step1104() {
                                               : mmio$rdata))))));
   if (mmio$rdata$oldVal != mmio$rdata) { activeFlags[370] = true; }
 }
-void DiffNewTop::step1105() {
+void Diffnewtop::step1105() {
   activeFlags[1105] = false;
   if (mmio$_T_1) {
     0x0;
@@ -25672,7 +25672,7 @@ void DiffNewTop::step1105() {
   };
   if (reset) { memcpy(mmio$vga_ctrl, (const uint32_t[]){0, 0}, 2 * sizeof(uint32_t)); }
 }
-void DiffNewTop::step1106() {
+void Diffnewtop::step1106() {
   activeFlags[1106] = false;
   uint64_t mmio$mtimecmp$oldVal = mmio$mtimecmp;
   mmio$mtimecmp =
@@ -25685,7 +25685,7 @@ void DiffNewTop::step1106() {
                                   : mmio$mtimecmp)));
   if (mmio$mtimecmp$oldVal != mmio$mtimecmp) { activeFlags[1104] = true; }
 }
-void DiffNewTop::step1107() {
+void Diffnewtop::step1107() {
   activeFlags[1107] = false;
   mmio$uart[5] = 0x20;
   if (reset) {
@@ -25704,7 +25704,7 @@ void DiffNewTop::step1107() {
   }
   activeFlags[1104] = true;
 }
-void DiffNewTop::step1108() {
+void Diffnewtop::step1108() {
   activeFlags[1108] = false;
   uint32_t mmio$waddr$oldVal = mmio$waddr;
   mmio$waddr = (reset ? 0x0 : (mmio$_T_1 ? (mmio$_T_2 ? crossBar$io$mmioAxi$wa$bits$addr : mmio$waddr) : mmio$waddr));
@@ -25734,13 +25734,13 @@ void DiffNewTop::step1108() {
     activeFlags[1107] = true;
   }
 }
-void DiffNewTop::step1109() {
+void Diffnewtop::step1109() {
   activeFlags[1109] = false;
   uint8_t cpu$mem2Axi$mode$oldVal = cpu$mem2Axi$mode;
   cpu$mem2Axi$mode = (reset ? 0x0 : (cpu$mem2Axi$_T ? cpu$memCrossbar$io$mmio$dc_mode : cpu$mem2Axi$mode));
   if (cpu$mem2Axi$mode$oldVal != cpu$mem2Axi$mode) { activeFlags[1101] = true; }
 }
-void DiffNewTop::step1110() {
+void Diffnewtop::step1110() {
   activeFlags[1110] = false;
   uint32_t cpu$mem2Axi$pre_addr$oldVal = cpu$mem2Axi$pre_addr;
   cpu$mem2Axi$pre_addr =
@@ -25751,7 +25751,7 @@ void DiffNewTop::step1110() {
                     : cpu$mem2Axi$pre_addr));
   if (cpu$mem2Axi$pre_addr$oldVal != cpu$mem2Axi$pre_addr) { activeFlags[1101] = true; }
 }
-void DiffNewTop::step1111() {
+void Diffnewtop::step1111() {
   activeFlags[1111] = false;
   uint8_t cpu$mem2Axi$wstrb$oldVal = cpu$mem2Axi$wstrb;
   cpu$mem2Axi$wstrb =
@@ -25771,7 +25771,7 @@ void DiffNewTop::step1111() {
                     : cpu$mem2Axi$wstrb));
   if (cpu$mem2Axi$wstrb$oldVal != cpu$mem2Axi$wstrb) { activeFlags[367] = true; }
 }
-void DiffNewTop::step1112() {
+void Diffnewtop::step1112() {
   activeFlags[1112] = false;
   uint64_t cpu$mem2Axi$wdata$oldVal = cpu$mem2Axi$wdata;
   cpu$mem2Axi$wdata =
@@ -25784,7 +25784,7 @@ void DiffNewTop::step1112() {
                                : cpu$mem2Axi$wdata));
   if (cpu$mem2Axi$wdata$oldVal != cpu$mem2Axi$wdata) { activeFlags[367] = true; }
 }
-void DiffNewTop::step1113() {
+void Diffnewtop::step1113() {
   activeFlags[1113] = false;
   uint8_t cpu$mem2Axi$state$oldVal = cpu$mem2Axi$state;
   cpu$mem2Axi$state =
@@ -25815,7 +25815,7 @@ void DiffNewTop::step1113() {
     activeFlags[1113] = true;
   }
 }
-void DiffNewTop::step1114() {
+void Diffnewtop::step1114() {
   activeFlags[1114] = false;
   uint8_t cpu$dcache$state$oldVal = cpu$dcache$state;
   cpu$dcache$state =
@@ -25853,7 +25853,7 @@ void DiffNewTop::step1114() {
     activeFlags[1007] = true;
   }
 }
-void DiffNewTop::step1115() {
+void Diffnewtop::step1115() {
   activeFlags[1115] = false;
   uint8_t mmio$wdready$oldVal = mmio$wdready;
   mmio$wdready =
@@ -25864,7 +25864,7 @@ void DiffNewTop::step1115() {
                                  : mmio$wdready)));
   if (mmio$wdready$oldVal != mmio$wdready) { activeFlags[370] = true; }
 }
-void DiffNewTop::step1116() {
+void Diffnewtop::step1116() {
   activeFlags[1116] = false;
   uint8_t mmio$state$oldVal = mmio$state;
   mmio$state =
@@ -25906,7 +25906,7 @@ void DiffNewTop::step1116() {
     activeFlags[17] = true;
   }
 }
-void DiffNewTop::step1117() {
+void Diffnewtop::step1117() {
   activeFlags[1117] = false;
   uint32_t mem$raStart$oldVal = mem$raStart;
   mem$raStart =
@@ -25929,7 +25929,7 @@ void DiffNewTop::step1117() {
     activeFlags[44] = true;
   }
 }
-void DiffNewTop::step1118() {
+void Diffnewtop::step1118() {
   activeFlags[1118] = false;
   uint32_t mem$waStart$oldVal = mem$waStart;
   mem$waStart =
@@ -25943,7 +25943,7 @@ void DiffNewTop::step1118() {
                     : mem$waStart));
   if (mem$waStart$oldVal != mem$waStart) { activeFlags[36] = true; }
 }
-void DiffNewTop::step1119() {
+void Diffnewtop::step1119() {
   activeFlags[1119] = false;
   uint8_t mem$wdReady$oldVal = mem$wdReady;
   mem$wdReady =
@@ -25955,7 +25955,7 @@ void DiffNewTop::step1119() {
                                  : mem$wdReady)));
   if (mem$wdReady$oldVal != mem$wdReady) { activeFlags[370] = true; }
 }
-void DiffNewTop::step1120() {
+void Diffnewtop::step1120() {
   activeFlags[1120] = false;
   uint8_t mem$state$oldVal = mem$state;
   mem$state =
@@ -25971,7 +25971,7 @@ void DiffNewTop::step1120() {
     activeFlags[33] = true;
   }
 }
-void DiffNewTop::step1121() {
+void Diffnewtop::step1121() {
   activeFlags[1121] = false;
   uint8_t cpu$flash2Axi$rdataEn$oldVal = cpu$flash2Axi$rdataEn;
   cpu$flash2Axi$rdataEn =
@@ -25994,35 +25994,35 @@ void DiffNewTop::step1121() {
     activeFlags[1035] = true;
   }
 }
-void DiffNewTop::step1122() {
+void Diffnewtop::step1122() {
   activeFlags[1122] = false;
   uint128_t cpu$icache$Ram_bw_3$ram$output$oldVal = cpu$icache$Ram_bw_3$ram$output;
   cpu$icache$Ram_bw_3$ram$output =
       (reset ? 0x0 : (cpu$icache$Ram_bw_3$ram$_T_2 ? 0x0 : cpu$icache$Ram_bw_3$ram$ram$output_MPORT$data));
   if (cpu$icache$Ram_bw_3$ram$output$oldVal != cpu$icache$Ram_bw_3$ram$output) { activeFlags[250] = true; }
 }
-void DiffNewTop::step1123() {
+void Diffnewtop::step1123() {
   activeFlags[1123] = false;
   uint128_t cpu$icache$Ram_bw_2$ram$output$oldVal = cpu$icache$Ram_bw_2$ram$output;
   cpu$icache$Ram_bw_2$ram$output =
       (reset ? 0x0 : (cpu$icache$Ram_bw_2$ram$_T_2 ? 0x0 : cpu$icache$Ram_bw_2$ram$ram$output_MPORT$data));
   if (cpu$icache$Ram_bw_2$ram$output$oldVal != cpu$icache$Ram_bw_2$ram$output) { activeFlags[250] = true; }
 }
-void DiffNewTop::step1124() {
+void Diffnewtop::step1124() {
   activeFlags[1124] = false;
   uint128_t cpu$icache$Ram_bw_1$ram$output$oldVal = cpu$icache$Ram_bw_1$ram$output;
   cpu$icache$Ram_bw_1$ram$output =
       (reset ? 0x0 : (cpu$icache$Ram_bw_1$ram$_T_2 ? 0x0 : cpu$icache$Ram_bw_1$ram$ram$output_MPORT$data));
   if (cpu$icache$Ram_bw_1$ram$output$oldVal != cpu$icache$Ram_bw_1$ram$output) { activeFlags[250] = true; }
 }
-void DiffNewTop::step1125() {
+void Diffnewtop::step1125() {
   activeFlags[1125] = false;
   uint128_t cpu$icache$Ram_bw$ram$output$oldVal = cpu$icache$Ram_bw$ram$output;
   cpu$icache$Ram_bw$ram$output =
       (reset ? 0x0 : (cpu$icache$Ram_bw$ram$_T_2 ? 0x0 : cpu$icache$Ram_bw$ram$ram$output_MPORT$data));
   if (cpu$icache$Ram_bw$ram$output$oldVal != cpu$icache$Ram_bw$ram$output) { activeFlags[250] = true; }
 }
-void DiffNewTop::step1126() {
+void Diffnewtop::step1126() {
   activeFlags[1126] = false;
   uint8_t cpu$icache$axiOffset$oldVal = cpu$icache$axiOffset;
   cpu$icache$axiOffset =
@@ -26042,7 +26042,7 @@ void DiffNewTop::step1126() {
     activeFlags[1126] = true;
   }
 }
-void DiffNewTop::step1127() {
+void Diffnewtop::step1127() {
   activeFlags[1127] = false;
   uint8_t cpu$icache$wait_r$oldVal = cpu$icache$wait_r;
   cpu$icache$wait_r =
@@ -26055,7 +26055,7 @@ void DiffNewTop::step1127() {
     activeFlags[895] = true;
   }
 }
-void DiffNewTop::step1128() {
+void Diffnewtop::step1128() {
   activeFlags[1128] = false;
   if (reset) {
     memcpy(cpu$icache$valid, (const uint8_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -26114,7 +26114,7 @@ void DiffNewTop::step1128() {
   }
   activeFlags[866] = true;
 }
-void DiffNewTop::step1129() {
+void Diffnewtop::step1129() {
   activeFlags[1129] = false;
   if (reset) {
     memcpy(cpu$icache$tag, (const uint32_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -26137,7 +26137,7 @@ void DiffNewTop::step1129() {
   }
   activeFlags[866] = true;
 }
-void DiffNewTop::step1130() {
+void Diffnewtop::step1130() {
   activeFlags[1130] = false;
   uint8_t cpu$icache$rdataEn$oldVal = cpu$icache$rdataEn;
   cpu$icache$rdataEn =
@@ -26152,7 +26152,7 @@ void DiffNewTop::step1130() {
                                   : cpu$icache$rdataEn))));
   if (cpu$icache$rdataEn$oldVal != cpu$icache$rdataEn) { activeFlags[389] = true; }
 }
-void DiffNewTop::step1131() {
+void Diffnewtop::step1131() {
   activeFlags[1131] = false;
   uint8_t crossBar$state$oldVal = crossBar$state;
   crossBar$state =
@@ -26175,7 +26175,7 @@ void DiffNewTop::step1131() {
     activeFlags[4] = true;
   }
 }
-void DiffNewTop::step1132() {
+void Diffnewtop::step1132() {
   activeFlags[1132] = false;
   uint32_t cpu$flash2Axi$raddr$oldVal = cpu$flash2Axi$raddr;
   cpu$flash2Axi$raddr =
@@ -26186,7 +26186,7 @@ void DiffNewTop::step1132() {
                                  : cpu$flash2Axi$raddr));
   if (cpu$flash2Axi$raddr$oldVal != cpu$flash2Axi$raddr) { activeFlags[367] = true; }
 }
-void DiffNewTop::step1133() {
+void Diffnewtop::step1133() {
   activeFlags[1133] = false;
   uint8_t cpu$flash2Axi$wstrb$oldVal = cpu$flash2Axi$wstrb;
   cpu$flash2Axi$wstrb =
@@ -26207,7 +26207,7 @@ void DiffNewTop::step1133() {
                     : cpu$flash2Axi$wstrb));
   if (cpu$flash2Axi$wstrb$oldVal != cpu$flash2Axi$wstrb) { activeFlags[367] = true; }
 }
-void DiffNewTop::step1134() {
+void Diffnewtop::step1134() {
   activeFlags[1134] = false;
   uint64_t cpu$flash2Axi$wdata$oldVal = cpu$flash2Axi$wdata;
   cpu$flash2Axi$wdata =
@@ -26220,7 +26220,7 @@ void DiffNewTop::step1134() {
                     : cpu$flash2Axi$wdata));
   if (cpu$flash2Axi$wdata$oldVal != cpu$flash2Axi$wdata) { activeFlags[367] = true; }
 }
-void DiffNewTop::step1135() {
+void Diffnewtop::step1135() {
   activeFlags[1135] = false;
   uint32_t cpu$flash2Axi$waddr$oldVal = cpu$flash2Axi$waddr;
   cpu$flash2Axi$waddr =
@@ -26229,7 +26229,7 @@ void DiffNewTop::step1135() {
                                  : cpu$flash2Axi$waddr));
   if (cpu$flash2Axi$waddr$oldVal != cpu$flash2Axi$waddr) { activeFlags[367] = true; }
 }
-void DiffNewTop::step1136() {
+void Diffnewtop::step1136() {
   activeFlags[1136] = false;
   uint32_t cpu$split64to32$addr_r$oldVal = cpu$split64to32$addr_r;
   cpu$split64to32$addr_r =
@@ -26243,13 +26243,13 @@ void DiffNewTop::step1136() {
                     : cpu$split64to32$addr_r));
   if (cpu$split64to32$addr_r$oldVal != cpu$split64to32$addr_r) { activeFlags[897] = true; }
 }
-void DiffNewTop::step1137() {
+void Diffnewtop::step1137() {
   activeFlags[1137] = false;
   uint8_t cpu$flash2Axi$mode$oldVal = cpu$flash2Axi$mode;
   cpu$flash2Axi$mode = (reset ? 0x0 : (cpu$flash2Axi$_T ? cpu$split64to32$io$data_out$dc_mode : cpu$flash2Axi$mode));
   if (cpu$flash2Axi$mode$oldVal != cpu$flash2Axi$mode) { activeFlags[1097] = true; }
 }
-void DiffNewTop::step1138() {
+void Diffnewtop::step1138() {
   activeFlags[1138] = false;
   uint32_t cpu$fetch$paddr2_r$oldVal = cpu$fetch$paddr2_r;
   cpu$fetch$paddr2_r =
@@ -26260,7 +26260,7 @@ void DiffNewTop::step1138() {
                     : cpu$fetch$paddr2_r));
   if (cpu$fetch$paddr2_r$oldVal != cpu$fetch$paddr2_r) { activeFlags[861] = true; }
 }
-void DiffNewTop::step1139() {
+void Diffnewtop::step1139() {
   activeFlags[1139] = false;
   uint32_t cpu$tlb_if$out_paddr_r$oldVal = cpu$tlb_if$out_paddr_r;
   cpu$tlb_if$out_paddr_r =
@@ -26403,13 +26403,13 @@ void DiffNewTop::step1139() {
     activeFlags[1138] = true;
   }
 }
-void DiffNewTop::step1140() {
+void Diffnewtop::step1140() {
   activeFlags[1140] = false;
   uint64_t cpu$dcache$wdata_r$oldVal = cpu$dcache$wdata_r;
   cpu$dcache$wdata_r = (reset ? 0x0 : (cpu$dcache$hs_in ? cpu$dcSelector$io$select$wdata : cpu$dcache$wdata_r));
   if (cpu$dcache$wdata_r$oldVal != cpu$dcache$wdata_r) { activeFlags[472] = true; }
 }
-void DiffNewTop::step1141() {
+void Diffnewtop::step1141() {
   activeFlags[1141] = false;
   uint64_t cpu$tlb_if$wpte_data_r$oldVal = cpu$tlb_if$wpte_data_r;
   cpu$tlb_if$wpte_data_r =
@@ -26431,7 +26431,7 @@ void DiffNewTop::step1141() {
                     : cpu$tlb_if$wpte_data_r));
   if (cpu$tlb_if$wpte_data_r$oldVal != cpu$tlb_if$wpte_data_r) { activeFlags[354] = true; }
 }
-void DiffNewTop::step1142() {
+void Diffnewtop::step1142() {
   activeFlags[1142] = false;
   if (reset) {
     memcpy(cpu$tlb_if$paddr, (const uint32_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 16 * sizeof(uint32_t));
@@ -26461,7 +26461,7 @@ void DiffNewTop::step1142() {
   }
   activeFlags[931] = true;
 }
-void DiffNewTop::step1143() {
+void Diffnewtop::step1143() {
   activeFlags[1143] = false;
   uint8_t cpu$tlb_if$level$oldVal = cpu$tlb_if$level;
   cpu$tlb_if$level =
@@ -26489,7 +26489,7 @@ void DiffNewTop::step1143() {
     activeFlags[1143] = true;
   }
 }
-void DiffNewTop::step1144() {
+void Diffnewtop::step1144() {
   activeFlags[1144] = false;
   uint8_t cpu$tlb_if$offset$oldVal = cpu$tlb_if$offset;
   cpu$tlb_if$offset =
@@ -26515,7 +26515,7 @@ void DiffNewTop::step1144() {
     activeFlags[1144] = true;
   }
 }
-void DiffNewTop::step1145() {
+void Diffnewtop::step1145() {
   activeFlags[1145] = false;
   uint8_t cpu$tlb_if$select_r$oldVal = cpu$tlb_if$select_r;
   cpu$tlb_if$select_r =
@@ -26546,7 +26546,7 @@ void DiffNewTop::step1145() {
     activeFlags[1142] = true;
   }
 }
-void DiffNewTop::step1146() {
+void Diffnewtop::step1146() {
   activeFlags[1146] = false;
   uint64_t cpu$fetch$excep2_r$tval$oldVal = cpu$fetch$excep2_r$tval;
   cpu$fetch$excep2_r$tval =
@@ -26559,7 +26559,7 @@ void DiffNewTop::step1146() {
                                 : cpu$fetch$excep2_r$tval));
   if (cpu$fetch$excep2_r$tval$oldVal != cpu$fetch$excep2_r$tval) { activeFlags[946] = true; }
 }
-void DiffNewTop::step1147() {
+void Diffnewtop::step1147() {
   activeFlags[1147] = false;
   uint64_t cpu$tlb_if$out_excep_r$tval$oldVal = cpu$tlb_if$out_excep_r$tval;
   cpu$tlb_if$out_excep_r$tval =
@@ -26577,7 +26577,7 @@ void DiffNewTop::step1147() {
                     : cpu$tlb_if$out_excep_r$tval));
   if (cpu$tlb_if$out_excep_r$tval$oldVal != cpu$tlb_if$out_excep_r$tval) { activeFlags[1146] = true; }
 }
-void DiffNewTop::step1148() {
+void Diffnewtop::step1148() {
   activeFlags[1148] = false;
   uint8_t cpu$tlb_if$m_type_r$oldVal = cpu$tlb_if$m_type_r;
   cpu$tlb_if$m_type_r =
@@ -26594,7 +26594,7 @@ void DiffNewTop::step1148() {
                     : cpu$tlb_if$m_type_r));
   if (cpu$tlb_if$m_type_r$oldVal != cpu$tlb_if$m_type_r) { activeFlags[908] = true; }
 }
-void DiffNewTop::step1149() {
+void Diffnewtop::step1149() {
   activeFlags[1149] = false;
   uint64_t cpu$tlb_if$pre_addr$oldVal = cpu$tlb_if$pre_addr;
   cpu$tlb_if$pre_addr =
@@ -26608,7 +26608,7 @@ void DiffNewTop::step1149() {
     activeFlags[1045] = true;
   }
 }
-void DiffNewTop::step1150() {
+void Diffnewtop::step1150() {
   activeFlags[1150] = false;
   uint64_t cpu$memory$excep3_r$pc$oldVal = cpu$memory$excep3_r$pc;
   cpu$memory$excep3_r$pc = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$excep2_r$pc : cpu$memory$excep3_r$pc));
@@ -26617,7 +26617,7 @@ void DiffNewTop::step1150() {
     activeFlags[997] = true;
   }
 }
-void DiffNewTop::step1151() {
+void Diffnewtop::step1151() {
   activeFlags[1151] = false;
   uint64_t cpu$memory$excep2_r$pc$oldVal = cpu$memory$excep2_r$pc;
   cpu$memory$excep2_r$pc =
@@ -26629,13 +26629,13 @@ void DiffNewTop::step1151() {
                                  : (cpu$memory$hs1 ? cpu$memory$excep1_r$pc : cpu$memory$excep2_r$pc)));
   if (cpu$memory$excep2_r$pc$oldVal != cpu$memory$excep2_r$pc) { activeFlags[1150] = true; }
 }
-void DiffNewTop::step1152() {
+void Diffnewtop::step1152() {
   activeFlags[1152] = false;
   uint64_t cpu$memory$excep1_r$pc$oldVal = cpu$memory$excep1_r$pc;
   cpu$memory$excep1_r$pc = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$excep_r$pc : cpu$memory$excep1_r$pc));
   if (cpu$memory$excep1_r$pc$oldVal != cpu$memory$excep1_r$pc) { activeFlags[1151] = true; }
 }
-void DiffNewTop::step1153() {
+void Diffnewtop::step1153() {
   activeFlags[1153] = false;
   uint64_t cpu$execute$excep_r$pc$oldVal = cpu$execute$excep_r$pc;
   cpu$execute$excep_r$pc =
@@ -26647,7 +26647,7 @@ void DiffNewTop::step1153() {
                     : cpu$execute$excep_r$pc));
   if (cpu$execute$excep_r$pc$oldVal != cpu$execute$excep_r$pc) { activeFlags[1152] = true; }
 }
-void DiffNewTop::step1154() {
+void Diffnewtop::step1154() {
   activeFlags[1154] = false;
   uint64_t cpu$readregs$excep_r$pc$oldVal = cpu$readregs$excep_r$pc;
   cpu$readregs$excep_r$pc =
@@ -26656,13 +26656,13 @@ void DiffNewTop::step1154() {
                                    : cpu$readregs$excep_r$pc));
   if (cpu$readregs$excep_r$pc$oldVal != cpu$readregs$excep_r$pc) { activeFlags[1153] = true; }
 }
-void DiffNewTop::step1155() {
+void Diffnewtop::step1155() {
   activeFlags[1155] = false;
   uint64_t cpu$forwading$excep_r$pc$oldVal = cpu$forwading$excep_r$pc;
   cpu$forwading$excep_r$pc = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$excep_r$pc : cpu$forwading$excep_r$pc));
   if (cpu$forwading$excep_r$pc$oldVal != cpu$forwading$excep_r$pc) { activeFlags[1154] = true; }
 }
-void DiffNewTop::step1156() {
+void Diffnewtop::step1156() {
   activeFlags[1156] = false;
   uint64_t cpu$decode$excep_r$pc$oldVal = cpu$decode$excep_r$pc;
   cpu$decode$excep_r$pc =
@@ -26682,7 +26682,7 @@ void DiffNewTop::step1156() {
                                   : cpu$decode$excep_r$pc))));
   if (cpu$decode$excep_r$pc$oldVal != cpu$decode$excep_r$pc) { activeFlags[1155] = true; }
 }
-void DiffNewTop::step1157() {
+void Diffnewtop::step1157() {
   activeFlags[1157] = false;
   uint64_t cpu$fetch$excep3_r$pc$oldVal = cpu$fetch$excep3_r$pc;
   cpu$fetch$excep3_r$pc =
@@ -26694,7 +26694,7 @@ void DiffNewTop::step1157() {
                                 : cpu$fetch$excep3_r$pc));
   if (cpu$fetch$excep3_r$pc$oldVal != cpu$fetch$excep3_r$pc) { activeFlags[1156] = true; }
 }
-void DiffNewTop::step1158() {
+void Diffnewtop::step1158() {
   activeFlags[1158] = false;
   uint64_t cpu$fetch$excep_buf$pc$oldVal = cpu$fetch$excep_buf$pc;
   cpu$fetch$excep_buf$pc =
@@ -26704,7 +26704,7 @@ void DiffNewTop::step1158() {
                                 : cpu$fetch$excep_buf$pc));
   if (cpu$fetch$excep_buf$pc$oldVal != cpu$fetch$excep_buf$pc) { activeFlags[1157] = true; }
 }
-void DiffNewTop::step1159() {
+void Diffnewtop::step1159() {
   activeFlags[1159] = false;
   uint64_t cpu$fetch$excep2_r$pc$oldVal = cpu$fetch$excep2_r$pc;
   cpu$fetch$excep2_r$pc =
@@ -26717,7 +26717,7 @@ void DiffNewTop::step1159() {
                     : cpu$fetch$excep2_r$pc));
   if (cpu$fetch$excep2_r$pc$oldVal != cpu$fetch$excep2_r$pc) { activeFlags[1158] = true; }
 }
-void DiffNewTop::step1160() {
+void Diffnewtop::step1160() {
   activeFlags[1160] = false;
   uint64_t cpu$fetch$pc2_r$oldVal = cpu$fetch$pc2_r;
   cpu$fetch$pc2_r =
@@ -26727,7 +26727,7 @@ void DiffNewTop::step1160() {
     activeFlags[944] = true;
   }
 }
-void DiffNewTop::step1161() {
+void Diffnewtop::step1161() {
   activeFlags[1161] = false;
   uint64_t cpu$fetch$pc1_r$oldVal = cpu$fetch$pc1_r;
   cpu$fetch$pc1_r = (reset ? 0x0 : cpu$fetch$cur_pc);
@@ -26736,7 +26736,7 @@ void DiffNewTop::step1161() {
     activeFlags[1160] = true;
   }
 }
-void DiffNewTop::step1162() {
+void Diffnewtop::step1162() {
   activeFlags[1162] = false;
   uint64_t cpu$fetch$pc$oldVal = cpu$fetch$pc;
   cpu$fetch$pc =
@@ -26751,7 +26751,7 @@ void DiffNewTop::step1162() {
                                                             : cpu$fetch$cur_pc)))));
   if (cpu$fetch$pc$oldVal != cpu$fetch$pc) { activeFlags[911] = true; }
 }
-void DiffNewTop::step1163() {
+void Diffnewtop::step1163() {
   activeFlags[1163] = false;
   uint64_t cpu$execute$forceJmp$seq_pc$oldVal = cpu$execute$forceJmp$seq_pc;
   cpu$execute$forceJmp$seq_pc =
@@ -26760,7 +26760,7 @@ void DiffNewTop::step1163() {
                                   : cpu$execute$forceJmp$seq_pc));
   if (cpu$execute$forceJmp$seq_pc$oldVal != cpu$execute$forceJmp$seq_pc) { activeFlags[1162] = true; }
 }
-void DiffNewTop::step1164() {
+void Diffnewtop::step1164() {
   activeFlags[1164] = false;
   uint64_t cpu$execute$next_pc_r$oldVal = cpu$execute$next_pc_r;
   cpu$execute$next_pc_r =
@@ -26769,7 +26769,7 @@ void DiffNewTop::step1164() {
                                   : (cpu$csrs$forceJmp$valid ? cpu$csrs$forceJmp$seq_pc : cpu$execute$next_pc_r)));
   if (cpu$execute$next_pc_r$oldVal != cpu$execute$next_pc_r) { activeFlags[1153] = true; }
 }
-void DiffNewTop::step1165() {
+void Diffnewtop::step1165() {
   activeFlags[1165] = false;
   uint64_t cpu$memory$dst_d2_r$oldVal = cpu$memory$dst_d2_r;
   cpu$memory$dst_d2_r =
@@ -26788,7 +26788,7 @@ void DiffNewTop::step1165() {
     activeFlags[1099] = true;
   }
 }
-void DiffNewTop::step1166() {
+void Diffnewtop::step1166() {
   activeFlags[1166] = false;
   uint64_t cpu$memory$dst_d1_r$oldVal = cpu$memory$dst_d1_r;
   cpu$memory$dst_d1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$dst_d_r : cpu$memory$dst_d1_r));
@@ -26798,7 +26798,7 @@ void DiffNewTop::step1166() {
     activeFlags[1165] = true;
   }
 }
-void DiffNewTop::step1167() {
+void Diffnewtop::step1167() {
   activeFlags[1167] = false;
   uint64_t cpu$execute$dst_d_r$oldVal = cpu$execute$dst_d_r;
   cpu$execute$dst_d_r =
@@ -26815,7 +26815,7 @@ void DiffNewTop::step1167() {
     activeFlags[1166] = true;
   }
 }
-void DiffNewTop::step1168() {
+void Diffnewtop::step1168() {
   activeFlags[1168] = false;
   uint64_t cpu$memCrossbar$data_r$oldVal = cpu$memCrossbar$data_r;
   cpu$memCrossbar$data_r =
@@ -26843,7 +26843,7 @@ void DiffNewTop::step1168() {
                     : cpu$memCrossbar$data_r));
   if (cpu$memCrossbar$data_r$oldVal != cpu$memCrossbar$data_r) { activeFlags[1099] = true; }
 }
-void DiffNewTop::step1169() {
+void Diffnewtop::step1169() {
   activeFlags[1169] = false;
   uint32_t cpu$plic$threshold1$oldVal = cpu$plic$threshold1;
   cpu$plic$threshold1 =
@@ -26855,7 +26855,7 @@ void DiffNewTop::step1169() {
     activeFlags[1168] = true;
   }
 }
-void DiffNewTop::step1170() {
+void Diffnewtop::step1170() {
   activeFlags[1170] = false;
   uint32_t cpu$plic$intr_enable2$oldVal = cpu$plic$intr_enable2;
   cpu$plic$intr_enable2 =
@@ -26865,7 +26865,7 @@ void DiffNewTop::step1170() {
                             : cpu$plic$intr_enable2));
   if (cpu$plic$intr_enable2$oldVal != cpu$plic$intr_enable2) { activeFlags[1168] = true; }
 }
-void DiffNewTop::step1171() {
+void Diffnewtop::step1171() {
   activeFlags[1171] = false;
   uint32_t cpu$plic$intr_enable1$oldVal = cpu$plic$intr_enable1;
   cpu$plic$intr_enable1 =
@@ -26875,7 +26875,7 @@ void DiffNewTop::step1171() {
                             : cpu$plic$intr_enable1));
   if (cpu$plic$intr_enable1$oldVal != cpu$plic$intr_enable1) { activeFlags[1168] = true; }
 }
-void DiffNewTop::step1172() {
+void Diffnewtop::step1172() {
   activeFlags[1172] = false;
   uint64_t cpu$clint$ipi$oldVal = cpu$clint$ipi;
   cpu$clint$ipi =
@@ -26884,7 +26884,7 @@ void DiffNewTop::step1172() {
                                : cpu$clint$ipi));
   if (cpu$clint$ipi$oldVal != cpu$clint$ipi) { activeFlags[1168] = true; }
 }
-void DiffNewTop::step1173() {
+void Diffnewtop::step1173() {
   activeFlags[1173] = false;
   uint64_t cpu$clint$mtimecmp$oldVal = cpu$clint$mtimecmp;
   cpu$clint$mtimecmp =
@@ -26897,7 +26897,7 @@ void DiffNewTop::step1173() {
     activeFlags[1168] = true;
   }
 }
-void DiffNewTop::step1174() {
+void Diffnewtop::step1174() {
   activeFlags[1174] = false;
   uint64_t cpu$clint$mtime$oldVal = cpu$clint$mtime;
   cpu$clint$mtime =
@@ -26914,13 +26914,13 @@ void DiffNewTop::step1174() {
     activeFlags[1174] = true;
   }
 }
-void DiffNewTop::step1175() {
+void Diffnewtop::step1175() {
   activeFlags[1175] = false;
   uint64_t cpu$memory$mem_data2_r$oldVal = cpu$memory$mem_data2_r;
   cpu$memory$mem_data2_r = (reset ? 0x0 : (cpu$memory$hs1 ? cpu$memory$mem_data1_r : cpu$memory$mem_data2_r));
   if (cpu$memory$mem_data2_r$oldVal != cpu$memory$mem_data2_r) { activeFlags[347] = true; }
 }
-void DiffNewTop::step1176() {
+void Diffnewtop::step1176() {
   activeFlags[1176] = false;
   uint64_t cpu$memory$mem_data1_r$oldVal = cpu$memory$mem_data1_r;
   cpu$memory$mem_data1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$mem_data_r : cpu$memory$mem_data1_r));
@@ -26929,13 +26929,13 @@ void DiffNewTop::step1176() {
     activeFlags[1175] = true;
   }
 }
-void DiffNewTop::step1177() {
+void Diffnewtop::step1177() {
   activeFlags[1177] = false;
   uint64_t cpu$execute$mem_data_r$oldVal = cpu$execute$mem_data_r;
   cpu$execute$mem_data_r = (reset ? 0x0 : (cpu$execute$hs_in ? cpu$execute$wdata : cpu$execute$mem_data_r));
   if (cpu$execute$mem_data_r$oldVal != cpu$execute$mem_data_r) { activeFlags[1176] = true; }
 }
-void DiffNewTop::step1178() {
+void Diffnewtop::step1178() {
   activeFlags[1178] = false;
   uint64_t cpu$readregs$dst_d_r$oldVal = cpu$readregs$dst_d_r;
   cpu$readregs$dst_d_r =
@@ -26954,7 +26954,7 @@ void DiffNewTop::step1178() {
     activeFlags[960] = true;
   }
 }
-void DiffNewTop::step1179() {
+void Diffnewtop::step1179() {
   activeFlags[1179] = false;
   uint64_t cpu$csrs$stval$oldVal = cpu$csrs$stval;
   cpu$csrs$stval =
@@ -27108,7 +27108,7 @@ void DiffNewTop::step1179() {
                                                                                                                                   : cpu$csrs$stval))))))))))))))))));
   if (cpu$csrs$stval$oldVal != cpu$csrs$stval) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1180() {
+void Diffnewtop::step1180() {
   activeFlags[1180] = false;
   uint64_t cpu$csrs$mtval$oldVal = cpu$csrs$mtval;
   cpu$csrs$mtval =
@@ -27154,7 +27154,7 @@ void DiffNewTop::step1180() {
                                                      : cpu$csrs$mtval)))))));
   if (cpu$csrs$mtval$oldVal != cpu$csrs$mtval) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1181() {
+void Diffnewtop::step1181() {
   activeFlags[1181] = false;
   uint64_t cpu$memory$excep3_r$tval$oldVal = cpu$memory$excep3_r$tval;
   cpu$memory$excep3_r$tval = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$excep2_r$tval : cpu$memory$excep3_r$tval));
@@ -27163,7 +27163,7 @@ void DiffNewTop::step1181() {
     activeFlags[1180] = true;
   }
 }
-void DiffNewTop::step1182() {
+void Diffnewtop::step1182() {
   activeFlags[1182] = false;
   uint64_t cpu$memory$excep2_r$tval$oldVal = cpu$memory$excep2_r$tval;
   cpu$memory$excep2_r$tval =
@@ -27176,13 +27176,13 @@ void DiffNewTop::step1182() {
                     : (cpu$memory$hs1 ? cpu$memory$excep1_r$tval : cpu$memory$excep2_r$tval)));
   if (cpu$memory$excep2_r$tval$oldVal != cpu$memory$excep2_r$tval) { activeFlags[1181] = true; }
 }
-void DiffNewTop::step1183() {
+void Diffnewtop::step1183() {
   activeFlags[1183] = false;
   uint64_t cpu$memory$excep1_r$tval$oldVal = cpu$memory$excep1_r$tval;
   cpu$memory$excep1_r$tval = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$excep_r$tval : cpu$memory$excep1_r$tval));
   if (cpu$memory$excep1_r$tval$oldVal != cpu$memory$excep1_r$tval) { activeFlags[1182] = true; }
 }
-void DiffNewTop::step1184() {
+void Diffnewtop::step1184() {
   activeFlags[1184] = false;
   uint64_t cpu$execute$excep_r$tval$oldVal = cpu$execute$excep_r$tval;
   cpu$execute$excep_r$tval =
@@ -27191,7 +27191,7 @@ void DiffNewTop::step1184() {
                                   : cpu$execute$excep_r$tval));
   if (cpu$execute$excep_r$tval$oldVal != cpu$execute$excep_r$tval) { activeFlags[1183] = true; }
 }
-void DiffNewTop::step1185() {
+void Diffnewtop::step1185() {
   activeFlags[1185] = false;
   uint64_t cpu$readregs$excep_r$tval$oldVal = cpu$readregs$excep_r$tval;
   cpu$readregs$excep_r$tval =
@@ -27200,14 +27200,14 @@ void DiffNewTop::step1185() {
                                    : cpu$readregs$excep_r$tval));
   if (cpu$readregs$excep_r$tval$oldVal != cpu$readregs$excep_r$tval) { activeFlags[1184] = true; }
 }
-void DiffNewTop::step1186() {
+void Diffnewtop::step1186() {
   activeFlags[1186] = false;
   uint64_t cpu$forwading$excep_r$tval$oldVal = cpu$forwading$excep_r$tval;
   cpu$forwading$excep_r$tval =
       (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$excep_r$tval : cpu$forwading$excep_r$tval));
   if (cpu$forwading$excep_r$tval$oldVal != cpu$forwading$excep_r$tval) { activeFlags[1185] = true; }
 }
-void DiffNewTop::step1187() {
+void Diffnewtop::step1187() {
   activeFlags[1187] = false;
   uint64_t cpu$decode$excep_r$tval$oldVal = cpu$decode$excep_r$tval;
   cpu$decode$excep_r$tval =
@@ -27227,7 +27227,7 @@ void DiffNewTop::step1187() {
                                   : cpu$decode$excep_r$tval))));
   if (cpu$decode$excep_r$tval$oldVal != cpu$decode$excep_r$tval) { activeFlags[1186] = true; }
 }
-void DiffNewTop::step1188() {
+void Diffnewtop::step1188() {
   activeFlags[1188] = false;
   uint64_t cpu$fetch$excep3_r$tval$oldVal = cpu$fetch$excep3_r$tval;
   cpu$fetch$excep3_r$tval =
@@ -27246,7 +27246,7 @@ void DiffNewTop::step1188() {
                   : cpu$fetch$excep3_r$tval));
   if (cpu$fetch$excep3_r$tval$oldVal != cpu$fetch$excep3_r$tval) { activeFlags[1187] = true; }
 }
-void DiffNewTop::step1189() {
+void Diffnewtop::step1189() {
   activeFlags[1189] = false;
   uint8_t cpu$csrs$forceJmp$valid$oldVal = cpu$csrs$forceJmp$valid;
   cpu$csrs$forceJmp$valid = (reset ? 0x0 : (cpu$writeback$io$excep$en ? 0x1 : 0x0));
@@ -27255,7 +27255,7 @@ void DiffNewTop::step1189() {
     activeFlags[1164] = true;
   }
 }
-void DiffNewTop::step1190() {
+void Diffnewtop::step1190() {
   activeFlags[1190] = false;
   uint64_t cpu$csrs$forceJmp$seq_pc$oldVal = cpu$csrs$forceJmp$seq_pc;
   cpu$csrs$forceJmp$seq_pc =
@@ -27280,7 +27280,7 @@ void DiffNewTop::step1190() {
     activeFlags[1164] = true;
   }
 }
-void DiffNewTop::step1191() {
+void Diffnewtop::step1191() {
   activeFlags[1191] = false;
   uint64_t cpu$csrs$scause$oldVal = cpu$csrs$scause;
   cpu$csrs$scause =
@@ -27407,7 +27407,7 @@ void DiffNewTop::step1191() {
                                                                                                                                                                                                                                                                                                                                  : (cpu$writeback$io$excep$en ? (cpu$csrs$_T ? cpu$csrs$scause : (cpu$csrs$_T_1 ? cpu$csrs$scause : (cpu$csrs$_T_6 ? cpu$memory$excep3_r$cause : cpu$csrs$scause))) : cpu$csrs$scause))))))))))))))))))))));
   if (cpu$csrs$scause$oldVal != cpu$csrs$scause) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1192() {
+void Diffnewtop::step1192() {
   activeFlags[1192] = false;
   uint64_t cpu$csrs$mcause$oldVal = cpu$csrs$mcause;
   cpu$csrs$mcause =
@@ -27503,7 +27503,7 @@ void DiffNewTop::step1192() {
                                                                                         : cpu$csrs$mcause))))))))))));
   if (cpu$csrs$mcause$oldVal != cpu$csrs$mcause) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1193() {
+void Diffnewtop::step1193() {
   activeFlags[1193] = false;
   uint64_t cpu$memory$excep3_r$cause$oldVal = cpu$memory$excep3_r$cause;
   cpu$memory$excep3_r$cause = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$excep2_r$cause : cpu$memory$excep3_r$cause));
@@ -27514,7 +27514,7 @@ void DiffNewTop::step1193() {
     activeFlags[1192] = true;
   }
 }
-void DiffNewTop::step1194() {
+void Diffnewtop::step1194() {
   activeFlags[1194] = false;
   uint64_t cpu$memory$excep2_r$cause$oldVal = cpu$memory$excep2_r$cause;
   cpu$memory$excep2_r$cause =
@@ -27527,7 +27527,7 @@ void DiffNewTop::step1194() {
                     : (cpu$memory$hs1 ? cpu$memory$excep1_r$cause : cpu$memory$excep2_r$cause)));
   if (cpu$memory$excep2_r$cause$oldVal != cpu$memory$excep2_r$cause) { activeFlags[1193] = true; }
 }
-void DiffNewTop::step1195() {
+void Diffnewtop::step1195() {
   activeFlags[1195] = false;
   uint64_t cpu$memory$excep1_r$cause$oldVal = cpu$memory$excep1_r$cause;
   cpu$memory$excep1_r$cause =
@@ -27537,7 +27537,7 @@ void DiffNewTop::step1195() {
     activeFlags[1194] = true;
   }
 }
-void DiffNewTop::step1196() {
+void Diffnewtop::step1196() {
   activeFlags[1196] = false;
   uint64_t cpu$execute$excep_r$cause$oldVal = cpu$execute$excep_r$cause;
   cpu$execute$excep_r$cause =
@@ -27547,7 +27547,7 @@ void DiffNewTop::step1196() {
                                   : cpu$execute$excep_r$cause));
   if (cpu$execute$excep_r$cause$oldVal != cpu$execute$excep_r$cause) { activeFlags[1195] = true; }
 }
-void DiffNewTop::step1197() {
+void Diffnewtop::step1197() {
   activeFlags[1197] = false;
   uint64_t cpu$readregs$excep_r$cause$oldVal = cpu$readregs$excep_r$cause;
   cpu$readregs$excep_r$cause = (reset ? 0x0
@@ -27558,14 +27558,14 @@ void DiffNewTop::step1197() {
     activeFlags[1196] = true;
   }
 }
-void DiffNewTop::step1198() {
+void Diffnewtop::step1198() {
   activeFlags[1198] = false;
   uint64_t cpu$forwading$excep_r$cause$oldVal = cpu$forwading$excep_r$cause;
   cpu$forwading$excep_r$cause =
       (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$excep_r$cause : cpu$forwading$excep_r$cause));
   if (cpu$forwading$excep_r$cause$oldVal != cpu$forwading$excep_r$cause) { activeFlags[1197] = true; }
 }
-void DiffNewTop::step1199() {
+void Diffnewtop::step1199() {
   activeFlags[1199] = false;
   uint64_t cpu$decode$excep_r$cause$oldVal = cpu$decode$excep_r$cause;
   cpu$decode$excep_r$cause =
@@ -27586,7 +27586,7 @@ void DiffNewTop::step1199() {
                                   : cpu$decode$excep_r$cause))));
   if (cpu$decode$excep_r$cause$oldVal != cpu$decode$excep_r$cause) { activeFlags[1198] = true; }
 }
-void DiffNewTop::step1200() {
+void Diffnewtop::step1200() {
   activeFlags[1200] = false;
   uint64_t cpu$fetch$excep3_r$cause$oldVal = cpu$fetch$excep3_r$cause;
   cpu$fetch$excep3_r$cause =
@@ -27596,7 +27596,7 @@ void DiffNewTop::step1200() {
                                 : cpu$fetch$excep3_r$cause));
   if (cpu$fetch$excep3_r$cause$oldVal != cpu$fetch$excep3_r$cause) { activeFlags[1199] = true; }
 }
-void DiffNewTop::step1201() {
+void Diffnewtop::step1201() {
   activeFlags[1201] = false;
   uint64_t cpu$fetch$excep_buf$cause$oldVal = cpu$fetch$excep_buf$cause;
   cpu$fetch$excep_buf$cause =
@@ -27610,7 +27610,7 @@ void DiffNewTop::step1201() {
     activeFlags[1200] = true;
   }
 }
-void DiffNewTop::step1202() {
+void Diffnewtop::step1202() {
   activeFlags[1202] = false;
   uint64_t cpu$fetch$excep2_r$cause$oldVal = cpu$fetch$excep2_r$cause;
   cpu$fetch$excep2_r$cause =
@@ -27623,13 +27623,13 @@ void DiffNewTop::step1202() {
                                 : cpu$fetch$excep2_r$cause));
   if (cpu$fetch$excep2_r$cause$oldVal != cpu$fetch$excep2_r$cause) { activeFlags[1201] = true; }
 }
-void DiffNewTop::step1203() {
+void Diffnewtop::step1203() {
   activeFlags[1203] = false;
   uint64_t cpu$fetch$excep1_r$cause$oldVal = cpu$fetch$excep1_r$cause;
   cpu$fetch$excep1_r$cause = (reset ? 0x0 : (cpu$fetch$hs_in ? cpu$csrs$intr_out_r$cause : cpu$fetch$excep1_r$cause));
   if (cpu$fetch$excep1_r$cause$oldVal != cpu$fetch$excep1_r$cause) { activeFlags[1202] = true; }
 }
-void DiffNewTop::step1204() {
+void Diffnewtop::step1204() {
   activeFlags[1204] = false;
   uint64_t cpu$csrs$intr_out_r$cause$oldVal = cpu$csrs$intr_out_r$cause;
   cpu$csrs$intr_out_r$cause =
@@ -27648,7 +27648,7 @@ void DiffNewTop::step1204() {
                 0x8000000000000000));
   if (cpu$csrs$intr_out_r$cause$oldVal != cpu$csrs$intr_out_r$cause) { activeFlags[1203] = true; }
 }
-void DiffNewTop::step1205() {
+void Diffnewtop::step1205() {
   activeFlags[1205] = false;
   uint8_t cpu$memory$excep3_r$etype$oldVal = cpu$memory$excep3_r$etype;
   cpu$memory$excep3_r$etype = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$excep2_r$etype : cpu$memory$excep3_r$etype));
@@ -27657,7 +27657,7 @@ void DiffNewTop::step1205() {
     activeFlags[304] = true;
   }
 }
-void DiffNewTop::step1206() {
+void Diffnewtop::step1206() {
   activeFlags[1206] = false;
   uint8_t cpu$memory$excep2_r$etype$oldVal = cpu$memory$excep2_r$etype;
   cpu$memory$excep2_r$etype =
@@ -27670,14 +27670,14 @@ void DiffNewTop::step1206() {
                     : (cpu$memory$hs1 ? cpu$memory$excep1_r$etype : cpu$memory$excep2_r$etype)));
   if (cpu$memory$excep2_r$etype$oldVal != cpu$memory$excep2_r$etype) { activeFlags[1205] = true; }
 }
-void DiffNewTop::step1207() {
+void Diffnewtop::step1207() {
   activeFlags[1207] = false;
   uint8_t cpu$memory$excep1_r$etype$oldVal = cpu$memory$excep1_r$etype;
   cpu$memory$excep1_r$etype =
       (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$excep_r$etype : cpu$memory$excep1_r$etype));
   if (cpu$memory$excep1_r$etype$oldVal != cpu$memory$excep1_r$etype) { activeFlags[1206] = true; }
 }
-void DiffNewTop::step1208() {
+void Diffnewtop::step1208() {
   activeFlags[1208] = false;
   uint8_t cpu$execute$excep_r$etype$oldVal = cpu$execute$excep_r$etype;
   cpu$execute$excep_r$etype =
@@ -27685,7 +27685,7 @@ void DiffNewTop::step1208() {
              : (cpu$execute$hs_in ? (cpu$execute$_T_1 ? 0x0 : cpu$readregs$excep_r$etype) : cpu$execute$excep_r$etype));
   if (cpu$execute$excep_r$etype$oldVal != cpu$execute$excep_r$etype) { activeFlags[1207] = true; }
 }
-void DiffNewTop::step1209() {
+void Diffnewtop::step1209() {
   activeFlags[1209] = false;
   uint8_t cpu$readregs$excep_r$etype$oldVal = cpu$readregs$excep_r$etype;
   cpu$readregs$excep_r$etype = (reset ? 0x0
@@ -27693,14 +27693,14 @@ void DiffNewTop::step1209() {
                                                             : cpu$readregs$excep_r$etype));
   if (cpu$readregs$excep_r$etype$oldVal != cpu$readregs$excep_r$etype) { activeFlags[1208] = true; }
 }
-void DiffNewTop::step1210() {
+void Diffnewtop::step1210() {
   activeFlags[1210] = false;
   uint8_t cpu$forwading$excep_r$etype$oldVal = cpu$forwading$excep_r$etype;
   cpu$forwading$excep_r$etype =
       (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$excep_r$etype : cpu$forwading$excep_r$etype));
   if (cpu$forwading$excep_r$etype$oldVal != cpu$forwading$excep_r$etype) { activeFlags[1209] = true; }
 }
-void DiffNewTop::step1211() {
+void Diffnewtop::step1211() {
   activeFlags[1211] = false;
   uint8_t cpu$decode$excep_r$etype$oldVal = cpu$decode$excep_r$etype;
   cpu$decode$excep_r$etype =
@@ -27717,7 +27717,7 @@ void DiffNewTop::step1211() {
                                 : cpu$decode$excep_r$etype))));
   if (cpu$decode$excep_r$etype$oldVal != cpu$decode$excep_r$etype) { activeFlags[1210] = true; }
 }
-void DiffNewTop::step1212() {
+void Diffnewtop::step1212() {
   activeFlags[1212] = false;
   uint8_t cpu$fetch$excep3_r$etype$oldVal = cpu$fetch$excep3_r$etype;
   cpu$fetch$excep3_r$etype =
@@ -27727,7 +27727,7 @@ void DiffNewTop::step1212() {
                                 : cpu$fetch$excep3_r$etype));
   if (cpu$fetch$excep3_r$etype$oldVal != cpu$fetch$excep3_r$etype) { activeFlags[1211] = true; }
 }
-void DiffNewTop::step1213() {
+void Diffnewtop::step1213() {
   activeFlags[1213] = false;
   uint8_t cpu$fetch$excep_buf$etype$oldVal = cpu$fetch$excep_buf$etype;
   cpu$fetch$excep_buf$etype =
@@ -27738,7 +27738,7 @@ void DiffNewTop::step1213() {
                     : cpu$fetch$excep_buf$etype));
   if (cpu$fetch$excep_buf$etype$oldVal != cpu$fetch$excep_buf$etype) { activeFlags[1212] = true; }
 }
-void DiffNewTop::step1214() {
+void Diffnewtop::step1214() {
   activeFlags[1214] = false;
   uint8_t cpu$fetch$excep2_r$etype$oldVal = cpu$fetch$excep2_r$etype;
   cpu$fetch$excep2_r$etype =
@@ -27751,7 +27751,7 @@ void DiffNewTop::step1214() {
                                 : cpu$fetch$excep2_r$etype));
   if (cpu$fetch$excep2_r$etype$oldVal != cpu$fetch$excep2_r$etype) { activeFlags[1213] = true; }
 }
-void DiffNewTop::step1215() {
+void Diffnewtop::step1215() {
   activeFlags[1215] = false;
   uint8_t cpu$fetch$update_excep_pc$oldVal = cpu$fetch$update_excep_pc;
   cpu$fetch$update_excep_pc =
@@ -27765,7 +27765,7 @@ void DiffNewTop::step1215() {
     activeFlags[1188] = true;
   }
 }
-void DiffNewTop::step1216() {
+void Diffnewtop::step1216() {
   activeFlags[1216] = false;
   uint8_t cpu$fetch$wait_jmp_pc$oldVal = cpu$fetch$wait_jmp_pc;
   cpu$fetch$wait_jmp_pc =
@@ -27786,7 +27786,7 @@ void DiffNewTop::step1216() {
     activeFlags[1216] = true;
   }
 }
-void DiffNewTop::step1217() {
+void Diffnewtop::step1217() {
   activeFlags[1217] = false;
   uint8_t cpu$fetch$stall2_r$oldVal = cpu$fetch$stall2_r;
   cpu$fetch$stall2_r =
@@ -27796,7 +27796,7 @@ void DiffNewTop::step1217() {
                     : 0x0));
   if (cpu$fetch$stall2_r$oldVal != cpu$fetch$stall2_r) { activeFlags[937] = true; }
 }
-void DiffNewTop::step1218() {
+void Diffnewtop::step1218() {
   activeFlags[1218] = false;
   uint8_t cpu$fetch$excep2_r$en$oldVal = cpu$fetch$excep2_r$en;
   cpu$fetch$excep2_r$en =
@@ -27813,7 +27813,7 @@ void DiffNewTop::step1218() {
     activeFlags[949] = true;
   }
 }
-void DiffNewTop::step1219() {
+void Diffnewtop::step1219() {
   activeFlags[1219] = false;
   uint8_t cpu$fetch$excep1_r$en$oldVal = cpu$fetch$excep1_r$en;
   cpu$fetch$excep1_r$en = (reset ? 0x0 : (cpu$fetch$hs_in ? cpu$csrs$intr_out_r$en : cpu$fetch$excep1_r$en));
@@ -27823,37 +27823,37 @@ void DiffNewTop::step1219() {
     activeFlags[1218] = true;
   }
 }
-void DiffNewTop::step1220() {
+void Diffnewtop::step1220() {
   activeFlags[1220] = false;
   uint8_t cpu$fetch$stall1_r$oldVal = cpu$fetch$stall1_r;
   cpu$fetch$stall1_r = (reset ? 0x0 : (cpu$fetch$hs_in ? (cpu$csrs$intr_out_r$en ? 0x1 : 0x0) : 0x0));
   if (cpu$fetch$stall1_r$oldVal != cpu$fetch$stall1_r) { activeFlags[937] = true; }
 }
-void DiffNewTop::step1221() {
+void Diffnewtop::step1221() {
   activeFlags[1221] = false;
   uint8_t cpu$fetch$excep1_r$etype$oldVal = cpu$fetch$excep1_r$etype;
   cpu$fetch$excep1_r$etype = (reset ? 0x0 : (cpu$fetch$hs_in ? 0x0 : cpu$fetch$excep1_r$etype));
   if (cpu$fetch$excep1_r$etype$oldVal != cpu$fetch$excep1_r$etype) { activeFlags[1214] = true; }
 }
-void DiffNewTop::step1222() {
+void Diffnewtop::step1222() {
   activeFlags[1222] = false;
   uint64_t cpu$fetch$excep1_r$pc$oldVal = cpu$fetch$excep1_r$pc;
   cpu$fetch$excep1_r$pc = (reset ? 0x0 : (cpu$fetch$hs_in ? 0x0 : cpu$fetch$excep1_r$pc));
   if (cpu$fetch$excep1_r$pc$oldVal != cpu$fetch$excep1_r$pc) { activeFlags[1159] = true; }
 }
-void DiffNewTop::step1223() {
+void Diffnewtop::step1223() {
   activeFlags[1223] = false;
   uint64_t cpu$fetch$excep1_r$tval$oldVal = cpu$fetch$excep1_r$tval;
   cpu$fetch$excep1_r$tval = (reset ? 0x0 : (cpu$fetch$hs_in ? 0x0 : cpu$fetch$excep1_r$tval));
   if (cpu$fetch$excep1_r$tval$oldVal != cpu$fetch$excep1_r$tval) { activeFlags[1146] = true; }
 }
-void DiffNewTop::step1224() {
+void Diffnewtop::step1224() {
   activeFlags[1224] = false;
   uint8_t cpu$fetch$drop1_r$oldVal = cpu$fetch$drop1_r;
   cpu$fetch$drop1_r = (reset ? 0x0 : (cpu$fetch$hs_in ? (cpu$csrs$intr_out_r$en ? 0x1 : 0x0) : 0x0));
   if (cpu$fetch$drop1_r$oldVal != cpu$fetch$drop1_r) { activeFlags[903] = true; }
 }
-void DiffNewTop::step1225() {
+void Diffnewtop::step1225() {
   activeFlags[1225] = false;
   uint8_t cpu$csrs$intr_out_r$en$oldVal = cpu$csrs$intr_out_r$en;
   cpu$csrs$intr_out_r$en = (reset ? 0x0 : (cpu$csrs$enable_int != 0x0));
@@ -27865,7 +27865,7 @@ void DiffNewTop::step1225() {
     activeFlags[1224] = true;
   }
 }
-void DiffNewTop::step1226() {
+void Diffnewtop::step1226() {
   activeFlags[1226] = false;
   uint8_t cpu$csrs$intr_seip$oldVal = cpu$csrs$intr_seip;
   cpu$csrs$intr_seip =
@@ -27875,7 +27875,7 @@ void DiffNewTop::step1226() {
     activeFlags[996] = true;
   }
 }
-void DiffNewTop::step1227() {
+void Diffnewtop::step1227() {
   activeFlags[1227] = false;
   uint32_t cpu$plic$pending$oldVal = cpu$plic$pending;
   cpu$plic$pending =
@@ -27910,13 +27910,13 @@ void DiffNewTop::step1227() {
     activeFlags[1227] = true;
   }
 }
-void DiffNewTop::step1228() {
+void Diffnewtop::step1228() {
   activeFlags[1228] = false;
   uint32_t intr_count$oldVal = intr_count;
   intr_count = (reset ? 0x1 : intr_count);
   if (intr_count$oldVal != intr_count) { activeFlags[1227] = true; }
 }
-void DiffNewTop::step1229() {
+void Diffnewtop::step1229() {
   activeFlags[1229] = false;
   uint64_t cpu$dmaBridge$dc_wdata_r$oldVal = cpu$dmaBridge$dc_wdata_r;
   cpu$dmaBridge$dc_wdata_r =
@@ -27941,7 +27941,7 @@ void DiffNewTop::step1229() {
                                                               : cpu$dmaBridge$dc_wdata_r))))))));
   if (cpu$dmaBridge$dc_wdata_r$oldVal != cpu$dmaBridge$dc_wdata_r) { activeFlags[354] = true; }
 }
-void DiffNewTop::step1230() {
+void Diffnewtop::step1230() {
   activeFlags[1230] = false;
   uint64_t cpu$dmaBridge$rdata_r$oldVal = cpu$dmaBridge$rdata_r;
   cpu$dmaBridge$rdata_r =
@@ -27953,7 +27953,7 @@ void DiffNewTop::step1230() {
                                                                 : (cpu$dmaBridge$_T_5 ? cpu$dmaBridge$data_buf_r
                                                                                       : cpu$dmaBridge$rdata_r)))));
 }
-void DiffNewTop::step1231() {
+void Diffnewtop::step1231() {
   activeFlags[1231] = false;
   uint64_t cpu$dmaBridge$data_buf_r$oldVal = cpu$dmaBridge$data_buf_r;
   cpu$dmaBridge$data_buf_r =
@@ -27987,7 +27987,7 @@ void DiffNewTop::step1231() {
     activeFlags[1231] = true;
   }
 }
-void DiffNewTop::step1232() {
+void Diffnewtop::step1232() {
   activeFlags[1232] = false;
   uint8_t cpu$tlb_mem$wpte_hs_r$oldVal = cpu$tlb_mem$wpte_hs_r;
   cpu$tlb_mem$wpte_hs_r =
@@ -28005,7 +28005,7 @@ void DiffNewTop::step1232() {
                     : cpu$tlb_mem$wpte_hs_r));
   if (cpu$tlb_mem$wpte_hs_r$oldVal != cpu$tlb_mem$wpte_hs_r) { activeFlags[1057] = true; }
 }
-void DiffNewTop::step1233() {
+void Diffnewtop::step1233() {
   activeFlags[1233] = false;
   uint8_t cpu$tlb_mem$offset$oldVal = cpu$tlb_mem$offset;
   cpu$tlb_mem$offset =
@@ -28031,7 +28031,7 @@ void DiffNewTop::step1233() {
     activeFlags[1233] = true;
   }
 }
-void DiffNewTop::step1234() {
+void Diffnewtop::step1234() {
   activeFlags[1234] = false;
   if (reset) {
     memcpy(cpu$tlb_mem$pte_addr, (const uint32_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -28059,7 +28059,7 @@ void DiffNewTop::step1234() {
   }
   activeFlags[1056] = true;
 }
-void DiffNewTop::step1235() {
+void Diffnewtop::step1235() {
   activeFlags[1235] = false;
   uint64_t cpu$tlb_mem$wpte_data_r$oldVal = cpu$tlb_mem$wpte_data_r;
   cpu$tlb_mem$wpte_data_r =
@@ -28081,7 +28081,7 @@ void DiffNewTop::step1235() {
                     : cpu$tlb_mem$wpte_data_r));
   if (cpu$tlb_mem$wpte_data_r$oldVal != cpu$tlb_mem$wpte_data_r) { activeFlags[354] = true; }
 }
-void DiffNewTop::step1236() {
+void Diffnewtop::step1236() {
   activeFlags[1236] = false;
   if (reset) {
     memcpy(cpu$tlb_mem$paddr, (const uint32_t[]){0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -28112,7 +28112,7 @@ void DiffNewTop::step1236() {
   }
   activeFlags[527] = true;
 }
-void DiffNewTop::step1237() {
+void Diffnewtop::step1237() {
   activeFlags[1237] = false;
   uint8_t cpu$tlb_mem$select_r$oldVal = cpu$tlb_mem$select_r;
   cpu$tlb_mem$select_r =
@@ -28143,7 +28143,7 @@ void DiffNewTop::step1237() {
     activeFlags[1236] = true;
   }
 }
-void DiffNewTop::step1238() {
+void Diffnewtop::step1238() {
   activeFlags[1238] = false;
   uint64_t cpu$tlb_mem$out_excep_r$tval$oldVal = cpu$tlb_mem$out_excep_r$tval;
   cpu$tlb_mem$out_excep_r$tval =
@@ -28161,7 +28161,7 @@ void DiffNewTop::step1238() {
                     : cpu$tlb_mem$out_excep_r$tval));
   if (cpu$tlb_mem$out_excep_r$tval$oldVal != cpu$tlb_mem$out_excep_r$tval) { activeFlags[1182] = true; }
 }
-void DiffNewTop::step1239() {
+void Diffnewtop::step1239() {
   activeFlags[1239] = false;
   uint64_t cpu$tlb_mem$pre_addr$oldVal = cpu$tlb_mem$pre_addr;
   cpu$tlb_mem$pre_addr =
@@ -28175,7 +28175,7 @@ void DiffNewTop::step1239() {
     activeFlags[1056] = true;
   }
 }
-void DiffNewTop::step1240() {
+void Diffnewtop::step1240() {
   activeFlags[1240] = false;
   uint8_t cpu$tlb_mem$state$oldVal = cpu$tlb_mem$state;
   cpu$tlb_mem$state =
@@ -28206,7 +28206,7 @@ void DiffNewTop::step1240() {
     activeFlags[543] = true;
   }
 }
-void DiffNewTop::step1241() {
+void Diffnewtop::step1241() {
   activeFlags[1241] = false;
   uint32_t cpu$dcache$addr_r$oldVal = cpu$dcache$addr_r;
   cpu$dcache$addr_r = (reset ? 0x0 : (cpu$dcache$hs_in ? cpu$dcSelector$io$select$addr : cpu$dcache$addr_r));
@@ -28217,7 +28217,7 @@ void DiffNewTop::step1241() {
     activeFlags[1005] = true;
   }
 }
-void DiffNewTop::step1242() {
+void Diffnewtop::step1242() {
   activeFlags[1242] = false;
   uint32_t cpu$dmaBridge$dc_addr_r$oldVal = cpu$dmaBridge$dc_addr_r;
   cpu$dmaBridge$dc_addr_r =
@@ -28257,7 +28257,7 @@ void DiffNewTop::step1242() {
     activeFlags[1242] = true;
   }
 }
-void DiffNewTop::step1243() {
+void Diffnewtop::step1243() {
   activeFlags[1243] = false;
   uint32_t cpu$dmaBridge$addr_r$oldVal = cpu$dmaBridge$addr_r;
   cpu$dmaBridge$addr_r =
@@ -28289,7 +28289,7 @@ void DiffNewTop::step1243() {
     activeFlags[1243] = true;
   }
 }
-void DiffNewTop::step1244() {
+void Diffnewtop::step1244() {
   activeFlags[1244] = false;
   uint8_t cpu$dmaBridge$size_r$oldVal = cpu$dmaBridge$size_r;
   cpu$dmaBridge$size_r =
@@ -28308,7 +28308,7 @@ void DiffNewTop::step1244() {
     activeFlags[1243] = true;
   }
 }
-void DiffNewTop::step1245() {
+void Diffnewtop::step1245() {
   activeFlags[1245] = false;
   uint8_t cpu$dmaBridge$addr_left_r$oldVal = cpu$dmaBridge$addr_left_r;
   cpu$dmaBridge$addr_left_r =
@@ -28338,7 +28338,7 @@ void DiffNewTop::step1245() {
                                                             : cpu$dmaBridge$addr_left_r))))))));
   if (cpu$dmaBridge$addr_left_r$oldVal != cpu$dmaBridge$addr_left_r) { activeFlags[1245] = true; }
 }
-void DiffNewTop::step1246() {
+void Diffnewtop::step1246() {
   activeFlags[1246] = false;
   uint8_t cpu$dcache$amo_r$oldVal = cpu$dcache$amo_r;
   cpu$dcache$amo_r =
@@ -28351,7 +28351,7 @@ void DiffNewTop::step1246() {
                                  : cpu$dcache$amo_r));
   if (cpu$dcache$amo_r$oldVal != cpu$dcache$amo_r) { activeFlags[472] = true; }
 }
-void DiffNewTop::step1247() {
+void Diffnewtop::step1247() {
   activeFlags[1247] = false;
   uint8_t cpu$dcache$mode_r$oldVal = cpu$dcache$mode_r;
   cpu$dcache$mode_r = (reset ? 0x0 : (cpu$dcache$hs_in ? cpu$dcSelector$io$select$dc_mode : cpu$dcache$mode_r));
@@ -28361,7 +28361,7 @@ void DiffNewTop::step1247() {
     activeFlags[474] = true;
   }
 }
-void DiffNewTop::step1248() {
+void Diffnewtop::step1248() {
   activeFlags[1248] = false;
   uint8_t cpu$dmaBridge$dc_mode_r$oldVal = cpu$dmaBridge$dc_mode_r;
   cpu$dmaBridge$dc_mode_r =
@@ -28397,7 +28397,7 @@ void DiffNewTop::step1248() {
     activeFlags[1248] = true;
   }
 }
-void DiffNewTop::step1249() {
+void Diffnewtop::step1249() {
   activeFlags[1249] = false;
   uint8_t cpu$dmaBridge$arready_r$oldVal = cpu$dmaBridge$arready_r;
   cpu$dmaBridge$arready_r = (reset ? 0x0
@@ -28405,7 +28405,7 @@ void DiffNewTop::step1249() {
                                                        : (cpu$dmaBridge$_T_1 ? 0x0 : cpu$dmaBridge$arready_r)));
   if (cpu$dmaBridge$arready_r$oldVal != cpu$dmaBridge$arready_r) { activeFlags[55] = true; }
 }
-void DiffNewTop::step1250() {
+void Diffnewtop::step1250() {
   activeFlags[1250] = false;
   uint8_t dma$wstrb_r$oldVal = dma$wstrb_r;
   dma$wstrb_r =
@@ -28422,7 +28422,7 @@ void DiffNewTop::step1250() {
     activeFlags[1250] = true;
   }
 }
-void DiffNewTop::step1251() {
+void Diffnewtop::step1251() {
   activeFlags[1251] = false;
   uint64_t dma$wdata_r$oldVal = dma$wdata_r;
   dma$wdata_r =
@@ -28439,7 +28439,7 @@ void DiffNewTop::step1251() {
     activeFlags[1251] = true;
   }
 }
-void DiffNewTop::step1252() {
+void Diffnewtop::step1252() {
   activeFlags[1252] = false;
   uint8_t cpu$dmaBridge$awready_r$oldVal = cpu$dmaBridge$awready_r;
   cpu$dmaBridge$awready_r =
@@ -28454,7 +28454,7 @@ void DiffNewTop::step1252() {
                                                         : (cpu$dmaBridge$_T_7 ? 0x0 : cpu$dmaBridge$awready_r))))));
   if (cpu$dmaBridge$awready_r$oldVal != cpu$dmaBridge$awready_r) { activeFlags[60] = true; }
 }
-void DiffNewTop::step1253() {
+void Diffnewtop::step1253() {
   activeFlags[1253] = false;
   uint8_t cpu$dmaBridge$state$oldVal = cpu$dmaBridge$state;
   cpu$dmaBridge$state =
@@ -28491,7 +28491,7 @@ void DiffNewTop::step1253() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step1254() {
+void Diffnewtop::step1254() {
   activeFlags[1254] = false;
   uint8_t dma$bready_r$oldVal = dma$bready_r;
   dma$bready_r =
@@ -28510,7 +28510,7 @@ void DiffNewTop::step1254() {
     activeFlags[1253] = true;
   }
 }
-void DiffNewTop::step1255() {
+void Diffnewtop::step1255() {
   activeFlags[1255] = false;
   uint8_t dma$wlast_r$oldVal = dma$wlast_r;
   dma$wlast_r =
@@ -28532,7 +28532,7 @@ void DiffNewTop::step1255() {
     activeFlags[1255] = true;
   }
 }
-void DiffNewTop::step1256() {
+void Diffnewtop::step1256() {
   activeFlags[1256] = false;
   uint8_t dma$count_r$oldVal = dma$count_r;
   dma$count_r =
@@ -28549,19 +28549,19 @@ void DiffNewTop::step1256() {
     activeFlags[1256] = true;
   }
 }
-void DiffNewTop::step1257() {
+void Diffnewtop::step1257() {
   activeFlags[1257] = false;
   uint8_t dma$arsize_r$oldVal = dma$arsize_r;
   dma$arsize_r = (reset ? 0x0 : (dma$_T_2 ? (dma$enable_r ? 0x0 : dma$arsize_r) : dma$arsize_r));
   if (dma$arsize_r$oldVal != dma$arsize_r) { activeFlags[1244] = true; }
 }
-void DiffNewTop::step1258() {
+void Diffnewtop::step1258() {
   activeFlags[1258] = false;
   uint8_t dma$arlen_r$oldVal = dma$arlen_r;
   dma$arlen_r = (reset ? 0x0 : (dma$_T_2 ? (dma$enable_r ? 0x3 : dma$arlen_r) : dma$arlen_r));
   if (dma$arlen_r$oldVal != dma$arlen_r) { activeFlags[1077] = true; }
 }
-void DiffNewTop::step1259() {
+void Diffnewtop::step1259() {
   activeFlags[1259] = false;
   uint32_t dma$araddr_r$oldVal = dma$araddr_r;
   dma$araddr_r = (reset ? 0x0 : (dma$_T_2 ? (dma$enable_r ? 0x81000004 : dma$araddr_r) : dma$araddr_r));
@@ -28570,19 +28570,19 @@ void DiffNewTop::step1259() {
     activeFlags[1243] = true;
   }
 }
-void DiffNewTop::step1260() {
+void Diffnewtop::step1260() {
   activeFlags[1260] = false;
   uint8_t dma$awsize_r$oldVal = dma$awsize_r;
   dma$awsize_r = (reset ? 0x0 : (dma$_T_2 ? (dma$enable_w ? 0x0 : dma$awsize_r) : dma$awsize_r));
   if (dma$awsize_r$oldVal != dma$awsize_r) { activeFlags[1244] = true; }
 }
-void DiffNewTop::step1261() {
+void Diffnewtop::step1261() {
   activeFlags[1261] = false;
   uint8_t dma$awlen_r$oldVal = dma$awlen_r;
   dma$awlen_r = (reset ? 0x0 : (dma$_T_2 ? (dma$enable_w ? 0x3 : dma$awlen_r) : dma$awlen_r));
   if (dma$awlen_r$oldVal != dma$awlen_r) { activeFlags[1077] = true; }
 }
-void DiffNewTop::step1262() {
+void Diffnewtop::step1262() {
   activeFlags[1262] = false;
   uint32_t dma$awaddr_r$oldVal = dma$awaddr_r;
   dma$awaddr_r = (reset ? 0x0 : (dma$_T_2 ? (dma$enable_w ? 0x81000004 : dma$awaddr_r) : dma$awaddr_r));
@@ -28591,7 +28591,7 @@ void DiffNewTop::step1262() {
     activeFlags[1243] = true;
   }
 }
-void DiffNewTop::step1263() {
+void Diffnewtop::step1263() {
   activeFlags[1263] = false;
   uint8_t dma$enable_w$oldVal = dma$enable_w;
   dma$enable_w = (reset ? 0x0 : (dma$_T_2 ? (dma$enable_w ? 0x0 : dma$enable_w) : dma$enable_w));
@@ -28604,7 +28604,7 @@ void DiffNewTop::step1263() {
     activeFlags[1263] = true;
   }
 }
-void DiffNewTop::step1264() {
+void Diffnewtop::step1264() {
   activeFlags[1264] = false;
   uint8_t dma$enable_r$oldVal = dma$enable_r;
   dma$enable_r = (reset ? 0x0 : (dma$_T_2 ? (dma$enable_r ? 0x0 : dma$enable_r) : dma$enable_r));
@@ -28617,13 +28617,13 @@ void DiffNewTop::step1264() {
     activeFlags[1264] = true;
   }
 }
-void DiffNewTop::step1265() {
+void Diffnewtop::step1265() {
   activeFlags[1265] = false;
   uint64_t dma$count$oldVal = dma$count;
   dma$count = (reset ? 0x0 : ((dma$count + 0x1) & 0xffffffffffffffff));
   if (dma$count$oldVal != dma$count) { activeFlags[1265] = true; }
 }
-void DiffNewTop::step1266() {
+void Diffnewtop::step1266() {
   activeFlags[1266] = false;
   uint64_t mmio$mtime$oldVal = mmio$mtime;
   mmio$mtime = (reset ? 0x0 : ((mmio$count == 0x0) ? ((mmio$mtime + 0x14) & 0xffffffffffffffff) : mmio$mtime));
@@ -28632,13 +28632,13 @@ void DiffNewTop::step1266() {
     activeFlags[1266] = true;
   }
 }
-void DiffNewTop::step1267() {
+void Diffnewtop::step1267() {
   activeFlags[1267] = false;
   uint8_t mmio$count$oldVal = mmio$count;
   mmio$count = (reset ? 0x0 : mmio$count);
   if (mmio$count$oldVal != mmio$count) { activeFlags[1266] = true; }
 }
-void DiffNewTop::step1268() {
+void Diffnewtop::step1268() {
   activeFlags[1268] = false;
   uint8_t cpu$plic$clear_r$oldVal = cpu$plic$clear_r;
   cpu$plic$clear_r =
@@ -28652,13 +28652,13 @@ void DiffNewTop::step1268() {
     activeFlags[1226] = true;
   }
 }
-void DiffNewTop::step1269() {
+void Diffnewtop::step1269() {
   activeFlags[1269] = false;
   uint8_t cpu$clint$clear_r$oldVal = cpu$clint$clear_r;
   cpu$clint$clear_r = (reset ? 0x0 : (cpu$clint$_T_2 ? (cpu$memCrossbar$io$clintIO$wvalid ? 0x1 : 0x0) : 0x0));
   if (cpu$clint$clear_r$oldVal != cpu$clint$clear_r) { activeFlags[996] = true; }
 }
-void DiffNewTop::step1270() {
+void Diffnewtop::step1270() {
   activeFlags[1270] = false;
   uint8_t cpu$clint$count$oldVal = cpu$clint$count;
   cpu$clint$count = (reset ? 0x0 : ((cpu$clint$count + 0x1) & 0x3));
@@ -28667,7 +28667,7 @@ void DiffNewTop::step1270() {
     activeFlags[1270] = true;
   }
 }
-void DiffNewTop::step1271() {
+void Diffnewtop::step1271() {
   activeFlags[1271] = false;
   uint8_t cpu$tlb_if$flush_r$oldVal = cpu$tlb_if$flush_r;
   cpu$tlb_if$flush_r = (reset ? 0x0 : (cpu$tlb_if$_T_49 ? (cpu$tlb_if$_T_50 ? 0x0 : 0x1) : cpu$tlb_if$flush_r));
@@ -28676,7 +28676,7 @@ void DiffNewTop::step1271() {
     activeFlags[906] = true;
   }
 }
-void DiffNewTop::step1272() {
+void Diffnewtop::step1272() {
   activeFlags[1272] = false;
   uint8_t cpu$writeback$cache_r$oldVal = cpu$writeback$cache_r;
   cpu$writeback$cache_r =
@@ -28692,7 +28692,7 @@ void DiffNewTop::step1272() {
     activeFlags[1128] = true;
   }
 }
-void DiffNewTop::step1273() {
+void Diffnewtop::step1273() {
   activeFlags[1273] = false;
   uint8_t cpu$writeback$tlb_r$oldVal = cpu$writeback$tlb_r;
   cpu$writeback$tlb_r =
@@ -28711,14 +28711,14 @@ void DiffNewTop::step1273() {
     activeFlags[906] = true;
   }
 }
-void DiffNewTop::step1274() {
+void Diffnewtop::step1274() {
   activeFlags[1274] = false;
   uint8_t cpu$writeback$forceJmp$valid$oldVal = cpu$writeback$forceJmp$valid;
   cpu$writeback$forceJmp$valid =
       (reset ? 0x0 : (cpu$writeback$_T ? (cpu$memory$valid3_r ? (cpu$writeback$_T_4 ? 0x1 : 0x0) : 0x0) : 0x0));
   if (cpu$writeback$forceJmp$valid$oldVal != cpu$writeback$forceJmp$valid) { activeFlags[1162] = true; }
 }
-void DiffNewTop::step1275() {
+void Diffnewtop::step1275() {
   activeFlags[1275] = false;
   uint64_t cpu$writeback$forceJmp$seq_pc$oldVal = cpu$writeback$forceJmp$seq_pc;
   cpu$writeback$forceJmp$seq_pc =
@@ -28730,13 +28730,13 @@ void DiffNewTop::step1275() {
                     : cpu$writeback$forceJmp$seq_pc));
   if (cpu$writeback$forceJmp$seq_pc$oldVal != cpu$writeback$forceJmp$seq_pc) { activeFlags[1162] = true; }
 }
-void DiffNewTop::step1276() {
+void Diffnewtop::step1276() {
   activeFlags[1276] = false;
   uint8_t cpu$writeback$recov_r$oldVal = cpu$writeback$recov_r;
   cpu$writeback$recov_r = (reset ? 0x0 : (cpu$writeback$_T ? (cpu$memory$valid3_r ? cpu$memory$recov3_r : 0x0) : 0x0));
   if (cpu$writeback$recov_r$oldVal != cpu$writeback$recov_r) { activeFlags[937] = true; }
 }
-void DiffNewTop::step1277() {
+void Diffnewtop::step1277() {
   activeFlags[1277] = false;
   uint8_t cpu$memory$recov3_r$oldVal = cpu$memory$recov3_r;
   cpu$memory$recov3_r = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$recov2_r : cpu$memory$recov3_r));
@@ -28745,13 +28745,13 @@ void DiffNewTop::step1277() {
     activeFlags[1276] = true;
   }
 }
-void DiffNewTop::step1278() {
+void Diffnewtop::step1278() {
   activeFlags[1278] = false;
   uint8_t cpu$writeback$is_mmio_r$oldVal = cpu$writeback$is_mmio_r;
   cpu$writeback$is_mmio_r = cpu$memory$is_mmio_r;
   if (cpu$writeback$is_mmio_r$oldVal != cpu$writeback$is_mmio_r) { activeFlags[1278] = true; }
 }
-void DiffNewTop::step1279() {
+void Diffnewtop::step1279() {
   activeFlags[1279] = false;
   uint8_t cpu$memory$is_mmio_r$oldVal = cpu$memory$is_mmio_r;
   cpu$memory$is_mmio_r =
@@ -28760,7 +28760,7 @@ void DiffNewTop::step1279() {
                                : cpu$memory$is_mmio_r));
   if (cpu$memory$is_mmio_r$oldVal != cpu$memory$is_mmio_r) { activeFlags[1278] = true; }
 }
-void DiffNewTop::step1280() {
+void Diffnewtop::step1280() {
   activeFlags[1280] = false;
   uint8_t cpu$memory$special3_r$oldVal = cpu$memory$special3_r;
   cpu$memory$special3_r = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$special2_r : cpu$memory$special3_r));
@@ -28770,7 +28770,7 @@ void DiffNewTop::step1280() {
     activeFlags[1273] = true;
   }
 }
-void DiffNewTop::step1281() {
+void Diffnewtop::step1281() {
   activeFlags[1281] = false;
   uint64_t cpu$csrs$mhartid$oldVal = cpu$csrs$mhartid;
   cpu$csrs$mhartid =
@@ -28826,7 +28826,7 @@ void DiffNewTop::step1281() {
                                                                                                                                                                                cpu$csrs$_T_56 ? cpu$csrs$mhartid : (cpu$csrs$_T_57 ? cpu$csrs$mhartid : (cpu$csrs$_T_58 ? cpu$csrs$mhartid : (cpu$csrs$_T_59 ? cpu$csrs$mhartid : (cpu$csrs$_T_60 ? cpu$csrs$mhartid : (cpu$csrs$_T_61 ? cpu$csrs$mhartid : (cpu$csrs$_T_62 ? cpu$csrs$mhartid : (cpu$csrs$_T_63 ? cpu$csrs$mhartid : (cpu$csrs$_T_64 ? cpu$csrs$mhartid : ((cpu$memory$csr_id3_r == 0xf14) ? cpu$memory$csr_d3_r : cpu$csrs$mhartid)))))))))))))))))))))))))))))));
   if (cpu$csrs$mhartid$oldVal != cpu$csrs$mhartid) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1282() {
+void Diffnewtop::step1282() {
   activeFlags[1282] = false;
   uint64_t cpu$csrs$uscratch$oldVal = cpu$csrs$uscratch;
   cpu$csrs$uscratch =
@@ -28869,7 +28869,7 @@ void DiffNewTop::step1282() {
                                                                                                                                   cpu$csrs$_T_50 ? cpu$csrs$uscratch : (cpu$csrs$_T_51 ? cpu$csrs$uscratch : (cpu$csrs$_T_52 ? cpu$csrs$uscratch : (cpu$csrs$_T_53 ? cpu$csrs$uscratch : (cpu$csrs$_T_54 ? cpu$csrs$uscratch : (cpu$csrs$_T_55 ? cpu$csrs$uscratch : (cpu$csrs$_T_56 ? cpu$csrs$uscratch : (cpu$csrs$_T_57 ? cpu$csrs$uscratch : (cpu$csrs$_T_58 ? cpu$csrs$uscratch : (cpu$csrs$_T_59 ? cpu$csrs$uscratch : (cpu$csrs$_T_60 ? cpu$csrs$uscratch : (cpu$csrs$_T_61 ? cpu$csrs$uscratch : (cpu$csrs$_T_62 ? cpu$csrs$uscratch : (cpu$csrs$_T_63 ? cpu$csrs$uscratch : (cpu$csrs$_T_64 ? cpu$memory$csr_d3_r : cpu$csrs$uscratch))))))))))))))))))))))))))))));
   if (cpu$csrs$uscratch$oldVal != cpu$csrs$uscratch) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1283() {
+void Diffnewtop::step1283() {
   activeFlags[1283] = false;
   uint64_t cpu$csrs$pmpaddr3$oldVal = cpu$csrs$pmpaddr3;
   cpu$csrs$pmpaddr3 =
@@ -28908,7 +28908,7 @@ void DiffNewTop::step1283() {
                                                                                                                     cpu$csrs$_T_48 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_49 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_50 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_51 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_52 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_53 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_54 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_55 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_56 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_57 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_58 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_59 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_60 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_61 ? cpu$csrs$pmpaddr3 : (cpu$csrs$_T_62 ? (cpu$memory$csr_d3_r & 0x3fffffffffffff) : cpu$csrs$pmpaddr3))))))))))))))))))))))))))));
   if (cpu$csrs$pmpaddr3$oldVal != cpu$csrs$pmpaddr3) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1284() {
+void Diffnewtop::step1284() {
   activeFlags[1284] = false;
   uint64_t cpu$csrs$pmpaddr2$oldVal = cpu$csrs$pmpaddr2;
   cpu$csrs$pmpaddr2 =
@@ -28938,7 +28938,7 @@ void DiffNewTop::step1284() {
                                                                                                                     cpu$csrs$_T_47 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_48 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_49 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_50 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_51 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_52 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_53 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_54 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_55 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_56 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_57 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_58 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_59 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_60 ? cpu$csrs$pmpaddr2 : (cpu$csrs$_T_61 ? (cpu$memory$csr_d3_r & 0x3fffffffffffff) : cpu$csrs$pmpaddr2)))))))))))))))))))))))))));
   if (cpu$csrs$pmpaddr2$oldVal != cpu$csrs$pmpaddr2) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1285() {
+void Diffnewtop::step1285() {
   activeFlags[1285] = false;
   uint64_t cpu$csrs$pmpaddr1$oldVal = cpu$csrs$pmpaddr1;
   cpu$csrs$pmpaddr1 = (reset ? 0x0
@@ -28965,7 +28965,7 @@ void DiffNewTop::step1285() {
                                                                                                                     cpu$csrs$_T_46 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_47 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_48 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_49 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_50 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_51 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_52 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_53 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_54 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_55 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_56 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_57 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_58 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_59 ? cpu$csrs$pmpaddr1 : (cpu$csrs$_T_60 ? (cpu$memory$csr_d3_r & 0x3fffffffffffff) : cpu$csrs$pmpaddr1))))))))))))))))))))))))));
   if (cpu$csrs$pmpaddr1$oldVal != cpu$csrs$pmpaddr1) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1286() {
+void Diffnewtop::step1286() {
   activeFlags[1286] = false;
   uint64_t cpu$csrs$pmpaddr0$oldVal = cpu$csrs$pmpaddr0;
   cpu$csrs$pmpaddr0 =
@@ -28991,7 +28991,7 @@ void DiffNewTop::step1286() {
                                                                                                                     cpu$csrs$_T_45 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_46 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_47 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_48 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_49 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_50 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_51 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_52 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_53 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_54 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_55 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_56 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_57 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_58 ? cpu$csrs$pmpaddr0 : (cpu$csrs$_T_59 ? (cpu$memory$csr_d3_r & 0x3fffffffffffff) : cpu$csrs$pmpaddr0)))))))))))))))))))))))));
   if (cpu$csrs$pmpaddr0$oldVal != cpu$csrs$pmpaddr0) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1287() {
+void Diffnewtop::step1287() {
   activeFlags[1287] = false;
   uint64_t cpu$csrs$satp$oldVal = cpu$csrs$satp;
   cpu$csrs$satp =
@@ -29048,7 +29048,7 @@ void DiffNewTop::step1287() {
     activeFlags[1287] = true;
   }
 }
-void DiffNewTop::step1288() {
+void Diffnewtop::step1288() {
   activeFlags[1288] = false;
   uint64_t cpu$csrs$stvec$oldVal = cpu$csrs$stvec;
   cpu$csrs$stvec =
@@ -29096,7 +29096,7 @@ void DiffNewTop::step1288() {
     activeFlags[1190] = true;
   }
 }
-void DiffNewTop::step1289() {
+void Diffnewtop::step1289() {
   activeFlags[1289] = false;
   uint64_t cpu$csrs$sscratch$oldVal = cpu$csrs$sscratch;
   cpu$csrs$sscratch =
@@ -29139,7 +29139,7 @@ void DiffNewTop::step1289() {
                                                                                                                                   : cpu$csrs$sscratch))))))))))))))))));
   if (cpu$csrs$sscratch$oldVal != cpu$csrs$sscratch) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1290() {
+void Diffnewtop::step1290() {
   activeFlags[1290] = false;
   uint32_t cpu$csrs$scounteren$oldVal = cpu$csrs$scounteren;
   cpu$csrs$scounteren =
@@ -29176,7 +29176,7 @@ void DiffNewTop::step1290() {
                                                                                                              : cpu$csrs$scounteren)))))))))))))));
   if (cpu$csrs$scounteren$oldVal != cpu$csrs$scounteren) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1291() {
+void Diffnewtop::step1291() {
   activeFlags[1291] = false;
   uint32_t cpu$csrs$mcounteren$oldVal = cpu$csrs$mcounteren;
   cpu$csrs$mcounteren =
@@ -29211,7 +29211,7 @@ void DiffNewTop::step1291() {
                                                                                                       : cpu$csrs$mcounteren))))))))))))));
   if (cpu$csrs$mcounteren$oldVal != cpu$csrs$mcounteren) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1292() {
+void Diffnewtop::step1292() {
   activeFlags[1292] = false;
   uint64_t cpu$csrs$mie$oldVal = cpu$csrs$mie;
   cpu$csrs$mie =
@@ -29272,7 +29272,7 @@ void DiffNewTop::step1292() {
     activeFlags[1292] = true;
   }
 }
-void DiffNewTop::step1293() {
+void Diffnewtop::step1293() {
   activeFlags[1293] = false;
   uint64_t cpu$csrs$mideleg$oldVal = cpu$csrs$mideleg;
   cpu$csrs$mideleg =
@@ -29311,7 +29311,7 @@ void DiffNewTop::step1293() {
     activeFlags[1292] = true;
   }
 }
-void DiffNewTop::step1294() {
+void Diffnewtop::step1294() {
   activeFlags[1294] = false;
   uint64_t cpu$csrs$medeleg$oldVal = cpu$csrs$medeleg;
   cpu$csrs$medeleg =
@@ -29345,7 +29345,7 @@ void DiffNewTop::step1294() {
     activeFlags[625] = true;
   }
 }
-void DiffNewTop::step1295() {
+void Diffnewtop::step1295() {
   activeFlags[1295] = false;
   uint64_t cpu$csrs$mtvec$oldVal = cpu$csrs$mtvec;
   cpu$csrs$mtvec =
@@ -29367,7 +29367,7 @@ void DiffNewTop::step1295() {
     activeFlags[1190] = true;
   }
 }
-void DiffNewTop::step1296() {
+void Diffnewtop::step1296() {
   activeFlags[1296] = false;
   uint64_t cpu$csrs$mscratch$oldVal = cpu$csrs$mscratch;
   cpu$csrs$mscratch =
@@ -29384,20 +29384,20 @@ void DiffNewTop::step1296() {
                                                                                         : cpu$csrs$mscratch)))))));
   if (cpu$csrs$mscratch$oldVal != cpu$csrs$mscratch) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1297() {
+void Diffnewtop::step1297() {
   activeFlags[1297] = false;
   uint64_t cpu$csrs$misa$oldVal = cpu$csrs$misa;
   cpu$csrs$misa = (reset ? 0x800000000014112d
                          : (cpu$csrs$_T_36 ? cpu$csrs$misa : (cpu$csrs$_T_37 ? cpu$memory$csr_d3_r : cpu$csrs$misa)));
   if (cpu$csrs$misa$oldVal != cpu$csrs$misa) { activeFlags[625] = true; }
 }
-void DiffNewTop::step1298() {
+void Diffnewtop::step1298() {
   activeFlags[1298] = false;
   uint8_t cpu$memory$csr_en3_r$oldVal = cpu$memory$csr_en3_r;
   cpu$memory$csr_en3_r = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$csr_en2_r : cpu$memory$csr_en3_r));
   if (cpu$memory$csr_en3_r$oldVal != cpu$memory$csr_en3_r) { activeFlags[307] = true; }
 }
-void DiffNewTop::step1299() {
+void Diffnewtop::step1299() {
   activeFlags[1299] = false;
   uint64_t cpu$memory$csr_d3_r$oldVal = cpu$memory$csr_d3_r;
   cpu$memory$csr_d3_r = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$csr_d2_r : cpu$memory$csr_d3_r));
@@ -29429,7 +29429,7 @@ void DiffNewTop::step1299() {
     activeFlags[1297] = true;
   }
 }
-void DiffNewTop::step1300() {
+void Diffnewtop::step1300() {
   activeFlags[1300] = false;
   uint16_t cpu$memory$csr_id3_r$oldVal = cpu$memory$csr_id3_r;
   cpu$memory$csr_id3_r = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$csr_id2_r : cpu$memory$csr_id3_r));
@@ -29465,7 +29465,7 @@ void DiffNewTop::step1300() {
     activeFlags[1281] = true;
   }
 }
-void DiffNewTop::step1301() {
+void Diffnewtop::step1301() {
   activeFlags[1301] = false;
   uint8_t cpu$memory$recov2_r$oldVal = cpu$memory$recov2_r;
   cpu$memory$recov2_r =
@@ -29477,33 +29477,33 @@ void DiffNewTop::step1301() {
                     : (cpu$memory$hs1 ? cpu$memory$recov1_r : cpu$memory$recov2_r)));
   if (cpu$memory$recov2_r$oldVal != cpu$memory$recov2_r) { activeFlags[1277] = true; }
 }
-void DiffNewTop::step1302() {
+void Diffnewtop::step1302() {
   activeFlags[1302] = false;
   uint8_t cpu$memory$recov1_r$oldVal = cpu$memory$recov1_r;
   cpu$memory$recov1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$recov_r : cpu$memory$recov1_r));
   if (cpu$memory$recov1_r$oldVal != cpu$memory$recov1_r) { activeFlags[1301] = true; }
 }
-void DiffNewTop::step1303() {
+void Diffnewtop::step1303() {
   activeFlags[1303] = false;
   uint8_t cpu$execute$recov_r$oldVal = cpu$execute$recov_r;
   cpu$execute$recov_r =
       (reset ? 0x0 : (cpu$execute$hs_in ? (cpu$execute$_T_1 ? 0x1 : cpu$readregs$recov_r) : cpu$execute$recov_r));
   if (cpu$execute$recov_r$oldVal != cpu$execute$recov_r) { activeFlags[1302] = true; }
 }
-void DiffNewTop::step1304() {
+void Diffnewtop::step1304() {
   activeFlags[1304] = false;
   uint8_t cpu$readregs$recov_r$oldVal = cpu$readregs$recov_r;
   cpu$readregs$recov_r =
       (reset ? 0x0 : (cpu$readregs$hs_in ? (cpu$readregs$_T ? 0x1 : cpu$forwading$recov_r) : cpu$readregs$recov_r));
   if (cpu$readregs$recov_r$oldVal != cpu$readregs$recov_r) { activeFlags[1303] = true; }
 }
-void DiffNewTop::step1305() {
+void Diffnewtop::step1305() {
   activeFlags[1305] = false;
   uint8_t cpu$forwading$recov_r$oldVal = cpu$forwading$recov_r;
   cpu$forwading$recov_r = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$recov_r : cpu$forwading$recov_r));
   if (cpu$forwading$recov_r$oldVal != cpu$forwading$recov_r) { activeFlags[1304] = true; }
 }
-void DiffNewTop::step1306() {
+void Diffnewtop::step1306() {
   activeFlags[1306] = false;
   uint8_t cpu$forwading$swap_r$oldVal = cpu$forwading$swap_r;
   cpu$forwading$swap_r = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$swap_r : cpu$forwading$swap_r));
@@ -29513,56 +29513,56 @@ void DiffNewTop::step1306() {
     activeFlags[1178] = true;
   }
 }
-void DiffNewTop::step1307() {
+void Diffnewtop::step1307() {
   activeFlags[1307] = false;
   uint8_t cpu$readregs$indi_r$oldVal = cpu$readregs$indi_r;
   cpu$readregs$indi_r = (reset ? 0x0 : (cpu$readregs$hs_in ? cpu$forwading$indi_r : cpu$readregs$indi_r));
   if (cpu$readregs$indi_r$oldVal != cpu$readregs$indi_r) { activeFlags[975] = true; }
 }
-void DiffNewTop::step1308() {
+void Diffnewtop::step1308() {
   activeFlags[1308] = false;
   uint8_t cpu$forwading$indi_r$oldVal = cpu$forwading$indi_r;
   cpu$forwading$indi_r = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$indi_r : cpu$forwading$indi_r));
   if (cpu$forwading$indi_r$oldVal != cpu$forwading$indi_r) { activeFlags[1307] = true; }
 }
-void DiffNewTop::step1309() {
+void Diffnewtop::step1309() {
   activeFlags[1309] = false;
   uint8_t cpu$memory$special2_r$oldVal = cpu$memory$special2_r;
   cpu$memory$special2_r = (reset ? 0x0 : (cpu$memory$hs1 ? cpu$memory$special1_r : cpu$memory$special2_r));
   if (cpu$memory$special2_r$oldVal != cpu$memory$special2_r) { activeFlags[1280] = true; }
 }
-void DiffNewTop::step1310() {
+void Diffnewtop::step1310() {
   activeFlags[1310] = false;
   uint8_t cpu$memory$special1_r$oldVal = cpu$memory$special1_r;
   cpu$memory$special1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$special_r : cpu$memory$special1_r));
   if (cpu$memory$special1_r$oldVal != cpu$memory$special1_r) { activeFlags[1309] = true; }
 }
-void DiffNewTop::step1311() {
+void Diffnewtop::step1311() {
   activeFlags[1311] = false;
   uint8_t cpu$execute$special_r$oldVal = cpu$execute$special_r;
   cpu$execute$special_r = (reset ? 0x0 : (cpu$execute$hs_in ? cpu$readregs$special_r : cpu$execute$special_r));
   if (cpu$execute$special_r$oldVal != cpu$execute$special_r) { activeFlags[1310] = true; }
 }
-void DiffNewTop::step1312() {
+void Diffnewtop::step1312() {
   activeFlags[1312] = false;
   uint8_t cpu$readregs$special_r$oldVal = cpu$readregs$special_r;
   cpu$readregs$special_r =
       (reset ? 0x0 : (cpu$readregs$hs_in ? (cpu$readregs$_T ? 0x0 : cpu$forwading$special_r) : cpu$readregs$special_r));
   if (cpu$readregs$special_r$oldVal != cpu$readregs$special_r) { activeFlags[1311] = true; }
 }
-void DiffNewTop::step1313() {
+void Diffnewtop::step1313() {
   activeFlags[1313] = false;
   uint8_t cpu$forwading$special_r$oldVal = cpu$forwading$special_r;
   cpu$forwading$special_r = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$special_r : cpu$forwading$special_r));
   if (cpu$forwading$special_r$oldVal != cpu$forwading$special_r) { activeFlags[1312] = true; }
 }
-void DiffNewTop::step1314() {
+void Diffnewtop::step1314() {
   activeFlags[1314] = false;
   uint8_t cpu$execute$forceJmp$valid$oldVal = cpu$execute$forceJmp$valid;
   cpu$execute$forceJmp$valid = (reset ? 0x0 : (cpu$execute$_T_13 ? (cpu$execute$_T_18 ? 0x1 : 0x0) : 0x0));
   if (cpu$execute$forceJmp$valid$oldVal != cpu$execute$forceJmp$valid) { activeFlags[1162] = true; }
 }
-void DiffNewTop::step1315() {
+void Diffnewtop::step1315() {
   activeFlags[1315] = false;
   uint8_t cpu$readregs$jmp_type_r$oldVal = cpu$readregs$jmp_type_r;
   cpu$readregs$jmp_type_r =
@@ -29574,13 +29574,13 @@ void DiffNewTop::step1315() {
     activeFlags[585] = true;
   }
 }
-void DiffNewTop::step1316() {
+void Diffnewtop::step1316() {
   activeFlags[1316] = false;
   uint8_t cpu$forwading$jmp_type_r$oldVal = cpu$forwading$jmp_type_r;
   cpu$forwading$jmp_type_r = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$jmp_type_r : cpu$forwading$jmp_type_r));
   if (cpu$forwading$jmp_type_r$oldVal != cpu$forwading$jmp_type_r) { activeFlags[1315] = true; }
 }
-void DiffNewTop::step1317() {
+void Diffnewtop::step1317() {
   activeFlags[1317] = false;
   uint64_t cpu$forwading$dst_d_r$oldVal = cpu$forwading$dst_d_r;
   cpu$forwading$dst_d_r = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$dst_d_r : cpu$forwading$dst_d_r));
@@ -29590,13 +29590,13 @@ void DiffNewTop::step1317() {
     activeFlags[1178] = true;
   }
 }
-void DiffNewTop::step1318() {
+void Diffnewtop::step1318() {
   activeFlags[1318] = false;
   uint8_t cpu$forwading$dst_r$oldVal = cpu$forwading$dst_r;
   cpu$forwading$dst_r = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$dst_r : cpu$forwading$dst_r));
   if (cpu$forwading$dst_r$oldVal != cpu$forwading$dst_r) { activeFlags[967] = true; }
 }
-void DiffNewTop::step1319() {
+void Diffnewtop::step1319() {
   activeFlags[1319] = false;
   uint8_t cpu$readregs$ctrl_r$brType$oldVal = cpu$readregs$ctrl_r$brType;
   cpu$readregs$ctrl_r$brType = (reset ? 0x0
@@ -29604,14 +29604,14 @@ void DiffNewTop::step1319() {
                                                             : cpu$readregs$ctrl_r$brType));
   if (cpu$readregs$ctrl_r$brType$oldVal != cpu$readregs$ctrl_r$brType) { activeFlags[583] = true; }
 }
-void DiffNewTop::step1320() {
+void Diffnewtop::step1320() {
   activeFlags[1320] = false;
   uint8_t cpu$forwading$ctrl_r$brType$oldVal = cpu$forwading$ctrl_r$brType;
   cpu$forwading$ctrl_r$brType =
       (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$ctrl_r$brType : cpu$forwading$ctrl_r$brType));
   if (cpu$forwading$ctrl_r$brType$oldVal != cpu$forwading$ctrl_r$brType) { activeFlags[1319] = true; }
 }
-void DiffNewTop::step1321() {
+void Diffnewtop::step1321() {
   activeFlags[1321] = false;
   uint8_t cpu$memory$csr_en2_r$oldVal = cpu$memory$csr_en2_r;
   cpu$memory$csr_en2_r =
@@ -29623,13 +29623,13 @@ void DiffNewTop::step1321() {
                     : (cpu$memory$hs1 ? cpu$memory$csr_en1_r : cpu$memory$csr_en2_r)));
   if (cpu$memory$csr_en2_r$oldVal != cpu$memory$csr_en2_r) { activeFlags[1298] = true; }
 }
-void DiffNewTop::step1322() {
+void Diffnewtop::step1322() {
   activeFlags[1322] = false;
   uint8_t cpu$memory$csr_en1_r$oldVal = cpu$memory$csr_en1_r;
   cpu$memory$csr_en1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$ctrl_r$writeCSREn : cpu$memory$csr_en1_r));
   if (cpu$memory$csr_en1_r$oldVal != cpu$memory$csr_en1_r) { activeFlags[1321] = true; }
 }
-void DiffNewTop::step1323() {
+void Diffnewtop::step1323() {
   activeFlags[1323] = false;
   uint8_t cpu$execute$ctrl_r$writeCSREn$oldVal = cpu$execute$ctrl_r$writeCSREn;
   cpu$execute$ctrl_r$writeCSREn =
@@ -29638,7 +29638,7 @@ void DiffNewTop::step1323() {
                                   : cpu$execute$ctrl_r$writeCSREn));
   if (cpu$execute$ctrl_r$writeCSREn$oldVal != cpu$execute$ctrl_r$writeCSREn) { activeFlags[1322] = true; }
 }
-void DiffNewTop::step1324() {
+void Diffnewtop::step1324() {
   activeFlags[1324] = false;
   uint8_t cpu$readregs$ctrl_r$writeCSREn$oldVal = cpu$readregs$ctrl_r$writeCSREn;
   cpu$readregs$ctrl_r$writeCSREn =
@@ -29650,7 +29650,7 @@ void DiffNewTop::step1324() {
     activeFlags[1323] = true;
   }
 }
-void DiffNewTop::step1325() {
+void Diffnewtop::step1325() {
   activeFlags[1325] = false;
   uint8_t cpu$readregs$ctrl_r$writeRegEn$oldVal = cpu$readregs$ctrl_r$writeRegEn;
   cpu$readregs$ctrl_r$writeRegEn =
@@ -29659,20 +29659,20 @@ void DiffNewTop::step1325() {
                                    : cpu$readregs$ctrl_r$writeRegEn));
   if (cpu$readregs$ctrl_r$writeRegEn$oldVal != cpu$readregs$ctrl_r$writeRegEn) { activeFlags[974] = true; }
 }
-void DiffNewTop::step1326() {
+void Diffnewtop::step1326() {
   activeFlags[1326] = false;
   uint8_t cpu$execute$excep_r$en$oldVal = cpu$execute$excep_r$en;
   cpu$execute$excep_r$en =
       (reset ? 0x0 : (cpu$execute$hs_in ? (cpu$execute$_T_1 ? 0x1 : cpu$readregs$excep_r$en) : cpu$execute$excep_r$en));
   if (cpu$execute$excep_r$en$oldVal != cpu$execute$excep_r$en) { activeFlags[979] = true; }
 }
-void DiffNewTop::step1327() {
+void Diffnewtop::step1327() {
   activeFlags[1327] = false;
   uint8_t cpu$execute$stall_r$oldVal = cpu$execute$stall_r;
   cpu$execute$stall_r = (reset ? 0x0 : (cpu$execute$hs_in ? (cpu$execute$_T_1 ? 0x1 : 0x0) : 0x0));
   if (cpu$execute$stall_r$oldVal != cpu$execute$stall_r) { activeFlags[937] = true; }
 }
-void DiffNewTop::step1328() {
+void Diffnewtop::step1328() {
   activeFlags[1328] = false;
   uint8_t cpu$readregs$ctrl_r$dcMode$oldVal = cpu$readregs$ctrl_r$dcMode;
   cpu$readregs$ctrl_r$dcMode = (reset ? 0x0
@@ -29685,31 +29685,31 @@ void DiffNewTop::step1328() {
     activeFlags[1196] = true;
   }
 }
-void DiffNewTop::step1329() {
+void Diffnewtop::step1329() {
   activeFlags[1329] = false;
   uint64_t cpu$memory$csr_d2_r$oldVal = cpu$memory$csr_d2_r;
   cpu$memory$csr_d2_r = (reset ? 0x0 : (cpu$memory$hs1 ? cpu$memory$csr_d1_r : cpu$memory$csr_d2_r));
   if (cpu$memory$csr_d2_r$oldVal != cpu$memory$csr_d2_r) { activeFlags[1299] = true; }
 }
-void DiffNewTop::step1330() {
+void Diffnewtop::step1330() {
   activeFlags[1330] = false;
   uint64_t cpu$memory$csr_d1_r$oldVal = cpu$memory$csr_d1_r;
   cpu$memory$csr_d1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$csr_d_r : cpu$memory$csr_d1_r));
   if (cpu$memory$csr_d1_r$oldVal != cpu$memory$csr_d1_r) { activeFlags[1329] = true; }
 }
-void DiffNewTop::step1331() {
+void Diffnewtop::step1331() {
   activeFlags[1331] = false;
   uint64_t cpu$execute$csr_d_r$oldVal = cpu$execute$csr_d_r;
   cpu$execute$csr_d_r = (reset ? 0x0 : (cpu$execute$hs_in ? cpu$execute$alu_out : cpu$execute$csr_d_r));
   if (cpu$execute$csr_d_r$oldVal != cpu$execute$csr_d_r) { activeFlags[1330] = true; }
 }
-void DiffNewTop::step1332() {
+void Diffnewtop::step1332() {
   activeFlags[1332] = false;
   uint64_t cpu$memory$mem_addr1_r$oldVal = cpu$memory$mem_addr1_r;
   cpu$memory$mem_addr1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$mem_addr_r : cpu$memory$mem_addr1_r));
   if (cpu$memory$mem_addr1_r$oldVal != cpu$memory$mem_addr1_r) { activeFlags[507] = true; }
 }
-void DiffNewTop::step1333() {
+void Diffnewtop::step1333() {
   activeFlags[1333] = false;
   uint64_t cpu$execute$mem_addr_r$oldVal = cpu$execute$mem_addr_r;
   cpu$execute$mem_addr_r = (reset ? 0x0 : (cpu$execute$hs_in ? cpu$execute$alu_out : cpu$execute$mem_addr_r));
@@ -29718,13 +29718,13 @@ void DiffNewTop::step1333() {
     activeFlags[1332] = true;
   }
 }
-void DiffNewTop::step1334() {
+void Diffnewtop::step1334() {
   activeFlags[1334] = false;
   uint8_t cpu$execute$alu64_r$oldVal = cpu$execute$alu64_r;
   cpu$execute$alu64_r = (reset ? 0x0 : (cpu$execute$hs_in ? cpu$execute$alu64 : cpu$execute$alu64_r));
   if (cpu$execute$alu64_r$oldVal != cpu$execute$alu64_r) { activeFlags[579] = true; }
 }
-void DiffNewTop::step1335() {
+void Diffnewtop::step1335() {
   activeFlags[1335] = false;
   uint8_t cpu$execute$alu$divider$pre_alu64$oldVal = cpu$execute$alu$divider$pre_alu64;
   cpu$execute$alu$divider$pre_alu64 =
@@ -29734,7 +29734,7 @@ void DiffNewTop::step1335() {
                     : cpu$execute$alu$divider$pre_alu64));
   if (cpu$execute$alu$divider$pre_alu64$oldVal != cpu$execute$alu$divider$pre_alu64) { activeFlags[579] = true; }
 }
-void DiffNewTop::step1336() {
+void Diffnewtop::step1336() {
   activeFlags[1336] = false;
   uint8_t cpu$execute$alu$divider$rem_sign$oldVal = cpu$execute$alu$divider$rem_sign;
   cpu$execute$alu$divider$rem_sign =
@@ -29746,7 +29746,7 @@ void DiffNewTop::step1336() {
                     : cpu$execute$alu$divider$rem_sign));
   if (cpu$execute$alu$divider$rem_sign$oldVal != cpu$execute$alu$divider$rem_sign) { activeFlags[579] = true; }
 }
-void DiffNewTop::step1337() {
+void Diffnewtop::step1337() {
   activeFlags[1337] = false;
   uint8_t cpu$execute$alu$divider$qua_sign$oldVal = cpu$execute$alu$divider$qua_sign;
   cpu$execute$alu$divider$qua_sign =
@@ -29760,7 +29760,7 @@ void DiffNewTop::step1337() {
                                            : cpu$execute$alu$divider$qua_sign));
   if (cpu$execute$alu$divider$qua_sign$oldVal != cpu$execute$alu$divider$qua_sign) { activeFlags[579] = true; }
 }
-void DiffNewTop::step1338() {
+void Diffnewtop::step1338() {
   activeFlags[1338] = false;
   uint64_t cpu$execute$alu$divider$quatient$oldVal = cpu$execute$alu$divider$quatient;
   cpu$execute$alu$divider$quatient =
@@ -29783,7 +29783,7 @@ void DiffNewTop::step1338() {
     activeFlags[1338] = true;
   }
 }
-void DiffNewTop::step1339() {
+void Diffnewtop::step1339() {
   activeFlags[1339] = false;
   uint128_t cpu$execute$alu$divider$val2$oldVal = cpu$execute$alu$divider$val2;
   cpu$execute$alu$divider$val2 =
@@ -29808,7 +29808,7 @@ void DiffNewTop::step1339() {
     activeFlags[1339] = true;
   }
 }
-void DiffNewTop::step1340() {
+void Diffnewtop::step1340() {
   activeFlags[1340] = false;
   uint64_t cpu$execute$alu$multiplier$out_r$oldVal = cpu$execute$alu$multiplier$out_r;
   cpu$execute$alu$multiplier$out_r =
@@ -29848,7 +29848,7 @@ void DiffNewTop::step1340() {
                          : cpu$execute$alu$multiplier$out_r)));
   if (cpu$execute$alu$multiplier$out_r$oldVal != cpu$execute$alu$multiplier$out_r) { activeFlags[579] = true; }
 }
-void DiffNewTop::step1341() {
+void Diffnewtop::step1341() {
   activeFlags[1341] = false;
   uint64_t cpu$execute$alu$multiplier$val2$oldVal = cpu$execute$alu$multiplier$val2;
   cpu$execute$alu$multiplier$val2 =
@@ -29858,7 +29858,7 @@ void DiffNewTop::step1341() {
                     : cpu$execute$alu$multiplier$val2));
   if (cpu$execute$alu$multiplier$val2$oldVal != cpu$execute$alu$multiplier$val2) { activeFlags[1340] = true; }
 }
-void DiffNewTop::step1342() {
+void Diffnewtop::step1342() {
   activeFlags[1342] = false;
   uint64_t cpu$execute$alu$multiplier$val1$oldVal = cpu$execute$alu$multiplier$val1;
   cpu$execute$alu$multiplier$val1 =
@@ -29868,7 +29868,7 @@ void DiffNewTop::step1342() {
                     : cpu$execute$alu$multiplier$val1));
   if (cpu$execute$alu$multiplier$val1$oldVal != cpu$execute$alu$multiplier$val1) { activeFlags[1340] = true; }
 }
-void DiffNewTop::step1343() {
+void Diffnewtop::step1343() {
   activeFlags[1343] = false;
   uint8_t cpu$readregs$ctrl_r$aluWidth$oldVal = cpu$readregs$ctrl_r$aluWidth;
   cpu$readregs$ctrl_r$aluWidth = (reset ? 0x0
@@ -29876,7 +29876,7 @@ void DiffNewTop::step1343() {
                                                               : cpu$readregs$ctrl_r$aluWidth));
   if (cpu$readregs$ctrl_r$aluWidth$oldVal != cpu$readregs$ctrl_r$aluWidth) { activeFlags[570] = true; }
 }
-void DiffNewTop::step1344() {
+void Diffnewtop::step1344() {
   activeFlags[1344] = false;
   uint8_t cpu$execute$drop_alu$oldVal = cpu$execute$drop_alu;
   cpu$execute$drop_alu =
@@ -29886,7 +29886,7 @@ void DiffNewTop::step1344() {
                                  : ((cpu$execute$state != 0x0) ? 0x1 : cpu$execute$drop_alu)));
   if (cpu$execute$drop_alu$oldVal != cpu$execute$drop_alu) { activeFlags[976] = true; }
 }
-void DiffNewTop::step1345() {
+void Diffnewtop::step1345() {
   activeFlags[1345] = false;
   uint8_t cpu$execute$alu$pre_aluop$oldVal = cpu$execute$alu$pre_aluop;
   cpu$execute$alu$pre_aluop =
@@ -29895,7 +29895,7 @@ void DiffNewTop::step1345() {
                                    : cpu$execute$alu$pre_aluop));
   if (cpu$execute$alu$pre_aluop$oldVal != cpu$execute$alu$pre_aluop) { activeFlags[579] = true; }
 }
-void DiffNewTop::step1346() {
+void Diffnewtop::step1346() {
   activeFlags[1346] = false;
   uint8_t cpu$execute$alu$multiplier$aluop_r$oldVal = cpu$execute$alu$multiplier$aluop_r;
   cpu$execute$alu$multiplier$aluop_r =
@@ -29905,7 +29905,7 @@ void DiffNewTop::step1346() {
                                               : cpu$execute$alu$multiplier$aluop_r));
   if (cpu$execute$alu$multiplier$aluop_r$oldVal != cpu$execute$alu$multiplier$aluop_r) { activeFlags[1340] = true; }
 }
-void DiffNewTop::step1347() {
+void Diffnewtop::step1347() {
   activeFlags[1347] = false;
   uint8_t cpu$execute$alu$multiplier$state$oldVal = cpu$execute$alu$multiplier$state;
   cpu$execute$alu$multiplier$state =
@@ -29918,7 +29918,7 @@ void DiffNewTop::step1347() {
     activeFlags[558] = true;
   }
 }
-void DiffNewTop::step1348() {
+void Diffnewtop::step1348() {
   activeFlags[1348] = false;
   uint8_t cpu$execute$alu$state$oldVal = cpu$execute$alu$state;
   cpu$execute$alu$state =
@@ -29937,7 +29937,7 @@ void DiffNewTop::step1348() {
     activeFlags[549] = true;
   }
 }
-void DiffNewTop::step1349() {
+void Diffnewtop::step1349() {
   activeFlags[1349] = false;
   uint8_t cpu$readregs$ctrl_r$aluOp$oldVal = cpu$readregs$ctrl_r$aluOp;
   cpu$readregs$ctrl_r$aluOp =
@@ -29955,7 +29955,7 @@ void DiffNewTop::step1349() {
     activeFlags[1346] = true;
   }
 }
-void DiffNewTop::step1350() {
+void Diffnewtop::step1350() {
   activeFlags[1350] = false;
   uint8_t cpu$readregs$excep_r$en$oldVal = cpu$readregs$excep_r$en;
   cpu$readregs$excep_r$en =
@@ -29966,13 +29966,13 @@ void DiffNewTop::step1350() {
     activeFlags[1326] = true;
   }
 }
-void DiffNewTop::step1351() {
+void Diffnewtop::step1351() {
   activeFlags[1351] = false;
   uint8_t cpu$readregs$stall_r$oldVal = cpu$readregs$stall_r;
   cpu$readregs$stall_r = (reset ? 0x0 : (cpu$readregs$hs_in ? (cpu$readregs$_T ? 0x1 : 0x0) : 0x0));
   if (cpu$readregs$stall_r$oldVal != cpu$readregs$stall_r) { activeFlags[937] = true; }
 }
-void DiffNewTop::step1352() {
+void Diffnewtop::step1352() {
   activeFlags[1352] = false;
   uint8_t cpu$forwading$ctrl_r$writeCSREn$oldVal = cpu$forwading$ctrl_r$writeCSREn;
   cpu$forwading$ctrl_r$writeCSREn =
@@ -29983,35 +29983,35 @@ void DiffNewTop::step1352() {
     activeFlags[1324] = true;
   }
 }
-void DiffNewTop::step1353() {
+void Diffnewtop::step1353() {
   activeFlags[1353] = false;
   uint8_t cpu$forwading$ctrl_r$writeRegEn$oldVal = cpu$forwading$ctrl_r$writeRegEn;
   cpu$forwading$ctrl_r$writeRegEn =
       (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$ctrl_r$writeRegEn : cpu$forwading$ctrl_r$writeRegEn));
   if (cpu$forwading$ctrl_r$writeRegEn$oldVal != cpu$forwading$ctrl_r$writeRegEn) { activeFlags[1325] = true; }
 }
-void DiffNewTop::step1354() {
+void Diffnewtop::step1354() {
   activeFlags[1354] = false;
   uint8_t cpu$forwading$ctrl_r$dcMode$oldVal = cpu$forwading$ctrl_r$dcMode;
   cpu$forwading$ctrl_r$dcMode =
       (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$ctrl_r$dcMode : cpu$forwading$ctrl_r$dcMode));
   if (cpu$forwading$ctrl_r$dcMode$oldVal != cpu$forwading$ctrl_r$dcMode) { activeFlags[1328] = true; }
 }
-void DiffNewTop::step1355() {
+void Diffnewtop::step1355() {
   activeFlags[1355] = false;
   uint8_t cpu$forwading$ctrl_r$aluWidth$oldVal = cpu$forwading$ctrl_r$aluWidth;
   cpu$forwading$ctrl_r$aluWidth =
       (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$ctrl_r$aluWidth : cpu$forwading$ctrl_r$aluWidth));
   if (cpu$forwading$ctrl_r$aluWidth$oldVal != cpu$forwading$ctrl_r$aluWidth) { activeFlags[1343] = true; }
 }
-void DiffNewTop::step1356() {
+void Diffnewtop::step1356() {
   activeFlags[1356] = false;
   uint8_t cpu$forwading$ctrl_r$aluOp$oldVal = cpu$forwading$ctrl_r$aluOp;
   cpu$forwading$ctrl_r$aluOp =
       (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$ctrl_r$aluOp : cpu$forwading$ctrl_r$aluOp));
   if (cpu$forwading$ctrl_r$aluOp$oldVal != cpu$forwading$ctrl_r$aluOp) { activeFlags[1349] = true; }
 }
-void DiffNewTop::step1357() {
+void Diffnewtop::step1357() {
   activeFlags[1357] = false;
   uint8_t cpu$forwading$excep_r$en$oldVal = cpu$forwading$excep_r$en;
   cpu$forwading$excep_r$en = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$excep_r$en : cpu$forwading$excep_r$en));
@@ -30020,19 +30020,19 @@ void DiffNewTop::step1357() {
     activeFlags[1350] = true;
   }
 }
-void DiffNewTop::step1358() {
+void Diffnewtop::step1358() {
   activeFlags[1358] = false;
   uint64_t cpu$memory$pc3_r$oldVal = cpu$memory$pc3_r;
   cpu$memory$pc3_r = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$pc2_r : cpu$memory$pc3_r));
   if (cpu$memory$pc3_r$oldVal != cpu$memory$pc3_r) { activeFlags[1275] = true; }
 }
-void DiffNewTop::step1359() {
+void Diffnewtop::step1359() {
   activeFlags[1359] = false;
   uint64_t cpu$memory$pc2_r$oldVal = cpu$memory$pc2_r;
   cpu$memory$pc2_r = (reset ? 0x0 : (cpu$memory$hs1 ? cpu$memory$pc1_r : cpu$memory$pc2_r));
   if (cpu$memory$pc2_r$oldVal != cpu$memory$pc2_r) { activeFlags[1358] = true; }
 }
-void DiffNewTop::step1360() {
+void Diffnewtop::step1360() {
   activeFlags[1360] = false;
   uint64_t cpu$memory$pc1_r$oldVal = cpu$memory$pc1_r;
   cpu$memory$pc1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$pc_r : cpu$memory$pc1_r));
@@ -30041,13 +30041,13 @@ void DiffNewTop::step1360() {
     activeFlags[1359] = true;
   }
 }
-void DiffNewTop::step1361() {
+void Diffnewtop::step1361() {
   activeFlags[1361] = false;
   uint64_t cpu$execute$pc_r$oldVal = cpu$execute$pc_r;
   cpu$execute$pc_r = (reset ? 0x0 : (cpu$execute$hs_in ? cpu$readregs$pc_r : cpu$execute$pc_r));
   if (cpu$execute$pc_r$oldVal != cpu$execute$pc_r) { activeFlags[1360] = true; }
 }
-void DiffNewTop::step1362() {
+void Diffnewtop::step1362() {
   activeFlags[1362] = false;
   uint64_t cpu$readregs$pc_r$oldVal = cpu$readregs$pc_r;
   cpu$readregs$pc_r = (reset ? 0x0 : (cpu$readregs$hs_in ? cpu$forwading$pc_r : cpu$readregs$pc_r));
@@ -30057,7 +30057,7 @@ void DiffNewTop::step1362() {
     activeFlags[1361] = true;
   }
 }
-void DiffNewTop::step1363() {
+void Diffnewtop::step1363() {
   activeFlags[1363] = false;
   uint64_t cpu$forwading$pc_r$oldVal = cpu$forwading$pc_r;
   cpu$forwading$pc_r = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$pc_r : cpu$forwading$pc_r));
@@ -30066,13 +30066,13 @@ void DiffNewTop::step1363() {
     activeFlags[1362] = true;
   }
 }
-void DiffNewTop::step1364() {
+void Diffnewtop::step1364() {
   activeFlags[1364] = false;
   uint32_t cpu$memory$inst2_r$oldVal = cpu$memory$inst2_r;
   cpu$memory$inst2_r = (reset ? 0x0 : (cpu$memory$hs1 ? cpu$memory$inst1_r : cpu$memory$inst2_r));
   if (cpu$memory$inst2_r$oldVal != cpu$memory$inst2_r) { activeFlags[1246] = true; }
 }
-void DiffNewTop::step1365() {
+void Diffnewtop::step1365() {
   activeFlags[1365] = false;
   uint32_t cpu$memory$inst1_r$oldVal = cpu$memory$inst1_r;
   cpu$memory$inst1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$inst_r : cpu$memory$inst1_r));
@@ -30081,13 +30081,13 @@ void DiffNewTop::step1365() {
     activeFlags[1364] = true;
   }
 }
-void DiffNewTop::step1366() {
+void Diffnewtop::step1366() {
   activeFlags[1366] = false;
   uint32_t cpu$execute$inst_r$oldVal = cpu$execute$inst_r;
   cpu$execute$inst_r = (reset ? 0x0 : (cpu$execute$hs_in ? cpu$readregs$inst_r : cpu$execute$inst_r));
   if (cpu$execute$inst_r$oldVal != cpu$execute$inst_r) { activeFlags[1365] = true; }
 }
-void DiffNewTop::step1367() {
+void Diffnewtop::step1367() {
   activeFlags[1367] = false;
   uint32_t cpu$readregs$inst_r$oldVal = cpu$readregs$inst_r;
   cpu$readregs$inst_r = (reset ? 0x0 : (cpu$readregs$hs_in ? cpu$forwading$inst_r : cpu$readregs$inst_r));
@@ -30096,7 +30096,7 @@ void DiffNewTop::step1367() {
     activeFlags[1366] = true;
   }
 }
-void DiffNewTop::step1368() {
+void Diffnewtop::step1368() {
   activeFlags[1368] = false;
   uint32_t cpu$forwading$inst_r$oldVal = cpu$forwading$inst_r;
   cpu$forwading$inst_r = (reset ? 0x0 : (cpu$forwading$hs_in ? cpu$decode$inst_r : cpu$forwading$inst_r));
@@ -30105,7 +30105,7 @@ void DiffNewTop::step1368() {
     activeFlags[1367] = true;
   }
 }
-void DiffNewTop::step1369() {
+void Diffnewtop::step1369() {
   activeFlags[1369] = false;
   uint8_t cpu$decode$recov_r$oldVal = cpu$decode$recov_r;
   cpu$decode$recov_r =
@@ -30141,7 +30141,7 @@ void DiffNewTop::step1369() {
                                   : cpu$decode$recov_r))));
   if (cpu$decode$recov_r$oldVal != cpu$decode$recov_r) { activeFlags[1305] = true; }
 }
-void DiffNewTop::step1370() {
+void Diffnewtop::step1370() {
   activeFlags[1370] = false;
   uint8_t cpu$decode$indi_r$oldVal = cpu$decode$indi_r;
   cpu$decode$indi_r =
@@ -30158,7 +30158,7 @@ void DiffNewTop::step1370() {
                                               : cpu$decode$indi_r))));
   if (cpu$decode$indi_r$oldVal != cpu$decode$indi_r) { activeFlags[1308] = true; }
 }
-void DiffNewTop::step1371() {
+void Diffnewtop::step1371() {
   activeFlags[1371] = false;
   uint8_t cpu$decode$swap_r$oldVal = cpu$decode$swap_r;
   cpu$decode$swap_r =
@@ -30174,7 +30174,7 @@ void DiffNewTop::step1371() {
                                             : cpu$decode$swap_r))));
   if (cpu$decode$swap_r$oldVal != cpu$decode$swap_r) { activeFlags[1306] = true; }
 }
-void DiffNewTop::step1372() {
+void Diffnewtop::step1372() {
   activeFlags[1372] = false;
   uint8_t cpu$decode$special_r$oldVal = cpu$decode$special_r;
   cpu$decode$special_r =
@@ -30186,7 +30186,7 @@ void DiffNewTop::step1372() {
                                                            : cpu$decode$special_r))));
   if (cpu$decode$special_r$oldVal != cpu$decode$special_r) { activeFlags[1313] = true; }
 }
-void DiffNewTop::step1373() {
+void Diffnewtop::step1373() {
   activeFlags[1373] = false;
   uint8_t cpu$decode$jmp_type_r$oldVal = cpu$decode$jmp_type_r;
   cpu$decode$jmp_type_r =
@@ -30224,7 +30224,7 @@ void DiffNewTop::step1373() {
                                 : cpu$decode$jmp_type_r))));
   if (cpu$decode$jmp_type_r$oldVal != cpu$decode$jmp_type_r) { activeFlags[1316] = true; }
 }
-void DiffNewTop::step1374() {
+void Diffnewtop::step1374() {
   activeFlags[1374] = false;
   uint64_t cpu$decode$dst_d_r$oldVal = cpu$decode$dst_d_r;
   cpu$decode$dst_d_r =
@@ -30319,7 +30319,7 @@ void DiffNewTop::step1374() {
                          : cpu$decode$dst_d_r)));
   if (cpu$decode$dst_d_r$oldVal != cpu$decode$dst_d_r) { activeFlags[1317] = true; }
 }
-void DiffNewTop::step1375() {
+void Diffnewtop::step1375() {
   activeFlags[1375] = false;
   uint8_t cpu$decode$dst_r$oldVal = cpu$decode$dst_r;
   cpu$decode$dst_r =
@@ -30343,7 +30343,7 @@ void DiffNewTop::step1375() {
     activeFlags[1318] = true;
   }
 }
-void DiffNewTop::step1376() {
+void Diffnewtop::step1376() {
   activeFlags[1376] = false;
   uint64_t cpu$decode$rs2_d_r$oldVal = cpu$decode$rs2_d_r;
   cpu$decode$rs2_d_r =
@@ -30411,7 +30411,7 @@ void DiffNewTop::step1376() {
                          : cpu$decode$rs2_d_r)));
   if (cpu$decode$rs2_d_r$oldVal != cpu$decode$rs2_d_r) { activeFlags[960] = true; }
 }
-void DiffNewTop::step1377() {
+void Diffnewtop::step1377() {
   activeFlags[1377] = false;
   uint64_t cpu$decode$rs1_d_r$oldVal = cpu$decode$rs1_d_r;
   cpu$decode$rs1_d_r =
@@ -30457,7 +30457,7 @@ void DiffNewTop::step1377() {
                                      : cpu$decode$rs1_d_r)));
   if (cpu$decode$rs1_d_r$oldVal != cpu$decode$rs1_d_r) { activeFlags[957] = true; }
 }
-void DiffNewTop::step1378() {
+void Diffnewtop::step1378() {
   activeFlags[1378] = false;
   uint8_t cpu$decode$ctrl_r$brType$oldVal = cpu$decode$ctrl_r$brType;
   cpu$decode$ctrl_r$brType =
@@ -30482,7 +30482,7 @@ void DiffNewTop::step1378() {
                                 : cpu$decode$ctrl_r$brType))));
   if (cpu$decode$ctrl_r$brType$oldVal != cpu$decode$ctrl_r$brType) { activeFlags[1320] = true; }
 }
-void DiffNewTop::step1379() {
+void Diffnewtop::step1379() {
   activeFlags[1379] = false;
   uint8_t cpu$decode$ctrl_r$writeCSREn$oldVal = cpu$decode$ctrl_r$writeCSREn;
   cpu$decode$ctrl_r$writeCSREn =
@@ -30493,7 +30493,7 @@ void DiffNewTop::step1379() {
                                         : (cpu$decode$_T_8 ? cpu$decode$instType_6 : cpu$decode$ctrl_r$writeCSREn))));
   if (cpu$decode$ctrl_r$writeCSREn$oldVal != cpu$decode$ctrl_r$writeCSREn) { activeFlags[1352] = true; }
 }
-void DiffNewTop::step1380() {
+void Diffnewtop::step1380() {
   activeFlags[1380] = false;
   uint8_t cpu$decode$ctrl_r$writeRegEn$oldVal = cpu$decode$ctrl_r$writeRegEn;
 cpu$decode$ctrl_r$writeRegEn = (reset? 0x0 : (cpu$decode$_T_70? 0x0 : (cpu$decode$_T_43? (cpu$decode$_instType_c_T_2? 0x1 : (cpu$decode$_instType_c_T_4? 0x1 : (cpu$decode$_instType_c_T_6? 0x1 : (cpu$decode$_instType_c_T_8? 0x0 : (cpu$decode$_instType_c_T_10? 0x0 : (cpu$decode$_instType_c_T_12? 0x1 : (cpu$decode$_instType_c_T_14? 0x1 : (cpu$decode$_instType_c_T_16? 0x1 : (cpu$decode$_instType_c_T_18? 0x1 : (cpu$decode$_instType_c_T_20? 0x1 : (cpu$decode$_instType_c_T_22? 0x1 : (cpu$decode$_instType_c_T_24? 0x1 : (cpu$decode$_instType_c_T_26? 0x1 : (cpu$decode$_instType_c_T_28? 0x1 : (cpu$decode$_instType_c_T_30? 0x1 : (cpu$decode$_instType_c_T_32? 0x1 : (cpu$decode$_instType_c_T_34? 0x1 : (cpu$decode$_instType_c_T_36? 0x1 : (cpu$decode$_instType_c_T_38? 0x1 : (cpu$decode$_instType_c_T_40? 0x0 : (cpu$decode$_instType_c_T_42? 0x0 : (cpu$decode$_instType_c_T_44? 0x0 : (cpu$decode$_instType_c_T_46? 0x1 : (cpu$decode$_instType_c_T_48? 0x1 : (cpu$decode$_instType_c_T_50? 0x1 : (cpu$decode$_instType_c_T_52? 0x0 : (cpu$decode$_instType_c_T_54? 0x1 : (cpu$decode$_instType_c_T_56? 0x1 : (cpu$decode$_instType_c_T_58? 0x1 : 0x0))))))))))))))))))))))))))))) : (cpu$decode$_T_8? (cpu$decode$_instType_T_1? 0x1 : (cpu$decode$_instType_T_3? 0x1 : (cpu$decode$_instType_T_5? 0x1 : (cpu$decode$_instType_T_7? 0x1 : (cpu$decode$_instType_T_9? 0x0 : (cpu$decode$_instType_T_11? 0x0 : (cpu$decode$_instType_T_13? 0x0 : (cpu$decode$_instType_T_15? 0x0 : (cpu$decode$_instType_T_17? 0x0 : (cpu$decode$_instType_T_19? 0x0 : (cpu$decode$_instType_T_21? 0x1 : (cpu$decode$_instType_T_23? 0x1 : (cpu$decode$_instType_T_25? 0x1 : (cpu$decode$_instType_T_27? 0x1 : (cpu$decode$_instType_T_29? 0x1 : (cpu$decode$_instType_T_31? 0x1 : (cpu$decode$_instType_T_33? 0x1 : (cpu$decode$_instType_T_35? 0x0 : (cpu$decode$_instType_T_37? 0x0 : (cpu$decode$_instType_T_39? 0x0 : (cpu$decode$_instType_T_41? 0x0 : (cpu$decode$_instType_T_43? 0x1 : (cpu$decode$_instType_T_45? 0x1 : (cpu$decode$_instType_T_47? 0x1 : (cpu$decode$_instType_T_49? 0x1 : (cpu$decode$_instType_T_51? 0x1 : (cpu$decode$_instType_T_53? 0x1 : (cpu$decode$_instType_T_55? 0x1 : (cpu$decode$_instType_T_57? 0x1 : (cpu$decode$_instType_T_59? 0x1 : (cpu$decode$_instType_T_61? 0x1 : (cpu$decode$_instType_T_63? 0x1 : (cpu$decode$_instType_T_65? 0x1 : (cpu$decode$_instType_T_67? 0x1 : (cpu$decode$_instType_T_69? 0x1 : (cpu$decode$_instType_T_71? 0x1 : (cpu$decode$_instType_T_73? 0x1 : (cpu$decode$_instType_T_75? 0x1 : (cpu$decode$_instType_T_77? 0x1 : (cpu$decode$_instType_T_79? 0x1 : (cpu$decode$_instType_T_81? 0x1 : (cpu$decode$_instType_T_83? 0x1 : (cpu$decode$_instType_T_85? 0x1 : (cpu$decode$_instType_T_87? 0x1 : (cpu$decode$_instType_T_89? 0x1 : (cpu$decode$_instType_T_91? 0x1 : (cpu$decode$_instType_T_93? 0x1 : (cpu$decode$_instType_T_95? 0x1 : (cpu$decode$_instType_T_97? 0x1 : (cpu$decode$_instType_T_99? 0x1 : (cpu$decode$_instType_T_101? 0x1 : (cpu$decode$_instType_T_103? 0x1 : (cpu$decode$_instType_T_105? 0x1 : (cpu$decode$_instType_T_107? 0x1 : (cpu$decode$_instType_T_109? 0x1 : (cpu$decode$_instType_T_111? 0x1 : (cpu$decode$_instType_T_113? 0x1 : (cpu$decode$_instType_T_115? 0x1 : (cpu$decode$_instType_T_117? 0x1 : (cpu$decode$_instType_T_119? 0x1 : (cpu$decode$_instType_T_121? 0x1 : (cpu$decode$_instType_T_123? 0x1 : (cpu$decode$_instType_T_125? 0x1 : (cpu$decode$_instType_T_127? 0x1 : (cpu$decode$_instType_T_129? 0x1 : (cpu$decode$_instType_T_131? 0x1 : (cpu$decode$_instType_T_133? 0x1 : (cpu$decode$_instType_T_135? 0x1 : (cpu$decode$_instType_T_137? 0x1 : (cpu$decode$_instType_T_139? 0x1 : (cpu$decode$_instType_T_141? 0x1 : (cpu$decode$_instType_T_143? 0x1 : (cpu$decode$_instType_T_145? 0x1 : (cpu$decode$_instType_T_147? 0x1 : (cpu$decode$_instType_T_149? 0x1 : (cpu$decode$_instType_T_151? 0x1 : (cpu$decode$_instType_T_153? 0x1 : (cpu$decode$_instType_T_155? 0x1 : (cpu$decode$_instType_T_157? 0x1 : (cpu$decode$_instType_T_159? 0x1 : (cpu$decode$_instType_T_161? 0x1 : (cpu$decode$_instType_T_163? 0x1 : (cpu$decode$_instType_T_165? 0x1 : (cpu$decode$_instType_T_167? 0x1 : (cpu$decode$_instType_T_169? 0x1 : (cpu$decode$_instType_T_171? 0x1 : (cpu$decode$_instType_T_173? 0x1 : (cpu$decode$_instType_T_175? 0x1 : (cpu$decode$_instType_T_177? 0x1 : (cpu$decode$_instType_T_179? 0x1 : 0x0)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) : cpu$decode$ctrl_r$writeRegEn))));
@@ -30502,25 +30502,25 @@ if (cpu$decode$ctrl_r$writeRegEn$oldVal != cpu$decode$ctrl_r$writeRegEn) {
   activeFlags[1353] = true;
 }
 }
-void DiffNewTop::step1381() {
+void Diffnewtop::step1381() {
   activeFlags[1381] = false;
   uint8_t cpu$decode$ctrl_r$dcMode$oldVal = cpu$decode$ctrl_r$dcMode;
 cpu$decode$ctrl_r$dcMode = (reset? 0x0 : (cpu$decode$_T_70? 0x0 : (cpu$decode$_T_43? (cpu$decode$_instType_c_T_2? 0x0 : (cpu$decode$_instType_c_T_4? 0x6 : (cpu$decode$_instType_c_T_6? 0x7 : (cpu$decode$_instType_c_T_8? 0xa : (cpu$decode$_instType_c_T_10? 0xb : (cpu$decode$_instType_c_T_12? 0x0 : (cpu$decode$_instType_c_T_14? 0x0 : (cpu$decode$_instType_c_T_16? 0x0 : (cpu$decode$_instType_c_T_18? 0x0 : (cpu$decode$_instType_c_T_20? 0x0 : (cpu$decode$_instType_c_T_22? 0x0 : (cpu$decode$_instType_c_T_24? 0x0 : (cpu$decode$_instType_c_T_26? 0x0 : (cpu$decode$_instType_c_T_28? 0x0 : (cpu$decode$_instType_c_T_30? 0x0 : (cpu$decode$_instType_c_T_32? 0x0 : (cpu$decode$_instType_c_T_34? 0x0 : (cpu$decode$_instType_c_T_36? 0x0 : (cpu$decode$_instType_c_T_38? 0x0 : (cpu$decode$_instType_c_T_40? 0x0 : (cpu$decode$_instType_c_T_42? 0x0 : (cpu$decode$_instType_c_T_44? 0x0 : (cpu$decode$_instType_c_T_46? 0x0 : (cpu$decode$_instType_c_T_48? 0x6 : (cpu$decode$_instType_c_T_50? 0x7 : (cpu$decode$_instType_c_T_52? 0x0 : (cpu$decode$_instType_c_T_54? 0x0 : (cpu$decode$_instType_c_T_56? 0x0 : (cpu$decode$_instType_c_T_58? 0x0 : (cpu$decode$_instType_c_T_60? 0xa : (cpu$decode$_instType_c_T_62? 0xb : 0x0))))))))))))))))))))))))))))))) : (cpu$decode$_T_8? (cpu$decode$_instType_T_1? 0x0 : (cpu$decode$_instType_T_3? 0x0 : (cpu$decode$_instType_T_5? 0x0 : (cpu$decode$_instType_T_7? 0x0 : (cpu$decode$_instType_T_9? 0x0 : (cpu$decode$_instType_T_11? 0x0 : (cpu$decode$_instType_T_13? 0x0 : (cpu$decode$_instType_T_15? 0x0 : (cpu$decode$_instType_T_17? 0x0 : (cpu$decode$_instType_T_19? 0x0 : (cpu$decode$_instType_T_21? 0x4 : (cpu$decode$_instType_T_23? 0x5 : (cpu$decode$_instType_T_25? 0x6 : (cpu$decode$_instType_T_27? 0x7 : (cpu$decode$_instType_T_29? 0x14 : (cpu$decode$_instType_T_31? 0x15 : (cpu$decode$_instType_T_33? 0x16 : (cpu$decode$_instType_T_35? 0x8 : (cpu$decode$_instType_T_37? 0x9 : (cpu$decode$_instType_T_39? 0xa : (cpu$decode$_instType_T_41? 0xb : (cpu$decode$_instType_T_43? 0x0 : (cpu$decode$_instType_T_45? 0x0 : (cpu$decode$_instType_T_47? 0x0 : (cpu$decode$_instType_T_49? 0x0 : (cpu$decode$_instType_T_51? 0x0 : (cpu$decode$_instType_T_53? 0x0 : (cpu$decode$_instType_T_55? 0x0 : (cpu$decode$_instType_T_57? 0x0 : (cpu$decode$_instType_T_59? 0x0 : (cpu$decode$_instType_T_61? 0x0 : (cpu$decode$_instType_T_63? 0x0 : (cpu$decode$_instType_T_65? 0x0 : (cpu$decode$_instType_T_67? 0x0 : (cpu$decode$_instType_T_69? 0x0 : (cpu$decode$_instType_T_71? 0x0 : (cpu$decode$_instType_T_73? 0x0 : (cpu$decode$_instType_T_75? 0x0 : (cpu$decode$_instType_T_77? 0x0 : (cpu$decode$_instType_T_79? 0x0 : (cpu$decode$_instType_T_81? 0x0 : (cpu$decode$_instType_T_83? 0x0 : (cpu$decode$_instType_T_85? 0x0 : (cpu$decode$_instType_T_87? 0x0 : (cpu$decode$_instType_T_89? 0x0 : (cpu$decode$_instType_T_91? 0x0 : (cpu$decode$_instType_T_93? 0x0 : (cpu$decode$_instType_T_95? 0x0 : (cpu$decode$_instType_T_97? 0x0 : (cpu$decode$_instType_T_99? 0x0 : (cpu$decode$_instType_T_101? 0x0 : (cpu$decode$_instType_T_103? 0x0 : (cpu$decode$_instType_T_105? 0x0 : (cpu$decode$_instType_T_107? 0x0 : (cpu$decode$_instType_T_109? 0x0 : (cpu$decode$_instType_T_111? 0x0 : (cpu$decode$_instType_T_113? 0x0 : (cpu$decode$_instType_T_115? 0x0 : (cpu$decode$_instType_T_117? 0x0 : (cpu$decode$_instType_T_119? 0x0 : (cpu$decode$_instType_T_121? 0x0 : (cpu$decode$_instType_T_123? 0x0 : (cpu$decode$_instType_T_125? 0x0 : (cpu$decode$_instType_T_127? 0x0 : (cpu$decode$_instType_T_129? 0x0 : (cpu$decode$_instType_T_131? 0x0 : (cpu$decode$_instType_T_133? 0x0 : (cpu$decode$_instType_T_135? 0x0 : (cpu$decode$_instType_T_137? 0x6 : (cpu$decode$_instType_T_139? 0xa : (cpu$decode$_instType_T_141? 0xe : (cpu$decode$_instType_T_143? 0xe : (cpu$decode$_instType_T_145? 0xe : (cpu$decode$_instType_T_147? 0xe : (cpu$decode$_instType_T_149? 0xe : (cpu$decode$_instType_T_151? 0xe : (cpu$decode$_instType_T_153? 0xe : (cpu$decode$_instType_T_155? 0xe : (cpu$decode$_instType_T_157? 0xe : (cpu$decode$_instType_T_159? 0x7 : (cpu$decode$_instType_T_161? 0xb : (cpu$decode$_instType_T_163? 0xf : (cpu$decode$_instType_T_165? 0xf : (cpu$decode$_instType_T_167? 0xf : (cpu$decode$_instType_T_169? 0xf : (cpu$decode$_instType_T_171? 0xf : (cpu$decode$_instType_T_173? 0xf : (cpu$decode$_instType_T_175? 0xf : (cpu$decode$_instType_T_177? 0xf : (cpu$decode$_instType_T_179? 0xf : 0x0)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) : cpu$decode$ctrl_r$dcMode))));
 if (cpu$decode$ctrl_r$dcMode$oldVal != cpu$decode$ctrl_r$dcMode) { activeFlags[1354] = true; }
 }
-void DiffNewTop::step1382() {
+void Diffnewtop::step1382() {
   activeFlags[1382] = false;
   uint8_t cpu$decode$ctrl_r$aluWidth$oldVal = cpu$decode$ctrl_r$aluWidth;
 cpu$decode$ctrl_r$aluWidth = (reset? 0x0 : (cpu$decode$_T_70? 0x0 : (cpu$decode$_T_43? (cpu$decode$_instType_c_T_2? 0x0 : (cpu$decode$_instType_c_T_4? 0x0 : (cpu$decode$_instType_c_T_6? 0x0 : (cpu$decode$_instType_c_T_8? 0x0 : (cpu$decode$_instType_c_T_10? 0x0 : (cpu$decode$_instType_c_T_12? 0x0 : (cpu$decode$_instType_c_T_14? 0x1 : (cpu$decode$_instType_c_T_16? 0x0 : (cpu$decode$_instType_c_T_18? 0x0 : (cpu$decode$_instType_c_T_20? 0x0 : (cpu$decode$_instType_c_T_22? 0x0 : (cpu$decode$_instType_c_T_24? 0x0 : (cpu$decode$_instType_c_T_26? 0x0 : (cpu$decode$_instType_c_T_28? 0x0 : (cpu$decode$_instType_c_T_30? 0x0 : (cpu$decode$_instType_c_T_32? 0x0 : (cpu$decode$_instType_c_T_34? 0x0 : (cpu$decode$_instType_c_T_36? 0x1 : (cpu$decode$_instType_c_T_38? 0x1 : 0x0))))))))))))))))))) : (cpu$decode$_T_8? (cpu$decode$_instType_T_1? 0x0 : (cpu$decode$_instType_T_3? 0x0 : (cpu$decode$_instType_T_5? 0x0 : (cpu$decode$_instType_T_7? 0x0 : (cpu$decode$_instType_T_9? 0x0 : (cpu$decode$_instType_T_11? 0x0 : (cpu$decode$_instType_T_13? 0x0 : (cpu$decode$_instType_T_15? 0x0 : (cpu$decode$_instType_T_17? 0x0 : (cpu$decode$_instType_T_19? 0x0 : (cpu$decode$_instType_T_21? 0x0 : (cpu$decode$_instType_T_23? 0x0 : (cpu$decode$_instType_T_25? 0x0 : (cpu$decode$_instType_T_27? 0x0 : (cpu$decode$_instType_T_29? 0x0 : (cpu$decode$_instType_T_31? 0x0 : (cpu$decode$_instType_T_33? 0x0 : (cpu$decode$_instType_T_35? 0x0 : (cpu$decode$_instType_T_37? 0x0 : (cpu$decode$_instType_T_39? 0x0 : (cpu$decode$_instType_T_41? 0x0 : (cpu$decode$_instType_T_43? 0x0 : (cpu$decode$_instType_T_45? 0x0 : (cpu$decode$_instType_T_47? 0x0 : (cpu$decode$_instType_T_49? 0x0 : (cpu$decode$_instType_T_51? 0x0 : (cpu$decode$_instType_T_53? 0x0 : (cpu$decode$_instType_T_55? 0x0 : (cpu$decode$_instType_T_57? 0x0 : (cpu$decode$_instType_T_59? 0x0 : (cpu$decode$_instType_T_61? 0x0 : (cpu$decode$_instType_T_63? 0x0 : (cpu$decode$_instType_T_65? 0x0 : (cpu$decode$_instType_T_67? 0x0 : (cpu$decode$_instType_T_69? 0x0 : (cpu$decode$_instType_T_71? 0x0 : (cpu$decode$_instType_T_73? 0x0 : (cpu$decode$_instType_T_75? 0x0 : (cpu$decode$_instType_T_77? 0x0 : (cpu$decode$_instType_T_79? 0x0 : (cpu$decode$_instType_T_81? 0x0 : (cpu$decode$_instType_T_83? 0x0 : (cpu$decode$_instType_T_85? 0x0 : (cpu$decode$_instType_T_87? 0x0 : (cpu$decode$_instType_T_89? 0x0 : (cpu$decode$_instType_T_91? 0x0 : (cpu$decode$_instType_T_93? 0x0 : (cpu$decode$_instType_T_95? 0x0 : (cpu$decode$_instType_T_97? 0x1 : (cpu$decode$_instType_T_99? 0x1 : (cpu$decode$_instType_T_101? 0x1 : (cpu$decode$_instType_T_103? 0x1 : (cpu$decode$_instType_T_105? 0x1 : (cpu$decode$_instType_T_107? 0x1 : (cpu$decode$_instType_T_109? 0x1 : (cpu$decode$_instType_T_111? 0x1 : (cpu$decode$_instType_T_113? 0x1 : (cpu$decode$_instType_T_115? 0x1 : (cpu$decode$_instType_T_117? 0x1 : (cpu$decode$_instType_T_119? 0x1 : (cpu$decode$_instType_T_121? 0x1 : (cpu$decode$_instType_T_123? 0x1 : 0x0)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) : cpu$decode$ctrl_r$aluWidth))));
 if (cpu$decode$ctrl_r$aluWidth$oldVal != cpu$decode$ctrl_r$aluWidth) { activeFlags[1355] = true; }
 }
-void DiffNewTop::step1383() {
+void Diffnewtop::step1383() {
   activeFlags[1383] = false;
   uint8_t cpu$decode$ctrl_r$aluOp$oldVal = cpu$decode$ctrl_r$aluOp;
 cpu$decode$ctrl_r$aluOp = (reset? 0x0 : (cpu$decode$_T_70? 0x0 : (cpu$decode$_T_43? (cpu$decode$_instType_c_T_2? 0x3 : (cpu$decode$_instType_c_T_4? 0x3 : (cpu$decode$_instType_c_T_6? 0x3 : (cpu$decode$_instType_c_T_8? 0x3 : (cpu$decode$_instType_c_T_10? 0x3 : (cpu$decode$_instType_c_T_12? 0x3 : (cpu$decode$_instType_c_T_14? 0x3 : (cpu$decode$_instType_c_T_16? 0x2 : (cpu$decode$_instType_c_T_18? 0x3 : (cpu$decode$_instType_c_T_20? 0x2 : (cpu$decode$_instType_c_T_22? 0x8 : (cpu$decode$_instType_c_T_24? 0x9 : (cpu$decode$_instType_c_T_26? 0x6 : (cpu$decode$_instType_c_T_28? 0xa : (cpu$decode$_instType_c_T_30? 0x4 : (cpu$decode$_instType_c_T_32? 0x5 : (cpu$decode$_instType_c_T_34? 0x6 : (cpu$decode$_instType_c_T_36? 0xa : (cpu$decode$_instType_c_T_38? 0x3 : (cpu$decode$_instType_c_T_40? 0x2 : (cpu$decode$_instType_c_T_42? 0x0 : (cpu$decode$_instType_c_T_44? 0x0 : (cpu$decode$_instType_c_T_46? 0x7 : (cpu$decode$_instType_c_T_48? 0x3 : (cpu$decode$_instType_c_T_50? 0x3 : (cpu$decode$_instType_c_T_52? 0x1 : (cpu$decode$_instType_c_T_54? 0x2 : (cpu$decode$_instType_c_T_56? 0x2 : (cpu$decode$_instType_c_T_58? 0x3 : (cpu$decode$_instType_c_T_60? 0x3 : (cpu$decode$_instType_c_T_62? 0x3 : 0x0))))))))))))))))))))))))))))))) : (cpu$decode$_T_8? (cpu$decode$_instType_T_1? 0x1 : (cpu$decode$_instType_T_3? 0x3 : (cpu$decode$_instType_T_5? 0x2 : (cpu$decode$_instType_T_7? 0x2 : (cpu$decode$_instType_T_9? 0x0 : (cpu$decode$_instType_T_11? 0x0 : (cpu$decode$_instType_T_13? 0x0 : (cpu$decode$_instType_T_15? 0x0 : (cpu$decode$_instType_T_17? 0x0 : (cpu$decode$_instType_T_19? 0x0 : (cpu$decode$_instType_T_21? 0x3 : (cpu$decode$_instType_T_23? 0x3 : (cpu$decode$_instType_T_25? 0x3 : (cpu$decode$_instType_T_27? 0x3 : (cpu$decode$_instType_T_29? 0x3 : (cpu$decode$_instType_T_31? 0x3 : (cpu$decode$_instType_T_33? 0x3 : (cpu$decode$_instType_T_35? 0x3 : (cpu$decode$_instType_T_37? 0x3 : (cpu$decode$_instType_T_39? 0x3 : (cpu$decode$_instType_T_41? 0x3 : (cpu$decode$_instType_T_43? 0x3 : (cpu$decode$_instType_T_45? 0xb : (cpu$decode$_instType_T_47? 0xc : (cpu$decode$_instType_T_49? 0x4 : (cpu$decode$_instType_T_51? 0x5 : (cpu$decode$_instType_T_53? 0x6 : (cpu$decode$_instType_T_55? 0x7 : (cpu$decode$_instType_T_57? 0x8 : (cpu$decode$_instType_T_59? 0x9 : (cpu$decode$_instType_T_61? 0x3 : (cpu$decode$_instType_T_63? 0xa : (cpu$decode$_instType_T_65? 0x7 : (cpu$decode$_instType_T_67? 0xb : (cpu$decode$_instType_T_69? 0xc : (cpu$decode$_instType_T_71? 0x4 : (cpu$decode$_instType_T_73? 0x8 : (cpu$decode$_instType_T_75? 0x9 : (cpu$decode$_instType_T_77? 0x5 : (cpu$decode$_instType_T_79? 0x6 : (cpu$decode$_instType_T_81? 0xd : (cpu$decode$_instType_T_83? 0xe : (cpu$decode$_instType_T_85? 0xf : (cpu$decode$_instType_T_87? 0x10 : (cpu$decode$_instType_T_89? 0x11 : (cpu$decode$_instType_T_91? 0x12 : (cpu$decode$_instType_T_93? 0x13 : (cpu$decode$_instType_T_95? 0x14 : (cpu$decode$_instType_T_97? 0xd : (cpu$decode$_instType_T_99? 0x11 : (cpu$decode$_instType_T_101? 0x12 : (cpu$decode$_instType_T_103? 0x13 : (cpu$decode$_instType_T_105? 0x14 : (cpu$decode$_instType_T_107? 0x3 : (cpu$decode$_instType_T_109? 0x7 : (cpu$decode$_instType_T_111? 0x8 : (cpu$decode$_instType_T_113? 0x9 : (cpu$decode$_instType_T_115? 0x3 : (cpu$decode$_instType_T_117? 0xa : (cpu$decode$_instType_T_119? 0x7 : (cpu$decode$_instType_T_121? 0x8 : (cpu$decode$_instType_T_123? 0x9 : (cpu$decode$_instType_T_125? 0x1 : (cpu$decode$_instType_T_127? 0x5 : (cpu$decode$_instType_T_129? 0x15 : (cpu$decode$_instType_T_131? 0x1 : (cpu$decode$_instType_T_133? 0x5 : (cpu$decode$_instType_T_135? 0x15 : (cpu$decode$_instType_T_137? 0x1 : (cpu$decode$_instType_T_139? 0x1 : (cpu$decode$_instType_T_141? 0x1 : (cpu$decode$_instType_T_143? 0x1 : (cpu$decode$_instType_T_145? 0x1 : (cpu$decode$_instType_T_147? 0x1 : (cpu$decode$_instType_T_149? 0x1 : (cpu$decode$_instType_T_151? 0x1 : (cpu$decode$_instType_T_153? 0x1 : (cpu$decode$_instType_T_155? 0x1 : (cpu$decode$_instType_T_157? 0x1 : (cpu$decode$_instType_T_159? 0x1 : (cpu$decode$_instType_T_161? 0x1 : (cpu$decode$_instType_T_163? 0x1 : (cpu$decode$_instType_T_165? 0x1 : (cpu$decode$_instType_T_167? 0x1 : (cpu$decode$_instType_T_169? 0x1 : (cpu$decode$_instType_T_171? 0x1 : (cpu$decode$_instType_T_173? 0x1 : (cpu$decode$_instType_T_175? 0x1 : (cpu$decode$_instType_T_177? 0x1 : (cpu$decode$_instType_T_179? 0x1 : 0x0)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) : cpu$decode$ctrl_r$aluOp))));
 if (cpu$decode$ctrl_r$aluOp$oldVal != cpu$decode$ctrl_r$aluOp) { activeFlags[1356] = true; }
 }
-void DiffNewTop::step1384() {
+void Diffnewtop::step1384() {
   activeFlags[1384] = false;
   uint8_t cpu$decode$excep_r$en$oldVal = cpu$decode$excep_r$en;
   cpu$decode$excep_r$en =
@@ -30540,7 +30540,7 @@ void DiffNewTop::step1384() {
                                 : cpu$decode$excep_r$en))));
   if (cpu$decode$excep_r$en$oldVal != cpu$decode$excep_r$en) { activeFlags[1357] = true; }
 }
-void DiffNewTop::step1385() {
+void Diffnewtop::step1385() {
   activeFlags[1385] = false;
   uint64_t cpu$decode$pc_r$oldVal = cpu$decode$pc_r;
   cpu$decode$pc_r =
@@ -30550,7 +30550,7 @@ void DiffNewTop::step1385() {
                     : (cpu$decode$_T_43 ? cpu$fetch$pc3_r : (cpu$decode$_T_8 ? cpu$fetch$pc3_r : cpu$decode$pc_r))));
   if (cpu$decode$pc_r$oldVal != cpu$decode$pc_r) { activeFlags[1363] = true; }
 }
-void DiffNewTop::step1386() {
+void Diffnewtop::step1386() {
   activeFlags[1386] = false;
   uint32_t cpu$decode$inst_r$oldVal = cpu$decode$inst_r;
   cpu$decode$inst_r =
@@ -30560,7 +30560,7 @@ void DiffNewTop::step1386() {
                                                      : (cpu$decode$_T_8 ? cpu$fetch$inst_r : cpu$decode$inst_r))));
   if (cpu$decode$inst_r$oldVal != cpu$decode$inst_r) { activeFlags[1368] = true; }
 }
-void DiffNewTop::step1387() {
+void Diffnewtop::step1387() {
   activeFlags[1387] = false;
   uint8_t cpu$decode$stall_r$oldVal = cpu$decode$stall_r;
   cpu$decode$stall_r =
@@ -30609,7 +30609,7 @@ void DiffNewTop::step1387() {
                            : 0x0)));
   if (cpu$decode$stall_r$oldVal != cpu$decode$stall_r) { activeFlags[937] = true; }
 }
-void DiffNewTop::step1388() {
+void Diffnewtop::step1388() {
   activeFlags[1388] = false;
   uint64_t cpu$fetch$pc3_r$oldVal = cpu$fetch$pc3_r;
   cpu$fetch$pc3_r =
@@ -30622,7 +30622,7 @@ void DiffNewTop::step1388() {
     activeFlags[1385] = true;
   }
 }
-void DiffNewTop::step1389() {
+void Diffnewtop::step1389() {
   activeFlags[1389] = false;
   uint8_t cpu$fetch$reset_tlb$oldVal = cpu$fetch$reset_tlb;
   cpu$fetch$reset_tlb =
@@ -30631,7 +30631,7 @@ void DiffNewTop::step1389() {
                                 : ((cpu$tlb_if$out_valid_r | cpu$tlb_if$out_excep_r$en) == 0x0)));
   if (cpu$fetch$reset_tlb$oldVal != cpu$fetch$reset_tlb) { activeFlags[859] = true; }
 }
-void DiffNewTop::step1390() {
+void Diffnewtop::step1390() {
   activeFlags[1390] = false;
   uint8_t cpu$fetch$recov3_r$oldVal = cpu$fetch$recov3_r;
   cpu$fetch$recov3_r =
@@ -30640,20 +30640,20 @@ void DiffNewTop::step1390() {
                                 : cpu$fetch$recov3_r));
   if (cpu$fetch$recov3_r$oldVal != cpu$fetch$recov3_r) { activeFlags[1369] = true; }
 }
-void DiffNewTop::step1391() {
+void Diffnewtop::step1391() {
   activeFlags[1391] = false;
   uint8_t cpu$fetch$stall3_r$oldVal = cpu$fetch$stall3_r;
   cpu$fetch$stall3_r =
       (reset ? 0x0 : (cpu$fetch$_T_28 ? (cpu$fetch$_T_32 ? (cpu$fetch$_T_38 ? 0x1 : 0x0) : 0x0) : 0x0));
   if (cpu$fetch$stall3_r$oldVal != cpu$fetch$stall3_r) { activeFlags[937] = true; }
 }
-void DiffNewTop::step1392() {
+void Diffnewtop::step1392() {
   activeFlags[1392] = false;
   uint8_t cpu$fetch$drop3_r$oldVal = cpu$fetch$drop3_r;
   cpu$fetch$drop3_r = (reset ? 0x0 : (cpu$fetch$_T_28 ? (cpu$fetch$_T_32 ? (cpu$fetch$_T_38 ? 0x1 : 0x0) : 0x0) : 0x0));
   if (cpu$fetch$drop3_r$oldVal != cpu$fetch$drop3_r) { activeFlags[854] = true; }
 }
-void DiffNewTop::step1393() {
+void Diffnewtop::step1393() {
   activeFlags[1393] = false;
   uint8_t cpu$decode$drop_r$oldVal = cpu$decode$drop_r;
   cpu$decode$drop_r =
@@ -30702,7 +30702,7 @@ void DiffNewTop::step1393() {
                            : 0x0)));
   if (cpu$decode$drop_r$oldVal != cpu$decode$drop_r) { activeFlags[659] = true; }
 }
-void DiffNewTop::step1394() {
+void Diffnewtop::step1394() {
   activeFlags[1394] = false;
   uint8_t cpu$forwading$state$oldVal = cpu$forwading$state;
   cpu$forwading$state =
@@ -30723,7 +30723,7 @@ void DiffNewTop::step1394() {
     activeFlags[630] = true;
   }
 }
-void DiffNewTop::step1395() {
+void Diffnewtop::step1395() {
   activeFlags[1395] = false;
   uint8_t cpu$memory$dst_en3_r$oldVal = cpu$memory$dst_en3_r;
   cpu$memory$dst_en3_r = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$dst_en2_r : cpu$memory$dst_en3_r));
@@ -30732,7 +30732,7 @@ void DiffNewTop::step1395() {
     activeFlags[992] = true;
   }
 }
-void DiffNewTop::step1396() {
+void Diffnewtop::step1396() {
   activeFlags[1396] = false;
   uint8_t cpu$memory$dst3_r$oldVal = cpu$memory$dst3_r;
   cpu$memory$dst3_r = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$dst2_r : cpu$memory$dst3_r));
@@ -30742,7 +30742,7 @@ void DiffNewTop::step1396() {
     activeFlags[992] = true;
   }
 }
-void DiffNewTop::step1397() {
+void Diffnewtop::step1397() {
   activeFlags[1397] = false;
   uint8_t cpu$memory$excep3_r$en$oldVal = cpu$memory$excep3_r$en;
   cpu$memory$excep3_r$en = (reset ? 0x0 : (cpu$memory$hs2 ? cpu$memory$excep2_r$en : cpu$memory$excep3_r$en));
@@ -30751,13 +30751,13 @@ void DiffNewTop::step1397() {
     activeFlags[306] = true;
   }
 }
-void DiffNewTop::step1398() {
+void Diffnewtop::step1398() {
   activeFlags[1398] = false;
   uint16_t cpu$memory$csr_id2_r$oldVal = cpu$memory$csr_id2_r;
   cpu$memory$csr_id2_r = (reset ? 0x0 : (cpu$memory$hs1 ? cpu$memory$csr_id1_r : cpu$memory$csr_id2_r));
   if (cpu$memory$csr_id2_r$oldVal != cpu$memory$csr_id2_r) { activeFlags[1300] = true; }
 }
-void DiffNewTop::step1399() {
+void Diffnewtop::step1399() {
   activeFlags[1399] = false;
   uint8_t cpu$memory$dst_en2_r$oldVal = cpu$memory$dst_en2_r;
   cpu$memory$dst_en2_r =
@@ -30797,7 +30797,7 @@ void DiffNewTop::step1399() {
     activeFlags[1395] = true;
   }
 }
-void DiffNewTop::step1400() {
+void Diffnewtop::step1400() {
   activeFlags[1400] = false;
   uint8_t cpu$memory$dst2_r$oldVal = cpu$memory$dst2_r;
   cpu$memory$dst2_r = (reset ? 0x0 : (cpu$memory$hs1 ? cpu$memory$dst1_r : cpu$memory$dst2_r));
@@ -30807,7 +30807,7 @@ void DiffNewTop::step1400() {
     activeFlags[1396] = true;
   }
 }
-void DiffNewTop::step1401() {
+void Diffnewtop::step1401() {
   activeFlags[1401] = false;
   uint8_t cpu$memory$excep2_r$en$oldVal = cpu$memory$excep2_r$en;
   cpu$memory$excep2_r$en =
@@ -30820,13 +30820,13 @@ void DiffNewTop::step1401() {
                   : (cpu$memory$hs1 ? cpu$memory$excep1_r$en : cpu$memory$excep2_r$en)));
   if (cpu$memory$excep2_r$en$oldVal != cpu$memory$excep2_r$en) { activeFlags[1397] = true; }
 }
-void DiffNewTop::step1402() {
+void Diffnewtop::step1402() {
   activeFlags[1402] = false;
   uint16_t cpu$memory$csr_id1_r$oldVal = cpu$memory$csr_id1_r;
   cpu$memory$csr_id1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$csr_id_r : cpu$memory$csr_id1_r));
   if (cpu$memory$csr_id1_r$oldVal != cpu$memory$csr_id1_r) { activeFlags[1398] = true; }
 }
-void DiffNewTop::step1403() {
+void Diffnewtop::step1403() {
   activeFlags[1403] = false;
   uint8_t cpu$memory$dst_en1_r$oldVal = cpu$memory$dst_en1_r;
   cpu$memory$dst_en1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$ctrl_r$writeRegEn : cpu$memory$dst_en1_r));
@@ -30835,7 +30835,7 @@ void DiffNewTop::step1403() {
     activeFlags[1399] = true;
   }
 }
-void DiffNewTop::step1404() {
+void Diffnewtop::step1404() {
   activeFlags[1404] = false;
   uint8_t cpu$memory$dst1_r$oldVal = cpu$memory$dst1_r;
   cpu$memory$dst1_r = (reset ? 0x0 : (cpu$memory$hs_in ? cpu$execute$dst_r : cpu$memory$dst1_r));
@@ -30845,14 +30845,14 @@ void DiffNewTop::step1404() {
     activeFlags[1400] = true;
   }
 }
-void DiffNewTop::step1405() {
+void Diffnewtop::step1405() {
   activeFlags[1405] = false;
   uint8_t cpu$memory$stall2_r$oldVal = cpu$memory$stall2_r;
   cpu$memory$stall2_r =
       (reset ? 0x0 : (cpu$memory$_T_24 ? (cpu$memory$hs1 ? (cpu$memory$_T_26 ? 0x1 : 0x0) : 0x0) : 0x0));
   if (cpu$memory$stall2_r$oldVal != cpu$memory$stall2_r) { activeFlags[937] = true; }
 }
-void DiffNewTop::step1406() {
+void Diffnewtop::step1406() {
   activeFlags[1406] = false;
   uint8_t cpu$execute$dst_r$oldVal = cpu$execute$dst_r;
   cpu$execute$dst_r = (reset ? 0x0 : (cpu$execute$hs_in ? cpu$readregs$dst_r : cpu$execute$dst_r));
@@ -30862,19 +30862,19 @@ void DiffNewTop::step1406() {
     activeFlags[1404] = true;
   }
 }
-void DiffNewTop::step1407() {
+void Diffnewtop::step1407() {
   activeFlags[1407] = false;
   uint16_t cpu$execute$csr_id_r$oldVal = cpu$execute$csr_id_r;
   cpu$execute$csr_id_r = (reset ? 0x0 : (cpu$execute$hs_in ? cpu$readregs$rs2_r : cpu$execute$csr_id_r));
   if (cpu$execute$csr_id_r$oldVal != cpu$execute$csr_id_r) { activeFlags[1402] = true; }
 }
-void DiffNewTop::step1408() {
+void Diffnewtop::step1408() {
   activeFlags[1408] = false;
   uint16_t cpu$readregs$rs2_r$oldVal = cpu$readregs$rs2_r;
   cpu$readregs$rs2_r = (reset ? 0x0 : (cpu$readregs$hs_in ? cpu$forwading$rs2_r : cpu$readregs$rs2_r));
   if (cpu$readregs$rs2_r$oldVal != cpu$readregs$rs2_r) { activeFlags[1407] = true; }
 }
-void DiffNewTop::step1409() {
+void Diffnewtop::step1409() {
   activeFlags[1409] = false;
   uint8_t cpu$readregs$valid_r$oldVal = cpu$readregs$valid_r;
   cpu$readregs$valid_r = (reset ? 0x0
@@ -30889,7 +30889,7 @@ void DiffNewTop::step1409() {
     activeFlags[590] = true;
   }
 }
-void DiffNewTop::step1410() {
+void Diffnewtop::step1410() {
   activeFlags[1410] = false;
   uint8_t cpu$memCrossbar$data_valid$oldVal = cpu$memCrossbar$data_valid;
   cpu$memCrossbar$data_valid =
@@ -30902,7 +30902,7 @@ void DiffNewTop::step1410() {
                            : cpu$memCrossbar$data_valid)));
   if (cpu$memCrossbar$data_valid$oldVal != cpu$memCrossbar$data_valid) { activeFlags[102] = true; }
 }
-void DiffNewTop::step1411() {
+void Diffnewtop::step1411() {
   activeFlags[1411] = false;
   uint8_t cpu$flash2Axi$out_valid$oldVal = cpu$flash2Axi$out_valid;
   cpu$flash2Axi$out_valid = (reset ? 0x0 : ((cpu$flash2Axi$state == 0x6) | (cpu$flash2Axi$state == 0x3)));
@@ -30911,7 +30911,7 @@ void DiffNewTop::step1411() {
     activeFlags[1095] = true;
   }
 }
-void DiffNewTop::step1412() {
+void Diffnewtop::step1412() {
   activeFlags[1412] = false;
   uint8_t cpu$flash2Axi$wdataEn$oldVal = cpu$flash2Axi$wdataEn;
   cpu$flash2Axi$wdataEn =
@@ -30923,7 +30923,7 @@ void DiffNewTop::step1412() {
                            : (cpu$flash2Axi$_T_8 ? 0x1 : (cpu$flash2Axi$_T_9 ? 0x0 : cpu$flash2Axi$wdataEn)))));
   if (cpu$flash2Axi$wdataEn$oldVal != cpu$flash2Axi$wdataEn) { activeFlags[367] = true; }
 }
-void DiffNewTop::step1414() {
+void Diffnewtop::step1414() {
   activeFlags[1414] = false;
   uint8_t cpu$memory$drop_tlb$oldVal = cpu$memory$drop_tlb;
   cpu$memory$drop_tlb = (reset ? 0x0
@@ -30937,13 +30937,13 @@ void DiffNewTop::step1414() {
     activeFlags[1414] = true;
   }
 }
-void DiffNewTop::step1420() {
+void Diffnewtop::step1420() {
   activeFlags[1420] = false;
   uint8_t cpu$forwading$stall_r$oldVal = cpu$forwading$stall_r;
   cpu$forwading$stall_r = (reset ? 0x0 : cpu$forwading$stall_r);
   if (cpu$forwading$stall_r$oldVal != cpu$forwading$stall_r) { activeFlags[937] = true; }
 }
-void DiffNewTop::step() {
+void Diffnewtop::step() {
   if (unlikely(activeFlags[2])) step2();
   if (unlikely(activeFlags[3])) step3();
   if (unlikely(activeFlags[4])) step4();

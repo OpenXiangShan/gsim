@@ -8,7 +8,7 @@
 #include <fstream>
 
 #if defined(GSIM)
-#include <top.h>
+#include <newtop.h>
 MOD_NAME* mod;
 #endif
 
@@ -83,21 +83,26 @@ void ref_reset(){
 #ifdef GSIM
 void mod_reset() {
   mod->set_reset(1);
+  for (int i = 0; i < 10; i ++) {
+    mod->step();
+  }
   mod->set_reset(0);
 }
 #endif
 #ifdef GSIM_DIFF
 void ref_reset() {
   ref->set_reset(1);
-  ref->step();
+  for (int i = 0; i < 10; i ++)
+    ref->step();
   ref->set_reset(0);
 }
 #endif
 
 #if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
 
+bool checkSig(bool display, REF_NAME* ref, MOD_NAME* mod);
 bool checkSignals(bool display) {
-  #include "../obj/checkSig.h"
+  return checkSig(display, ref, mod);
 }
 #endif
 
@@ -120,9 +125,24 @@ int main(int argc, char** argv) {
   ref_reset();
   ref->step();
 #endif
+#if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
+    bool isDiff = checkSignals(false);
+    if(isDiff) {
+      std::cout << "all Sigs:\n -----------------\n";
+      checkSignals(true);
+      std::cout << "Failed init\nALL diffs: mode -- ref\n";
+      checkSignals(false);
+      return 0;
+    }
+#endif
   std::cout << "start testing.....\n";
+  // printf("size = %lx %lx\n", sizeof(*ref->rootp),
+  // (uintptr_t)&(ref->rootp->newtop__DOT__cpu__DOT__icache__DOT__Ram_bw__DOT__ram__DOT__ram) - (uintptr_t)(ref->rootp));
   bool dut_end = false;
   uint64_t cycles = 0;
+#ifdef PERF
+  FILE* activeFp = fopen(ACTIVE_FILE, "w");
+#endif
   clock_t start = clock();
   while(!dut_end) {
 #ifdef VERILATOR
@@ -133,9 +153,26 @@ int main(int argc, char** argv) {
 #endif
     cycles ++;
 #if (!defined(GSIM) && defined(VERILATOR)) || (defined(GSIM) && !defined(VERILATOR))
-    if(cycles % 1000000 == 0 && cycles < 600000000) {
+    if(cycles % 10000000 == 0 && cycles <= 600000000) {
       clock_t dur = clock() - start;
       printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+#ifdef PERF
+      size_t totalActives = 0;
+      size_t validActives = 0;
+      for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
+        totalActives += mod->activeTimes[i];
+        validActives += mod->validActive[i];
+      }
+      printf("totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
+          totalActives, totalActives / cycles, validActives, validActives / cycles);
+      fprintf(activeFp, "totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
+          totalActives, totalActives / cycles, validActives, validActives / cycles);
+      for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
+        fprintf(activeFp, "%ld: activeTimes %ld validActive %ld\n", i, mod->activeTimes[i], mod->validActive[i]);
+      }
+      if (cycles == 50000000) return 0;
+#endif
+      if (cycles == 600000000) return 0;
     }
 #if 0
     if (cycles % 10000000 == 0 && cycles < 600000000) {

@@ -6,6 +6,10 @@
   #include "syntax.hh"
   #include "Parser.h"
   int curr_indent = 0;
+  int angle_num = 0;
+  int square_num = 0;
+  int bracket_num = 0;
+  int parenthesis_num = 0;
   static int TAB_WIDTH = 2;
   std::stack<int>indentLevels;
   #define YY_USER_INIT { \
@@ -16,7 +20,7 @@
   #define YY_DECL int Parser::Lexical::lex(Parser::Syntax::semantic_type* yylval)
   int Parser::Lexical::lex_debug(Parser::Syntax::semantic_type* yylval) {
     int ret = lex(yylval);
-    std::cout << ret << " " << yytext << std::endl;
+    std::cout << "(" << lineno() << ", " << ret << ") " << yytext << std::endl;
     return ret;
   }
 %}
@@ -35,12 +39,13 @@ int_dec     -?{digit_dec}+
 letter      [A-Za-z]
 id          (_|{letter})(_|{letter}|{digit_dec})*
 string      \"((\\\")|[!|0-9A-Za-z %\\,:=_^.&~\t()-{}$'])*\"
-info        [0-9A-Za-z.{}:,/ _]+
+info        [0-9A-Za-z.{}:,/ _-]+
 /* Fileinfo communicates Chisel source file and line/column info */
 
 /* %x initial */
 %x indent
 %x info
+%x dotId
 %s normal
 
 %%
@@ -74,24 +79,31 @@ info        [0-9A-Za-z.{}:,/ _]+
 <info>{info}* { yylval->strVal = strdup(yytext); return token::Info; }
 <info>"]"       { BEGIN(normal); }
 
+<dotId>{int_dec}|{id} { yylval->name = strdup(yytext); BEGIN(normal); return token::ID; }
+
 <normal>"@"     { BEGIN(info); }
 <normal>"<<"    { return token::DoubleLeft; }
 <normal>">>"    { return token::DoubleRight; }
-<normal>Clock|Reset|AsyncReset  { yylval->typeGround = strdup(yytext); return token::Clock; }
+<normal>Clock                   { yylval->typeGround = strdup(yytext); return token::Clock; }
+<normal>Reset                   { yylval->typeGround = strdup(yytext); return token::Reset; }
+<normal>AsyncReset              { yylval->typeGround = strdup(yytext); return token::AsyReset; }
 <normal>UInt|SInt               { yylval->typeGround = strdup(yytext); return token::IntType; }
 <normal>Analog                  { yylval->typeGround = strdup(yytext); return token::anaType; }
 <normal>Fixed                   { yylval->typeGround = strdup(yytext); return token::FixedType; }
 <normal>flip                    { return token::Flip;}
-<normal>(add|sub|mul|div|rem|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat)[(] { yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E2OP; }
-<normal>(asUInt|asSInt|asClock|asAsyncReset|cvt|neg|not|andr|orr|xorr)[(] { yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1OP; }
-<normal>(pad|shl|shr|head|tail)[(]   { yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1I1OP; }
-<normal>bits[(]                 { yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1I2OP; }
+<normal>(add|sub|mul|div|rem|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat)[(] { parenthesis_num++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E2OP; }
+<normal>(asUInt|asSInt|asClock|asAsyncReset|cvt|neg|not|andr|orr|xorr)[(] { parenthesis_num ++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1OP; }
+<normal>(pad|shl|shr|head|tail)[(]   { parenthesis_num ++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1I1OP; }
+<normal>bits[(]                 { parenthesis_num ++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1I2OP; }
 <normal>mux                     { return token::Mux; }
 <normal>validif                 { return token::Validif; }
 <normal>old|new|undefined       { yylval->typeRUW = strdup(yytext); return token::Ruw; }
 <normal>mem                     { return token::Mem; }
 <normal>{int}                   { yylval->strVal = strndup(yytext+1, strlen(yytext)-2); return token::INT; }
-<normal>{int_dec}                   { yylval->strVal = strdup(yytext); return token::INT; }
+<normal>{int_dec}               { if (angle_num == 0 && square_num == 0 && parenthesis_num == 0 && bracket_num != 0) { \
+                                    yylval->name = strdup(yytext); return token::ID; \
+                                  } \
+                                  yylval->strVal = strdup(yytext); return token::INT; }
 <normal>data-type               { return token::DataType; }
 <normal>depth                   { return token::Depth; }
 <normal>read-latency            { return token::ReadLatency; }
@@ -134,6 +146,15 @@ info        [0-9A-Za-z.{}:,/ _]+
 <normal>"=>"                    { return token::RightArrow; }
 <normal>"<="                    { return token::LeftArrow; }
 <normal>"<-"                    { return token::Leftarrow; }
+<normal>"<"                     { angle_num ++; return yytext[0];}
+<normal>">"                     { angle_num --; return yytext[0];}
+<normal>"["                     { square_num ++; return yytext[0];}
+<normal>"]"                     { square_num --; return yytext[0];}
+<normal>"{"                     { bracket_num ++; return yytext[0];}
+<normal>"}"                     { bracket_num --; return yytext[0];}
+<normal>"("                     { parenthesis_num ++; return yytext[0];}
+<normal>")"                     { parenthesis_num --; return yytext[0];}
+<normal>"."                     { if (lineno() != 1) BEGIN(dotId); return yytext[0]; }
 <normal>[.,:=@%<>()\[\]{}""]    { return yytext[0]; }
 <normal>[ \t]                   { }
 <normal>\n                      { curr_indent = 0; BEGIN(indent); }

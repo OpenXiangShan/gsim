@@ -8,8 +8,6 @@
 
 int p_stoi(const char* str);
 //   int  yylex (yy::parser::value_type* yylval);
-  PNode* newNode(int type, char* info, char* name, int num, ...);
-  PNode* newNode(int type, char* info, PList* plist);
   char* emptyStr = NULL;
 %}
 
@@ -51,7 +49,7 @@ int p_stoi(const char* str);
 %token <strVal> INT String
 %token DoubleLeft "<<"
 %token DoubleRight ">>"
-%token <typeGround> Clock IntType anaType FixedType
+%token <typeGround> Clock Reset IntType anaType FixedType AsyReset
 /* %token <intVal> IntVal */
 
 %token <typeOP> E2OP E1OP E1I1OP E1I2OP  
@@ -94,6 +92,10 @@ ALLID: ID {$$ = $1; }
     | Output { $$ = strdup("output"); }
     | Target { $$ = strdup("target"); }
     | Invalid { $$ = strdup("invalid"); }
+    | Mux { $$ = strdup("mux"); }
+    | Stop { $$ = strdup("stop"); }
+    | Depth {$$ = strdup("depth"); }
+    | Skip {$$ = strdup("skip"); }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
@@ -109,6 +111,8 @@ binary_point:
     | "<<" INT ">>"   { TODO(); }
     ;
 type_ground: Clock    { $$ = new PNode(P_Clock, synlineno()); }
+    | Reset    { $$ = new PNode(P_INT_TYPE, synlineno()); $$->setWidth(1); $$->setSign(0);}
+    | AsyReset    { $$ = new PNode(P_ASYRESET, synlineno()); $$->setWidth(1); $$->setSign(0);}
     | IntType width   { $$ = newNode(P_INT_TYPE, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); }
     | anaType width   { TODO(); }
     | FixedType width binary_point  { TODO(); }
@@ -196,8 +200,8 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5
     | Inst ALLID Of ALLID info    { $$ = newNode(P_INST, synlineno(), $5, $2, 0); $$->appendExtraInfo($4); }
     | Node ALLID '=' expr info { $$ = newNode(P_NODE, synlineno(), $5, $2, 1, $4); }
     | reference "<=" expr info  { $$ = newNode(P_CONNECT, $1->lineno, $4, NULL, 2, $1, $3); }
-    | reference "<-" expr info  { TODO(); }
-    | reference Is Invalid info { $$ = NULL; }
+    | reference "<-" expr info  { $$ = newNode(P_PAR_CONNECT, $1->lineno, $4, NULL, 2, $1, $3); }
+    | reference Is Invalid info { $$ = newNode(P_INVALID, synlineno(), nullptr, 0); $$->setWidth(1); $$ = newNode(P_CONNECT, $1->lineno, $4, NULL, 2, $1, $$); }
     | Attach '(' references ')' info { TODO(); }
     | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $2->lineno, $4, NULL, 3, $2, $6, $8); } /* expected newline before statement */
     | Stop '(' expr ',' expr ',' INT ')' info   { TODO(); }

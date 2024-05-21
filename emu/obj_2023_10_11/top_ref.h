@@ -14,9 +14,9 @@
 #define uint128_t __uint128_t
 #define int128_t __int128_t
 #define UINT128(hi, lo) ((uint128_t)(hi) << 64 | (lo))
-class DiffNewTop{
+class Diffnewtop{
 public:
-DiffNewTop() {
+Diffnewtop() {
 init_functions();
 mpz_init(t0);
 mpz_init(oldValMpz);

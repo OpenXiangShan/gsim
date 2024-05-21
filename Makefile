@@ -14,23 +14,54 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 OBJ_DIR = obj
 $(shell mkdir -p $(OBJ_DIR))
 
-# NAME ?= newtop
-# NAME ?= freechips.rocketchip.system.DefaultConfig
-# NAME ?= Exp1AllTest
-NAME ?= SimTop
+dutName = xiangshan
 
-# EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
-EMU_DIFFTEST = $(EMU_DIR)/emu-NutShell.cpp
+ifeq ($(dutName),ysyx3)
+	NAME ?= newtop
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
+	mainargs = ready-to-run/bin/bbl-hello.bin
+	TEST_FILE = ready-to-run/$(NAME)
+else ifeq ($(dutName),NutShell)
+	NAME ?= SimTop
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
+	mainargs = ready-to-run/bin/linux-NutShell.bin
+	TEST_FILE = ready-to-run/$(NAME)
+else ifeq ($(dutName),rocket)
+	NAME ?= TestHarness
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-rocketchip.cpp
+	mainargs = ready-to-run/bin/linux-rocket.bin
+	TEST_FILE = ready-to-run/$(NAME)
+else ifeq ($(dutName),boom)
+	NAME ?= TestHarness
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
+	mainargs = ready-to-run/bin/linux-rocket.bin
+	TEST_FILE = ready-to-run/$(NAME).LargeBoomConfig
+else ifeq ($(dutName),small-boom)
+	NAME ?= TestHarness
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
+	mainargs = ready-to-run/bin/bbl-test1.bin
+	TEST_FILE = ready-to-run/$(NAME).SmallBoomConfig
+else ifeq ($(dutName),xiangshan)
+	NAME ?= SimTop
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
+	mainargs = ready-to-run/bin/linux-xiangshan.bin
+	TEST_FILE = ready-to-run/$(NAME)-xiangshan
+else ifeq ($(dutName),xiangshan-default)
+	NAME ?= SimTop
+	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
+	mainargs = ready-to-run/bin/linux-xiangshan.bin
+	TEST_FILE = ready-to-run/$(NAME)-xiangshan-default
+endif
 
 MODE ?= 0
-DIFF_VERSION ?= 2023_10_11
+DIFF_VERSION ?= 2024_1_14
+# DIFF_VERSION ?= NutShell
 EVENT_DRIVEN ?= 0
 
-TEST_FILE = ready-to-run/$(NAME)
 
 CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror \
 	-DDST_NAME=\"$(NAME)\" -DEVENT_DRIVEN=$(EVENT_DRIVEN)
-CXX = g++
+CXX = clang++
 TARGET = GraphEmu
 
 FIRRTL_FILE = $(TEST_FILE).hi.fir
@@ -49,60 +80,68 @@ PARSER_OBJS := $(PARSER_SRCS:.cc=.o)
 HEADERS := $(foreach x, $(INCLUDE_DIR), $(wildcard $(addprefix $(x)/*,.h)))
 
 VERI_INC_DIR = $(OBJ_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
-VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME)
-VERI_CFLAGS = -O3 $(addprefix -I../, $(VERI_INC_DIR)) $(MODE_FLAGS)
+VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME) --max-num-width 1048576 --compiler clang # --trace-fst
+VERI_CFLAGS = $(addprefix -I../, $(VERI_INC_DIR)) $(MODE_FLAGS) -fbracket-depth=2048 -Wno-parentheses-equality
 VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\"
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
 VERI_VSRCS += $(addprefix ready-to-run/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v DifftestMemInitializer.v)
-VERI_CSRCS = $(shell find $(OBJ_DIR) $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIFFTEST)
-VERI_HEADER = $(shell find $(OBJ_DIR) -name "*.h")
+VERI_CSRCS = $(shell find $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIFFTEST) $(shell find $(OBJ_DIR)/$(NAME) -name "*.cpp")
+VERI_HEADER = $(OBJ_DIR)/$(NAME).h
 VERI_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(VERI_CSRCS:.cpp=.o))
 
 REF_GSIM_DIR = $(EMU_DIR)/obj_$(DIFF_VERSION)
-REF_GSIM_SRCS = $(REF_GSIM_DIR)/top_ref.cpp
+REF_GSIM_SRCS = $(shell find $(REF_GSIM_DIR)/splitted -name "*.cpp")
 REF_GSIM_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(REF_GSIM_SRCS:.cpp=.o))
 
-GSIM_CFLAGS = -O3 $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME)
+GSIM_CFLAGS = $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME) -DMOD_HEADER=\"$(NAME).h\" -fbracket-depth=2048 \
+			-Wno-parentheses-equality # -ggdb
 
-mainargs = ready-to-run/bin/linux-NutShell.bin
-# mainargs = ready-to-run/bin/bbl-hello.bin
-# mainargs = ysyx3-bin/rtthread.bin
+OPT_FAST = 
 
 ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
 endif
 
+ifeq ($(PERF),1)
+	CXXFLAGS += -DPERF
+	GSIM_CFLAGS += -DPERF -DACTIVE_FILE=\"logs/active-$(dutName).txt\"
+endif
+
 ifeq ($(MODE),0)
 	MODE_FLAGS += -DGSIM
 	target = $(EMU_BUILD_DIR)/S$(NAME)
+	GSIM_CFLAGS += -O3 -Wno-format
 else ifeq ($(MODE), 1)
 	MODE_FLAGS += -DVERILATOR
 	target = ./obj_dir/V$(NAME)
 	VERI_CSRCS = $(EMU_DIFFTEST)
+	VERI_CFLAGS += -O3
+	OPT_FAST += -O3
 else ifeq ($(MODE), 2)
 	MODE_FLAGS += -DGSIM -DVERILATOR
-	CXXFLAGS += -DDIFFTEST_PER_SIG
+	CXXFLAGS += -DDIFFTEST_PER_SIG -DVERILATOR_DIFF
 	target = ./obj_dir/V$(NAME)
-	SIG_COMMAND = python3 scripts/sigFilter.py
+	SIG_COMMAND = python3 scripts/sigFilter.py $(NAME)
 else
 	MODE_FLAGS += -DGSIM -DGSIM_DIFF
 	target = $(EMU_BUILD_DIR)/S$(NAME)_diff
 	CXXFLAGS += -DDIFFTEST_PER_SIG
-	GSIM_CFLAGS += -I$(REF_GSIM_DIR) -DREF_NAME=DiffNewTop
-	SIG_COMMAND = python3 scripts/genSigDiff.py
+	GSIM_CFLAGS += -O0
+	GSIM_CFLAGS += -I$(REF_GSIM_DIR) -DREF_NAME=Diff$(NAME)
+	SIG_COMMAND = python3 scripts/genSigDiff.py $(NAME) $(DIFF_VERSION)
 endif
 
-$(GSIM_BUILD_DIR)/%.o: %.cpp $(PARSER_SRCS)
+$(GSIM_BUILD_DIR)/%.o: %.cpp $(PARSER_SRCS) $(HEADERS) Makefile
 	@mkdir -p $(dir $@) && echo + CXX $<
 	@$(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
 
-$(EMU_BUILD_DIR)/%.o: %.cpp $(VERI_HEADER)
+$(EMU_BUILD_DIR)/%.o: %.cpp $(VERI_HEADER) Makefile
 	@mkdir -p $(dir $@) && echo + CXX $<
 	$(CXX) $< $(GSIM_CFLAGS) -c -o $@
 
 $(TARGET): makedir $(PARSER_OBJS) $(OBJS)
-	$(CXX) $(CXXFLAGS) $(OBJS) $(PARSER_OBJS) -o $(GSIM_BUILD_DIR)/$(TARGET) -lgmp
+	$(CXX) $(CXXFLAGS) -rdynamic $(OBJS) $(PARSER_OBJS) -o $(GSIM_BUILD_DIR)/$(TARGET) -lgmp
 
 makedir:
 	mkdir -p build
@@ -110,7 +149,10 @@ makedir:
 
 compile: $(TARGET)
 	$(GSIM_BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
+	-rm -rf obj/$(NAME)
+	mkdir -p obj/$(NAME)
 	$(SIG_COMMAND)
+	python ./scripts/partition.py obj/$(NAME).cpp obj/$(NAME)
 
 clean:
 	rm -rf obj parser/build obj_dir build
@@ -119,7 +161,7 @@ clean-obj:
 	rm -rf obj_dir
 
 emu: obj/top.cpp $(EMU_SRC)
-	g++ $(EMU_SRC) obj/top.cpp -DMOD_NAME=S$(NAME) -Wl,-lgmp -Iobj -I$(EMU_SRC_DIR) -o $(GSIM_BUILD_DIR)/$(EMU_TARGET)
+	$(CXX) $(EMU_SRC) obj/top.cpp -DMOD_NAME=S$(NAME) -Wl,-lgmp -Iobj -I$(EMU_SRC_DIR) -o $(GSIM_BUILD_DIR)/$(EMU_TARGET)
 	$(GSIM_BUILD_DIR)/$(EMU_TARGET)
 
 # flex & bison
@@ -140,9 +182,9 @@ $(EMU_BUILD_DIR)/S$(NAME)_diff: $(VERI_OBJS) $(REF_GSIM_OBJS)
 	echo $(REF_GSIM_OBJS)
 	$(CXX) $^ $(GSIM_CFLAGS) -lgmp -o $@
 
-./obj_dir/V$(NAME): $(VERI_CSRCS)
-	verilator $(VERI_VFLAGS) -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $^
-	make -s OPT_FAST="-O3" -j -C ./obj_dir -f V$(NAME).mk V$(NAME)
+./obj_dir/V$(NAME): $(VERI_CSRCS) $(VERI_VSRCS) Makefile
+	verilator $(VERI_VFLAGS) +define+RANDOMIZE_GARBAGE_ASSIGN -O3 -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
+	make -s OPT_FAST="$(OPT_FAST)" CXX=clang -j 15 -C ./obj_dir -f V$(NAME).mk V$(NAME)
 
 build-emu: $(target)
 
@@ -169,6 +211,6 @@ gendoc:
 # 	@clang-format -i --style=file $(SRCS) $(HEADERS)
 
 format-obj:
-	@clang-format -i --style=file obj/top.cpp
+	@clang-format -i --style=file obj/$(NAME).cpp
 
 .PHONY: compile clean emu difftest count makedir gendoc format-obj build-emu

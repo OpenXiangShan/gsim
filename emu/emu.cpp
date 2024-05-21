@@ -1,5 +1,5 @@
 #include <iostream>
-#include <top.h>
+#include MOD_HEADER
 
 MOD_NAME* mod;
 

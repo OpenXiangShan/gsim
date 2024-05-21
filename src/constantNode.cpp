@@ -1,480 +1,1056 @@
-/**
- * @file ConstantNode
- * @brief ConstantNode 常量传播
- */
+/*
+  Generator instructions for every nodes in sortedSuperNodes
+  merge constantNode into here
+*/
 
-#include <gmp.h>
+#include <cstdio>
 #include <map>
+#include <gmp.h>
+#include <queue>
 #include <stack>
 #include <tuple>
+#include <utility>
 
 #include "common.h"
-#include "Node.h"
 #include "graph.h"
-#include "PNode.h"
 #include "opFuncs.h"
 
-#define N(i) g->sorted[i]
+#define Child(id, name) getChild(id)->name
+#define ChildCons(id, name) consEMap[getChild(id)]->name
 
-#define POTENTIAL_TYPE(n) (potentialUncheckedType(n) || (n->type == NODE_REG_SRC))
+void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
+static void recomputeAllNodes();
 
-#define EXPR1INT_FUNC_TYPE void (*)(mpz_t & dst, mpz_t & src, mp_bitcnt_t bitcnt, mp_bitcnt_t n)
-#define EXPR1_FUNC_TYPE void (*)(mpz_t & dst, mpz_t & src, mp_bitcnt_t bitcnt)
-#define EXPR2_FUNC_TYPE void (*)(mpz_t & dst, mpz_t & src1, mp_bitcnt_t bitcnt1, mpz_t & src2, mp_bitcnt_t bitcnt2)
+static std::map<Node*, valInfo*> consMap;
+static std::map<ENode*, valInfo*> consEMap;
 
-int p_stoi(const char* str);
-std::pair<int, std::string> strBaseAll(std::string s);
-void checkAndComputeConstant(Node* node);
-void checkRegDst(Node* node);
-static std::set<Node*> checked;
-static int constantNode = 0;
-static int totalNode    = 0;
-
-class mpz_wrap {
- public:
-  mpz_wrap() { mpz_init(a); n = NULL; }
-  mpz_t a;
-  Node* n;
-  std::vector<int>index;
+struct ordercmp {
+  bool operator()(Node* n1, Node* n2) {
+    return n1->order > n2->order;
+  }
 };
 
-static std::vector<mpz_wrap*> val;
-static bool topValid = false;
+static std::priority_queue<Node*, std::vector<Node*>, ordercmp> recomputeQueue;
+static std::set<Node*> uniqueRecompute;
 
-static inline bool potentialUncheckedType(Node* n) {
-  if (n->type == NODE_MEMBER) {
-    switch(n->parent->type) {
-      case NODE_READER:
-        return n == n->parent->member[0] || n == n->parent->member[1];
-      case NODE_WRITER:
-        return true;
-      case NODE_READWRITER:
-        return n != n->parent->member[2] && n != n->parent->member[3];
-      default:
-        Assert(0, "Should not reach here\n");
-    }
-  }
-  return (n->type == NODE_REG_DST) || (n->type == NODE_ACTIVE) || (n->type == NODE_OUT) || (n->type == NODE_OTHERS);
-}
-
-static inline void allocVal() {
-  mpz_wrap* wrap = new mpz_wrap();
-  val.push_back(wrap);
-}
-
-static void setPrev(Node* node, int& prevIdx) {
-  allocVal();
-  if (node->workingVal->operands[prevIdx]->dimension.size() == 0) {
-    mpz_set_str(val.back()->a, node->workingVal->operands[prevIdx]->workingVal->consVal.c_str(), 16);
-  }
-  val.back()->n = node->workingVal->operands[prevIdx];
-  topValid = true;
-  prevIdx--;
-}
-
-static void inline deleteAndPop() {
-  delete val.back();
-  val.pop_back();
-}
-
-// width num
-static std::map<std::string, std::tuple<EXPR1INT_FUNC_TYPE, EXPR1INT_FUNC_TYPE>> expr1int1Map = {
-    {"pad",   {u_pad, s_pad}},
-    {"shl",   {u_shl, invalidExpr1Int1}},
-    {"shr",   {u_shr, s_shr}},
-    {"head",  {u_head, invalidExpr1Int1}},
-    {"tail",  {u_tail, invalidExpr1Int1}},
-};
-
-static std::map<std::string, std::tuple<EXPR1_FUNC_TYPE, EXPR1_FUNC_TYPE>> expr1Map = {
-    {"asUInt",    {u_asUInt, invalidExpr1}},
-    {"asSInt",    {invalidExpr1, s_asSInt}},
-    {"asClock",   {u_asClock, invalidExpr1}},
-    {"asAsyncReset", {invalidExpr1, invalidExpr1}},
-    {"cvt",       {u_cvt, s_cvt}},
-    {"neg",       {invalidExpr1, s_neg}},
-    {"not",       {u_not, invalidExpr1}},
-    {"andr",      {u_andr, invalidExpr1}},
-    {"orr",       {u_orr, invalidExpr1}},
-    {"xorr",      {u_xorr, invalidExpr1}},
-};
-
-static std::map<std::string, std::tuple<EXPR2_FUNC_TYPE, EXPR2_FUNC_TYPE>> expr2Map = {
-    {"add",   {us_add, us_add}},
-    {"sub",   {us_sub, us_sub}},
-    {"mul",   {us_mul, us_mul}},
-    {"div",   {us_div, us_div}},
-    {"rem",   {us_rem, us_rem}},
-    {"lt",    {us_lt, us_lt}},
-    {"leq",   {us_leq, us_leq}},
-    {"gt",    {us_gt, us_gt}},
-    {"geq",   {us_geq, us_geq}},
-    {"eq",    {us_eq, us_eq}},
-    {"neq",   {us_neq, us_neq}},
-    {"dshl",  {u_dshl, invalidExpr2}},
-    {"dshr",  {u_dshr, s_dshr}},
-    {"and",   {u_and, invalidExpr2}},
-    {"or",    {u_ior, invalidExpr2}},
-    {"xor",   {u_xor, invalidExpr2}},
-    {"cat",   {u_cat, invalidExpr2}},
-};
-
-static void cons_1expr1int(Node* node, int opIdx, int& prevIdx) {
-  PNode* op = node->workingVal->ops[opIdx];
-  Assert(expr1int1Map.find(op->name) != expr1int1Map.end(), "Operation %s not found\n", op->name.c_str());
-  std::tuple<EXPR1INT_FUNC_TYPE, EXPR1INT_FUNC_TYPE> funcs = expr1int1Map[op->name];
-  unsigned long n = p_stoi(op->getExtra(0).c_str());
-  if (op->name == "head" || op->name == "tail") n = op->getChild(0)->width - n;
-  if (!topValid) setPrev(node, prevIdx);
-  (op->sign ? std::get<1>(funcs) : std::get<0>(funcs))(val.back()->a, val.back()->a, op->getChild(0)->width, n);
-}
-
-static void cons_1expr(Node* node, int opIdx, int& prevIdx) {
-  PNode* op = node->workingVal->ops[opIdx];
-  Assert(expr1Map.find(op->name) != expr1Map.end(), "Operation %s not found\n", op->name.c_str());
-  std::tuple<EXPR1_FUNC_TYPE, EXPR1_FUNC_TYPE> funcs = expr1Map[op->name];
-  if (!topValid) setPrev(node, prevIdx);
-  (op->sign ? std::get<1>(funcs) : std::get<0>(funcs))(val.back()->a, val.back()->a, op->getChild(0)->width);
-}
-
-static void cons_2expr(Node* node, int opIdx, int& prevIdx) {
-  PNode* op = node->workingVal->ops[opIdx];
-  Assert(expr2Map.find(op->name) != expr2Map.end(), "Operation %s not found\n", op->name.c_str());
-  std::tuple<EXPR2_FUNC_TYPE, EXPR2_FUNC_TYPE> funcs = expr2Map[op->name];
-
-  if (!topValid) setPrev(node, prevIdx);
-
-  (op->sign ? std::get<1>(funcs) : std::get<0>(funcs))(val[val.size() - 2]->a, val.back()->a, op->getChild(0)->width,
-                                                       val[val.size() - 2]->a, op->getChild(1)->width);
-  deleteAndPop();
-}
-
-static void cons_1expr2int(Node* node, int opIdx, int& prevIdx) {
-  PNode* op = node->workingVal->ops[opIdx];
-  if (!topValid) { setPrev(node, prevIdx); }
-  if (op->sign) {
-    std::cout << op->name << " " << op->lineno << " " << node->name << std::endl;
-    TODO();
-  }
-  else u_bits(val.back()->a, val.back()->a, op->getChild(0)->width, p_stoi(op->getExtra(0).c_str()),
-           p_stoi(op->getExtra(1).c_str()));
-}
-
-static void cons_mux(Node* node, int opIdx, int& prevIdx) {
-  if (!topValid) setPrev(node, prevIdx);
-  us_mux(val[val.size() - 3]->a, val.back()->a, val[val.size() - 2]->a, val[val.size() - 3]->a);
-  deleteAndPop();
-  deleteAndPop();
-}
-
-static void cons_intInit(Node* node, int opIdx) {
-  int base;
-  std::string cons;
-  std::tie(base, cons) = strBaseAll(node->workingVal->ops[opIdx]->getExtra(0));
-  allocVal();
-  mpz_set_str(val.back()->a, cons.c_str(), base);
-  topValid = true;
-}
-
-void computeConstant(Node* node) {
-  int prevIdx = node->workingVal->operands.size() - 1;
-  for (int i = node->workingVal->ops.size() - 1; i >= 0; i--) {
-    if (!node->workingVal->ops[i]) {
-      if (!topValid) setPrev(node, prevIdx);
-      topValid = false;
-      continue;
-    }
-    switch (node->workingVal->ops[i]->type) {
-      case P_1EXPR1INT: cons_1expr1int(node, i, prevIdx); break;
-      case P_1EXPR2INT: cons_1expr2int(node, i, prevIdx); break;
-      case P_2EXPR: cons_2expr(node, i, prevIdx); break;
-      case P_1EXPR: cons_1expr(node, i, prevIdx); break;
-      case P_EXPR_MUX: cons_mux(node, i, prevIdx); break;
-      case P_EXPR_INT_INIT: cons_intInit(node, i); break;
-      case P_WHEN: cons_mux(node, i, prevIdx); break;
-      case P_PRINTF:
-      case P_ASSERT: break;  // TODO
-      default: Assert(0, "Invalid constantNode(%s) with type %d\n", node->name.c_str(), node->workingVal->ops[i]->type);
-    }
-    char* str             = mpz_get_str(NULL, 16, val[0]->a);
-    node->workingVal->ops[i]->consVal = str;
-    free(str);
+static void addRecompute(Node* node) {
+  if (uniqueRecompute.find(node) == uniqueRecompute.end()) {
+    recomputeQueue.push(node);
+    uniqueRecompute.insert(node);
   }
 }
 
-void constantReCheck(Node* node) { // re-check node->next
-  for (Node* n : node->next) {
-    if (n->status == CONSTANT_NODE) continue;
-    checkAndComputeConstant(n);
-    if (n->status == CONSTANT_NODE) constantReCheck(n);
-  }
+static bool mpzOutOfBound(mpz_t& val, int width) {
+  mpz_t tmp;
+  mpz_init(tmp);
+  mpz_set_ui(tmp, 1);
+  mpz_mul_2exp(tmp, tmp, width);
+  mpz_sub_ui(tmp, tmp, 1);
+  if (mpz_cmp(val, tmp) > 0) return true;
+  return false;
 }
 
-bool cons_l_index(Node* node, int opIdx, int& prevIdx, std::vector<int>& index) {
-  PNode* op = node->workingVal->ops[opIdx];
-  index.push_back(std::stoi(op->name));
-  return op->lineno == 0;
+valInfo* setENodeCons(ENode* enode, std::string str) {
+  valInfo* consInfo = new valInfo(enode->width, enode->sign);
+  consInfo->setConstantByStr(str);
+  consEMap[enode] = consInfo;
+  return consInfo;
 }
 
-void computeArrayMember(Node* node, Node* parent) {
-  int prevIdx = node->workingVal->operands.size() - 1;
-  std::vector<int> index;
-  bool indexEnd = false;
-  for (int i = node->workingVal->ops.size() - 1; i >= 0; i --) {
-    if (!node->workingVal->ops[i]) {
-      if (!topValid) setPrev(node, prevIdx);
-      topValid = false;
-      continue;
-    }
-    switch (node->workingVal->ops[i]->type) {
-      case P_1EXPR1INT: cons_1expr1int(node, i, prevIdx); break;
-      case P_1EXPR2INT: cons_1expr2int(node, i, prevIdx); break;
-      case P_2EXPR: cons_2expr(node, i, prevIdx); break;
-      case P_1EXPR: cons_1expr(node, i, prevIdx); break;
-      case P_EXPR_MUX: cons_mux(node, i, prevIdx); break;
-      case P_EXPR_INT_INIT: cons_intInit(node, i); break;
-      case P_L_CONS_INDEX: indexEnd = cons_l_index(node, i, prevIdx, index); break;
-      default: Assert(0, "Invalid constantNode(%s) with type %d\n", node->name.c_str(), node->workingVal->ops[i]->type);
-    }
-    if (indexEnd) {
-      if (!topValid) setPrev(node, prevIdx);
-      int dstIdx = 0;
-      for (size_t t1 = 0; t1 < index.size(); t1 ++) dstIdx = dstIdx * parent->dimension[t1] + index[t1];
-      for (size_t t1 = index.size(); t1 < parent->dimension.size(); t1 ++) dstIdx *= parent->dimension[t1];
-      if (val.back()->n && val.back()->n->dimension.size() != val.back()->index.size()) { // array set
-        Assert(val.back()->n->dimension.size() > val.back()->index.size(), "index out of bound (%s)\n", val.back()->n->name.c_str());
-        int base = 0, num = 1;
-        for (size_t t1 = 0; t1 < val.back()->index.size(); t1 ++) {
-          base = base * val.back()->n->dimension[t1] + val.back()->index[t1];
-        }
-        for (size_t t1 = val.back()->index.size(); t1 < val.back()->n->dimension.size(); t1 ++) {
-          num *= val.back()->n->dimension[t1];
-        }
-
-        for (int t1 = base * num; t1 < num; t1 ++) {
-          parent->consArray[dstIdx ++] = val.back()->n->consArray[t1];
-        }
-      } else {
-        char* str = mpz_get_str(NULL, 16, val[val.size()-1]->a);
-        parent->consArray[dstIdx] = str;
-        free(str);
-      }
-      index.erase(index.begin(), index.end());
-      indexEnd = false;
-      topValid = false;
-      deleteAndPop();
-    }
-  }
+valInfo* setNodeCons(Node* node, std::string str) {
+  node->status = CONSTANT_NODE;
+  valInfo* consInfo = new valInfo(node->width, node->sign);
+  consInfo->setConstantByStr(str);
+  consMap[node] = consInfo;
+  return consInfo;
 }
 
-void computeArrayConstant(Node* node) {
-  topValid = false;
-  int entryNum = 1;
-  for (size_t i = 0; i < node->dimension.size(); i ++) entryNum *= node->dimension[i];
-  Assert(node->consArray.size() == 0, "%s is already computed!\n", node->name.c_str());
-  node->consArray.resize(entryNum);
-
-  computeArrayMember(node, node);
-  for (Node* member : node->member) computeArrayMember(member, node);
-
-  for (size_t i = 0; i < node->consArray.size(); i ++) {
-    if (node->consArray[i].length() == 0) node->consArray[i] = "0";
-    node->workingVal->consVal += node->consArray[i];
-    if (i != (node->consArray.size() - 1)) node->workingVal->consVal += ", ";
+valInfo* ENode::consMux(bool isLvalue) {
+  /* cond is constant */
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (mpz_cmp_ui(ChildCons(0, consVal), 0) == 0) return consEMap[getChild(2)];
+    else return consEMap[getChild(1)];
   }
-  // std::cout << "consArray " << node->name << " " << node->workingVal->consVal << std::endl;
+  if (ChildCons(1, status) == VAL_CONSTANT && ChildCons(2, status) == VAL_CONSTANT) {
+    if (mpz_cmp(ChildCons(1, consVal), ChildCons(2, consVal)) == 0) {
+      return consEMap[getChild(1)];
+    }
+  }
+  return new valInfo(width, sign);
 }
 
-
-void checkAndComputeConstant(Node* node) {
-  // std::cout << "checking " << node->name << " " << node->type << std::endl;
-  checked.insert(node);
-  bool isConstant = true;
-  for (Node* operand : node->workingVal->operands) {
-    if (potentialUncheckedType(operand) && checked.find(operand) == checked.end()) {
-      if (operand->type == NODE_REG_DST && operand->dimension.size() == 0) checkRegDst(operand);
-      else checkAndComputeConstant(operand);
-    }
-    if (!POTENTIAL_TYPE(operand) || operand->status != CONSTANT_NODE) {
-      isConstant = false;
-    }
-  }
-  if (node->dimension.size() != 0) {
-    for (Node* member : node->member) {
-      for (Node* operand : member->workingVal->operands) {
-        if (potentialUncheckedType(operand) && checked.find(operand) == checked.end()) {
-          checkAndComputeConstant(operand);
-        }
-        if (!POTENTIAL_TYPE(operand) || operand->status != CONSTANT_NODE) {
-          isConstant = false;
-        }
-      }
-    }
-  }
-  if (isConstant) {  // compute constant
-  // std::cout << node->name << " is constant " << std::endl;
-    constantNode++;
-    if (node->dimension.size() != 0) {
-      computeArrayConstant(node);
-      node->status  = CONSTANT_NODE;
-      return;
-    }
-    if (node->workingVal->ops.size() == 0) {
-      if (node->workingVal->operands.size() != 0) {
-        Assert(node->workingVal->operands.size() == 1, "Invalid operand size %ld for %s\n", node->workingVal->operands.size(), node->name.c_str());
-        node->workingVal->consVal = node->workingVal->operands[0]->workingVal->consVal;
-      } else {
-        node->workingVal->consVal = "0";
-      }
-
-    } else {
-      topValid = false;
-      computeConstant(node);
-      Assert(val.size() == 1, "Invalid val size %ld for %s\n", val.size(), node->name.c_str());
-      char* str     = mpz_get_str(NULL, 16, val[0]->a);
-      node->workingVal->consVal = str;
-      free(str);
-      deleteAndPop();
-    }
-    node->status  = CONSTANT_NODE;
-    // std::cout << "set " << node->name << " = " << node->workingVal->consVal << std::endl;
-
-  } else {
-    // std::cout << node->name << " is not constant\n";
-  }
-}
-
-void removeInValid(std::set<Node*>& nodeSet) {
-  for (auto iter = nodeSet.begin(); iter != nodeSet.end(); ) {
-    if ((*iter)->status != VALID_NODE) iter = nodeSet.erase(iter);
-    else iter ++;
-  }
-}
-
-void checkRegDst(Node* node) {
-  int tmp = node->status;
-    checkAndComputeConstant(node);
-    node->workingVal = node->resetVal;
-    checkAndComputeConstant(node);
-    node->workingVal = node->resetCond;
-    checkAndComputeConstant(node);
-    node->workingVal = node->value;
-    if (node->value->operands.size() == 0 && node->value->ops.size() == 0 && node->resetVal->consVal.length() != 0) {
-      node->status = CONSTANT_NODE;
-      node->workingVal = node->resetVal;
-    } else if (node->value->consVal.length() == 0) {
-      node->status = tmp;
-    } else if (node->value->consVal == node->resetVal->consVal) {
-      node->status = CONSTANT_NODE;
-    } else if (node->resetCond->consVal.length() != 0) {
-      node->status = CONSTANT_NODE;
-      if (p_stoi(node->resetCond->consVal.c_str()) != 0) {
-        node->workingVal = node->resetVal;
+valInfo* ENode::consWhen(Node* node, bool isLvalue) {
+  /* cond is constant */
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (mpz_cmp_ui(ChildCons(0, consVal), 0) == 0) {
+      if (getChild(2)) return consEMap[getChild(2)];
+      else {
+        valInfo* consInfo = new valInfo(0, 0);
+        consInfo->status = VAL_EMPTY;
+        return consInfo;
       }
     } else {
-      node->status = tmp;
+      if (getChild(1)) return consEMap[getChild(1)];
+      valInfo* consInfo = new valInfo(0, 0);
+      consInfo->status = VAL_EMPTY;
+      return consInfo;
     }
-}
+  }
+  if (getChild(1) && ChildCons(1, status) == VAL_CONSTANT && getChild(2) && ChildCons(2, status) == VAL_CONSTANT) {
+    if (mpz_cmp(ChildCons(1, consVal), ChildCons(2, consVal)) == 0) {
+      return consEMap[getChild(1)];
+    }
+  }
+  if (getChild(1) && ChildCons(1, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_MEM_MEMBER)) {
+    if (getChild(2)) return consEMap[getChild(2)];
+    valInfo* consInfo = new valInfo(0, 0);
+    consInfo->status = VAL_EMPTY;
+    return consInfo;
+  }
+  if (getChild(2) && ChildCons(2, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_MEM_MEMBER)) {
+    if (getChild(1)) return consEMap[getChild(1)];
+    valInfo* consInfo = new valInfo(0, 0);
+    consInfo->status = VAL_EMPTY;
+    return consInfo;
+  }
+  valInfo* ret = new valInfo(width, sign);
 
-// compute constant val
-void constantPropagation(graph* g) {
-  for (size_t i = 0; i < g->sorted.size(); i++) {
-    // std::cout << N(i)->name << " " << N(i)->type << " " << N(i)->status << "======="<< std::endl;
-    if (N(i)->status == CONSTANT_NODE && N(i)->type != NODE_REG_DST) {
-      checkAndComputeConstant(N(i));
-      continue;
+  if (!getChild(1) && getChild(2)) {
+    if (ChildCons(2, sameConstant)) {
+      ret->sameConstant = true;
+      mpz_set(ret->assignmentCons, ChildCons(2, assignmentCons));
     }
-    if (N(i)->status != VALID_NODE && N(i)->status != CONSTANT_NODE) {
-      continue;
-    }
-    totalNode++;
-    int tmp = 0;
-    switch (N(i)->type) {
-      case NODE_READER: {
-        checkAndComputeConstant(N(i)->member[0]);  // addr
-        checkAndComputeConstant(N(i)->member[1]);  // en
-        break;
-      }
-      case NODE_WRITER: {
-        checkAndComputeConstant(N(i)->member[0]);  // addr
-        checkAndComputeConstant(N(i)->member[1]);  // en
-        checkAndComputeConstant(N(i)->member[3]);  // data
-        checkAndComputeConstant(N(i)->member[4]);  // mask
-        break;
-      }
-      case NODE_READWRITER: {
-        checkAndComputeConstant(N(i)->member[0]);  // addr
-        checkAndComputeConstant(N(i)->member[1]);  // en
-        checkAndComputeConstant(N(i)->member[4]);  // wdata
-        checkAndComputeConstant(N(i)->member[5]);  // wmask
-        checkAndComputeConstant(N(i)->member[6]);  // wmode
-        break;
-      }
-      case NODE_OTHERS:
-      case NODE_OUT:
-      case NODE_ACTIVE:
-        checkAndComputeConstant(N(i));
-        break;
-      case NODE_REG_DST: {
-        checkRegDst(N(i));
-        break;
-        tmp = N(i)->status;
-        checkAndComputeConstant(N(i));
-        N(i)->workingVal = N(i)->resetVal;
-        checkAndComputeConstant(N(i));
-        N(i)->workingVal = N(i)->resetCond;
-        checkAndComputeConstant(N(i));
-        N(i)->workingVal = N(i)->value;
-        if (N(i)->value->operands.size() == 0 && N(i)->value->ops.size() == 0 && N(i)->resetVal->consVal.length() != 0) {
-          N(i)->status = CONSTANT_NODE;
-          N(i)->workingVal = N(i)->resetVal;
-        } else if (N(i)->value->consVal.length() == 0) {
-          N(i)->status = tmp;
-        } else if (N(i)->value->consVal == N(i)->resetVal->consVal) {
-          N(i)->status = CONSTANT_NODE;
-        } else if (N(i)->resetCond->consVal.length() != 0) {
-          N(i)->status = CONSTANT_NODE;
-          if (p_stoi(N(i)->resetCond->consVal.c_str()) != 0) {
-            N(i)->workingVal = N(i)->resetVal;
-          }
+    if (ChildCons(2, beg) != ChildCons(2, end)) {
+      for (int i = ChildCons(2, beg); i <= ChildCons(2, end); i ++) {
+        if (ChildCons(2, getMemberInfo(i)) && ChildCons(2, getMemberInfo(i))->status == VAL_CONSTANT) {
+          valInfo* info = new valInfo(width, sign);
+          info->sameConstant = true;
+          mpz_set(info->assignmentCons, ChildCons(2, getMemberInfo(i))->consVal);
+          ret->memberInfo.push_back(info);
         } else {
-          N(i)->status = tmp;
+          ret->memberInfo.push_back(nullptr);
         }
-        break;
       }
-      default: break;
+    }
+  } else if (getChild(1) && !getChild(2)) {
+    if (ChildCons(1, sameConstant)) {
+      ret->sameConstant = true;
+      mpz_set(ret->assignmentCons, ChildCons(1, assignmentCons));
+    }
+  } else if (getChild(1) && getChild(2)) {
+    if (ChildCons(1, sameConstant) && ChildCons(2, sameConstant) && (mpz_cmp(ChildCons(1, assignmentCons), ChildCons(2, assignmentCons)) == 0)) {
+      ret->sameConstant = true;
+      mpz_set(ret->assignmentCons, ChildCons(1, assignmentCons));
+    }
+  }
+  return ret;
+}
+
+valInfo* ENode::consStmt(Node* node, bool isLvalue) {
+  if (getChildNum() == 1) return getChild(0)->computeConstant(node, isLvalue);
+  return new valInfo(width, sign);
+}
+
+valInfo* ENode::consAdd(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    us_add(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consSub(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    us_sub(ret->consVal, ChildCons(0, consVal), ChildCons(1, consVal), width);
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consMul(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    us_mul(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consDIv(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    us_div(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consRem(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    us_rem(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consLt(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    us_lt(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consLeq(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    us_leq(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consGt(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    us_gt(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consGeq(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    us_geq(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consEq(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    us_eq(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  } else if ((ChildCons(0, status) == VAL_CONSTANT && mpzOutOfBound(ChildCons(0, consVal), Child(1, width)))
+      ||(ChildCons(1, status) == VAL_CONSTANT && mpzOutOfBound(ChildCons(1, consVal), Child(0, width)))) {
+    ret->setConstantByStr("0");
+  }
+  return ret;
+}
+
+valInfo* ENode::consNeq(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    us_neq(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consDshl(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    if (sign) TODO();
+    u_dshl(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consDshr(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    (sign ? s_dshr : u_dshr)(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consAnd(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    if (sign) TODO();
+    u_and(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  } else if ((ChildCons(0, status) == VAL_CONSTANT && mpz_sgn(ChildCons(0, consVal)) == 0) ||
+            (ChildCons(1, status) == VAL_CONSTANT && mpz_sgn(ChildCons(1, consVal)) == 0)) {
+          ret->setConstantByStr("0");
+  }
+  return ret;
+}
+
+valInfo* ENode::consOr(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    if (sign) TODO();
+    u_ior(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consXor(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    if (sign) TODO();
+    u_xor(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consCat(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
+    if (sign) TODO();
+    u_cat(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consAsUInt(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (sign) TODO();
+    u_asUInt(ret->consVal, ChildCons(0, consVal), ChildCons(0, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consAsSInt(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (!sign) TODO();
+    s_asSInt(ret->consVal, ChildCons(0, consVal), ChildCons(0, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consAsClock(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (sign) TODO();
+    u_asClock(ret->consVal, ChildCons(0, consVal), ChildCons(0, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consAsAsyncReset(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (sign) TODO();
+    u_asAsyncReset(ret->consVal, ChildCons(0, consVal), ChildCons(0, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consCvt(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    (sign ? s_cvt : u_cvt)(ret->consVal, ChildCons(0, consVal), ChildCons(0, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consNeg(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (!sign) TODO();
+    s_neg(ret->consVal, ChildCons(0, consVal), ChildCons(0, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consNot(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (sign) TODO();
+    u_not(ret->consVal, ChildCons(0, consVal), ChildCons(0, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consAndr(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (sign) TODO();
+    u_andr(ret->consVal, ChildCons(0, consVal), ChildCons(0, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consOrr(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (sign) TODO();
+    u_orr(ret->consVal, ChildCons(0, consVal), ChildCons(0, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consXorr(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (sign) TODO();
+    u_xorr(ret->consVal, ChildCons(0, consVal), ChildCons(0, width));
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consPad(bool isLvalue) {
+  /* no operation for UInt variable */
+  if (!sign || (width <= ChildCons(0, width))) {
+    return consEMap[getChild(0)];
+  }
+  /* SInt padding */
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    (sign ? s_pad : u_pad)(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), values[0]);  // n(values[0]) == width
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consShl(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  int n = values[0];
+
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (sign) TODO();
+    u_shl(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), n);
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consShr(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    (sign ? s_shr : u_shr)(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), values[0]);  // n(values[0]) == width
+    ret->setConsStr();
+  }
+  return ret;
+}
+/*
+  trancate the n least significant bits
+  different from tail operantion defined in firrtl spec (changed in inferWidth)
+*/
+valInfo* ENode::consHead(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  int n = values[0];
+  Assert(n >= 0, "child width %d is less than current width %d", Child(0, width), values[0]);
+
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (sign) TODO();
+    u_head(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), n);
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+/*
+  remain the n least significant bits
+  different from tail operantion defined in firrtl spec (changed in inferWidth)
+*/
+valInfo* ENode::consTail(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  int n = MIN(width, values[0]);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (sign) TODO();
+    u_tail(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), n); // u_tail remains the last n bits
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consBits(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  int hi = values[0];
+  int lo = values[1];
+
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (sign) TODO();
+    u_bits(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), hi, lo);
+    ret->setConsStr();
+  } else if (lo >= Child(0, width) || lo >= ChildCons(0, width)) {
+    ret->setConstantByStr("0");
+  }
+  return ret;
+}
+
+valInfo* ENode::consIndexInt(bool isLvalue) {
+  return new valInfo(width, sign);
+}
+
+valInfo* ENode::consIndex(bool isLvalue) {
+  return new valInfo(width, sign);
+}
+
+valInfo* ENode::consInt(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  std::string str;
+  int base;
+  std::tie(base, str) = firStrBase(strVal);
+  ret->setConstantByStr(str, base);
+  return ret;
+}
+
+valInfo* ENode::consReadMem(bool isLvalue) {
+  return new valInfo(width, sign);
+}
+
+valInfo* ENode::consInvalid(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  ret->status = VAL_INVALID;
+  return ret;
+}
+
+valInfo* ENode::consReset(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    if (mpz_sgn(ChildCons(0, consVal)) == 0) {
+      ret->status = VAL_EMPTY_SRC;
+    } else {
+      ret = consEMap[getChild(1)];
+    }
+  }
+  return ret;
+}
+
+/* compute enode */
+valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
+  if (consEMap.find(this) != consEMap.end()) return consEMap[this];
+  if (width == 0 && !isLvalue) {
+    valInfo* ret = setENodeCons(this, "0");
+    consEMap[this] = ret;
+    return ret;
+  }
+  for (ENode* childNode : child) {
+    if (childNode) childNode->computeConstant(node, isLvalue);
+  }
+  valInfo* ret;
+  if (nodePtr) {
+    if (nodePtr->isArray() && nodePtr->arraySplitted()) {
+      if (getChildNum() < nodePtr->dimension.size()) {
+        int beg, end;
+        std::tie(beg, end) = getIdx(nodePtr);
+        if (beg >= 0 && beg == end) {
+          ret = nodePtr->getArrayMember(beg)->computeConstant()->dup();
+        } else {
+          ret = new valInfo(width, sign);
+          ret->beg = beg;
+          ret->end = end;
+          ret->width = nodePtr->width;
+          ret->sign = nodePtr->sign;
+          ret->splittedArray = nodePtr;
+          if (ret->beg >= 0) {
+            for (int i = ret->beg; i <= ret->end; i ++) {
+              Node* member = nodePtr->getArrayMember(i);
+              member->computeConstant();
+              if (consMap.find(member) != consMap.end()) ret->memberInfo.push_back(consMap[member]);
+              else ret->memberInfo.push_back(nullptr);
+            }
+          }
+        }
+      } else {
+        int idx = getArrayIndex(nodePtr);
+        ret = nodePtr->getArrayMember(idx)->computeConstant()->dup();
+      }
+    } else if (nodePtr->isArray()) {
+      int beg, end;
+      std::tie(beg, end) = getIdx(nodePtr);
+      ret = nodePtr->computeConstant()->dup(beg, end);
+      ret->beg = beg;
+      ret->end = end;
+    } else {
+      ret = nodePtr->computeConstant()->dup();
+    }
+
+    if (!isLvalue && ret->width <= BASIC_WIDTH) {
+      if (ret->width > width) {
+        if (ret->status == VAL_CONSTANT) {
+          ret->updateConsVal();
+        }
+      }
+    }
+    ret->width = width;
+    consEMap[this] = ret;
+    return ret;
+  }
+
+  switch(opType) {
+    case OP_ADD: ret = consAdd(isLvalue); break;
+    case OP_SUB: ret = consSub(isLvalue); break;
+    case OP_MUL: ret = consMul(isLvalue); break;
+    case OP_DIV: ret = consDIv(isLvalue); break;
+    case OP_REM: ret = consRem(isLvalue); break;
+    case OP_LT:  ret = consLt(isLvalue); break;
+    case OP_LEQ: ret = consLeq(isLvalue); break;
+    case OP_GT:  ret = consGt(isLvalue); break;
+    case OP_GEQ: ret = consGeq(isLvalue); break;
+    case OP_EQ:  ret = consEq(isLvalue); break;
+    case OP_NEQ: ret = consNeq(isLvalue); break;
+    case OP_DSHL: ret = consDshl(isLvalue); break;
+    case OP_DSHR: ret = consDshr(isLvalue); break;
+    case OP_AND: ret = consAnd(isLvalue); break;
+    case OP_OR:  ret = consOr(isLvalue); break;
+    case OP_XOR: ret = consXor(isLvalue); break;
+    case OP_CAT: ret = consCat(isLvalue); break;
+    case OP_ASUINT: ret = consAsUInt(isLvalue); break;
+    case OP_ASSINT: ret = consAsSInt(isLvalue); break;
+    case OP_ASCLOCK: ret = consAsClock(isLvalue); break;
+    case OP_ASASYNCRESET: ret = consAsAsyncReset(isLvalue); break;
+    case OP_CVT: ret = consCvt(isLvalue); break;
+    case OP_NEG: ret = consNeg(isLvalue); break;
+    case OP_NOT: ret = consNot(isLvalue); break;
+    case OP_ANDR: ret = consAndr(isLvalue); break;
+    case OP_ORR: ret = consOrr(isLvalue); break;
+    case OP_XORR: ret = consXorr(isLvalue); break;
+    case OP_PAD: ret = consPad(isLvalue); break;
+    case OP_SHL: ret = consShl(isLvalue); break;
+    case OP_SHR: ret = consShr(isLvalue); break;
+    case OP_HEAD: ret = consHead(isLvalue); break;
+    case OP_TAIL: ret = consTail(isLvalue); break;
+    case OP_BITS: ret = consBits(isLvalue); break;
+    case OP_INDEX_INT: ret = consIndexInt(isLvalue); break;
+    case OP_INDEX: ret = consIndex(isLvalue); break;
+    case OP_MUX: ret = consMux(isLvalue); break;
+    case OP_WHEN: ret = consWhen(node, isLvalue); break;
+    case OP_STMT: ret = consStmt(node, isLvalue); break;
+    case OP_INT: ret = consInt(isLvalue); break;
+    case OP_READ_MEM: ret = consReadMem(isLvalue); break;
+    case OP_INVALID: ret = consInvalid(isLvalue); break;
+    case OP_RESET: ret = consReset(isLvalue); break;
+    case OP_PRINTF:
+    case OP_ASSERT:
+      ret = new valInfo();
+      break;
+    default:
+      Panic();
+  }
+  consEMap[this] = ret;
+  return ret;
+
+}
+
+void clearConsEMap(ExpTree* tree) {
+  std::stack<ENode*> s;
+  s.push(tree->getRoot());
+  s.push(tree->getlval());
+
+  while(!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    if (!top) continue;
+    consEMap.erase(top);
+    for (ENode* child : top->child) s.push(child);
+  }
+}
+
+static void recomputeAllNodes() {
+  while (!recomputeQueue.empty()) {
+    Node* node = recomputeQueue.top();
+    recomputeQueue.pop();
+    uniqueRecompute.erase(node);
+    node->recomputeConstant();
+  }
+}
+
+void Node::recomputeConstant() {
+  if (consMap.find(this) == consMap.end()) return;
+  valInfo* prevVal = consMap[this];
+  std::vector<valInfo*> prevArrayVal (consMap[this]->memberInfo);
+  consMap.erase(this);
+  for (ExpTree* tree : arrayVal) {
+    if (tree) clearConsEMap(tree);
+  }
+  for (ExpTree* tree : assignTree) clearConsEMap(tree);
+  computeConstant();
+  bool recomputeNext = false;
+  if (consMap[this]->status != prevVal->status) {
+    recomputeNext = true;
+  }
+  for (size_t i = 0; i < prevArrayVal.size(); i ++) {
+    if ((!prevArrayVal[i] && consMap[this]->memberInfo[i]) || (prevArrayVal[i] && !consMap[this]->memberInfo[i])) {
+      recomputeNext = true;
+      break;
+    }
+    if (prevArrayVal[i] && consMap[this]->memberInfo[i] && prevArrayVal[i]->status != consMap[this]->memberInfo[i]->status) {
+      recomputeNext = true;
+      break;
+    }
+  }
+  if (recomputeNext) {
+    for (Node* nextNode : next) {
+      if (uniqueRecompute.find(nextNode) == uniqueRecompute.end()) {
+        recomputeQueue.push(nextNode);
+        uniqueRecompute.insert(nextNode);
+      }
+    }
+  }
+}
+
+valInfo* Node::computeConstantArray() {
+  valInfo* ret = new valInfo(width, sign);
+  std::set<int> allIdx;
+  bool anyVarIdx = false;
+  for (ExpTree* tree : assignTree) {
+    std::string lvalue = name;
+    if (tree->getlval()) {
+      int beg, end;
+      std::tie(beg, end) = tree->getlval()->getIdx(this);
+      if (beg < 0) anyVarIdx = true;
+      else {
+        for (int i = beg; i <= end; i ++) {
+          if (allIdx.find(i) != allIdx.end()) anyVarIdx = true;
+          allIdx.insert(i);
+        }
+      }
+    } else {
+      display();
+      TODO();
+    }
+    tree->getRoot()->computeConstant(this, false);
+  }
+
+  for (ExpTree* tree : arrayVal) {
+      int beg, end;
+      if (tree->getlval()) {
+        for (ENode* lchild : tree->getlval()->child) lchild->computeConstant(this, true);
+        tree->getRoot()->computeConstant(this, false);
+        std::tie(beg, end) = tree->getlval()->getIdx(this);
+        if (beg < 0) anyVarIdx = true;
+        else {
+          for (int i = beg; i <= end; i ++) {
+            if (allIdx.find(i) != allIdx.end()) anyVarIdx = true;
+            allIdx.insert(i);
+          }
+        }
+      } else {
+        TODO();
+      }
+  }
+
+  if (!anyVarIdx) {
+    int num = arrayEntryNum();
+    ret->memberInfo.resize(num, nullptr);
+    for (ExpTree* tree : assignTree) {
+      int infoIdxBeg, infoIdxEnd;
+      std::tie(infoIdxBeg, infoIdxEnd) = tree->getlval()->getIdx(this);
+      if (consEMap[tree->getRoot()]->status == VAL_CONSTANT) {
+        if (infoIdxBeg == infoIdxEnd) {
+          ret->memberInfo[infoIdxBeg] = consEMap[tree->getRoot()];
+        } else if (consEMap[tree->getRoot()]->memberInfo.size() != 0) {
+          for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) {
+            ret->memberInfo[infoIdxBeg + i] = consEMap[tree->getRoot()]->getMemberInfo(i);
+          }
+        }
+      }
+    }
+
+    for (ExpTree* tree : arrayVal) {
+      int infoIdxBeg, infoIdxEnd;
+      std::tie(infoIdxBeg, infoIdxEnd) = tree->getlval()->getIdx(this);
+      if (consEMap[tree->getRoot()]->status == VAL_CONSTANT) {
+        if (infoIdxBeg == infoIdxEnd) {
+          ret->memberInfo[infoIdxBeg] = consEMap[tree->getRoot()];
+
+        } else if (consEMap[tree->getRoot()]->memberInfo.size() != 0) {
+          for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) {
+            ret->memberInfo[infoIdxBeg + i] = consEMap[tree->getRoot()]->getMemberInfo(i);
+          }
+        }
+
+      }
+    }
+
+    if (type == NODE_REG_DST && getSrc()->assignTree.size() == 0) {
+      for (int i = 0; i < num; i ++) {
+        if (ret->memberInfo[i] && ret->memberInfo[i]->sameConstant) {
+          ret->memberInfo[i]->status = VAL_CONSTANT;
+          mpz_set(ret->memberInfo[i]->consVal, ret->memberInfo[i]->assignmentCons);
+          ret->memberInfo[i]->setConsStr();
+        }
+      }
+    }
+  }
+  consMap[this] = ret;
+  return ret;
+}
+
+void graph::constantMemory() {
+  int num = 0;
+  mpz_t val;
+  mpz_init(val);
+  while (1) {
+    for (Node* mem : memory) {
+      bool isConstant = true;
+      bool isFirst = true;
+      for (Node* port : mem->member) {
+        if (port->type == NODE_WRITER) {
+          Node* wdata = port->get_member(WRITER_DATA);
+          if (wdata->status == CONSTANT_NODE) {
+            if (isFirst) {
+              mpz_set(val, consMap[wdata]->consVal);
+              isFirst = false;
+            } else if (mpz_cmp(consMap[wdata]->consVal, val) == 0) {
+
+            } else {
+              isConstant = false;
+              break;
+            }
+          } else {
+            isConstant = false;
+            break;
+          }
+        }
+      }
+      if (isConstant) {
+        num ++;
+        for (Node* port : mem->member) {
+          if (port->type == NODE_READER) {
+            setNodeCons(port->get_member(READER_ADDR), "0");
+            setNodeCons(port->get_member(READER_EN), "0");
+            setNodeCons(port->get_member(READER_DATA), mpz_get_str(NULL, 16, val));
+            for (Node* next : port->get_member(READER_DATA)->next) {
+              if (consMap.find(next) != consMap.end()) addRecompute(next);
+            }
+          } else if (port->type == NODE_WRITER) {
+            setNodeCons(port->get_member(WRITER_ADDR), "0");
+            setNodeCons(port->get_member(WRITER_EN), "0");
+            setNodeCons(port->get_member(WRITER_MASK), "0");
+          } else TODO();
+        }
+        mem->status = CONSTANT_NODE;
+      }
+    }
+    if (recomputeQueue.empty()) break;
+    recomputeAllNodes();
+    memory.erase(
+      std::remove_if(memory.begin(), memory.end(), [](const Node* n){ return n->status == CONSTANT_NODE; }),
+        memory.end()
+    );
+  }
+  printf("[constantNode] find %d constant memories\n", num);
+}
+
+valInfo* Node::computeConstant() {
+  if (consMap.find(this) != consMap.end()) return consMap[this];
+  if (computeInfo) {
+    consMap[this] = computeInfo;
+    return computeInfo;
+  }
+
+  Assert(status != DEAD_NODE, "compute constant deadNode %s\n", name.c_str());
+  if (width == 0) {
+    status = CONSTANT_NODE;
+    valInfo* consInfo = new valInfo(width, sign);
+    consInfo->setConstantByStr("0");
+    consMap[this] = consInfo;
+    return consInfo;
+  }
+  if (isArray()) {
+    return computeConstantArray();
+  }
+
+  if (assignTree.size() == 0) {
+    valInfo* ret = new valInfo(width, sign);
+    if (type == NODE_OTHERS) {
+      status = CONSTANT_NODE;
+      ret->setConstantByStr("0");
+    }
+    consMap[this] = ret;
+    return ret;
+  }
+  valInfo* ret = nullptr;
+  for (size_t i = 0; i < assignTree.size(); i ++) {
+    ExpTree* tree = assignTree[i];
+    valInfo* info = tree->getRoot()->computeConstant(this, false);
+    if (info->status == VAL_EMPTY || info->status == VAL_INVALID) continue;
+    ret = info->dupWithCons();
+    if ((ret->status == VAL_INVALID || ret->status == VAL_CONSTANT) && (i < assignTree.size() - 1) ) {
+      // TODO: replace using OP_INT
+      fillEmptyWhen(assignTree[i+1], tree->getRoot());
     }
   }
 
-  for (size_t i = 0; i < g->sorted.size(); i++) {
-    if (N(i)->status == VALID_NODE) {
-      removeInValid(N(i)->prev);
-      removeInValid(N(i)->next);
+  if (!ret) ret = assignTree.back()->getRoot()->computeConstant(this, false)->dup();
+  Assert(ret, "empty info in %s\n", name.c_str());
+  if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) ret->setConstantByStr("0");
+  if (ret->status == VAL_CONSTANT) {
+    status = CONSTANT_NODE;
+    if (type == NODE_REG_DST) {
+      if (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, consMap[getSrc()]->consVal) == 0)) {
+        getSrc()->status = CONSTANT_NODE;
+        consMap[getSrc()] = ret;
+        /* re-compute nodes depend on src */
+        for (Node* next : (regSplit ? getSrc() : this)->next) {
+          if (consMap.find(next) != consMap.end()) {
+            addRecompute(next);
+          }
+        }
+        recomputeAllNodes();
+      }
+    } else if (type == NODE_MEM_MEMBER && mpz_sgn(ret->consVal) == 0) {
+      Node* port = parent;
+      if (port->type == NODE_READER) {
+        if (this == port->get_member(READER_EN)) {
+          setNodeCons(port->get_member(READER_DATA), "0");
+          setNodeCons(port->get_member(READER_ADDR), "0");
+          for (Node* next : port->get_member(READER_DATA)->next) {
+            if (consMap.find(next) != consMap.end()) addRecompute(next);
+          }
+        }
+      } else if (port->type == NODE_WRITER) {
+        if (this == port->get_member(WRITER_EN) || this == port->get_member(WRITER_MASK)) {
+          setNodeCons(port->get_member(WRITER_ADDR), "0");
+          setNodeCons(port->get_member(WRITER_DATA), "0");
+          if (this != port->get_member(WRITER_EN)) setNodeCons(port->get_member(WRITER_EN), "0");
+          if (this != port->get_member(WRITER_MASK)) setNodeCons(port->get_member(WRITER_MASK), "0");
+        }
+      }
+      recomputeAllNodes();
+    }
+  } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant &&
+    (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(consMap[getSrc()]->consVal, ret->assignmentCons) == 0))) {
+    ret->status = VAL_CONSTANT;
+    mpz_set(ret->consVal, ret->assignmentCons);
+    ret->setConsStr();
+    status = CONSTANT_NODE;
+    getSrc()->status = CONSTANT_NODE;
+    consMap[getSrc()] = ret;
+    for (Node* next : (regSplit ? getSrc() : this)->next) {
+      if (consMap.find(next) != consMap.end()) {
+        addRecompute(next);
+      }
+    }
+    recomputeAllNodes();
+  }
+  ret->width = width;
+  ret->sign = sign;
+  consMap[this] = ret;
+  return ret;
+}
+
+void ExpTree::removeConstant() {
+  if (consEMap[getRoot()]->status == VAL_CONSTANT) return;  // used for array
+  if ((getRoot()->opType == OP_MUX || getRoot()->opType == OP_WHEN) &&
+    consEMap.find(getRoot()->getChild(0)) != consEMap.end() && consEMap[getRoot()->getChild(0)]->status == VAL_CONSTANT) {
+    valInfo* info = consEMap[getRoot()->getChild(0)];
+    if (mpz_cmp_ui(info->consVal, 0) == 0) setRoot(getRoot()->getChild(2));
+    else setRoot(getRoot()->getChild(1));
+  }
+  if (!getRoot() || consEMap[getRoot()]->status == VAL_CONSTANT) return;
+  std::stack<ENode*> s;
+  Assert(getRoot(), "emptyRoot");
+  s.push(getRoot());
+  if (getlval()) s.push(getlval());
+  while (!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    Assert(consEMap.find(top) == consEMap.end() || consEMap[top]->status != VAL_CONSTANT, "constant not removed");
+    for (size_t i = 0; i < top->child.size(); i ++) {
+      ENode* childENode = top->child[i];
+      if (!childENode) continue;
+      if (consEMap.find(childENode) != consEMap.end() && consEMap[childENode]->status == VAL_CONSTANT) {
+        childENode->nodePtr = nullptr;
+        childENode->opType = OP_INT;
+        childENode->child.clear();
+        childENode->strVal = mpz_get_str(NULL, 10, consEMap[childENode]->consVal);
+      } else if ((childENode->opType == OP_MUX || childENode->opType == OP_WHEN) &&
+          consEMap.find(childENode->getChild(0)) != consEMap.end() && consEMap[childENode->getChild(0)]->status == VAL_CONSTANT) {
+        valInfo* info = consEMap[childENode->getChild(0)];
+        if (mpz_cmp_ui(info->consVal, 0) == 0) top->child[i] = childENode->getChild(2);
+        else top->child[i] = childENode->getChild(1);
+      } else {
+        s.push(childENode);
+      }
+      if (top->opType == OP_STMT) {
+        top->child.erase(
+        std::remove_if(top->child.begin(), top->child.end(), [](ENode* enode){ return enode == nullptr; }),
+          top->child.end()
+        );
+      }
     }
   }
+}
 
-
-  g->sorted.erase(
-      std::remove_if(g->sorted.begin(), g->sorted.end(), [](const Node* n) { return n->status != VALID_NODE; }),
-      g->sorted.end());
-
-  std::cout << "find " << constantNode << " constant nodes (" << totalNode << ")\n";
-#if 0
-  for (Node* superNode : g->superNodes) {
-    std::cout << superNode->name << " " << superNode->id << ": ";
-    for (Node* member : superNode->setOrder) std::cout << member->name <<  "(" << member->id << ", " << (member->status != VALID_NODE ? "invalid " : "valid ") << member->prev.size()<< " " << member->next.size() << ") ";
-    std::cout << "\nprev: " << std::endl;
-    for (Node* prevSuper : superNode->prev) std::cout << "  " <<prevSuper->name << " " << prevSuper->id << std::endl;
-    std::cout << "next: " << std::endl;
-    for (Node* nextSuper : superNode->next) std::cout << "  " <<nextSuper->name << " " << nextSuper->id << std::endl;
-  }
-  for (Node* node : g->sorted) {
-    std::cout << node->name << " " << node->id << " " << node->master->name << " " << node->master->id << ": (" << node->next.size() << ")" << std::endl;
-    for (Node* next : node->next) {
-      std::cout << "   next " << next->name << " " << next->id << " ";
-      if (next->master) std::cout << next->master->name << " " << next->master->id << std::endl;
-      else std::cout << "NULL " << std::endl;
+void graph::constantAnalysis() {
+  std::set<Node*>s;
+  for (SuperNode* super : sortedSuper) {
+    for (Node* n : super->member) {
+        n->computeConstant();
     }
   }
-#endif
+  constantMemory();
+
+  /* remove constant nodes */
+  size_t totalNodes = countNodes();
+  size_t totalSuper = sortedSuper.size();
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->status == CONSTANT_NODE) {
+          member->computeInfo = consMap[member];
+      }
+    }
+  }
+  // removeNodes(CONSTANT_NODE);
+
+  /* update valTree */
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->status == CONSTANT_NODE) continue;
+      for (ExpTree* tree : member->arrayVal) {
+        tree->removeConstant();
+      }
+      member->arrayVal.erase(
+      std::remove_if(member->arrayVal.begin(), member->arrayVal.end(), [](ExpTree* tree){ return !tree->getRoot(); }),
+        member->arrayVal.end()
+      );
+      for (ExpTree* tree : member->assignTree) {
+        tree->removeConstant();
+      }
+      member->assignTree.erase(
+      std::remove_if(member->assignTree.begin(), member->assignTree.end(), [](ExpTree* tree){ return !tree->getRoot() || consEMap[tree->getRoot()]->status == VAL_CONSTANT; }),
+        member->assignTree.end()
+      );
+    }
+  }
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      member->prev.clear();
+      member->next.clear();
+    }
+  }
+  removeNodesNoConnect(DEAD_NODE);
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      member->updateConnect();
+    }
+  }
+  removeEmptySuper();
+  reconnectSuper();
+
+  size_t optimizeNodes = countNodes();
+  size_t optimizeSuper = sortedSuper.size();
+  printf("[constantNode] remove %ld constantNodes (%ld -> %ld)\n", totalNodes - optimizeNodes, totalNodes, optimizeNodes);
+  printf("[constantNode] remove %ld superNodes (%ld -> %ld)\n",  totalSuper - optimizeSuper, totalSuper, optimizeSuper);
+
 }

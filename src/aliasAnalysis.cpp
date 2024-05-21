@@ -1,119 +1,156 @@
-#include <graph.h>
-#include <common.h>
-#include <set>
+/*
+ determine whether two nodes refer to the same value, keep only one copy of it
+*/
 
-#define IS_RW(node) (node->type == NODE_READER || node->type == NODE_WRITER || node->type == NODE_READWRITER)
+#include "common.h"
+#include <stack>
+#include <map>
 
-void updateExprValue(Node* oldNode, Node* newNode, ExprValue* exprValue) {
-  auto ptr = find(exprValue->operands.begin(), exprValue->operands.end(), oldNode);
-  while (ptr != exprValue->operands.end()) {
-    *ptr = newNode;
-    ptr = find(exprValue->operands.begin(), exprValue->operands.end(), oldNode);
+/* TODO: array alias */
+/* TODO: A = B[idx] */
+ENode* Node::isAlias() {
+  if (type != NODE_OTHERS) return nullptr;
+  if (isArray()) {
+    /* alias array A to array B iff
+      A <= B (if idx = dim[0], A.arrayval[idx] = B, otherwise A.arrayval[idx] = null ) (Done)
+      A[i] <= B[i] for every i  (WIP)
+    */
+    if (prev.size() == 1 && arrayVal.size() == 1 && arrayVal[0]->getlval()->getChildNum() == 0 && arrayVal[0]->getRoot()->getNode()
+        && arrayVal[0]->getRoot()->getNode()->type == NODE_OTHERS) {
+      return arrayVal[0]->getRoot();
+    }
+    return nullptr;
   }
+  if (assignTree.size() != 1) return nullptr;
+  if (!assignTree[0]->getRoot()->getNode()) return nullptr;
+  if (prev.size() != 1) return nullptr;
+  if (isArrayMember && assignTree[0]->getRoot()->getNode()->isArray() && !assignTree[0]->getRoot()->getNode()->arraySplitted()) return nullptr;
+  return assignTree[0]->getRoot();
 }
 
-void updateOperand(Node* oldNode, Node* newNode, Node* dst) {
-  updateExprValue(oldNode, newNode, dst->workingVal);
-  if (dst->type == NODE_REG_DST) {
-    updateExprValue(oldNode, newNode, dst->resetCond);
-    updateExprValue(oldNode, newNode, dst->resetVal);
-    updateExprValue(oldNode, newNode, dst->iValue);
-  }
+ENode* ENode::mergeSubTree(ENode* newSubTree) {
+  ENode* ret = newSubTree->dup();
+  for (ENode* childENode : child) ret->addChild(childENode->dup());
+  return ret;
 }
 
-void updateConnect(Node* oldNode, Node* newNode, Node* dst) {
-  if(dst->prev.find(oldNode) != dst->prev.end()) {
-    dst->prev.erase(oldNode);
-    dst->prev.insert(newNode);
-    // oldNode->next.erase(dst);
-    newNode->next.insert(dst);
+Node* getLeafNode(bool isArray, ENode* enode) {
+  if (!enode->getNode()) return nullptr;
+  Node* node = enode->getNode();
+  if (node->isArray() && node->arraySplitted()) {
+    int beg, end;
+    std::tie(beg, end) = enode->getIdx(node);
+    if (beg < 0 || (isArray && enode->getChildNum() != node->dimension.size())) return node;
+    else return node->getArrayMember(beg);
   }
+  return node;
 }
 
-void replacePrevNode(Node* oldNode, Node* newNode, Node* dst) {
-  auto ptr = dst->next.end();
-  if((ptr = find(dst->next.begin(), dst->next.end(), oldNode)) != dst->next.end()) {
-    dst->next.erase(ptr);
+void ExpTree::replace(std::map<Node*, ENode*>& aliasMap, bool isArray) {
+  std::stack<ENode*> s;
+  Node* leafNode = getLeafNode(isArray, getRoot());
+  if(aliasMap.find(leafNode) != aliasMap.end()) {
+    int width = getRoot()->width;
+    if (leafNode == getRoot()->getNode())
+      setRoot(getRoot()->mergeSubTree(aliasMap[leafNode]));
+    else
+      setRoot(aliasMap[leafNode]->dup());
+    getRoot()->width = width;
+  }
+  s.push(getRoot());
+
+  if (getlval()) s.push(getlval());
+
+  while (!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    for (int i = 0; i < top->getChildNum(); i ++) {
+      if (!top->getChild(i)) continue;
+      s.push(top->getChild(i));
+      if (!top->getChild(i)->getNode()) continue;
+      Node* replaceNode = getLeafNode(isArray, top->getChild(i));
+      if (aliasMap.find(replaceNode) != aliasMap.end()) {
+        ENode* newChild;
+        if (replaceNode != top->getChild(i)->getNode()) { // splitted array member
+          newChild = aliasMap[replaceNode]->dup();
+        } else {
+          newChild = top->getChild(i)->mergeSubTree(aliasMap[replaceNode]);
+        }
+        newChild->width = top->getChild(i)->width;
+        top->setChild(i, newChild);
+      }
+    }
   }
 }
 /*
 A -> |         | -> E
      | C  -> D |
 B -> |         | -> F
-      new   old
+           remove   
 */
-
-void markAlias(Node* node) {
-  Node* oldNode = node;
-  Node* newNode = node->workingVal->operands[0];
-  if (newNode->type == NODE_MEMBER) return;
-  if (oldNode->width != newNode->width) return; // TODO
-  oldNode->type = NODE_INVALID;
-  // delete edge prev->old
-  for (Node* prev : oldNode->prev) {
-    replacePrevNode(oldNode, newNode, prev);
-    if (oldNode->dimension.size() != 0 || IS_RW(prev)) {
-      for (Node* member : prev->member) replacePrevNode(oldNode, newNode, member);
-    }
-  }
-  // update prev & operands in old.next
-  newNode->next.erase(oldNode);
-  newNode->master->next.erase(oldNode->master);
-  for (Node* next : oldNode->next) {
-    updateOperand(oldNode, newNode, next);
-    updateConnect(oldNode, newNode, next);
-    if (next->dimension.size() != 0 || IS_RW(next)) {
-      for (Node* member : next->member) {
-        updateOperand(oldNode, newNode, member);
+void graph::aliasAnalysis() {
+  /* counters */
+  size_t totalNodes = 0;
+  size_t aliasNum = 0;
+  size_t totalSuper = sortedSuper.size();
+  std::map<Node*, ENode*> aliasMap;
+  for (SuperNode* super : sortedSuper) {
+    totalNodes += super->member.size();
+    for (Node* member : super->member) {
+      ENode* enode = member->isAlias();
+      if (!enode) continue;
+      aliasNum ++;
+      Node* interNode = getLeafNode(member->isArray(), enode);//->getNode();
+      ENode* aliasENode = enode;
+      if (aliasMap.find(interNode) != aliasMap.end()) {
+        if (interNode == enode->getNode()) aliasENode = enode->mergeSubTree(aliasMap[interNode]);
+        else aliasENode = aliasMap[interNode]->dup();
+      }
+      if (member->isArrayMember && aliasENode->getNode()->isArray() && !aliasENode->getNode()->arraySplitted()) {
+        /* do not alias array member to */
+      } else {
+        member->status = DEAD_NODE;
+        aliasMap[member] = aliasENode;
       }
     }
-    newNode->master->next.insert(next->master);
   }
-
- }
-
-bool aliasArray(Node* node) {
-  if (node->workingVal->ops.size() != 0 || node->workingVal->operands.size() != 1) return false;
-  for (Node* member : node->member) {
-    if (member->workingVal->ops.size() != 0 || member->workingVal->operands.size() != 0) return false;
-  }
-  return true;
-}
-
-void aliasAnalysis(graph* g) {
-  for (size_t i = 0; i < g->sorted.size(); i ++) {
-    Node* node = g->sorted[i];
-    switch(node->type) {
-      case NODE_OTHERS:
-        if (node->dimension.size() != 0 && !aliasArray(node)) continue;
-        if (node->workingVal->ops.size() == 0 && node->workingVal->operands.size() == 1) {
-          markAlias(node);
-        }
-        break;
-      default:
-        if (node->workingVal->ops.size() == 0 && node->workingVal->operands.size() == 1) {
-          std::cout << "Node " << node->name << " potential alias" << std::endl;
-        }
+  /* update valTree */
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->status == DEAD_NODE) continue;
+      for (ExpTree* tree : member->arrayVal) {
+        if (tree) tree->replace(aliasMap, member->isArray());
+      }
+      for (ExpTree* tree : member->assignTree) tree->replace(aliasMap, member->isArray());
     }
   }
-  g->sorted.erase(std::remove_if(g->sorted.begin(), g->sorted.end(), [](const Node* n) { return n->type == NODE_INVALID; }),
-                  g->sorted.end());
-#if 0
-  for (Node* superNode : g->superNodes) {
-    std::cout << superNode->name << " " << superNode->id << ": ";
-    for (Node* member : superNode->setOrder) std::cout << member->name <<  "(" << member->id << ", " << (member->type == NODE_INVALID ? "invalid " : "valid ") << member->prev.size()<< " " << member->next.size() << ") ";
-    std::cout << "\nprev: " << std::endl;
-    for (Node* prevSuper : superNode->prev) std::cout << "  " <<prevSuper->name << " " << prevSuper->id << std::endl;
-    std::cout << "next: " << std::endl;
-    for (Node* nextSuper : superNode->next) std::cout << "  " <<nextSuper->name << " " << nextSuper->id << std::endl;
-  }
-  for (Node* node : g->sorted) {
-    std::cout << node->name << " " << node->id << " " << node->master->name << " " << node->master->id << ": (" << node->status << ")" << std::endl;
-    for (Node* next : node->next) {
-      std::cout << "   next " << next->name << " " << next->id << " ";
-      if (next->master) std::cout << next->master->name << " " << next->master->id << std::endl;
-      else std::cout << "NULL " << std::endl;
+
+  for (Node* reg : regsrc) {
+    if (reg->updateTree) {
+      reg->updateTree->replace(aliasMap, reg->isArray());
     }
   }
-#endif
+  for (auto iter : aliasMap) {
+    if(iter.first->isArrayMember) {
+      Node* parent = iter.first->arrayParent;
+      parent->arrayMember[iter.first->arrayIdx] = getLeafNode(false, iter.second);
+    }
+  }
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      member->prev.clear();
+      member->next.clear();
+    }
+  }
+  removeNodesNoConnect(DEAD_NODE);
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      member->updateConnect();
+    }
+  }
+  removeNodes(DEAD_NODE);
+
+  printf("remove %ld alias (%ld -> %ld)\n", aliasNum, totalNodes, totalNodes - aliasNum);
+  printf("remove %ld superNodes (%ld -> %ld)\n", totalSuper - sortedSuper.size(), totalSuper, sortedSuper.size());
+
 }
