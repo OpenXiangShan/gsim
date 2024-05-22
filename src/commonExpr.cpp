@@ -1,13 +1,14 @@
 #include "common.h"
+#include <cstdint>
 #include <stack>
 
 #define MAX_COMMON_NEXT 10
 
-static std::map<uint64_t, std::vector<Node*>> exprId;
-static std::map<Node*, int> nodeId;
+static std::map<uint64_t, std::set<Node*>> exprId;
+static std::map<uint64_t, std::set<Node*>> exprVisitedNodes;
+static std::map<Node*, uint64_t> nodeId;
 static std::map<Node*, Node*> realValueMap;
 static std::map<Node*, Node*> aliasMap;
-static std::vector<uint64_t> keyorder;
 
 Node* getLeafNode(bool isArray, ENode* enode);
 
@@ -31,7 +32,7 @@ uint64_t ExpTree::keyHash() {
   while (!s.empty()) {
     ENode* top = s.top();
     s.pop();
-    ret += top->keyHash();
+    ret = ret * 123 + top->keyHash();
     for (ENode* childENode : top->child) {
       if (childENode) s.push(childENode);
     }
@@ -120,51 +121,48 @@ void graph::commonExpr() {
       // if (node->next.size() == 1) continue;
       uint64_t key = node->keyHash();
       if (exprId.find(key) == exprId.end()) {
-        exprId[key] = std::vector<Node*>();
-        keyorder.push_back(key);
+        exprId[key] = std::set<Node*>();
       }
-      exprId[key].push_back(node);
+      exprId[key].insert(node);
       nodeId[node] = key;
     }
   }
-  for (int key : keyorder) {
-    if (exprId[key].size() <= 1) continue;
-    std::map<Node*, std::vector<Node*>> uniqueNodes;
-    /* pair-wise checking */
-    for (Node* node : exprId[key]) {
-      if (uniqueNodes.size() == 0) {
-        uniqueNodes[node] = std::vector<Node*>(1, node);
+
+  std::map<Node*, std::vector<Node*>> uniqueNodes;
+  for (SuperNode* super : sortedSuper) {
+    for (Node* node : super->member) {
+      uint64_t key = nodeId[node];
+      if (exprId[key].size() <= 1) { // hash slot with only one member
         realValueMap[node] = node;
+        uniqueNodes[node] = std::vector<Node*>(1, node);
         continue;
       }
-
-      for (auto iter : uniqueNodes) {
-        if (checkNodeEq(node, iter.first)) {
-          uniqueNodes[iter.first].push_back(node);
-          realValueMap[node] = iter.first;
-          break;
+      for (Node* elseNode : exprVisitedNodes[key]) {
+        if (elseNode == node) continue;
+        if (uniqueNodes.find(elseNode) != uniqueNodes.end() && checkNodeEq(node, elseNode)) {
+          uniqueNodes[elseNode].push_back(node);
+          realValueMap[node] = elseNode;
         }
       }
       if (realValueMap.find(node) == realValueMap.end()) {
         realValueMap[node] = node;
-      }
-    }
-    for (auto iter : uniqueNodes) {
-      if (iter.second.size() >= MAX_COMMON_NEXT) {
-        Node* aliasNode = iter.second[0];
-        for (size_t i = 1; i < iter.second.size(); i ++) {
-          Node* node = iter.second[i];
-          aliasMap[node] = aliasNode;
-        }
-      }
-    }
-    if (uniqueNodes.size() > 1) {
-      printf("different trees with same hash(size=%ld):\n", uniqueNodes.size());
-      for (auto iter : uniqueNodes) {
-        iter.first->display();
+        uniqueNodes[node] = std::vector<Node*>(1, node);
+        exprVisitedNodes[key].insert(node);
       }
     }
   }
+
+  for (auto iter : uniqueNodes) {
+    if (iter.second.size() >= MAX_COMMON_NEXT) {
+      Node* aliasNode = iter.second[0];
+      for (size_t i = 1; i < iter.second.size(); i ++) {
+        Node* node = iter.second[i];
+        aliasMap[node] = aliasNode;
+        node->status = DEAD_NODE;
+      }
+    }
+  }
+
 /* update assignTrees */
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {

@@ -221,7 +221,6 @@ public:
   ENode* mergeSubTree(ENode* newSubTree);
   ENode* dup();
   int getArrayIndex(Node* node);
-  Node* getLeafNode(std::set<Node*>& s);
   std::vector<int> getDim();
   clockVal* clockCompute();
   ResetType inferReset();
