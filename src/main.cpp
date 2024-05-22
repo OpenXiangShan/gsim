@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->aliasAnalysis());
 
-  // FUNC_WRAPPER(g->commonExpr());
+  FUNC_WRAPPER(g->commonExpr());
 
   FUNC_WRAPPER(g->mergeNodes());
 
