@@ -284,6 +284,7 @@ public:
     void removeConstant();
     void removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::set<ENode*>& visited);
     uint64_t keyHash();
+    void removeSelfAssignMent(Node* node);
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes

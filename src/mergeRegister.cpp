@@ -25,6 +25,23 @@ void ExpTree::replace(Node* oldNode, ENode* newENode) {
   }
 }
 
+void ExpTree::removeSelfAssignMent(Node* node) {
+  std::stack<ENode*> s;
+  s.push(getRoot());
+  while (!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    if (top->opType == OP_WHEN) {
+      for (size_t i = 1; i < top->getChildNum(); i ++) {
+        if (top->child[i] && node == getLeafNode(true, top->child[i])) top->child[i] = nullptr;
+      }
+    }
+    for (ENode* child : top->child) {
+      if (child) s.push(child);
+    }
+  }
+}
+
 bool isNext(Node* node, Node* checkNode) {
   bool outSuperNext = checkNode->super->order > node->super->order;
   bool inSuperNext = (checkNode->super == node->super) && (checkNode->orderInSuper > node->orderInSuper);
@@ -125,7 +142,13 @@ void graph::constructRegs() {
     } else {
       Assert(node->getDst()->assignTree.size() == 1, "invalid assignTree for node %s", node->name.c_str());
       node->updateTree->replace(node->getDst(), node->getDst()->assignTree.back()->getRoot());
-      node->getDst()->assignTree[0] = node->updateTree;
+      /* remove self-assignments */
+      if (getLeafNode(true, node->updateTree->getRoot()) == node->getSrc()) node->getDst()->assignTree.clear();
+      else {
+        node->getDst()->assignTree[0] = node->updateTree;
+        node->getDst()->assignTree[0]->removeSelfAssignMent(node);
+      }
+      node->next.erase(node->getDst());
       node->getDst()->updateConnect();
       node->getDst()->status = VALID_NODE;
       node->getDst()->computeInfo = nullptr;
