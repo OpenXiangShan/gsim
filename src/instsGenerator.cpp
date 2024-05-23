@@ -1660,6 +1660,9 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
     ret->setConsStr();
   } else if (lo >= Child(0, width) || lo >= ChildInfo(0, width)) {
     ret->setConstantByStr("0");
+  } else if (lo == 0 && hi == ChildInfo(0, width)) {
+    ret->valStr = ChildInfo(0, valStr);
+    ret->opNum = ChildInfo(0, opNum);
   } else if (childBasic && enodeBasic) {
     std::string shift;
     if (Child(0, sign)) {
