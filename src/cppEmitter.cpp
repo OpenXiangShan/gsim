@@ -276,7 +276,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   std::string diffNodeName = node->name;
   std::string originName = node->name;
 #endif
-  if (node->type == NODE_MEMORY){
+  if (node->type == NODE_MEMORY || node->type == NODE_REG_DST){
 
   } else if (originNode->isArrayMember) {
     allNames[originNode->name] = originNode->name;
@@ -393,6 +393,15 @@ static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bo
 }
 
 void graph::genNodeInsts(FILE* fp, Node* node) {
+  if (node->type == NODE_REG_SRC && node->reset == ASYRESET && node->regSplit && node->getDst()->status == VALID_NODE) {
+    if (node->getDst()->super->cppId != -1) {
+      if (!node->isArray()) {
+        if (node->width <= BASIC_WIDTH) fprintf(fp, "if (%s != %s)\n", node->name.c_str(), node->getDst()->name.c_str());
+        else fprintf(fp, "if(mpz_cmp(%s, %s) != 0) ", node->name.c_str(), node->getDst()->name.c_str());
+      }
+      fprintf(fp, "activeFlags[%d] = true;\n", node->getDst()->super->cppId);
+    }
+  }
   std::string oldnode;
   if (node->insts.size()) {
     /* save oldVal */

@@ -94,11 +94,6 @@ void Node::addReset() {
       regTop->addChild(nullptr);
     assignTree.clear();
     assignTree.push_back(new ExpTree(regTop, this));
-    if (getDst()->assignTree.size() != 0) {
-      fillEmptyWhen(getDst()->assignTree[0], new ENode(this));
-    } else {
-      getDst()->assignTree.push_back(new ExpTree(new ENode(this), getDst()));
-    }
   } else {
     Panic();
   }

@@ -329,6 +329,7 @@ Node* Node::arrayMemberNode(int idx) {
   arrayMember.push_back(member);
   member->arrayParent = this;
   member->clock = clock;
+  member->reset = reset;
   member->setType(width, sign);
   member->constructSuperNode();
 

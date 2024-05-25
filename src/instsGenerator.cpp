@@ -234,6 +234,21 @@ static int countArrayIndex(std::string name) {
   return count;
 }
 
+void srcUpdateDst(Node* node) {
+  if (node->type == NODE_REG_SRC && node->reset == ASYRESET && node->regSplit) {
+    std::vector<std::string> newInsts;
+    size_t start_pos = 0;
+    for (std::string inst : node->insts) {
+      while((start_pos = inst.find(node->name, start_pos)) != std::string::npos) {
+        inst.replace(start_pos, node->name.length(), node->getDst()->name);
+        start_pos += node->name.length();
+      }
+      newInsts.push_back(inst);
+    }
+    node->insts.insert(node->insts.end(), newInsts.begin(), newInsts.end());
+  }
+}
+
 static bool isSubArray(std::string name, Node* node) {
   size_t count = countArrayIndex(name);
   Assert(node->isArrayMember || count <= node->dimension.size(), "invalid array %s in %s", name.c_str(), node->name.c_str());
@@ -2361,12 +2376,7 @@ valInfo* Node::computeArray() {
   for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
     if (computeInfo->memberInfo[i] && computeInfo->memberInfo[i]->valStr.find("TMP$") != computeInfo->memberInfo[i]->valStr.npos) computeInfo->memberInfo[i] = nullptr;
   }
-  // printf("infos %s\n", name.c_str());
-  // for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
-  //   if (computeInfo->memberInfo[i]) {
-  //     printf("idx %ld %s\n", i, computeInfo->memberInfo[i]->valStr.c_str());
-  //   }
-  // }
+  srcUpdateDst(this);
   return computeInfo;
 }
 
@@ -2400,6 +2410,9 @@ void graph::instsGenerator() {
             n->insts.push_back(n->name + " = " + assignInfo->valStr + ";");
           else
             n->insts.push_back(format("mpz_set(%s, %s);", n->name.c_str(), assignInfo->valStr.c_str()));
+        }
+        if (n->type == NODE_REG_SRC && n->reset == ASYRESET && n->regSplit && n->getDst()->status == VALID_NODE) {
+          srcUpdateDst(n);
         }
       }
     }
