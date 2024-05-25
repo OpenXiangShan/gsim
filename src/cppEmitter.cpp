@@ -134,6 +134,7 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   includeLib(header, "ctime", true);
   includeLib(header, "iomanip", true);
   includeLib(header, "cstring", true);
+  includeLib(header, "map", true);
   includeLib(header, "functions.h", false);
   newLine(header);
 
@@ -152,6 +153,7 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags[i] = true;\n", superId);
 #ifdef PERF
   fprintf(header, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
+  fprintf(header, "for (int i = 0; i < %d; i ++) activator[i] = std::map<int, int>();\n", superId);
 for (SuperNode* super : sortedSuper) {
   if (super->cppId >= 0) fprintf(header, "nodeNum[%d] = %ld;\n", super->cppId, super->member.size());
 }
@@ -182,6 +184,7 @@ for (SuperNode* super : sortedSuper) {
   fprintf(header, "bool activeFlags[%d];\n", superId); // or super.size() if id == idx
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
+  fprintf(header, "std::map<int, int>activator[%d];\n", superId);
   fprintf(header, "size_t validActive[%d];\n", superId);
   fprintf(header, "size_t nodeNum[%d];\n", superId);
 #endif
@@ -376,6 +379,10 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   }
   for (int id : nextNodeId) {
     fprintf(fp, "activeFlags[%d] = true;\n", id);
+#ifdef PERF
+    fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\n activator[%d][%d] ++;\n",
+                id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
+#endif
   }
 #ifdef PERF
   if (inStep) fprintf(fp, "isActivateValid = true;\n");
@@ -386,6 +393,10 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
 static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bool inStep) {
   for (int id : activateId) {
     fprintf(fp, "activeFlags[%d] = true;\n", id);
+#ifdef PERF
+    fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\n activator[%d][%d] ++;\n",
+                id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
+#endif
   }
 #ifdef PERF
   if (inStep) fprintf(fp, "isActivateValid = true;\n");

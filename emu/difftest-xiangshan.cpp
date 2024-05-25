@@ -179,7 +179,10 @@ int main(int argc, char** argv) {
       fprintf(activeFp, "totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
           totalActives, totalActives / cycles, validActives, validActives / cycles);
       for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
-        fprintf(activeFp, "%ld: activeTimes %ld validActive %ld\n", i, mod->activeTimes[i], mod->validActive[i]);
+        fprintf(activeFp, "%ld: nodeNum %d activeTimes %ld validActive %ld\n", i, mod->nodeNum[i], mod->activeTimes[i], mod->validActive[i]);
+        for (auto iter : mod->activator[i]) {
+          fprintf(activeFp, "    %ld: times %ld\n", iter.first, iter.second);
+        }
       }
       if (cycles == 500000) return 0;
 #endif
