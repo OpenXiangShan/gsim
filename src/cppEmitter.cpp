@@ -652,7 +652,7 @@ void graph::genMemWrite(FILE* fp) {
         if (info_en->status == VAL_CONSTANT && mpz_sgn(info_en->consVal) == 0) continue;
         if (port->member[WRITER_DATA]->isArray() != 0) {
           Node* writerData = port->member[WRITER_DATA];
-          fprintf(fp, "if(%s) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str());
+          fprintf(fp, "if(unlikely(%s)) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str());
           std::string indexStr, bracket;
           for (size_t i = 0; i < writerData->dimension.size(); i ++) {
             fprintf(fp, "for (int i%ld = 0; i%ld < %d; i%ld ++) {", i, i, writerData->dimension[i], i);
@@ -674,7 +674,7 @@ void graph::genMemWrite(FILE* fp) {
           if (info_en->status != VAL_CONSTANT) cond += port->member[WRITER_EN]->computeInfo->valStr.c_str();
           valInfo* info_mask = port->member[WRITER_MASK]->computeInfo;
           if (info_mask->status != VAL_CONSTANT) cond += (cond.length() == 0 ? "" : " & ") + port->member[WRITER_MASK]->computeInfo->valStr;
-          fprintf(fp, "if(%s) {\n", cond.c_str());
+          fprintf(fp, "if(unlikely(%s)) {\n", cond.c_str());
           if (mem->width > BASIC_WIDTH) {
             if (port->member[WRITER_DATA]->computeInfo->status == VAL_CONSTANT) {
               if (mpz_cmp_ui(port->member[WRITER_DATA]->computeInfo->consVal, MAX_U64) > 0) TODO();
