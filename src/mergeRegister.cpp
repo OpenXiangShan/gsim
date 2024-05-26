@@ -5,6 +5,7 @@
 #include "common.h"
 #include <stack>
 Node* getLeafNode(bool isArray, ENode* enode);
+
 void ExpTree::replace(Node* oldNode, ENode* newENode) {
   std::stack<ENode*> s;
   if (getRoot()->getNode() && (getLeafNode(true, getRoot()) == oldNode)) {

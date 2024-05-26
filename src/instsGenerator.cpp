@@ -199,7 +199,6 @@ static std::string set64_tmp(valInfo* info, valInfo* parent) {
   return ret;
 }
 
-
 static std::string set128(std::string lvalue, valInfo* info, valInfo* ret) {
   std::string localName = info->valStr;
   if (info->opNum > 0) {

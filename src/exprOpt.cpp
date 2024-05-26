@@ -36,5 +36,5 @@ void Node::invalidArrayOptimize() {
     }
   }
   for (ExpTree* tree : assignTree) fillArrayInvalid(tree);
-  for (ExpTree* tree : arrayVal) fillArrayInvalid(tree);    
+  for (ExpTree* tree : arrayVal) fillArrayInvalid(tree);
 }

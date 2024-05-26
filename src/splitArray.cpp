@@ -396,6 +396,7 @@ void graph::checkNodeSplit(Node* node) {
     arraySplitMap[node] = false;
   }
 }
+
 /* splitted separately assigned, no variable index acceesing arrays */
 void graph::splitOptionalArray() {
   int num = 0;
