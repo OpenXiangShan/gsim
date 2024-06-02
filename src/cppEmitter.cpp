@@ -81,7 +81,7 @@ void graph::genMemInit(FILE* fp, Node* node) {
 }
 
 void graph::genNodeInit(FILE* fp, Node* node) {
-  if (node->status != VALID_NODE) return;
+  if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
   if (node->width > BASIC_WIDTH) {
     if (node->isArray()) {
@@ -99,7 +99,7 @@ void graph::genNodeInit(FILE* fp, Node* node) {
   } else {
 #if  defined (MEM_CHECK) || defined (DIFFTEST_PER_SIG)
     static std::set<Node*> initNodes;
-    if (node->isArrayMember) node = node->arrayParent;
+    if (node->isArrayMember && node->name[node->name.length()-1] == ']') node = node->arrayParent;
     if (initNodes.find(node) != initNodes.end()) return;
     initNodes.insert(node);
     switch (node->type) {
@@ -232,25 +232,47 @@ void graph::genHeaderEnd(FILE* fp) {
   fprintf(fp, "#endif\n");
 }
 
-void graph::genNodeDef(FILE* fp, Node* node) {
-  if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
-  if (node->type == NODE_REG_DST && !node->regSplit) return;
-#if defined(DIFFTEST_PER_SIG)
-  Node* originNode = node;
-#endif
-  if (node->isArrayMember) node = node->arrayParent;
-  if (definedNode.find(node) != definedNode.end()) return;
-  definedNode.insert(node);
-  if (node->width <= BASIC_WIDTH) {
-    fprintf(fp, "%s %s", widthUType(node->width).c_str(), node->name.c_str());
+#if defined(DIFFTEST_PER_SIG) && defined(GSIM_DIFF)
+void graph::genDiffSig(FILE* fp, Node* node) {
+  std::set<std::string> allNames;
+  std::string diffNodeName = node->name;
+  std::string originName = node->name;
+  if (node->type == NODE_MEMORY || node->type == NODE_REG_DST){
+
+  } else if (node->isArrayMember) {
+    allNames.insert(node->name);
+  } else if (node->isArray()) {
+    int num = node->arrayEntryNum();
+    std::vector<std::string> suffix(num);
+    int pairNum = 1;
+    for (size_t i = 0; i < node->dimension.size(); i ++) {
+      int suffixIdx = 0;
+      for (int l = 0; l < pairNum; l ++) {
+        for (int j = 0; j < node->dimension[i]; j ++) {
+          int suffixNum = num / node->dimension[i];
+          for (int k = 0; k < suffixNum; k ++) {
+            suffix[suffixIdx] += "[" + std::to_string(j) + "]";
+            suffixIdx ++;
+          }
+        }
+      }
+      num = num / node->dimension[i];
+      pairNum *= node->dimension[i];
+    }
+    for (size_t i = 0; i < suffix.size(); i ++) {
+      if (!node->arraySplitted() || node->getArrayMember(i)->name == diffNodeName + suffix[i])
+        allNames.insert(diffNodeName + suffix[i]);
+    }
   } else {
-    fprintf(fp, "mpz_t %s", node->name.c_str());
+    allNames.insert(diffNodeName);
   }
-  if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", upperPower2(node->depth));
-  for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
-  fprintf(fp, ";\n");
-#if defined(DIFFTEST_PER_SIG)
-  #if defined(VERILATOR_DIFF)
+  for (auto iter : allNames)
+    fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, iter.c_str(), iter.c_str());
+}
+#endif
+
+#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
+void graph::genDiffSig(FILE* fp, Node* node) {
     if (node->type == NODE_REG_SRC){
       if (node->width <= BASIC_WIDTH) {
         fprintf(fp, "%s %s%s", widthUType(node->width).c_str(), node->name.c_str(), "$prev");
@@ -262,7 +284,6 @@ void graph::genNodeDef(FILE* fp, Node* node) {
       }
       fprintf(fp, ";\n");
     }
-  #endif
   std::string verilatorName = name + "__DOT__" + (node->type == NODE_REG_DST? node->getSrc()->name : node->name);
   size_t pos;
   while ((pos = verilatorName.find("$$")) != std::string::npos) {
@@ -272,17 +293,12 @@ void graph::genNodeDef(FILE* fp, Node* node) {
     verilatorName.replace(pos, 1, "__DOT__");
   }
   std::map<std::string, std::string> allNames;
-#if defined(VERILATOR_DIFF)
   std::string diffNodeName = node->type == NODE_REG_DST ? (node->getSrc()->name + "$prev") : node->name;
   std::string originName = (node->type == NODE_REG_DST ? node->getSrc()->name : node->name);
-#else
-  std::string diffNodeName = node->name;
-  std::string originName = node->name;
-#endif
   if (node->type == NODE_MEMORY || node->type == NODE_REG_DST){
 
-  } else if (originNode->isArrayMember) {
-    allNames[originNode->name] = originNode->name;
+  } else if (node->isArrayMember) {
+    allNames[node->name] = node->name;
   } else if (node->isArray() && node->arrayEntryNum() == 1) {
     std::string verilatorSuffix, diffSuffix;
     for (size_t i = 0; i < node->dimension.size(); i ++) {
@@ -320,16 +336,34 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   } else {
     allNames[diffNodeName] = verilatorName;
   }
-  #ifdef VERILATOR_DIFF
   if (node->type != NODE_REG_SRC) {
     for (auto iter : allNames)
       fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, iter.first.c_str(), iter.second.c_str());
   }
-  #else
-  for (auto iter : allNames)
-    fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, iter.first.c_str(), iter.first.c_str());
-  #endif
+}
 #endif
+
+void graph::genNodeDef(FILE* fp, Node* node) {
+  if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
+  if (node->type == NODE_REG_DST && !node->regSplit) return;
+#ifdef GSIM_DIFF
+  genDiffSig(fp, node);
+#endif
+  if (node->isArrayMember && node->name[node->name.length()-1] == ']') node = node->arrayParent;
+  if (definedNode.find(node) != definedNode.end()) return;
+  definedNode.insert(node);
+  if (node->width <= BASIC_WIDTH) {
+    fprintf(fp, "%s %s", widthUType(node->width).c_str(), node->name.c_str());
+  } else {
+    fprintf(fp, "mpz_t %s", node->name.c_str());
+  }
+  if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", upperPower2(node->depth));
+  for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
+#ifdef VERILATOR_DIFF
+  genDiffSig(fp, node);
+#endif
+  fprintf(fp, ";\n");
+
 }
 
 FILE* graph::genSrcStart(std::string name) {

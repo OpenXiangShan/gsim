@@ -63,6 +63,8 @@ enum OPType {
 /* special nodes for invalid node */
   OP_INVALID,
   OP_RESET,
+/* width processing */
+  OP_SEXT,
 };
 
 class ENode {
@@ -285,6 +287,9 @@ public:
     void removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::set<ENode*>& visited);
     uint64_t keyHash();
     void removeSelfAssignMent(Node* node);
+    void matchWidth(int width);
+    void when2mux(int width);
+    void updateWithNewWidth();
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes

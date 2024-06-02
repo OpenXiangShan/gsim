@@ -37,6 +37,7 @@ class graph {
   void splitOptionalArray();
   void constantMemory();
   void orderAllNodes();
+  void genDiffSig(FILE* fp, Node* node);
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;

@@ -242,6 +242,7 @@ class Node {
   void invalidArrayOptimize();
   void fillArrayInvalid(ExpTree* tree);
   uint64_t keyHash();
+  void updateTreeWithNewWIdth();
 };
 
 enum SuperType {

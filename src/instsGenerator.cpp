@@ -142,15 +142,15 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo) {
 
   } else {
     std::string idxStr, bracket;
-    for (int i = dimIdx; i < node->dimension.size(); i ++) {
-      ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
+    for (int i = 0; i < node->dimension.size() - dimIdx; i ++) {
+      ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i + dimIdx], i);
       idxStr += "[i" + std::to_string(i) + "]";
       bracket += "}\n";
     }
     if (node->width > BASIC_WIDTH)
-      ret += format("mpz_set(%s%s, %s%s);\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str(), idxStr.c_str());
+      ret += format("mpz_set(%s%s, %s);\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
     else
-      ret += format("%s%s = %s%s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str(), idxStr.c_str());
+      ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
     ret += bracket;
   }
   return ret;
@@ -186,6 +186,11 @@ static std::string get128(std::string name) {
 static std::string set128_tmp(valInfo* info, valInfo* parent) {
   std::string localName = info->valStr;
   std::string ret = newMpzTmp();
+  if (info->status == VAL_CONSTANT) {
+    if (mpz_cmp_ui(info->consVal, MAX_U64) > 0) parent->insts.push_back(format("mpz_set_str(%s, \"%s\", 16);", ret.c_str(), mpz_get_str(NULL, 16, info->consVal)));
+    else parent->insts.push_back(format("mpz_set_ui(%s, %s);", ret.c_str(), info->valStr.c_str()));
+    return ret;
+  }
   if (info->opNum > 0) {
     localName = newLocalTmp();
     parent->insts.push_back(format("%s %s = %s;", widthUType(info->width).c_str(), localName.c_str(), info->valStr.c_str()));
@@ -197,15 +202,6 @@ static std::string set64_tmp(valInfo* info, valInfo* parent) {
   std::string ret = newMpzTmp();
   parent->insts.push_back(format("mpz_set_ui(%s, %s);", ret.c_str(), info->valStr.c_str()));
   return ret;
-}
-
-static std::string set128(std::string lvalue, valInfo* info, valInfo* ret) {
-  std::string localName = info->valStr;
-  if (info->opNum > 0) {
-    localName = newLocalTmp();
-    ret->insts.push_back(format("%s %s = %s;", widthUType(info->width).c_str(), localName.c_str(), info->valStr.c_str()));
-  }
-  return format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);\n", lvalue.c_str(), localName.c_str());
 }
 
 static int countArrayIndex(std::string name) {
@@ -427,7 +423,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "");
 
   } else if (!childBasic && !enodeBasic) { // can merge into childBasic && enodeBasic
-    auto assignmentMpz = [lvalue, node, ret](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
+    auto assignmentMpz = [lvalue, node, ret](bool isStmt, std::string expr, int width, bool sign, valInfo* info, ENode* child) {
       if (isStmt) return expr;
       if (expr.length() == 0 || expr == lvalue) return std::string("");
       else if (isSubArray(lvalue, node)) {
@@ -436,12 +432,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       else if (width <= 64) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
       else if (info->status == VAL_CONSTANT && info->consLength <= 16) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
       else if (info->status == VAL_CONSTANT) TODO();
-      else if (width <= BASIC_WIDTH) return set128(lvalue, info, ret);
+      else if (width <= BASIC_WIDTH) return setMpz(lvalue, child, ret, node);
       return format("mpz_set(%s, %s);", lvalue.c_str(), expr.c_str());
     };
     condStr = ChildInfo(0, valStr).c_str();
-    trueStr = ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "");
-    falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "");
+    trueStr = ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo), getChild(1)) : "");
+    falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo), getChild(2)) : "");
   } else if (!enodeBasic && childBasic) {
     auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign) {
       if (isStmt) return expr;
@@ -573,6 +569,9 @@ valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
     }
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " + " + rstr + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    if (!sign && width <= MAX(ChildInfo(0, width), ChildInfo(1, width))) {
+      ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+    }
   } else if (enodeBasic) {
     TODO();
   } else if (!childBasic && enodeBasic) {
@@ -610,6 +609,9 @@ valInfo* ENode::instsSub(Node* node, std::string lvalue, bool isRoot) {
     }
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " - " + rstr + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    if (!sign) {
+      ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+    }
   } else {
     TODO();
   }
@@ -1143,6 +1145,22 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
   bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
+  if (ChildInfo(0, status) == VAL_CONSTANT) {
+    for (valInfo* info : Child(1, computeInfo)->memberInfo) {
+      if (info && info->status == VAL_CONSTANT) {
+        valInfo* newMemberInfo = new valInfo();
+        newMemberInfo->status = VAL_CONSTANT;
+        newMemberInfo->width = width;
+        newMemberInfo->sign = sign;
+        u_cat(newMemberInfo->consVal, ChildInfo(0, consVal), ChildInfo(0, width), info->consVal, info->width);
+        newMemberInfo->setConsStr();
+        ret->memberInfo.push_back(newMemberInfo);
+      } else {
+        ret->memberInfo.push_back(nullptr);
+      }
+    }
+  }
+
   if (isConstant) {
     if (sign) TODO();
     u_cat(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
@@ -1167,18 +1185,13 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
   } else if (childBasic && !enodeBasic) { // child <= 128, cur > 128
     Assert(ChildInfo(0, opNum) >= 0 && ChildInfo(1, opNum) >= 0, "invalid opNum (%d %s) (%d, %s)", ChildInfo(0, opNum), ChildInfo(0, valStr).c_str(), ChildInfo(1, opNum), ChildInfo(1, valStr).c_str());
     std::string dstName = isRoot ? lvalue : newMpzTmp();
-    std::string midName = newMpzTmp();
+    std::string midName;
     /* set first value */
     if (ChildInfo(0, width) > 64) {
       std::string leftName = ChildInfo(0, valStr);
-      if (ChildInfo(0, opNum) > 0) {
-        leftName = newLocalTmp();
-        ret->insts.push_back(widthUType(Child(0, width)) + " " + leftName + " = " + ChildInfo(0, valStr) + ";");
-      }
-      /* import size = 2, least significant first, each 8B, host edian */
-      std::string setLeftInst = "mpz_import(" + midName + ", 2, -1, 8, 0, 0, (mp_limb_t*)&" + leftName + ");";
-      ret->insts.push_back(setLeftInst);
+      midName = set128_tmp(Child(0, computeInfo), ret);
     } else {
+      midName = newMpzTmp();
       ret->insts.push_back("mpz_set_ui(" + midName + ", " + ChildInfo(0, valStr) + ");");
     }
     /* concat second value*/
@@ -1206,14 +1219,8 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
     if (Child(0, width) <= 64) {
       ret->insts.push_back(format("mpz_set_ui(%s, %s);", midName.c_str(), ChildInfo(0, valStr).c_str()));
       firstName = midName;
-    } else if (Child(0, width) <= BASIC_WIDTH) {
-      std::string leftName = ChildInfo(0, valStr);
-      if (ChildInfo(0, opNum) > 0) {
-        leftName = newLocalTmp();
-        ret->insts.push_back(widthUType(Child(0, width)) + " " + leftName + " = " + ChildInfo(0, valStr) + ";");
-      }
-      ret->insts.push_back(format("mpz_import(%s,  2, -1, 8, 0, 0, (mp_limb_t*)&%s);", midName.c_str(), leftName.c_str()));
-      firstName = midName;
+    } else if (Child(0, width) <= BASIC_WIDTH || ChildInfo(0, status) == VAL_CONSTANT) {
+      firstName = set128_tmp(Child(0, computeInfo), ret);
     }
     if (Child(1, width) <= 64) {
       ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width)));
@@ -1722,10 +1729,12 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
     ret->opNum = ChildInfo(0, opNum);
   } else if (childBasic && enodeBasic) {
     std::string shift;
-    if (Child(0, sign)) {
-      shift = "(" + Cast(ChildInfo(0, width), Child(0, sign)) + ChildInfo(0, valStr) + " >> " + std::to_string(lo) + ")";
-    }  else {
-      shift = "(" + ChildInfo(0, valStr) + " >> " + std::to_string(lo) + ")";
+    if (lo == 0) {
+      if (Child(0, sign)) shift = Cast(ChildInfo(0, width), Child(0, sign)) + ChildInfo(0, valStr);
+      else shift = ChildInfo(0, valStr);
+    } else {
+      if (Child(0, sign)) shift = "(" + Cast(ChildInfo(0, width), Child(0, sign)) + ChildInfo(0, valStr) + " >> " + std::to_string(lo) + ")";
+      else shift = "(" + ChildInfo(0, valStr) + " >> " + std::to_string(lo) + ")";
     }
     ret->valStr = "(" + shift + " & " + bitMask(w) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
@@ -1807,15 +1816,10 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   Assert(node->type == NODE_MEM_MEMBER, "invalid type %d", node->type);
   Node* memory = node->parent->parent;
   ret->valStr = memory->name + "[" + ChildInfo(0, valStr) + "]";
-  bool isZeroIdx = true;
-  std::string zeroIdxStr;
-  for (size_t i = 0; i < memory->dimension.size(); i ++) {
-    if (memory->dimension[i] == 1) zeroIdxStr += "[0]";
-    else isZeroIdx = false;
+  for (int i = 0; i < memory->dimension.size(); i ++) {
+    computeInfo->valStr += "[i" + std::to_string(i) + "]";
   }
-  if (isZeroIdx) {
-    ret->valStr += zeroIdxStr;
-  }
+
   if (memory->width > width) {
     if (memory->width > 128 && width < 64)
       ret->valStr = format("(mpz_get_ui(%s) & %s)", ret->valStr.c_str(), bitMask(width).c_str());
@@ -1941,6 +1945,11 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->splittedArray = nodePtr;
           for (ENode* childENode : child)
             computeInfo->valStr += childENode->computeInfo->valStr;
+          if (!IS_INVALID_LVALUE(lvalue)) {
+            for (int i = 0; i < nodePtr->dimension.size() - getChildNum(); i ++) {
+              computeInfo->valStr += "[i" + std::to_string(i) + "]";
+            }
+          }
           computeInfo->opNum = 0;
           if (computeInfo->beg >= 0) {
             for (int i = computeInfo->beg; i <= computeInfo->end; i ++) {
@@ -1965,6 +1974,11 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       std::tie(beg, end) = getIdx(nodePtr);
       computeInfo->beg = beg;
       computeInfo->end = end;
+      if (!IS_INVALID_LVALUE(lvalue)) {
+        for (int i = 0; i < nodePtr->dimension.size() - getChildNum(); i ++) {
+          computeInfo->valStr += "[i" + std::to_string(i) + "]";
+        }
+      }
     } else {
       computeInfo = nodePtr->compute()->dup();
       if (child.size() != 0) {
@@ -2062,6 +2076,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     case OP_XOR: instsXor(n, lvalue, isRoot); break;
     case OP_CAT: instsCat(n, lvalue, isRoot); break;
     case OP_ASUINT: instsAsUInt(n, lvalue, isRoot); break;
+    case OP_SEXT:
     case OP_ASSINT: instsAsSInt(n, lvalue, isRoot); break;
     case OP_ASCLOCK: instsAsClock(n, lvalue, isRoot); break;
     case OP_ASASYNCRESET: instsAsAsyncReset(n, lvalue, isRoot); break;

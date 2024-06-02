@@ -486,7 +486,6 @@ valInfo* ENode::consBits(bool isLvalue) {
   int lo = values[1];
 
   if (ChildCons(0, status) == VAL_CONSTANT) {
-    if (sign) TODO();
     u_bits(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), hi, lo);
     ret->setConsStr();
   } else if (lo >= Child(0, width) || lo >= ChildCons(0, width)) {
@@ -614,6 +613,7 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
     case OP_XOR: ret = consXor(isLvalue); break;
     case OP_CAT: ret = consCat(isLvalue); break;
     case OP_ASUINT: ret = consAsUInt(isLvalue); break;
+    case OP_SEXT:
     case OP_ASSINT: ret = consAsSInt(isLvalue); break;
     case OP_ASCLOCK: ret = consAsClock(isLvalue); break;
     case OP_ASASYNCRESET: ret = consAsAsyncReset(isLvalue); break;
@@ -970,10 +970,18 @@ void ExpTree::removeConstant() {
       ENode* childENode = top->child[i];
       if (!childENode) continue;
       if (consEMap.find(childENode) != consEMap.end() && consEMap[childENode]->status == VAL_CONSTANT) {
-        childENode->nodePtr = nullptr;
-        childENode->opType = OP_INT;
-        childENode->child.clear();
-        childENode->strVal = mpz_get_str(NULL, 10, consEMap[childENode]->consVal);
+        if (top->opType == OP_INDEX) {
+          Assert(top->child.size() == 1, "opIndex with child %ld\n", top->child.size());
+          top->opType = OP_INDEX_INT;
+          top->values.push_back(mpz_get_ui(consEMap[childENode]->consVal));
+          top->child.clear();
+          break;
+        } else {
+          childENode->nodePtr = nullptr;
+          childENode->opType = OP_INT;
+          childENode->child.clear();
+          childENode->strVal = mpz_get_str(NULL, 10, consEMap[childENode]->consVal);
+        }
       } else if ((childENode->opType == OP_MUX || childENode->opType == OP_WHEN) &&
           consEMap.find(childENode->getChild(0)) != consEMap.end() && consEMap[childENode->getChild(0)]->status == VAL_CONSTANT) {
         valInfo* info = consEMap[childENode->getChild(0)];

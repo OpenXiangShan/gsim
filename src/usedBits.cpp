@@ -86,6 +86,9 @@ void ENode::passWidthToChild() {
     case OP_BITS:
       childBits.push_back(MIN(usedBit + values[1], values[0] + 1));
       break;
+    case OP_SEXT:
+      childBits.push_back(usedBit);
+      break;
     case OP_MUX:
     case OP_WHEN:
       childBits.push_back(1);
@@ -228,5 +231,30 @@ void graph::usedBits() {
     if (node->resetVal) node->resetVal->getRoot()->updateWidth();
     if (node->updateTree) node->updateTree->getRoot()->updateWidth();
   }
+
+  for (Node* node : splittedArray) {
+    int width = 0;
+    for (Node* member : node->arrayMember) width = MAX(width, member->width);
+    node->width = width;
+  }
+
   for (Node* mem : memory) mem->width = mem->usedBit;
+  for (SuperNode* super : sortedSuper) {
+    for (Node* node : super->member) node->updateTreeWithNewWIdth();
+  }
+}
+
+void Node::updateTreeWithNewWIdth() {
+  printf("visiting %s width %d\n", name.c_str(), width);
+  display();
+  /* add ops to match tree width */
+  for (ExpTree* tree : assignTree) tree->updateWithNewWidth();
+  for (ExpTree* tree : arrayVal) tree->updateWithNewWidth();
+  if (resetVal) resetVal->updateWithNewWidth();
+  if (updateTree) updateTree->updateWithNewWidth();
+  for (ExpTree* tree : assignTree) tree->matchWidth(width);
+  for (ExpTree* tree : arrayVal) tree->matchWidth(width);
+  if (resetVal) resetVal->matchWidth(width);
+  if (updateTree) updateTree->matchWidth(width);
+display();
 }

@@ -1,5 +1,7 @@
 #include "common.h"
+#include <stack>
 #include <tuple>
+#include <utility>
 
 int ENode::counter = 1;
 
@@ -61,8 +63,22 @@ void ENode::inferWidth() {
         break;
       case OP_AND: // the width is actually max, while the upper bits are zeros
         Assert(getChildNum() == 2 && s0 == s1, "invalid child");
-        if (getChild(0)->nodePtr && getChild(1)->nodePtr) setWidth(MIN(w0, w1), false);
-        else setWidth(MAX(w0, w1), false);
+        if (w0 != w1) {
+          int w = MIN(w0, w1);
+          ENode* enode = new ENode(OP_BITS);
+          enode->addVal(w-1);
+          enode->addVal(0);
+          enode->width = w;
+          enode->sign = s1;
+          if (w0 < w1) {
+            enode->addChild(getChild(1));
+            setChild(1, enode);
+          } else {
+            enode->addChild(getChild(0));
+            setChild(0, enode);
+          }
+        }
+        setWidth(MIN(w0, w1), false);
         break;
       case OP_OR: case OP_XOR:
         Assert(getChildNum() == 2 && s0 == s1, "invalid child");
@@ -170,10 +186,115 @@ void ENode::inferWidth() {
 }
 
 void ENode::updateWidth() {
- for (ENode* childENode : child) {
-  if (childENode) childENode->updateWidth();
- }
- width = usedBit;
+  for (ENode* childENode : child) {
+    if (childENode) childENode->updateWidth();
+  }
+  width = usedBit;
+}
+
+void ExpTree::updateWithNewWidth() {
+  std::stack<std::pair<ENode*, ENode*>> s;
+  s.push(std::make_pair(getRoot(), nullptr));
+  while (!s.empty()) {
+    ENode* top, *parent;
+    std::tie(top, parent) = s.top();
+    s.pop();
+    bool remove = false;
+    ENode* newChild = nullptr;
+    if (top->nodePtr) {
+      if (top->width < top->nodePtr->width) {
+        ENode* bits = new ENode(OP_BITS);
+        bits->width = top->width;
+        bits->sign = top->sign;
+        bits->addVal(top->width - 1);
+        bits->addVal(0);
+        bits->addChild(top);
+        remove = true;
+        newChild = bits;
+        top->width = top->nodePtr->width;
+      } else if (top->width > top->nodePtr->width) {
+        if (top->sign) {
+          ENode* sext = new ENode(OP_SEXT);
+          sext->width = top->width;
+          sext->sign = true;
+          sext->addVal(top->width);
+          sext->addChild(top);
+          remove = true;
+          newChild = sext;
+        } else {
+          ENode* cat = new ENode(OP_CAT);
+          cat->width = top->width;
+          ENode* intVal = new ENode(OP_INT);
+          intVal->strVal = "h0";
+          intVal->width = top->width - top->nodePtr->width;
+          cat->addChild(intVal);
+          cat->addChild(top);
+          top->width = top->nodePtr->width;
+          remove = true;
+          newChild = cat;
+        }
+      }
+    } else {
+      switch(top->opType) {
+        case OP_BITS:
+          if (top->width == top->getChild(0)->width) {
+            remove = true;
+            newChild = top->getChild(0);
+            break;
+          } else if (top->width > top->getChild(0)->width) {
+            if (top->sign) {
+              top->opType = OP_SEXT;
+              top->values.clear();
+              top->values.push_back(top->width);
+            } else {
+              top->opType = OP_CAT;
+              top->values.clear();
+              ENode* enode = new ENode(OP_INT);
+              enode->strVal = "h0";
+              enode->width = top->width - top->getChild(0)->width;
+              top->child.insert(top->child.begin(), enode);
+            }
+          } else if ((top->values[0] - top->values[1] + 1) > top->width) top->values[0] = top->values[1] + top->width - 1;
+          break;
+        case OP_SEXT:
+          if (top->width == top->getChild(0)->width) {
+            remove = true;
+            newChild = top->getChild(0);
+            break;
+          }
+          top->values[0] = top->width;
+          Assert(top->width >= top->getChild(0)->width, "invalid sext %p width %d childWidth %d", top, top->width, top->getChild(0)->width);
+          break;
+        case OP_CAT:
+          if (top->width == top->getChild(1)->width) {
+            remove = true;
+            newChild = top->getChild(1);
+          }
+          Assert(top->width >= top->getChild(1)->width, "invalid cat");
+          break;
+        case OP_TAIL:
+        case OP_HEAD:
+          if (top->width == top->getChild(0)->width) {
+            remove = true;
+            newChild = top->getChild(0);
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    if (remove) {
+      if (!parent) setRoot(newChild);
+      else {
+        for (int i = 0; i < parent->getChildNum(); i ++) {
+          if (parent->getChild(i) == top) parent->setChild(i, newChild);
+        }
+      }
+    }
+    for (ENode* child : top->child) {
+      if (child) s.push(std::make_pair(child, top));
+    }
+  }
 }
 /*
 return the index of lvalue(required to be array)
