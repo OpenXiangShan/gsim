@@ -108,6 +108,8 @@ void graph::aliasAnalysis() {
       }
       if (member->isArrayMember && aliasENode->getNode()->isArray() && !aliasENode->getNode()->arraySplitted()) {
         /* do not alias array member to */
+      } else if (member->isArray() && (member->arraySplitted() ^ aliasENode->getNode()->arraySplitted())) {
+
       } else {
         member->status = DEAD_NODE;
         aliasMap[member] = aliasENode;

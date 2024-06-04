@@ -1045,8 +1045,17 @@ valInfo* ENode::instsAnd(Node* node, std::string lvalue, bool isRoot) {
       TODO();
     }
   } else if (!childBasic && !enodeBasic) {
+    std::string lvalue = ChildInfo(0, valStr), rvalue = ChildInfo(1, valStr);
+    if (ChildInfo(0, status) == VAL_CONSTANT) {
+      lvalue = newMpzTmp();
+      setMpz(lvalue, getChild(0), ret, node);
+    }
+    if (ChildInfo(1, status) == VAL_CONSTANT) {
+      rvalue = newMpzTmp();
+      setMpz(rvalue, getChild(1), ret, node);
+    }
     std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_and(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
+    ret->insts.push_back(format("mpz_and(%s, %s, %s);", dstName.c_str(), lvalue.c_str(), rvalue.c_str()));
     ret->valStr = dstName;
     ret->opNum = 0;
   } else {
@@ -1974,7 +1983,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       std::tie(beg, end) = getIdx(nodePtr);
       computeInfo->beg = beg;
       computeInfo->end = end;
-      if (!IS_INVALID_LVALUE(lvalue)) {
+      if (!IS_INVALID_LVALUE(lvalue) && computeInfo->status == VAL_VALID) {
         for (int i = 0; i < nodePtr->dimension.size() - getChildNum(); i ++) {
           computeInfo->valStr += "[i" + std::to_string(i) + "]";
         }
