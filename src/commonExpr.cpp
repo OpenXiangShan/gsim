@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <stack>
 
-#define MAX_COMMON_NEXT 10
+#define MAX_COMMON_NEXT 5
 
 static std::map<uint64_t, std::set<Node*>> exprId;
 static std::map<uint64_t, std::set<Node*>> exprVisitedNodes;
