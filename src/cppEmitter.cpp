@@ -20,7 +20,7 @@ static const int nodePerDisplay = 5000;
 #endif
 static int superId = 1;
 static std::set<Node*> definedNode;
-
+extern std::set<int> maskWidth;
 bool nameExist(std::string str);
 
 std::string strRepeat(std::string str, int times) {
@@ -160,6 +160,13 @@ for (SuperNode* super : sortedSuper) {
   fprintf(header, "for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
 #endif
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_init(MPZ_TMP$%d);\n", i);
+  for (int i : maskWidth) {
+    std::string maskName = format("MPZ_MASK$%d", i);
+    fprintf(header, "mpz_init(%s);\n", maskName.c_str());
+    fprintf(header, "mpz_set_ui(%s, 1);\n", maskName.c_str());
+    fprintf(header, "mpz_mul_2exp(%s, %s, %d);\n", maskName.c_str(), maskName.c_str(), i);
+    fprintf(header, "mpz_sub_ui(%s, %s, 1);\n", maskName.c_str(), maskName.c_str());
+  }
   for (SuperNode* super : sortedSuper) {
     if (super->superType != SUPER_VALID) continue;
     for (Node* member : super->member) {
@@ -180,7 +187,7 @@ for (SuperNode* super : sortedSuper) {
   /* mpz variable used for intermidia values */
   fprintf(header, "mpz_t oldValMpz;\n");
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_t MPZ_TMP$%d;\n", i);
-
+  for (int i : maskWidth) fprintf(header, "mpz_t MPZ_MASK$%d;\n", i);
   fprintf(header, "bool activeFlags[%d];\n", superId); // or super.size() if id == idx
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
