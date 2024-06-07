@@ -1307,8 +1307,11 @@ valInfo* ENode::instsAsSInt(Node* node, std::string lvalue, bool isRoot) {
     s_asSInt(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
   } else if (childBasic && enodeBasic) {
-    int shiftBits = widthBits(width) - ChildInfo(0, width);
-    ret->valStr = format("(%s(%s << %d) >> %d)", Cast(width, true).c_str(), ChildInfo(0, valStr).c_str(), shiftBits, shiftBits);
+    if (Child(0, sign)) ret->valStr = format("%s%s%s", Cast(width, true).c_str(), Cast(ChildInfo(0, width), true).c_str(), ChildInfo(0, valStr).c_str());
+    else {
+      int shiftBits = widthBits(width) - ChildInfo(0, width);
+      ret->valStr = format("(%s(%s << %d) >> %d)", Cast(width, true).c_str(), ChildInfo(0, valStr).c_str(), shiftBits, shiftBits);
+    }
     ret->opNum = ChildInfo(0, opNum) + 1;
   } else if (!childBasic && !enodeBasic){
     std::string dstName = isRoot ? lvalue : newMpzTmp();
