@@ -32,6 +32,7 @@ class graph {
   /* defined in mergeNodes */
   void mergeOut1();
   void mergeIn1();
+  void mergeSublings();
   void splitArrayNode(Node* node);
   void checkNodeSplit(Node* node);
   void splitOptionalArray();

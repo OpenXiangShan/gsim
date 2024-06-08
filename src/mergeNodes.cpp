@@ -1,5 +1,6 @@
 
 #include <cstdio>
+#include <vector>
 #include "common.h"
 #define MAX_NODES_PER_SUPER 7000
 /*
@@ -64,11 +65,58 @@ void graph::mergeIn1() {
   // reconnectSuper();
 }
 
+uint64_t prevHash(SuperNode* super) {
+  uint64_t ret = super->prev.size()*7;
+  for (SuperNode* prev : super->prev) {
+    ret += (uint64_t)prev;
+  }
+  return ret;
+}
+
+bool prevEq(SuperNode* super1, SuperNode* super2) {
+  return super1->prev == super2->prev;
+}
+
+void graph::mergeSublings() {
+  std::map<uint64_t, std::vector<SuperNode*>> prevSuper;
+  for (SuperNode* super : sortedSuper) {
+    if (super->prev.size() == 0) continue;
+    if (inSrc(super) || super->superType != SUPER_VALID) continue;
+    uint64_t id = prevHash(super);
+    if (prevSuper.find(id) == prevSuper.end()) prevSuper[id] = std::vector<SuperNode*>();
+    prevSuper[id].push_back(super);
+  }
+
+  for (auto iter : prevSuper) {
+    std::set<SuperNode*> uniquePrev;
+    for (SuperNode* super : iter.second) {
+      bool find = false;
+      for (SuperNode* checkSuper : uniquePrev) {
+        if (prevEq(checkSuper, super)) { // merge or replace
+          find = true;
+          if (checkSuper->member.size() < 30) {
+            for (Node* member : super->member) member->super = checkSuper;
+            checkSuper->member.insert(checkSuper->member.end(), super->member.begin(), super->member.end());
+            super->member.clear();
+          } else {
+            uniquePrev.erase(checkSuper);
+            uniquePrev.insert(super);
+          }
+          break;
+        }
+      }
+      if (!find) uniquePrev.insert(super);
+    }
+  }
+  removeEmptySuper();
+}
+
 void graph::mergeNodes() {
   size_t totalSuper = sortedSuper.size();
 
   mergeOut1();
   mergeIn1();
+  mergeSublings();
 
   size_t optimizeSuper = sortedSuper.size();
   printf("[mergeNodes] remove %ld superNodes (%ld -> %ld)\n", totalSuper - optimizeSuper, totalSuper, optimizeSuper);
