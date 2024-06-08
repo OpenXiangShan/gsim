@@ -223,11 +223,11 @@ void graph::genInterfaceOutput(FILE* fp, Node* output) {
   if (std::find(sortedSuper.begin(), sortedSuper.end(), output->super) == sortedSuper.end()) return;
   if (output->width > BASIC_WIDTH) {
     fprintf(fp, "std::string get_%s() {\n", output->name.c_str());
-    if (output->status == CONSTANT_NODE) fprintf(fp, "return \"0x%s\";\n", output->computeInfo->valStr.c_str());
+    if (output->status == CONSTANT_NODE) fprintf(fp, "return \"%s\";\n", output->computeInfo->valStr.c_str());
     else fprintf(fp, "return std::string(\"0x\") + mpz_get_str(NULL, 16, %s);\n", output->computeInfo->valStr.c_str());
   } else {
     fprintf(fp, "%s get_%s() {\n", widthUType(output->width).c_str(), output->name.c_str());
-    if (output->status == CONSTANT_NODE) fprintf(fp, "return 0x%s;\n", output->computeInfo->valStr.c_str());
+    if (output->status == CONSTANT_NODE) fprintf(fp, "return %s;\n", output->computeInfo->valStr.c_str());
     else fprintf(fp, "return %s;\n", output->computeInfo->valStr.c_str());
   }
   fprintf(fp, "}\n");
