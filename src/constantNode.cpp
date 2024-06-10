@@ -287,9 +287,18 @@ valInfo* ENode::consAnd(bool isLvalue) {
 
 valInfo* ENode::consOr(bool isLvalue) {
   valInfo* ret = new valInfo(width, sign);
+  mpz_t mask;
+  mpz_init(mask);
+  mpz_set_ui(mask, 1);
+  mpz_mul_2exp(mask, mask, width);
+  mpz_sub_ui(mask, mask, 1);
   if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
     if (sign) TODO();
     u_ior(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
+    ret->setConsStr();
+  } else if ((ChildCons(0, status) == VAL_CONSTANT && mpz_cmp(ChildCons(0, consVal), mask) == 0) ||
+            (ChildCons(1, status) == VAL_CONSTANT && mpz_cmp(ChildCons(1, consVal), mask) == 0)) {
+    mpz_set(ret->consVal, mask);
     ret->setConsStr();
   }
   return ret;
@@ -1004,7 +1013,7 @@ void graph::constantAnalysis() {
   std::set<Node*>s;
   for (SuperNode* super : sortedSuper) {
     for (Node* n : super->member) {
-        n->computeConstant();
+      n->computeConstant();
     }
   }
   constantMemory();
@@ -1024,7 +1033,13 @@ void graph::constantAnalysis() {
   /* update valTree */
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
-      if (member->status == CONSTANT_NODE) continue;
+      if (member->status == CONSTANT_NODE) {
+        member->assignTree.clear();
+        ENode* enode = new ENode(OP_INT);
+        enode->computeInfo = member->computeInfo;
+        member->assignTree.push_back(new ExpTree(enode, member));
+        continue;
+      }
       for (ExpTree* tree : member->arrayVal) {
         tree->removeConstant();
       }
@@ -1047,7 +1062,7 @@ void graph::constantAnalysis() {
       member->next.clear();
     }
   }
-  removeNodesNoConnect(DEAD_NODE);
+
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       member->updateConnect();
