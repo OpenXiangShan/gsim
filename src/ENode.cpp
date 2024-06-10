@@ -94,12 +94,9 @@ void ENode::inferWidth() {
               }
             } else {
               int w = MAX(w0, w1);
-              ENode* enode = new ENode(OP_CAT);
+              ENode* enode = new ENode(OP_PAD);
+              enode->addVal(w);
               enode->width = w;
-              ENode* intVal = new ENode(OP_INT);
-              intVal->strVal = "h0";
-              intVal->width = w - MIN(w0, w1);
-              enode->addChild(intVal);
               if (w0 > w1) {
                 enode->addChild(getChild(1));
                 setChild(1, enode);
@@ -259,16 +256,13 @@ void ExpTree::updateWithNewWidth() {
           remove = true;
           newChild = sext;
         } else {
-          ENode* cat = new ENode(OP_CAT);
-          cat->width = top->width;
-          ENode* intVal = new ENode(OP_INT);
-          intVal->strVal = "h0";
-          intVal->width = top->width - top->nodePtr->width;
-          cat->addChild(intVal);
-          cat->addChild(top);
+          ENode* enode = new ENode(OP_PAD);
+          enode->addVal(top->width);
+          enode->width = top->width;
+          enode->addChild(top);
           top->width = top->nodePtr->width;
           remove = true;
-          newChild = cat;
+          newChild = enode;
         }
       }
     } else {
@@ -284,12 +278,8 @@ void ExpTree::updateWithNewWidth() {
               top->values.clear();
               top->values.push_back(top->width);
             } else {
-              top->opType = OP_CAT;
-              top->values.clear();
-              ENode* enode = new ENode(OP_INT);
-              enode->strVal = "h0";
-              enode->width = top->width - top->getChild(0)->width;
-              top->child.insert(top->child.begin(), enode);
+              top->opType = OP_PAD;
+              top->addVal(top->width);
             }
           } else if ((top->values[0] - top->values[1] + 1) > top->width) top->values[0] = top->values[1] + top->width - 1;
           break;

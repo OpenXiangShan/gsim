@@ -198,11 +198,15 @@ static std::string set128_tmp(valInfo* info, valInfo* parent) {
     else parent->insts.push_back(format("mpz_set_ui(%s, %s);", ret.c_str(), info->valStr.c_str()));
     return ret;
   }
-  if (info->opNum > 0) {
-    localName = newLocalTmp();
-    parent->insts.push_back(format("%s %s = %s;", widthUType(info->width).c_str(), localName.c_str(), info->valStr.c_str()));
+  if (info->width <= 64) {
+    parent->insts.push_back(format("mpz_set_ui(%s, %s);", ret.c_str(), info->valStr.c_str()));
+  } else {
+    if (info->opNum > 0) {
+      localName = newLocalTmp();
+      parent->insts.push_back(format("%s %s = %s;", widthUType(info->width).c_str(), localName.c_str(), info->valStr.c_str()));
+    }
+    parent->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", ret.c_str(), localName.c_str()));
   }
-  parent->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", ret.c_str(), localName.c_str()));
   return ret;
 }
 static std::string set64_tmp(valInfo* info, valInfo* parent) {
@@ -1525,7 +1529,11 @@ valInfo* ENode::instsXorr(Node* node, std::string lvalue, bool isRoot) {
 valInfo* ENode::instsPad(Node* node, std::string lvalue, bool isRoot) {
   /* no operation for UInt variable */
   if (!sign || (width <= ChildInfo(0, width))) {
-    computeInfo = getChild(0)->computeInfo;
+    if (width > BASIC_WIDTH && ChildInfo(0, width) <= BASIC_WIDTH) {
+      computeInfo->valStr = set128_tmp(Child(0, computeInfo), computeInfo);
+    } else {
+      computeInfo = getChild(0)->computeInfo;
+    }
     return computeInfo;
   }
   /* SInt padding */
