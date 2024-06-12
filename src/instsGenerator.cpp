@@ -389,9 +389,8 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     getChild(2) && ChildInfo(2, opNum) >= 0 && (ChildInfo(2, status) == VAL_CONSTANT || ChildInfo(2, status) == VAL_VALID) && !isSubArray(lvalue, node))
       return instsMux(node, lvalue, isRoot);
 
-  for (ENode* childNode : child) {
-    if (childNode) ret->mergeInsts(childNode->computeInfo);
-  }
+  ret->mergeInsts(getChild(0)->computeInfo);
+
   std::string condStr, trueStr, falseStr;
   if (childBasic && enodeBasic) {
     auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
@@ -465,6 +464,18 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
 
   } else {
     TODO();
+  }
+  if (getChild(1)) {
+    std::string trueInst;
+    for (std::string str : getChild(1)->computeInfo->insts) trueInst += str;
+    trueStr = trueInst + trueStr;
+    getChild(1)->computeInfo->insts.clear();
+  }
+  if (getChild(2)) {
+    std::string falseInst;
+    for (std::string str : getChild(2)->computeInfo->insts) falseInst += str;
+    falseStr = falseInst + falseStr;
+    getChild(2)->computeInfo->insts.clear();
   }
   ret->valStr = format("if(%s) { %s } else { %s }", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
   ret->opNum = -1;
