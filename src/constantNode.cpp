@@ -707,7 +707,7 @@ void Node::recomputeConstant() {
     }
   }
   if (recomputeNext) {
-    for (Node* nextNode : next) {
+    for (Node* nextNode : (type == NODE_REG_DST ? getSrc()->next : next)) {
       if (uniqueRecompute.find(nextNode) == uniqueRecompute.end()) {
         recomputeQueue.push(nextNode);
         uniqueRecompute.insert(nextNode);
@@ -958,53 +958,87 @@ valInfo* Node::computeConstant() {
   return ret;
 }
 
+bool isConsZero(ENode* enode) {
+  if (consEMap.find(enode) == consEMap.end()) return false;
+  if (consEMap[enode]->status != VAL_CONSTANT) return false;
+  if (mpz_sgn(consEMap[enode]->consVal) == 0) return true;
+  return false;
+}
+
+void ExpTree::updateNewChild(ENode* parent, ENode* child, int idx) {
+  if (parent) parent->child[idx] = child;
+  else setRoot(child);
+}
+
 void ExpTree::removeConstant() {
   if (consEMap[getRoot()]->status == VAL_CONSTANT) return;  // used for array
-  if ((getRoot()->opType == OP_MUX || getRoot()->opType == OP_WHEN) &&
-    consEMap.find(getRoot()->getChild(0)) != consEMap.end() && consEMap[getRoot()->getChild(0)]->status == VAL_CONSTANT) {
-    valInfo* info = consEMap[getRoot()->getChild(0)];
-    if (mpz_cmp_ui(info->consVal, 0) == 0) setRoot(getRoot()->getChild(2));
-    else setRoot(getRoot()->getChild(1));
-  }
   if (!getRoot() || consEMap[getRoot()]->status == VAL_CONSTANT) return;
-  std::stack<ENode*> s;
+  std::stack<std::tuple<ENode*, ENode*, int>> s;
   Assert(getRoot(), "emptyRoot");
-  s.push(getRoot());
-  if (getlval()) s.push(getlval());
+  s.push(std::make_tuple(getRoot(), nullptr, -1));
+  if (getlval()) s.push(std::make_tuple(getlval(), nullptr, -1));
   while (!s.empty()) {
-    ENode* top = s.top();
+    ENode* top, *parent;
+    int idx;
+    std::tie(top, parent, idx) = s.top();
     s.pop();
-    Assert(consEMap.find(top) == consEMap.end() || consEMap[top]->status != VAL_CONSTANT, "constant not removed");
-    for (size_t i = 0; i < top->child.size(); i ++) {
-      ENode* childENode = top->child[i];
-      if (!childENode) continue;
-      if (consEMap.find(childENode) != consEMap.end() && consEMap[childENode]->status == VAL_CONSTANT) {
-        if (top->opType == OP_INDEX) {
-          Assert(top->child.size() == 1, "opIndex with child %ld\n", top->child.size());
-          top->opType = OP_INDEX_INT;
-          top->values.push_back(mpz_get_ui(consEMap[childENode]->consVal));
-          top->child.clear();
-          break;
-        } else {
-          childENode->nodePtr = nullptr;
-          childENode->opType = OP_INT;
-          childENode->child.clear();
-          childENode->strVal = mpz_get_str(NULL, 10, consEMap[childENode]->consVal);
-        }
-      } else if ((childENode->opType == OP_MUX || childENode->opType == OP_WHEN) &&
-          consEMap.find(childENode->getChild(0)) != consEMap.end() && consEMap[childENode->getChild(0)]->status == VAL_CONSTANT) {
-        valInfo* info = consEMap[childENode->getChild(0)];
-        if (mpz_cmp_ui(info->consVal, 0) == 0) top->child[i] = childENode->getChild(2);
-        else top->child[i] = childENode->getChild(1);
+    bool remove = false;
+    Assert(parent || consEMap.find(top) == consEMap.end() || consEMap[top]->status != VAL_CONSTANT, "constant not removed");
+    if (consEMap.find(top) != consEMap.end() && consEMap[top]->status == VAL_CONSTANT) {
+      if (parent && parent->opType == OP_INDEX) {
+          Assert(parent->child.size() == 1, "opIndex with child %ld\n", top->child.size());
+          parent->opType = OP_INDEX_INT;
+          parent->values.push_back(mpz_get_ui(consEMap[top]->consVal));
+          parent->child.clear();
+          continue;
       } else {
-        s.push(childENode);
+        top->nodePtr = nullptr;
+        top->opType = OP_INT;
+        top->child.clear();
+        top->strVal = mpz_get_str(NULL, 10, consEMap[top]->consVal);
       }
-      if (top->opType == OP_STMT) {
-        top->child.erase(
-        std::remove_if(top->child.begin(), top->child.end(), [](ENode* enode){ return enode == nullptr; }),
-          top->child.end()
-        );
+    } else if ((top->opType == OP_MUX || top->opType == OP_WHEN) &&
+          consEMap.find(top->getChild(0)) != consEMap.end() && consEMap[top->getChild(0)]->status == VAL_CONSTANT) {
+      valInfo* info = consEMap[top->getChild(0)];
+      if (mpz_cmp_ui(info->consVal, 0) == 0) updateNewChild(parent, top->getChild(2), idx);//parent->child[idx] = top->getChild(2);
+      else updateNewChild(parent, top->getChild(1), idx);
+      remove = true;
+    } else if (top->opType == OP_OR && (isConsZero(top->getChild(0)) || isConsZero(top->getChild(1)))) {
+      if (isConsZero(top->getChild(0))) {
+        ENode* newChild = top->getChild(1);
+        if (top->width > top->getChild(1)->width) {
+          newChild = new ENode(OP_PAD);
+          newChild->addVal(top->width);
+          newChild->width = top->width;
+          newChild->addChild(top->getChild(1));
+        }
+        updateNewChild(parent, newChild, idx);
+      } else {
+        ENode* newChild = top->getChild(0);
+        if (top->width > top->getChild(0)->width) {
+          newChild = new ENode(OP_PAD);
+          newChild->addVal(top->width);
+          newChild->width = top->width;
+          newChild->addChild(top->getChild(0));
+        }
+        updateNewChild(parent, newChild, idx);
       }
+      remove = true;
+    }
+
+    if (!remove) {
+      for (size_t i = 0; i < top->child.size(); i ++) {
+        if (top->child[i]) s.push(std::make_tuple(top->child[i], top, i));
+      }
+    } else {
+      ENode* childENode = parent ? parent->getChild(idx) : root;
+      if (childENode) s.push(std::make_tuple(childENode, parent, idx));
+    }
+    if (parent && parent->opType == OP_STMT) {
+      parent->child.erase(
+      std::remove_if(parent->child.begin(), parent->child.end(), [](ENode* enode){ return enode == nullptr; }),
+        parent->child.end()
+      );
     }
   }
 }
@@ -1051,7 +1085,8 @@ void graph::constantAnalysis() {
         tree->removeConstant();
       }
       member->assignTree.erase(
-      std::remove_if(member->assignTree.begin(), member->assignTree.end(), [](ExpTree* tree){ return !tree->getRoot() || consEMap[tree->getRoot()]->status == VAL_CONSTANT; }),
+      std::remove_if(member->assignTree.begin(), member->assignTree.end(),
+        [](ExpTree* tree){ return !tree->getRoot() || (consEMap.find(tree->getRoot()) != consEMap.end() && consEMap[tree->getRoot()]->status == VAL_CONSTANT); }),
         member->assignTree.end()
       );
     }

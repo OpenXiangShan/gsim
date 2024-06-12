@@ -97,6 +97,7 @@ void graph::aliasAnalysis() {
   for (SuperNode* super : sortedSuper) {
     totalNodes += super->member.size();
     for (Node* member : super->member) {
+      if (member->status != VALID_NODE) continue;
       ENode* enode = member->isAlias();
       if (!enode) continue;
       aliasNum ++;
@@ -136,6 +137,15 @@ void graph::aliasAnalysis() {
     if(iter.first->isArrayMember) {
       Node* parent = iter.first->arrayParent;
       parent->arrayMember[iter.first->arrayIdx] = getLeafNode(false, iter.second);
+    }
+    if (iter.first->type == NODE_MEM_MEMBER) {
+      Node* parent = iter.first->parent;
+      for (size_t i = 0; i < parent->member.size(); i ++) {
+        if (parent->member[i] == iter.first) {
+          parent->member[i] = getLeafNode(false, iter.second);
+          break;
+        }
+      }
     }
   }
   for (SuperNode* super : sortedSuper) {

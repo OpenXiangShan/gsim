@@ -115,6 +115,7 @@ void graph::commonExpr() {
   for (SuperNode* super : sortedSuper) {
     if (super->superType != SUPER_VALID) continue;
     for (Node* node : super->member) {
+      if(node->status != VALID_NODE) continue;
       nodeId[node] = node->id;
       if (node->type != NODE_OTHERS || node->isArray() || node->isArrayMember) continue;
       if (node->prev.size() == 0) continue;
