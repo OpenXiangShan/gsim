@@ -3,6 +3,7 @@
 #include <vector>
 #include "common.h"
 #define MAX_NODES_PER_SUPER 7000
+#define MAX_SUBLINGS 30
 /*
   merge nodes with out-degree=1 to their successors
 */
@@ -94,7 +95,7 @@ void graph::mergeSublings() {
       for (SuperNode* checkSuper : uniquePrev) {
         if (prevEq(checkSuper, super)) { // merge or replace
           find = true;
-          if (checkSuper->member.size() < 30) {
+          if (checkSuper->member.size() < MAX_SUBLINGS) {
             for (Node* member : super->member) member->super = checkSuper;
             checkSuper->member.insert(checkSuper->member.end(), super->member.begin(), super->member.end());
             super->member.clear();
