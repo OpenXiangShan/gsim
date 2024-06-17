@@ -6,10 +6,13 @@
 
 #include <cstdio>
 #include <map>
+#include <utility>
 
 #define oldBasic(node) (node->isArrayMember ? arrayMemberOld(node) : (node->name + "$old"))
 #define oldMpz(node) std::string("oldValMpz")
 #define oldName(node) (node->width > BASIC_WIDTH ? oldMpz(node) : oldBasic(node))
+#define ACTIVE_WIDTH 8
+#define NODE_PER_SUBFUNC 9600
 
 #ifdef DIFFTEST_PER_SIG
 FILE* sigFile = nullptr;
@@ -20,9 +23,42 @@ static const int nodePerDisplay = 5000;
 #endif
 
 static int superId = 0;
+static int activeFlagNum = 0;
 static std::set<Node*> definedNode;
 extern std::set<int> maskWidth;
 bool nameExist(std::string str);
+
+std::pair<int, int> cppId2flagIdx(int cppId) {
+  int id = cppId / ACTIVE_WIDTH;
+  int bit = cppId % ACTIVE_WIDTH;
+  return std::make_pair(id, bit);
+}
+
+std::pair<int, uint64_t>setIdxMask(int cppId) {
+  int id, bit;
+  std::tie(id, bit) = cppId2flagIdx(cppId);
+  uint64_t mask = (uint64_t)1 << bit;
+  return std::make_pair(id, mask);
+}
+
+std::pair<int, uint64_t>clearIdxMask(int cppId) {
+  int id, bit;
+  std::tie(id, bit) = cppId2flagIdx(cppId);
+  uint64_t mask = (uint64_t)1 << bit;
+  if (ACTIVE_WIDTH == 64) mask = ~mask;
+  else mask = (~mask) & (((uint64_t)1 << ACTIVE_WIDTH) - 1);
+  return std::make_pair(id, mask);
+}
+
+void activeSet2bitMap(std::set<int>& activeId, std::map<int, uint64_t>& bitMapInfo) {
+  for (int id : activeId) {
+    int bitMapId;
+    uint64_t bitMapMask;
+    std::tie(bitMapId, bitMapMask) = setIdxMask(id);
+    if (bitMapInfo.find(bitMapId) == bitMapInfo.end()) bitMapInfo[bitMapId] = bitMapMask;
+    else bitMapInfo[bitMapId] |= bitMapMask;
+  }
+}
 
 std::string strRepeat(std::string str, int times) {
   std::string ret;
@@ -151,7 +187,7 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   /* constrcutor */
   fprintf(header, "S%s() {\n", name.c_str());
   /* some initialization */
-  fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags[i] = true;\n", superId);
+  fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
 #ifdef PERF
   fprintf(header, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
   fprintf(header, "for (int i = 0; i < %d; i ++) activator[i] = std::map<int, int>();\n", superId);
@@ -189,7 +225,7 @@ for (SuperNode* super : sortedSuper) {
   fprintf(header, "mpz_t oldValMpz;\n");
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_t MPZ_TMP$%d;\n", i);
   for (int i : maskWidth) fprintf(header, "mpz_t MPZ_MASK$%d;\n", i);
-  fprintf(header, "bool activeFlags[%d];\n", superId); // or super.size() if id == idx
+  fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
   fprintf(header, "std::map<int, int>activator[%d];\n", superId);
@@ -215,7 +251,7 @@ void graph::genInterfaceInput(FILE* fp, Node* input) {
     activate all nodes for simplicity
   */
   /* update nodes in the same superNode */
-  fprintf(fp, "for (int i = 0; i < %d; i ++) activeFlags[i] = true;\n", superId);
+  fprintf(fp, "for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
   fprintf(fp, "}\n");
 }
 
@@ -419,28 +455,32 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   } else {
     fprintf(fp, "if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
   }
-  for (int id : nextNodeId) {
-    fprintf(fp, "activeFlags[%d] = true;\n", id);
-#ifdef PERF
-    fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\n activator[%d][%d] ++;\n",
-                id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
-#endif
+  std::map<int, uint64_t> bitMapInfo;
+  activeSet2bitMap(nextNodeId, bitMapInfo);
+  for (auto iter : bitMapInfo) {
+    fprintf(fp, "activeFlags[%d] |= 0x%lx;\n", iter.first, iter.second);
   }
 #ifdef PERF
+  for (int id : nextNodeId) {
+    fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\nactivator[%d][%d] ++;\n",
+                id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
+  }
   if (inStep) fprintf(fp, "isActivateValid = true;\n");
 #endif
   fprintf(fp, "}\n");
 }
 
 static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bool inStep) {
-  for (int id : activateId) {
-    fprintf(fp, "activeFlags[%d] = true;\n", id);
-#ifdef PERF
-    fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\n activator[%d][%d] ++;\n",
-                id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
-#endif
+  std::map<int, uint64_t> bitMapInfo;
+  activeSet2bitMap(activateId, bitMapInfo);
+  for (auto iter : bitMapInfo) {
+    fprintf(fp, "activeFlags[%d] |= 0x%lx;\n", iter.first, iter.second);
   }
 #ifdef PERF
+  for (int id : activateId) {
+    fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\n activator[%d][%d] ++;\n",
+                id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
+  }
   if (inStep) fprintf(fp, "isActivateValid = true;\n");
 #endif
 }
@@ -452,7 +492,10 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
         if (node->width <= BASIC_WIDTH) fprintf(fp, "if (%s != %s)\n", node->name.c_str(), node->getDst()->name.c_str());
         else fprintf(fp, "if(mpz_cmp(%s, %s) != 0) ", node->name.c_str(), node->getDst()->name.c_str());
       }
-      fprintf(fp, "activeFlags[%d] = true;\n", node->getDst()->super->cppId);
+      int bitMapId;
+      uint64_t bitMapMask;
+      std::tie(bitMapId, bitMapMask) = setIdxMask(node->getDst()->super->cppId);
+      fprintf(fp, "activeFlags[%d] |= 0x%lx;\n", bitMapId, bitMapMask);
     }
   }
   std::string oldnode;
@@ -479,7 +522,10 @@ void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
     fprintf(fp, "saveDiffRegs();\n");
 #endif
   } else {
-    fprintf(fp, "activeFlags[%d] = false;\n", node->cppId);
+    int id;
+    uint64_t mask;
+    std::tie(id, mask) = clearIdxMask(node->cppId);
+    fprintf(fp, "activeFlags[%d] &= 0x%lx;\n", id, mask);
   #ifdef PERF
     fprintf(fp, "activeTimes[%d] ++;\n", node->cppId);
     fprintf(fp, "bool isActivateValid = false;\n");
@@ -619,10 +665,18 @@ void graph::genActivate(FILE* fp) {
   int idx = 0;
   for (int i = 0; i < subStepNum; i ++) {
     fprintf(fp, "void S%s::subStep%d(){\n", name.c_str(), i);
-    for (int i = 0; i < 10000 && idx < superId; i ++, idx ++) {
-      fprintf(fp, "if(unlikely(activeFlags[%d])) step%d();\n", idx, idx);
+
+    for (int i = 0; i < NODE_PER_SUBFUNC && idx < superId; i ++, idx ++) {
+      int id;
+      uint64_t mask;
+      std::tie(id, mask) = setIdxMask(idx);
+      if (idx % ACTIVE_WIDTH == 0) {
+        if (i != 0) fprintf(fp, "}\n");
+        fprintf(fp, "if(unlikely(activeFlags[%d] != 0)) {\n", id);
+      }
+      fprintf(fp, "if(unlikely(activeFlags[%d] & 0x%lx)) step%d();\n", id, mask, idx);
     }
-    fprintf(fp, "}\n");
+    fprintf(fp, "}\n}\n");
   }
 }
 
@@ -681,10 +735,11 @@ void graph::genMemWrite(FILE* fp) {
   /* writer affects other nodes through reader, no need to activate in writer */
   fprintf(fp, "void S%s::writeMem(){\n", name.c_str());
   for (Node* mem : memory) {
-    std::set<SuperNode*> readerNext;
+    std::set<int> readerNextId;
     for (Node* port : mem->member) {
       if (port->type == NODE_READER) {
-        readerNext.insert(port->get_member(READER_DATA)->super);
+        if (port->get_member(READER_DATA)->super->cppId >= 0)
+          readerNextId.insert(port->get_member(READER_DATA)->super->cppId);
       }
     }
     Assert(mem->rlatency <= 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
@@ -728,9 +783,10 @@ void graph::genMemWrite(FILE* fp) {
             fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
           }
         }
-        for (SuperNode* super : readerNext) {
-          if (super->cppId < 0) continue;
-          fprintf(fp, "activeFlags[%d] = true;\n", super->cppId);
+        std::map<int, uint64_t> bitMapInfo;
+        activeSet2bitMap(readerNextId, bitMapInfo);
+        for (auto iter : bitMapInfo) {
+          fprintf(fp, "activeFlags[%d] |= 0x%lx;\n", iter.first, iter.second);
         }
         fprintf(fp, "}\n");
 
@@ -803,8 +859,9 @@ void graph::cppEmitter() {
   for (SuperNode* super : sortedSuper) {
     if (super->superType == SUPER_SAVE_REG || !super->instsEmpty()) super->cppId = superId ++;
   }
-  subStepNum = (superId + 9999) / 10000;
-  updateRegNum = (regsrc.size() + 9999) / 10000;
+  activeFlagNum = (superId + ACTIVE_WIDTH - 1) / ACTIVE_WIDTH;
+  subStepNum = (superId + NODE_PER_SUBFUNC - 1) / NODE_PER_SUBFUNC;
+  updateRegNum = (regsrc.size() + NODE_PER_SUBFUNC - 1) / NODE_PER_SUBFUNC;
 
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
