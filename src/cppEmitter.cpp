@@ -18,7 +18,8 @@ FILE* sigFile = nullptr;
 static int displayNum = 0;
 static const int nodePerDisplay = 5000;
 #endif
-static int superId = 1;
+
+static int superId = 0;
 static std::set<Node*> definedNode;
 extern std::set<int> maskWidth;
 bool nameExist(std::string str);
@@ -63,7 +64,7 @@ static std::string arrayPrevName (std::string name) {
 #endif
 
 static void inline declStep(FILE* fp) {
-  for (int i = 1; i < superId; i ++) fprintf(fp, "void step%d();\n", i);
+  for (int i = 0; i < superId; i ++) fprintf(fp, "void step%d();\n", i);
   fprintf(fp, "void step();\n");
 }
 
@@ -615,10 +616,10 @@ void graph::genMemRead(FILE* fp) {
 }
 
 void graph::genActivate(FILE* fp) {
-  int idx = 1;
+  int idx = 0;
   for (int i = 0; i < subStepNum; i ++) {
     fprintf(fp, "void S%s::subStep%d(){\n", name.c_str(), i);
-    for (int i = 1; i < 10000 && idx < superId; i ++, idx ++) {
+    for (int i = 0; i < 10000 && idx < superId; i ++, idx ++) {
       fprintf(fp, "if(unlikely(activeFlags[%d])) step%d();\n", idx, idx);
     }
     fprintf(fp, "}\n");
@@ -728,7 +729,7 @@ void graph::genMemWrite(FILE* fp) {
           }
         }
         for (SuperNode* super : readerNext) {
-          if (super->cppId <= 0) continue;
+          if (super->cppId < 0) continue;
           fprintf(fp, "activeFlags[%d] = true;\n", super->cppId);
         }
         fprintf(fp, "}\n");
@@ -824,7 +825,7 @@ void graph::cppEmitter() {
     if (super->superType == SUPER_VALID) {
       for (Node* n : super->member) genNodeDef(header, n);
     }
-    if (super->cppId <= 0) continue;
+    if (super->cppId < 0) continue;
     genNodeStepStart(src, super);
     for (Node* n : super->member) {
       // genNodeDef(header, n);
