@@ -110,6 +110,7 @@ void graph::mergeSublings() {
     }
   }
   removeEmptySuper();
+  reconnectSuper();
 }
 
 void graph::mergeNodes() {
