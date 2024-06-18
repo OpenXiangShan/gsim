@@ -82,7 +82,7 @@ HEADERS := $(foreach x, $(INCLUDE_DIR), $(wildcard $(addprefix $(x)/*,.h)))
 VERI_INC_DIR = $(OBJ_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME) --max-num-width 1048576 --compiler clang # --trace-fst
 VERI_CFLAGS = $(addprefix -I../, $(VERI_INC_DIR)) $(MODE_FLAGS) -fbracket-depth=2048 -Wno-parentheses-equality
-VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\"
+VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\" -DDUTNAME=\\\"$(dutName)\\\"
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).v
 VERI_VSRCS += $(addprefix ready-to-run/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v DifftestMemInitializer.v)
@@ -95,7 +95,7 @@ REF_GSIM_SRCS = $(shell find $(REF_GSIM_DIR)/splitted -name "*.cpp")
 REF_GSIM_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(REF_GSIM_SRCS:.cpp=.o))
 
 GSIM_CFLAGS = $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME) -DMOD_HEADER=\"$(NAME).h\" -fbracket-depth=2048 \
-			-Wno-parentheses-equality # -ggdb
+			-Wno-parentheses-equality -DDUTNAME=\"$(dutName)\"# -pg #-ggdb
 
 OPT_FAST = 
 
@@ -105,10 +105,10 @@ endif
 
 ifeq ($(PERF),1)
 	CXXFLAGS += -DPERF
-	GSIM_CFLAGS += -DPERF -DACTIVE_FILE=\"logs/active-$(dutName).txt\"
-endif
-
-ifeq ($(MODE),0)
+	GSIM_CFLAGS += -DPERF -DACTIVE_FILE=\"logs/active-$(dutName).txt\" -O0 -Wno-format
+	MODE_FLAGS += -DGSIM
+	target = $(EMU_BUILD_DIR)/S$(NAME)
+else ifeq ($(MODE),0)
 	MODE_FLAGS += -DGSIM
 	target = $(EMU_BUILD_DIR)/S$(NAME)
 	GSIM_CFLAGS += -O3 -Wno-format
@@ -126,7 +126,7 @@ else ifeq ($(MODE), 2)
 else
 	MODE_FLAGS += -DGSIM -DGSIM_DIFF
 	target = $(EMU_BUILD_DIR)/S$(NAME)_diff
-	CXXFLAGS += -DDIFFTEST_PER_SIG
+	CXXFLAGS += -DDIFFTEST_PER_SIG -DGSIM_DIFF
 	GSIM_CFLAGS += -O0
 	GSIM_CFLAGS += -I$(REF_GSIM_DIR) -DREF_NAME=Diff$(NAME)
 	SIG_COMMAND = python3 scripts/genSigDiff.py $(NAME) $(DIFF_VERSION)
