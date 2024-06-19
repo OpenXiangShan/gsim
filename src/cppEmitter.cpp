@@ -600,65 +600,6 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
   nodeDisplay(fp, node);
 }
 
-void graph::genMemRead(FILE* fp) {
-  fprintf(fp, "void S%s::updateMem() {\n", name.c_str());
-  for (Node* mem : memory) {
-    Assert(mem->rlatency <= 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
-    if (mem->width > BASIC_WIDTH) {
-      for (Node* port : mem->member) {
-        if (port->type == NODE_READER && mem->rlatency == 1) {
-          if (port->member[READER_DATA]->dimension.size() != 0) {
-             std::string indexStr, bracket;
-            for (size_t i = 0; i < mem->dimension.size(); i ++) {
-              fprintf(fp, "for (int i%ld = 0; i%ld < %d; i%ld ++) {", i, i, mem->dimension[i], i);
-              indexStr += format("[i%ld]", i);
-              bracket += "}\n";
-            }
-            fprintf(fp, "mpz_set(%s%s, %s[%s]%s);\n", port->member[READER_DATA]->computeInfo->valStr.c_str(), indexStr.c_str(),
-                                mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str());
-
-            fprintf(fp, "%s", bracket.c_str());
-          } else {
-            fprintf(fp, "mpz_set(%s, %s[%s]);\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
-          }
-          activateUncondNext(fp, port->member[READER_DATA], port->member[READER_DATA]->nextActiveId, false);
-        }
-      }
-    } else {
-      for (Node* port : mem->member) {
-        if (port->type == NODE_READER && mem->rlatency == 1) {
-          if (port->member[READER_DATA]->dimension.size() != 0) {
-            fprintf(fp, "memcpy(%s, %s[%s], sizeof(%s));\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str(), port->member[READER_DATA]->name.c_str());
-#ifdef EMU_LOG
-            fprintf(fp, "if (cycles >= %d && cycles <= %d) {\n", LOG_START, LOG_END);
-            std::string idxStr, bracket;
-            fprintf(fp, "printf(\"%%ld read %s \", cycles);\n", port->member[READER_DATA]->name.c_str());
-            for (size_t i = 0; i < port->member[READER_DATA]->dimension.size(); i ++) {
-              fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, port->member[READER_DATA]->dimension[i], i);
-              idxStr += "[i" + std::to_string(i) + "]";
-              bracket += "}\n";
-            }
-            fprintf(fp, "printf(\"%%lx \", (uint64_t(%s)));", (port->member[READER_DATA]->name + idxStr).c_str());
-            fprintf(fp, "\n%s", bracket.c_str());
-            fprintf(fp, "printf(\"\\n\");\n}\n");
-#endif
-          }
-          else {
-            fprintf(fp, "%s = %s[%s];\n", port->member[READER_DATA]->name.c_str(), mem->name.c_str(), port->member[READER_ADDR]->computeInfo->valStr.c_str());
-#ifdef EMU_LOG
-            fprintf(fp, "if (cycles >= %d && cycles <= %d) {\n", LOG_START, LOG_END);
-            fprintf(fp, "printf(\"%%ld read %s %%lx\\n\", cycles, (uint64_t(%s)));\n", port->member[READER_DATA]->name.c_str(), port->member[READER_DATA]->name.c_str());
-            fprintf(fp, "}\n");
-#endif
-          }
-          activateUncondNext(fp, port->member[READER_DATA], port->member[READER_DATA]->nextActiveId, false);
-        }
-      }
-    }
-  }
-  fprintf(fp, "}\n");
-}
-
 void graph::genActivate(FILE* fp) {
   int idx = 0;
   for (int i = 0; i < subStepNum; i ++) {
@@ -841,8 +782,6 @@ void graph::saveDiffRegs(FILE* fp) {
 
 void graph::genStep(FILE* fp) {
   fprintf(fp, "void S%s::step() {\n", name.c_str());
-  /* readMemory */
-  // fprintf(fp, "updateMem();\n");
 
   for (int i = 0; i < subStepNum; i ++) {
     fprintf(fp, "subStep%d();\n", i);
@@ -916,7 +855,6 @@ void graph::cppEmitter() {
 #endif
 
   /* main evaluation loop (step)*/
-  // genMemRead(src);
   genActivate(src);
   genMemWrite(src);
   saveDiffRegs(src);
