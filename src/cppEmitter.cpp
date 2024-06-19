@@ -12,7 +12,7 @@
 #define oldMpz(node) std::string("oldValMpz")
 #define oldName(node) (node->width > BASIC_WIDTH ? oldMpz(node) : oldBasic(node))
 #define ACTIVE_WIDTH 8
-#define NODE_PER_SUBFUNC 9600
+#define NODE_PER_SUBFUNC 4800
 
 #ifdef DIFFTEST_PER_SIG
 FILE* sigFile = nullptr;
@@ -25,6 +25,7 @@ static const int nodePerDisplay = 5000;
 static int superId = 0;
 static int activeFlagNum = 0;
 static std::set<Node*> definedNode;
+static std::map<int, SuperNode*> cppId2Super;
 extern std::set<int> maskWidth;
 bool nameExist(std::string str);
 
@@ -100,7 +101,6 @@ static std::string arrayPrevName (std::string name) {
 #endif
 
 static void inline declStep(FILE* fp) {
-  for (int i = 0; i < superId; i ++) fprintf(fp, "void step%d();\n", i);
   fprintf(fp, "void step();\n");
 }
 
@@ -516,7 +516,6 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
 
 void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
   nodeNum ++;
-  fprintf(fp, "void S%s::step%d() {\n", name.c_str(), node->cppId);
   if(node->superType == SUPER_SAVE_REG) {
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
     fprintf(fp, "saveDiffRegs();\n");
@@ -598,7 +597,6 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
   }
 #endif
 
-  fprintf(fp, "}\n");
   nodeDisplay(fp, node);
 }
 
@@ -665,18 +663,27 @@ void graph::genActivate(FILE* fp) {
   int idx = 0;
   for (int i = 0; i < subStepNum; i ++) {
     fprintf(fp, "void S%s::subStep%d(){\n", name.c_str(), i);
-
     for (int i = 0; i < NODE_PER_SUBFUNC && idx < superId; i ++, idx ++) {
       int id;
       uint64_t mask;
       std::tie(id, mask) = setIdxMask(idx);
       if (idx % ACTIVE_WIDTH == 0) {
-        if (i != 0) fprintf(fp, "}\n");
+        if (i != 0) {
+          fprintf(fp, "}\n");
+        }
         fprintf(fp, "if(unlikely(activeFlags[%d] != 0)) {\n", id);
       }
-      fprintf(fp, "if(unlikely(activeFlags[%d] & 0x%lx)) step%d();\n", id, mask, idx);
+      fprintf(fp, "if(unlikely(activeFlags[%d] & 0x%lx)) {\n", id, mask);
+      SuperNode* super = cppId2Super[idx];
+      genNodeStepStart(fp, super);
+      for (Node* n : super->member) {
+        genNodeInsts(fp, n);
+      }
+      genNodeStepEnd(fp, super);
+      fprintf(fp, "}\n");
     }
-    fprintf(fp, "}\n}\n");
+    fprintf(fp, "}\n");
+    fprintf(fp, "}\n");
   }
 }
 
@@ -857,7 +864,10 @@ bool SuperNode::instsEmpty() {
 
 void graph::cppEmitter() {
   for (SuperNode* super : sortedSuper) {
-    if (super->superType == SUPER_SAVE_REG || !super->instsEmpty()) super->cppId = superId ++;
+    if (super->superType == SUPER_SAVE_REG || !super->instsEmpty()) {
+      super->cppId = superId ++;
+      cppId2Super[super->cppId] = super;
+    }
   }
   activeFlagNum = (superId + ACTIVE_WIDTH - 1) / ACTIVE_WIDTH;
   subStepNum = (superId + NODE_PER_SUBFUNC - 1) / NODE_PER_SUBFUNC;
@@ -882,13 +892,6 @@ void graph::cppEmitter() {
     if (super->superType == SUPER_VALID) {
       for (Node* n : super->member) genNodeDef(header, n);
     }
-    if (super->cppId < 0) continue;
-    genNodeStepStart(src, super);
-    for (Node* n : super->member) {
-      // genNodeDef(header, n);
-      genNodeInsts(src, n);
-    }
-    genNodeStepEnd(src, super);
   }
   /* memory definition */
   for (Node* mem : memory) genNodeDef(header, mem);
@@ -905,7 +908,6 @@ void graph::cppEmitter() {
   for (int i = 0; i < subStepNum; i ++) {
     fprintf(header, "void subStep%d();\n", i);
   }
-  // fprintf(header, "void updateMem();\n");
 
   fprintf(header, "void writeMem();\n");
 
