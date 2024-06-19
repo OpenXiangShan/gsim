@@ -56,9 +56,24 @@ void activeSet2bitMap(std::set<int>& activeId, std::map<int, uint64_t>& bitMapIn
     int bitMapId;
     uint64_t bitMapMask;
     std::tie(bitMapId, bitMapMask) = setIdxMask(id);
-    if (bitMapInfo.find(bitMapId) == bitMapInfo.end()) bitMapInfo[bitMapId] = bitMapMask;
-    else bitMapInfo[bitMapId] |= bitMapMask;
+    int num = 64 / ACTIVE_WIDTH;
+    bool find = false;
+    for (int i = 0; i < num; i ++) {
+      int newId = bitMapId - i;
+      if (bitMapInfo.find(newId) != bitMapInfo.end()) {
+        bitMapInfo[newId] |= bitMapMask << (i * ACTIVE_WIDTH);
+        find = true;
+      }
+    }
+    if (!find) bitMapInfo[bitMapId] = bitMapMask;
   }
+}
+
+std::string updateActiveStr(int idx, uint64_t mask) {
+  if (mask <= MAX_U8) return format("activeFlags[%d] |= 0x%lx;\n", idx, mask);
+  if (mask <= MAX_U16) return format("*(uint16_t*)&activeFlags[%d] |= 0x%lx;\n", idx, mask);
+  if (mask <= MAX_U32) return format("*(uint32_t*)&activeFlags[%d] |= 0x%lx;\n", idx, mask);
+  return format("*(uint64_t*)&activeFlags[%d] |= 0x%lx;\n", idx, mask);
 }
 
 std::string strRepeat(std::string str, int times) {
@@ -458,7 +473,7 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   std::map<int, uint64_t> bitMapInfo;
   activeSet2bitMap(nextNodeId, bitMapInfo);
   for (auto iter : bitMapInfo) {
-    fprintf(fp, "activeFlags[%d] |= 0x%lx;\n", iter.first, iter.second);
+    fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
   }
 #ifdef PERF
   for (int id : nextNodeId) {
@@ -474,7 +489,7 @@ static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bo
   std::map<int, uint64_t> bitMapInfo;
   activeSet2bitMap(activateId, bitMapInfo);
   for (auto iter : bitMapInfo) {
-    fprintf(fp, "activeFlags[%d] |= 0x%lx;\n", iter.first, iter.second);
+    fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
   }
 #ifdef PERF
   for (int id : activateId) {
@@ -734,7 +749,7 @@ void graph::genMemWrite(FILE* fp) {
         std::map<int, uint64_t> bitMapInfo;
         activeSet2bitMap(readerNextId, bitMapInfo);
         for (auto iter : bitMapInfo) {
-          fprintf(fp, "activeFlags[%d] |= 0x%lx;\n", iter.first, iter.second);
+          fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
         }
         fprintf(fp, "}\n");
 

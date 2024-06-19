@@ -66,6 +66,9 @@
 #define BASIC_WIDTH 128
 #define BASIC_TYPE __uint128_t
 #define uint128_t __uint128_t
+#define MAX_U8 0xff
+#define MAX_U16 0xffff
+#define MAX_U32 0xffffffff
 #define MAX_U64 0xffffffffffffffff
 
 #define UCast(width) (std::string("(") + widthUType(width) + ")")
