@@ -245,8 +245,6 @@ void graph::usedBits() {
 }
 
 void Node::updateTreeWithNewWIdth() {
-  printf("visiting %s width %d\n", name.c_str(), width);
-  display();
   /* add ops to match tree width */
   for (ExpTree* tree : assignTree) tree->updateWithNewWidth();
   for (ExpTree* tree : arrayVal) tree->updateWithNewWidth();
