@@ -10,6 +10,10 @@ Generate high-firrtl from scala
 
     $ mill -i __.test.runMain $(TOP_NAME) -td $(BUILD_DIR) -X high
 
+Generate high-firrtl from chirrtl (using [firrtl](https://github.com/chipsalliance/firrtl))
+
+    $./firrtl/utils/bin/firrtl -i SimTop.fir -X high -o SimTop.hi.fir
+
 Compile high-firttl to C++
 
     $ make compile MODE=0
