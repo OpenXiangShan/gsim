@@ -51,22 +51,27 @@ std::pair<int, uint64_t>clearIdxMask(int cppId) {
   return std::make_pair(id, mask);
 }
 
-void activeSet2bitMap(std::set<int>& activeId, std::map<int, uint64_t>& bitMapInfo) {
+uint64_t activeSet2bitMap(std::set<int>& activeId, std::map<int, uint64_t>& bitMapInfo, int curId) {
+  uint64_t ret = 0;
   for (int id : activeId) {
     int bitMapId;
     uint64_t bitMapMask;
     std::tie(bitMapId, bitMapMask) = setIdxMask(id);
     int num = 64 / ACTIVE_WIDTH;
     bool find = false;
-    for (int i = 0; i < num; i ++) {
-      int newId = bitMapId - i;
-      if (bitMapInfo.find(newId) != bitMapInfo.end()) {
-        bitMapInfo[newId] |= bitMapMask << (i * ACTIVE_WIDTH);
-        find = true;
+    if (curId >= 0 && id > curId && bitMapId == curId / ACTIVE_WIDTH) ret |= bitMapMask;
+    else {
+      for (int i = 0; i < num; i ++) {
+        int newId = bitMapId - i;
+        if (bitMapInfo.find(newId) != bitMapInfo.end()) {
+          bitMapInfo[newId] |= bitMapMask << (i * ACTIVE_WIDTH);
+          find = true;
+        }
       }
+      if (!find) bitMapInfo[bitMapId] = bitMapMask;
     }
-    if (!find) bitMapInfo[bitMapId] = bitMapMask;
   }
+  return ret;
 }
 
 std::string updateActiveStr(int idx, uint64_t mask) {
@@ -471,7 +476,8 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
     fprintf(fp, "if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
   }
   std::map<int, uint64_t> bitMapInfo;
-  activeSet2bitMap(nextNodeId, bitMapInfo);
+  uint64_t curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
+  if (curMask != 0) fprintf(fp, "oldFlag |= 0x%lx;\n", curMask);
   for (auto iter : bitMapInfo) {
     fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
   }
@@ -487,7 +493,8 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
 
 static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bool inStep) {
   std::map<int, uint64_t> bitMapInfo;
-  activeSet2bitMap(activateId, bitMapInfo);
+  uint64_t curMask = activeSet2bitMap(activateId, bitMapInfo, node->super->cppId);
+  if (curMask != 0) fprintf(fp, "oldFlag |= 0x%lx;\n", curMask);
   for (auto iter : bitMapInfo) {
     fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
   }
@@ -539,7 +546,6 @@ void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
     int id;
     uint64_t mask;
     std::tie(id, mask) = clearIdxMask(node->cppId);
-    fprintf(fp, "activeFlags[%d] &= 0x%lx;\n", id, mask);
   #ifdef PERF
     fprintf(fp, "activeTimes[%d] ++;\n", node->cppId);
     fprintf(fp, "bool isActivateValid = false;\n");
@@ -628,8 +634,10 @@ void graph::genActivate(FILE* fp) {
           fprintf(fp, "}\n");
         }
         fprintf(fp, "if(unlikely(activeFlags[%d] != 0)) {\n", id);
+        fprintf(fp, "uint%d_t oldFlag = activeFlags[%d];\n", ACTIVE_WIDTH, id);
+        fprintf(fp, "activeFlags[%d] = 0;\n", id);
       }
-      fprintf(fp, "if(unlikely(activeFlags[%d] & 0x%lx)) {\n", id, mask);
+      fprintf(fp, "if(unlikely(oldFlag & 0x%lx)) {\n", mask);
       SuperNode* super = cppId2Super[idx];
       genNodeStepStart(fp, super);
       for (Node* n : super->member) {
@@ -747,7 +755,7 @@ void graph::genMemWrite(FILE* fp) {
           }
         }
         std::map<int, uint64_t> bitMapInfo;
-        activeSet2bitMap(readerNextId, bitMapInfo);
+        activeSet2bitMap(readerNextId, bitMapInfo, -1);
         for (auto iter : bitMapInfo) {
           fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
         }
