@@ -110,6 +110,11 @@ class ArrayMemberList;
 
 enum ResetType { UNCERTAIN, ASYRESET, UINTRESET, ZERO_RESET };
 
+std::string arrayMemberName(Node* node, std::string suffix);
+#define newBasic(node) (node->isArrayMember ? arrayMemberName(node, "new") : (node->name + "$new"))
+#define newMpz(node) std::string("newValMpz")
+#define newName(node) (node->width > BASIC_WIDTH ? newMpz(node) : newBasic(node))
+
 #include "opFuncs.h"
 #include "debug.h"
 #include "Node.h"

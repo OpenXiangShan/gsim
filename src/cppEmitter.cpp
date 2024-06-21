@@ -8,9 +8,6 @@
 #include <map>
 #include <utility>
 
-#define oldBasic(node) (node->isArrayMember ? arrayMemberOld(node) : (node->name + "$old"))
-#define oldMpz(node) std::string("oldValMpz")
-#define oldName(node) (node->width > BASIC_WIDTH ? oldMpz(node) : oldBasic(node))
 #define ACTIVE_WIDTH 8
 #define NODE_PER_SUBFUNC 4800
 
@@ -104,10 +101,10 @@ std::string strReplace(std::string s, std::string oldStr, std::string newStr) {
   return s;
 }
 
-static std::string arrayMemberOld(Node* node) {
+std::string arrayMemberName(Node* node, std::string suffix) {
   Assert(node->isArrayMember, "invalid type %d %s", node->type, node->name.c_str());
   std::string ret = strReplace(node->name, "[", "__");
-  ret = strReplace(ret, "]", "__") + "$old";
+  ret = strReplace(ret, "]", "__") + "$" + suffix;
   return ret;
 }
 
@@ -233,7 +230,7 @@ for (SuperNode* super : sortedSuper) {
   for (Node* mem : memory) {
     genMemInit(header, mem);
   }
-  fprintf(header, "mpz_init(oldValMpz);\n");
+  fprintf(header, "mpz_init(newValMpz);\n");
 #if  defined (MEM_CHECK) || defined (DIFFTEST_PER_SIG)
   for (Node* mem :memory) {
     fprintf(header, "memset(%s, 0, sizeof(%s));\n", mem->name.c_str(), mem->name.c_str());
@@ -242,7 +239,7 @@ for (SuperNode* super : sortedSuper) {
   fprintf(header, "}\n");
 
   /* mpz variable used for intermidia values */
-  fprintf(header, "mpz_t oldValMpz;\n");
+  fprintf(header, "mpz_t newValMpz;\n");
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_t MPZ_TMP$%d;\n", i);
   for (int i : maskWidth) fprintf(header, "mpz_t MPZ_MASK$%d;\n", i);
   fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
@@ -447,21 +444,11 @@ std::string graph::saveOldVal(FILE* fp, Node* node) {
 
   if (!node->isArray()) {
     if (node->width > BASIC_WIDTH) {
-      fprintf(fp, "mpz_set(%s, %s);\n", oldMpz(node).c_str(), node->name.c_str());
-      ret = oldMpz(node);
+      fprintf(fp, "mpz_set(%s, %s);\n", newMpz(node).c_str(), node->name.c_str());
+      ret = newMpz(node);
     } else {
-      fprintf(fp, "%s %s = %s;\n", widthUType(node->width).c_str(), oldBasic(node).c_str(), node->name.c_str());
-      ret = oldBasic(node);
-    }
-  } else if (node->arrayEntryNum() == 1) {
-    std::string suffix = strRepeat("[0]", node->dimension.size());
-    if (node->width > BASIC_WIDTH) {
-      if (node->isArrayMember) TODO();
-      fprintf(fp, "mpz_set(%s, %s%s);\n", oldMpz(node).c_str(), node->name.c_str(), suffix.c_str());
-      ret = oldMpz(node);
-    } else {
-      fprintf(fp, "%s %s = %s%s;\n", widthUType(node->width).c_str(), oldBasic(node).c_str(), node->name.c_str(), suffix.c_str());
-      ret = oldBasic(node);
+      fprintf(fp, "%s %s = %s;\n", widthUType(node->width).c_str(), newBasic(node).c_str(), node->name.c_str());
+      ret = newBasic(node);
     }
   }
   return ret;
@@ -474,6 +461,12 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
     fprintf(fp, "if (mpz_cmp(%s, %s) != 0) {\n", nodeName.c_str(), oldName.c_str());
   } else {
     fprintf(fp, "if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
+  }
+  if (inStep) {
+    if (node->width > BASIC_WIDTH)
+      fprintf(fp, "mpz_set(%s, %s);\n", node->name.c_str(), newName(node).c_str());
+    else
+      fprintf(fp, "%s = %s;\n", node->name.c_str(), newName(node).c_str());
   }
   std::map<int, uint64_t> bitMapInfo;
   uint64_t curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
@@ -523,8 +516,28 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
   std::string oldnode;
   if (node->insts.size()) {
     /* save oldVal */
-    if (node->needActivate()) {
+    if (node->needActivate() && !node->isArray()) {
       oldnode = saveOldVal(fp, node);
+      for (size_t i = 0; i < node->insts.size(); i ++) {
+        std::string inst = node->insts[i];
+        size_t start_pos = 0;
+        if (node->width <= BASIC_WIDTH) {
+          std::string basicSet = node->name + " = ";
+          std::string replaceStr = newName(node) + " = ";
+          while((start_pos = inst.find(basicSet, start_pos)) != std::string::npos) {
+            inst.replace(start_pos, basicSet.length(), replaceStr);
+            start_pos += replaceStr.length();
+          }
+        } else {
+          std::string mpzSet = "(" + node->name + ",";
+          std::string replaceStr = "(newValMpz,";
+          while((start_pos = inst.find(mpzSet, start_pos)) != std::string::npos) {
+            inst.replace(start_pos, mpzSet.length(), replaceStr);
+            start_pos += replaceStr.length();
+          }
+        }
+        node->insts[i] = inst;
+      }
     }
     /* display all insts */
     for (std::string inst : node->insts) {
@@ -532,7 +545,7 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
     }
   }
   if (!node->needActivate()) ;
-  else if(node->dimension.size() == 0 || node->arrayEntryNum() == 1) activateNext(fp, node, node->nextActiveId, oldnode, true);
+  else if(node->dimension.size() == 0 || node->arrayEntryNum() == 1) activateNext(fp, node, node->nextActiveId, newName(node), true);
   else activateUncondNext(fp, node, node->nextActiveId, true);
 }
 
@@ -648,56 +661,6 @@ void graph::genActivate(FILE* fp) {
     }
     fprintf(fp, "}\n");
     fprintf(fp, "}\n");
-  }
-}
-
-void graph::genUpdateRegister(FILE* fp) {
-  /* update registers */
-  /* NOTE: register may need to update itself */
-  size_t idx = 0;
-  for (int i = 0; i < updateRegNum; i ++) {
-    fprintf(fp, "void S%s::updateRegister%d() {\n", name.c_str(), i);
-    for (int j = 0; j < 10000 && idx < regsrc.size(); j ++) {
-      Node* node = regsrc[idx ++];
-      if (node->regSplit && node->status == VALID_NODE) {
-        if (node->dimension.size() == 0 || node->arrayEntryNum() == 1) {
-            std::string regold;
-            if (node->regNeedActivate()) regold = saveOldVal(fp, node);
-            if (node->updateTree->getRoot()->computeInfo->opNum < 0) {
-              fprintf(fp, "%s\n", node->updateTree->getRoot()->computeInfo->valStr.c_str());
-            }
-            else if (node->width > BASIC_WIDTH) fprintf(fp, "mpz_set(%s, %s);\n", node->updateTree->getlval()->computeInfo->valStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
-            else fprintf(fp, "%s = %s;\n", node->updateTree->getlval()->computeInfo->valStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str());
-  #ifdef EMU_LOG
-            std::string nodeName = (node->isArray() && node->arrayEntryNum() == 1) ? (node->name + strRepeat("[0]", node->dimension.size())) : node->name;
-            if (node->width <= 32)
-              fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%x\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), nodeName.c_str());
-            else if (node->width <= 64)
-              fprintf(fp, "if (cycles >= %d && cycles <= %d)\nprintf(\"%%ld reg %s = %%lx\\n\", cycles, %s);\n", LOG_START, LOG_END, node->name.c_str(), nodeName.c_str());
-  #endif
-          if (node->regNeedActivate()) activateNext(fp, node, node->regActivate, regold, false);
-        } else {
-          // if (node->super->cppId < 0)
-            activateUncondNext(fp, node, node->regActivate, false);
-          if (node->updateTree->getRoot()->computeInfo->opNum < 0) {
-              fprintf(fp, "%s\n", node->updateTree->getRoot()->computeInfo->valStr.c_str());
-          } else if (node->width > BASIC_WIDTH) {
-            std::string idxStr, bracket;
-            for (size_t i = 0; i < node->dimension.size(); i ++) {
-              fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i], i);
-              idxStr += "[i" + std::to_string(i) + "]";
-              bracket += "}\n";
-            }
-            fprintf(fp, "mpz_set(%s%s, %s%s);\n", node->name.c_str(), idxStr.c_str(), node->updateTree->getRoot()->computeInfo->valStr.c_str(), idxStr.c_str());
-            fprintf(fp, "%s", bracket.c_str());
-          }
-          else fprintf(fp, "memcpy(%s, %s, sizeof(%s));\n", node->name.c_str(),
-                    node->updateTree->getRoot()->computeInfo->valStr.c_str(), node->name.c_str());
-        }
-      }
-    }
-    fprintf(fp, "}\n");
-
   }
 }
 
