@@ -21,6 +21,7 @@ public:
   std::vector<valInfo*> memberInfo;
   bool sameConstant = false;
   mpz_t assignmentCons;
+  bool fullyUpdated = true;
 
   valInfo(int _width = 0, bool _sign = 0) {
     mpz_init(consVal);
@@ -70,6 +71,7 @@ public:
     ret->width = width;
     ret->sign = sign;
     ret->consLength = consLength;
+    ret->fullyUpdated = fullyUpdated;
     if (status == VAL_CONSTANT) {
       mpz_set(ret->assignmentCons, assignmentCons);
       ret->sameConstant = sameConstant;

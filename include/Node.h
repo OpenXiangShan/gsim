@@ -143,6 +143,9 @@ class Node {
 
   int whenDepth = 0;
 
+/* used in instsGenerator */
+  bool fullyUpdated = true;
+
 /* used in cppEmitter */
   std::set<int> nextActiveId;
   std::set<int> regActivate;

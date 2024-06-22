@@ -440,9 +440,14 @@ void graph::genSrcEnd(FILE* fp) {
 
 std::string graph::saveOldVal(FILE* fp, Node* node) {
   std::string ret;
+  if (node->isArray()) return ret;
     /* save oldVal */
-
-  if (!node->isArray()) {
+  if (node->fullyUpdated) {
+    if (node->width <= BASIC_WIDTH) {
+      fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), newBasic(node).c_str());
+      ret = newBasic(node);
+    }
+  } else {
     if (node->width > BASIC_WIDTH) {
       fprintf(fp, "mpz_set(%s, %s);\n", newMpz(node).c_str(), node->name.c_str());
       ret = newMpz(node);

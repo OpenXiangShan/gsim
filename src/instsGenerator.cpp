@@ -479,6 +479,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   }
   ret->valStr = format("if(%s) { %s } else { %s }", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
   ret->opNum = -1;
+  if (!getChild(1) || !getChild(2) || !ChildInfo(1, fullyUpdated) || !ChildInfo(2, fullyUpdated)) ret->fullyUpdated = false;
 
   if (!getChild(1) && getChild(2)) {
     if (ChildInfo(2, sameConstant)) {
@@ -543,7 +544,9 @@ valInfo* ENode::instsStmt(Node* node, std::string lvalue, bool isRoot) {
     return computeInfo;
   }
   for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
+  bool updated = false;
   for (ENode* childENode : child) {
+    updated |= childENode->computeInfo->fullyUpdated;
     if (childENode->computeInfo->status == VAL_INVALID || childENode->computeInfo->status == VAL_EMPTY) continue;
     else if (childENode->computeInfo->opNum < 0) {
       computeInfo->valStr += childENode->computeInfo->valStr;
@@ -561,6 +564,7 @@ valInfo* ENode::instsStmt(Node* node, std::string lvalue, bool isRoot) {
     }
   }
   computeInfo->opNum = -1;
+  computeInfo->fullyUpdated = updated;
   return computeInfo;
 }
 
@@ -1935,6 +1939,7 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
     }
   }
   computeInfo->valStr = format("if(%s) { %s }", ChildInfo(0, valStr).c_str(), ret.c_str());
+  computeInfo->fullyUpdated = false;
   computeInfo->opNum = -1;
   return computeInfo;
 }
@@ -2177,6 +2182,14 @@ valInfo* Node::compute() {
       fillEmptyWhen(assignTree[i+1], tree->getRoot());
     }
   }
+  bool updated = false;
+  for (size_t i = 0; i < assignTree.size(); i ++) {
+    if (assignTree[i]->getRoot()->computeInfo->fullyUpdated) {
+      updated = true;
+      break;
+    }
+  }
+  fullyUpdated = updated;
   if (!ret) ret = assignTree.back()->getRoot()->compute(this, name, isRoot)->dup();
   Assert(ret, "empty info in %s\n", name.c_str());
   if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) ret->setConstantByStr("0");
