@@ -11,7 +11,7 @@ void graph::mergeOut1() {
   for (int i = sortedSuper.size() - 1; i >= 0; i --) {
     SuperNode* super = sortedSuper[i];
     /* do not merge superNodes that contains reg src */
-    if (inSrc(super) || super->superType != SUPER_VALID) continue;
+    if (super->superType != SUPER_VALID) continue;
     if (super->next.size() == 1) {
       SuperNode* nextSuper = *(super->next.begin());
       if (nextSuper->superType != SUPER_VALID) continue;
@@ -82,7 +82,7 @@ void graph::mergeSublings() {
   std::map<uint64_t, std::vector<SuperNode*>> prevSuper;
   for (SuperNode* super : sortedSuper) {
     if (super->prev.size() == 0) continue;
-    if (inSrc(super) || super->superType != SUPER_VALID) continue;
+    if (super->superType != SUPER_VALID) continue;
     uint64_t id = prevHash(super);
     if (prevSuper.find(id) == prevSuper.end()) prevSuper[id] = std::vector<SuperNode*>();
     prevSuper[id].push_back(super);
