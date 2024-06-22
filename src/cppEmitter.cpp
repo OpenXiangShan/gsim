@@ -650,7 +650,7 @@ void graph::genActivate(FILE* fp) {
         fprintf(fp, "uint%d_t oldFlag = activeFlags[%d];\n", ACTIVE_WIDTH, id);
         fprintf(fp, "activeFlags[%d] = 0;\n", id);
       }
-      fprintf(fp, "if(unlikely(oldFlag & 0x%lx)) {\n", mask);
+      fprintf(fp, "if(unlikely(oldFlag & 0x%lx)) { // id=%d\n", mask, idx);
       SuperNode* super = cppId2Super[idx];
       genNodeStepStart(fp, super);
       for (Node* n : super->member) {
