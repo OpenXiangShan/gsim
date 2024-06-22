@@ -40,13 +40,8 @@ int main(int argc, char** argv) {
   Parser::Syntax syntax{&lexical};
 
   FUNC_WRAPPER(syntax.parse());
-
-  MUX_DEBUG(std::cout << "parser finished\n");
-
   graph* g;
   FUNC_WRAPPER(g = AST2Graph(root));
-
-  MUX_DEBUG(preorder_traversal(root));
 
   FUNC_WRAPPER(g->splitArray());
 
