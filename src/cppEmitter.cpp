@@ -654,6 +654,7 @@ void graph::genActivate(FILE* fp) {
       SuperNode* super = cppId2Super[idx];
       genNodeStepStart(fp, super);
       for (Node* n : super->member) {
+        if (n->insts.size() == 0) continue;
         genNodeInsts(fp, n);
       }
       genNodeStepEnd(fp, super);

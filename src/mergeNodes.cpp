@@ -45,7 +45,7 @@ void graph::mergeIn1() {
     if (super->superType != SUPER_VALID) continue;
     if (super->prev.size() == 1) {
       SuperNode* prevSuper = *(super->prev.begin());
-      if (inSrc(prevSuper) || prevSuper->superType != SUPER_VALID) continue;
+      if (prevSuper->superType != SUPER_VALID) continue;
       if (prevSuper->member.size() > MAX_NODES_PER_SUPER) continue;
       /* move members in super to prev super */
       for (Node* member : super->member) member->super = prevSuper;
