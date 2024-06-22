@@ -10,7 +10,6 @@
 
 #define Child(id, name) getChild(id)->name
 
-static std::map<Node*, int> usedBits;
 /* all nodes that may affect their previous ndoes*/
 static std::vector<Node*> checkNodes;
 
@@ -250,9 +249,9 @@ void Node::updateTreeWithNewWIdth() {
   for (ExpTree* tree : arrayVal) tree->updateWithNewWidth();
   if (resetVal) resetVal->updateWithNewWidth();
   if (updateTree) updateTree->updateWithNewWidth();
+
   for (ExpTree* tree : assignTree) tree->matchWidth(width);
   for (ExpTree* tree : arrayVal) tree->matchWidth(width);
   if (resetVal) resetVal->matchWidth(width);
   if (updateTree) updateTree->matchWidth(width);
-display();
 }
