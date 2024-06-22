@@ -68,6 +68,7 @@ class graph {
   void cppEmitter();
   void usedBits();
   void traversal();
+  void traversalNoTree();
   void splitArray();
   void removeDeadNodes();
   void aliasAnalysis();

@@ -66,7 +66,7 @@ void ExpTree::display() {
       printf("%s(EMPTY)\n",std::string(depth * 2, ' ').c_str());
       continue;
     }
-    printf("%s(%d %s %p) %s [width=%d, sign=%d]", std::string(depth * 2, ' ').c_str(), top->opType, OP2Name[top->opType], top, (top->nodePtr) ? top->nodePtr->name.c_str(): "", top->width, top->sign);
+    printf("%s(%d %s %p) %s %s [width=%d, sign=%d, type=%d]", std::string(depth * 2, ' ').c_str(), top->opType, OP2Name[top->opType], top, (top->nodePtr) ? top->nodePtr->name.c_str(): "", top->strVal.c_str(), top->width, top->sign, (top->nodePtr) ? top->nodePtr->type: 0);
     for (int val : top->values) printf(" %d", val);
     printf("\n");
     for (int i = top->child.size() - 1; i >= 0; i --) {
@@ -104,5 +104,29 @@ void Node::display() {
   if (updateTree) {
     printf("[updateTree]:\n");
     updateTree->display();
+  }
+#if 0
+  for (Node* nextNode : next) {
+    printf("    next %p %s\n", nextNode, nextNode->name.c_str());
+  }
+  for (Node* prevNode : prev) {
+    printf("    prev %p %s\n", prevNode, prevNode->name.c_str());
+  }
+#endif
+}
+
+void ENode::display() {
+  ExpTree* tmp = new ExpTree(this, new ENode());
+  tmp->display();
+}
+
+void graph::traversalNoTree() {
+  int nodeIdx = 0;
+  for (size_t idx = 0; idx < sortedSuper.size(); idx ++) {
+    SuperNode* super = sortedSuper[idx];
+    printf("---%ld super id = %d---\n", idx, super->id);
+    for (Node* node : super->member) {
+      printf("%d: %s (super %d)\n", nodeIdx ++, node->name.c_str(), super->id);
+    }
   }
 }
