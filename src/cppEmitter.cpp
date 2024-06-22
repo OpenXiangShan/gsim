@@ -9,7 +9,7 @@
 #include <utility>
 
 #define ACTIVE_WIDTH 8
-#define NODE_PER_SUBFUNC 4800
+#define NODE_PER_SUBFUNC 2400
 
 #ifdef DIFFTEST_PER_SIG
 FILE* sigFile = nullptr;
