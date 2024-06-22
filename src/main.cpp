@@ -71,6 +71,8 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->commonExpr());
 
+  FUNC_WRAPPER(g->removeDeadNodes());
+
   FUNC_WRAPPER(g->mergeNodes());
 
   FUNC_WRAPPER(g->mergeRegister());

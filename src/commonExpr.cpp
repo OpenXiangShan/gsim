@@ -154,7 +154,13 @@ void graph::commonExpr() {
   }
 
   for (auto iter : uniqueNodes) {
-    if (iter.second.size() >= MAX_COMMON_NEXT) {
+    bool mergeCond = iter.second.size() >= MAX_COMMON_NEXT || iter.second[0]->width > BASIC_WIDTH;
+    if (!mergeCond) {
+      for (auto iter1 : iter.second) {
+        if (iter1->next.size() > 1) mergeCond = true;
+      }
+    }
+    if (mergeCond) {
       Node* aliasNode = iter.second[0];
       for (size_t i = 1; i < iter.second.size(); i ++) {
         Node* node = iter.second[i];
