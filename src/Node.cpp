@@ -248,30 +248,68 @@ void Node::removeConnection() {
   for (Node* nextNode : next) nextNode->prev.erase(this);
 }
 
+ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index);
+
+void splitTree(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees) {
+  if (node->dimension.size() == tree->getlval()->getChildNum()) {
+    newTrees.push_back(tree);
+    return;
+  }
+  int newBeg, newEnd;
+  std::tie(newBeg, newEnd) = tree->getlval()->getIdx(node);
+  if (newBeg < 0 || newBeg == newEnd) {
+    newTrees.push_back(tree);
+    return;
+  }
+  for (int i = newBeg; i <= newEnd; i ++) {
+    std::vector<int>newDim (node->dimension.size() - tree->getlval()->getChildNum());
+    int dim = i;
+    for (int j = node->dimension.size() - 1; j >= tree->getlval()->getChildNum() ; j --) {
+      newDim[j-tree->getlval()->getChildNum()] = dim % node->dimension[j];
+      dim = dim / node->dimension[j];
+    }
+    ExpTree* newTree = dupTreeWithIdx(tree, newDim);
+    newTrees.push_back(newTree);
+  }
+
+}
+
 void Node::addArrayVal(ExpTree* val) {
-  if (val->getRoot()->opType == OP_INVALID) ;
-  else if (val->getRoot()->opType == OP_WHEN) {
+  if (val->getRoot()->opType == OP_INVALID) return;
+  if (arrayVal.size() == 1 && arrayVal[0]->getRoot()->opType != OP_WHEN) {
+    ExpTree* oldTree = arrayVal[0];
+    arrayVal.clear();
+    std::vector<ExpTree*> newTrees;
+    splitTree(this, oldTree, newTrees);
+    for (ExpTree* tree : newTrees) arrayVal.push_back(tree);
+  }
+  if (val->getRoot()->opType == OP_WHEN) {
     arrayVal.push_back(val);
   } else {
-    bool replace = true;
-    int idx = -1;
     int newBeg, newEnd;
     std::tie(newBeg, newEnd) = val->getlval()->getIdx(this);
-    if (newBeg < 0) replace = false;
-    else {
+    if (newBeg < 0 || arrayVal.size() == 0) {
+      arrayVal.push_back(val);
+      return;
+    }
+    std::vector<ExpTree*> newTrees;
+    splitTree(this, val, newTrees);
+    for (ExpTree* tree : newTrees) {
+      int beg, end;
+      std::tie(beg, end) = tree->getlval()->getIdx(this);
+      int replaceIdx = -1;
       for (size_t i = 0; i < arrayVal.size(); i ++) {
-        int beg, end;
-        std::tie(beg, end) = arrayVal[i]->getlval()->getIdx(this);
-        if (beg < 0 || ((!(newBeg > end || newEnd < beg)) && (newBeg != beg || newEnd != end))) { // overlap and not same
-          replace = false;
-          break;
-        } else if (newBeg == beg && newEnd == end) {
-          idx = i;
+        int prevBeg, prevEnd;
+        std::tie(prevBeg, prevEnd) = arrayVal[i]->getlval()->getIdx(this);
+        if (prevBeg == beg && prevEnd == end) {
+          replaceIdx = i;
           break;
         }
       }
+      if (replaceIdx >= 0) {
+        arrayVal.erase(arrayVal.begin() + replaceIdx);
+      }
+      arrayVal.push_back(tree);
     }
-    if (replace && idx >= 0) arrayVal[idx] = val;
-    else arrayVal.push_back(val);
   }
 }
