@@ -479,7 +479,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   }
   ret->valStr = format("if(%s) { %s } else { %s }", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
   ret->opNum = -1;
-  if (!getChild(1) || !getChild(2) || !ChildInfo(1, fullyUpdated) || !ChildInfo(2, fullyUpdated)) ret->fullyUpdated = false;
+  if (trueStr.length() == 0 || falseStr.length() == 0 || !ChildInfo(1, fullyUpdated) || !ChildInfo(2, fullyUpdated)) ret->fullyUpdated = false;
 
   if (!getChild(1) && getChild(2)) {
     if (ChildInfo(2, sameConstant)) {
