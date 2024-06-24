@@ -151,6 +151,7 @@ class Node {
   std::set<int> regActivate;
 
   std::vector<std::string> insts;
+  std::vector<std::string> initInsts;
 
   void updateInfo(TypeInfo* info);
   void setType(int _width, bool _sign) {

@@ -2470,6 +2470,17 @@ valInfo* Node::computeArray() {
         }
       }
     }
+    bool allConstant = true;
+    for (int i = 0; i < num; i ++) {
+      if (!computeInfo->memberInfo[i] || computeInfo->memberInfo[i]->status != VAL_CONSTANT) {
+        allConstant = false;
+        break;
+      }
+    }
+    if (allConstant) {
+      initInsts.insert(initInsts.end(), insts.begin(), insts.end());
+      insts.clear();
+    }
   }
   /* to avoid update register using previous updated registers */
   if (type == NODE_REG_DST) computeInfo->memberInfo.clear();

@@ -173,6 +173,7 @@ void graph::genNodeInit(FILE* fp, Node* node) {
     }
 #endif
   }
+  for (std::string inst : node->initInsts) fprintf(fp, "%s\n", inst.c_str());
 }
 
 FILE* graph::genHeaderStart(std::string headerFile) {
