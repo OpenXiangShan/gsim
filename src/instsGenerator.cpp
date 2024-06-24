@@ -2171,7 +2171,12 @@ valInfo* Node::compute() {
     return computeInfo;
   }
 
-  bool isRoot = anyExtEdge() || next.size() != 1 || isArrayMember;
+  bool isRoot = anyExtEdge() || next.size() != 1;
+  if (isArrayMember) {
+    for (Node* nextNode : next) {
+      if (nextNode->isArray()) isRoot = true;
+    }
+  }
   valInfo* ret = nullptr;
   for (size_t i = 0; i < assignTree.size(); i ++) {
     ExpTree* tree = assignTree[i];
