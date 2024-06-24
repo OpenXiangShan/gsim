@@ -424,7 +424,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
 #ifdef VERILATOR_DIFF
   genDiffSig(fp, node);
 #endif
-  fprintf(fp, ";\n");
+  fprintf(fp, "; // width = %d\n", node->width);
 
 }
 
