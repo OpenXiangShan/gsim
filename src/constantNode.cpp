@@ -799,7 +799,33 @@ valInfo* Node::computeConstantArray() {
         }
       }
     }
+
+    mpz_t sameConsVal;
+    mpz_init(sameConsVal);
+    bool isStart = true;
+    bool isSame = true;
+    for (int i = 0; i < num; i++) {
+      if (!ret->memberInfo[i] || ret->memberInfo[i]->status != VAL_CONSTANT) {
+        isSame = false;
+        break;
+      }
+      if (isStart) {
+        mpz_set(sameConsVal, ret->memberInfo[i]->consVal);
+        isStart = false;
+      }
+      if (mpz_cmp(sameConsVal, ret->memberInfo[i]->consVal) != 0) {
+        isSame = false;
+        break;
+      }
+    }
+    if (isSame) {
+      ret->status = VAL_CONSTANT;
+      mpz_set(ret->consVal, sameConsVal);
+      status = CONSTANT_NODE;
+    }
+
   }
+
   consMap[this] = ret;
   return ret;
 }
