@@ -1,4 +1,5 @@
 #include "common.h"
+#include <stack>
 
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
@@ -37,4 +38,52 @@ void Node::invalidArrayOptimize() {
   }
   for (ExpTree* tree : assignTree) fillArrayInvalid(tree);
   for (ExpTree* tree : arrayVal) fillArrayInvalid(tree);
+}
+
+bool checkENodeEq(ENode* enode1, ENode* enode2);
+static bool subTreeEq(ENode* enode1, ENode* enode2) {
+  if (!checkENodeEq(enode1, enode2)) return false;
+  for (size_t i = 0; i < enode1->getChildNum(); i ++) {
+    if (!subTreeEq(enode1->getChild(i), enode2->getChild(i))) return false;
+  }
+  return true;
+}
+
+void ExpTree::treeOpt() {
+  std::stack<std::tuple<ENode*, ENode*, int>> s;
+  s.push(std::make_tuple(getRoot(), nullptr, -1));
+
+  while(!s.empty()) {
+    ENode* top, *parent;
+    int idx;
+    std::tie(top, parent, idx) = s.top();
+    s.pop();
+    if (top->opType == OP_WHEN || top->opType == OP_MUX) {
+      if (subTreeEq(top->getChild(1), top->getChild(2))) {
+        if (parent) {
+          parent->setChild(idx, top->getChild(1));
+        } else {
+          setRoot(top->getChild(1));
+        }
+        top = top->getChild(1);
+      }
+    }
+    for (size_t i = 0; i < top->child.size(); i ++) {
+      if (top->child[i]) s.push(std::make_tuple(top->child[i], top, i));
+    }
+  }
+}
+
+void graph::exprOpt() {
+  for (SuperNode* super : sortedSuper) {
+    if (super->superType != SUPER_VALID) continue;
+    for (Node* node : super->member) {
+      for (ExpTree* tree : node->assignTree) tree->treeOpt();
+      for (ExpTree* tree : node->arrayVal) tree->treeOpt();
+      if (node->resetVal) node->resetVal->treeOpt();
+      if (node->updateTree) node->updateTree->treeOpt();
+    }
+  }
+
+  reconnectAll();
 }

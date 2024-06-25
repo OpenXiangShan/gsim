@@ -1,5 +1,21 @@
 #include "common.h"
 
+void graph::reconnectAll() {
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      member->prev.clear();
+      member->next.clear();
+    }
+  }
+
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      member->updateConnect();
+    }
+  }
+  reconnectSuper();
+}
+
 void graph::reconnectSuper() {
   for (SuperNode* super : sortedSuper) {
     super->prev.clear();

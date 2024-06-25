@@ -291,6 +291,7 @@ public:
     void when2mux(int width);
     void updateWithNewWidth();
     void updateNewChild(ENode* parent, ENode* child, int idx);
+    void treeOpt();
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes

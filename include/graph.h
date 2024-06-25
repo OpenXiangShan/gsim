@@ -28,6 +28,7 @@ class graph {
   std::string saveOldVal(FILE* fp, Node* node);
   void removeNodesNoConnect(NodeStatus status);
   void reconnectSuper();
+  void reconnectAll();
   void resetAnalysis();
   /* defined in mergeNodes */
   void mergeOut1();
@@ -82,6 +83,7 @@ class graph {
   void constantAnalysis();
   void constructRegs();
   void commonExpr();
+  void exprOpt();
 };
 
 #endif

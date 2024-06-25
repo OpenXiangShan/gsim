@@ -55,6 +55,7 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->removeDeadNodes());
 
+  FUNC_WRAPPER(g->exprOpt());
   // FUNC_WRAPPER(g->traversal());
   FUNC_WRAPPER(g->usedBits());
 

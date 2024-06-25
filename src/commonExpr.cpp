@@ -47,7 +47,7 @@ uint64_t Node::keyHash() {
   return ret;
 }
 
-static bool checkENodeEq(ENode* enode1, ENode* enode2) {
+bool checkENodeEq(ENode* enode1, ENode* enode2) {
   if (!enode1 && !enode2) return true;
   if (!enode1 || !enode2) return false;
   if (enode1->opType != enode2->opType) return false;
