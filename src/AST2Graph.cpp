@@ -1441,6 +1441,11 @@ void saveWhenTree() {
         node->assignTree.push_back(node->valTree);
         node->valTree = nullptr;
       }
+      if (countEmptyWhen(node->assignTree.back()) == 0 && node->assignTree.back()->getRoot()->opType != OP_INVALID) {
+        if (node->assignTree.size() > 1) {
+          node->assignTree.erase(node->assignTree.begin(), node->assignTree.end() - 1);
+        }
+      }
     }
   }
 }
