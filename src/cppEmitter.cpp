@@ -408,6 +408,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
 void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
+  if (node->type == NODE_OTHERS && !node->needActivate() && node->width <= BASIC_WIDTH && !node->isArrayMember && !node->isArray()) return;
 #ifdef GSIM_DIFF
   genDiffSig(fp, node);
 #endif
@@ -521,6 +522,10 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
   }
   std::string oldnode;
   if (node->insts.size()) {
+    /* local variables */
+    if (node->type == NODE_OTHERS && !node->needActivate() && node->width <= BASIC_WIDTH && !node->isArrayMember && !node->isArray()) {
+      fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), node->name.c_str());
+    }
     /* save oldVal */
     if (node->needActivate() && !node->isArray()) {
       oldnode = saveOldVal(fp, node);
