@@ -1209,7 +1209,7 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
       hi = "(" + upperCast(width, ChildInfo(0, width), false) + ChildInfo(0, valStr) + " << " + std::to_string(Child(1, width)) + ")";
     if (hi.length() == 0) { // hi is zero
       ret->valStr = upperCast(width, ChildInfo(1, width), ChildInfo(1, sign)) + ChildInfo(1, valStr);
-      ret->opNum = ChildInfo(1, opNum);
+      ret->opNum = ChildInfo(1, opNum) + 1;
     } else {
       ret->valStr = "(" + hi + " | " + ChildInfo(1, valStr) + ")";
       ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
