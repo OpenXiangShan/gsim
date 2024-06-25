@@ -20,6 +20,7 @@ void visitStmts(graph* g, PNode* stmts);
 void visitWhen(graph* g, PNode* when);
 void removeDummyDim(graph* g);
 ENode* getWhenEnode(ExpTree* valTree, int depth);
+void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
 /* map between module name and module pnode*/
 static std::map<std::string, PNode*> moduleMap;
@@ -106,6 +107,33 @@ static inline std::string replacePrefix(std::string oldPrefix, std::string newPr
 static inline std::string lastField(std::string s) {
   size_t pos = s.find_last_of('$');
   return pos == std::string::npos ? "" : s.substr(pos + 1);
+}
+
+int countEmptyWhen(ExpTree* tree) {
+  int ret = 0;
+  std::stack<ENode*> s;
+  s.push(tree->getRoot());
+  while(!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    if (top->opType == OP_STMT) { /* push the first child */
+      for (ENode* childENode : top->child) {
+        if (childENode) {
+          s.push(childENode);
+          break;
+        }
+      }
+    } else {
+      for (ENode* childENode : top->child) {
+        if (childENode) s.push(childENode);
+      }
+    }
+    if (top->opType == OP_WHEN) {
+      if (!top->getChild(1)) ret ++;
+      if (!top->getChild(2)) ret ++;
+    }
+  }
+  return ret;
 }
 
 /*
@@ -1405,8 +1433,14 @@ void visitAssert(graph* g, PNode* ass) {
 void saveWhenTree() {
   for (Node* node : stmtsNodes) {
     if (node->valTree) {
-      node->assignTree.push_back(node->valTree);
-      node->valTree = nullptr;
+      if (!node->isArray() && node->assignTree.size() > 0 && countEmptyWhen(node->valTree) == 1) { // TODO: check if countEmptyWhen = 0
+        fillEmptyWhen(node->valTree, node->assignTree.back()->getRoot());
+        node->assignTree.back() = node->valTree;
+        node->valTree = nullptr;
+      } else {
+        node->assignTree.push_back(node->valTree);
+        node->valTree = nullptr;
+      }
     }
   }
 }
@@ -1629,6 +1663,7 @@ graph* AST2Graph(PNode* root) {
       }
     }
   }
+
   return g;
 }
 
