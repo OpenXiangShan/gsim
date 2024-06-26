@@ -79,31 +79,17 @@ void ENode::inferWidth() {
               setChild(0, enode);
             }
           } else {
-            if (getChild(0)->nodePtr && getChild(1)->nodePtr) {
-              int w = MIN(w0, w1);
-              ENode* enode = new ENode(OP_BITS);
-              enode->addVal(w-1);
-              enode->addVal(0);
-              enode->width = w;
-              if (w0 < w1) {
-                enode->addChild(getChild(1));
-                setChild(1, enode);
-              } else {
-                enode->addChild(getChild(0));
-                setChild(0, enode);
-              }
+            int w = MIN(w0, w1);
+            ENode* enode = new ENode(OP_BITS);
+            enode->addVal(w-1);
+            enode->addVal(0);
+            enode->width = w;
+            if (w0 < w1) {
+              enode->addChild(getChild(1));
+              setChild(1, enode);
             } else {
-              int w = MAX(w0, w1);
-              ENode* enode = new ENode(OP_PAD);
-              enode->addVal(w);
-              enode->width = w;
-              if (w0 > w1) {
-                enode->addChild(getChild(1));
-                setChild(1, enode);
-              } else {
-                enode->addChild(getChild(0));
-                setChild(0, enode);
-              }
+              enode->addChild(getChild(0));
+              setChild(0, enode);
             }
           }
         }
