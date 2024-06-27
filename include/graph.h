@@ -83,6 +83,7 @@ class graph {
   void constantAnalysis();
   void constructRegs();
   void commonExpr();
+  void splitNodes();
   void exprOpt();
 };
 

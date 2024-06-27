@@ -6,6 +6,7 @@
 
 class Node;
 class valInfo;
+class NodeComponent;
 
 enum OPType {
   OP_EMPTY,
@@ -229,6 +230,7 @@ public:
   ArrayMemberList* getArrayMember(Node* node);
   void display();
   uint64_t keyHash();
+  NodeComponent* inferComponent();
 };
 
 /* 

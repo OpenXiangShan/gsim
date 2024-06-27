@@ -8,6 +8,8 @@
 #include "debug.h"
 std::string format(const char *fmt, ...);
 
+class NodeComponent;
+
 enum NodeType{
   NODE_INVALID,
   NODE_REG_SRC,
@@ -246,6 +248,7 @@ class Node {
   void invalidArrayOptimize();
   void fillArrayInvalid(ExpTree* tree);
   uint64_t keyHash();
+  NodeComponent* inferComponent();
   void updateTreeWithNewWIdth();
 };
 
