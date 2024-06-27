@@ -1633,7 +1633,7 @@ valInfo* ENode::instsShl(Node* node, std::string lvalue, bool isRoot) {
       std::string val128 = ChildInfo(0, valStr);
       if (ChildInfo(0, opNum) > 0) {
         std::string localName = newLocalTmp();
-        computeInfo->insts.push_back(format("uint128_t %s = %s;", localName.c_str(), computeInfo->valStr.c_str()));
+        computeInfo->insts.push_back(format("uint128_t %s = %s;", localName.c_str(), ChildInfo(0, valStr).c_str()));
         val128 = localName;
       }
       computeInfo->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", dstName.c_str(), val128.c_str()));
