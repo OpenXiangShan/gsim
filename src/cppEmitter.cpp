@@ -155,6 +155,7 @@ void graph::genNodeInit(FILE* fp, Node* node) {
     static std::set<Node*> initNodes;
     if (node->isArrayMember && node->name[node->name.length()-1] == ']') node = node->arrayParent;
     if (initNodes.find(node) != initNodes.end()) return;
+    if (node->type == NODE_OTHERS && !node->needActivate() && node->width <= BASIC_WIDTH && !node->isArrayMember && !node->isArray()) return;
     initNodes.insert(node);
     switch (node->type) {
       case NODE_INVALID:
