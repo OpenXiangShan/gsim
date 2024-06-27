@@ -138,16 +138,6 @@ public:
   }
 };
 
-static std::string rangeMask(int hi, int lo) {
-  mpz_t mask;
-  mpz_init(mask);
-  mpz_set_ui(mask, 1);
-  mpz_mul_2exp(mask, mask, hi - lo + 1);
-  mpz_sub_ui(mask, mask, 1);
-  mpz_mul_2exp(mask, mask, lo);
-  return mpz_get_str(nullptr, 16, mask);
-}
-
 bool compMergable(NodeElement* ele1, NodeElement* ele2) {
   if (ele1->isNode != ele2->isNode) return false;
   if (ele1->isNode) return ele1->node == ele2->node && ele1->lo == ele2->hi + 1;
@@ -182,19 +172,14 @@ NodeComponent* ENode::inferComponent() {
   switch (opType) {
     case OP_BITS:
       child1 = getChild(0)->inferComponent();
-      // printf("bits %p val.size = %ld\n", this, values.size());
       if (child1) ret = child1->getbits(values[0], values[1]);
-      // printf("bits width %d\n", ret->width);
       break;
     case OP_CAT: 
       child1 = getChild(0)->inferComponent();
       child2 = getChild(1)->inferComponent();
-      // printf("here1 %p %p\n", child1, child2);
       if (child1 && child2) {
-        // printf("abc %d\n", ret->width);
         ret = merge2(child1, child2);
       }
-      // printf("cat width %d\n", ret->width);
       break;
     case OP_INT: {
       std::string str;
@@ -221,8 +206,6 @@ NodeComponent* ENode::inferComponent() {
 
 NodeComponent* Node::inferComponent() {
   Assert(assignTree.size() == 1, "invalid assignTree %s", name.c_str());
-  // printf("infer %s\n", name.c_str());
-  // display();
   return assignTree[0]->getRoot()->inferComponent();
 }
 
@@ -254,8 +237,8 @@ void graph::splitNodes() {
   for (auto iter : componentMap) {
     Node* node = iter.first;
     NodeComponent* comp = iter.second;
-    if (comp->components.size() == 1 && node == comp->components[0]->node) continue;
-    // if (comp->components.size() > 1) return;
+    if (comp->components.size() == 1 && comp->components[0]->isNode && node == comp->components[0]->node) continue;
+    // if (comp->components.size() != 1) continue;
     ENode* newRoot = nullptr;
     int hiBit = node->width - 1;
     for (size_t i = 0; i < comp->components.size(); i ++) {
@@ -264,30 +247,33 @@ void graph::splitNodes() {
       if (element->isNode) {
         enode = new ENode(element->node);
         enode->width = element->node->width;
-        if (element->lo != 0 || (element->hi + 1) != element->node->width) {
-          ENode* mask = new ENode(OP_INT);
-          mask->strVal = "h" + rangeMask(element->hi, element->lo);
-          ENode* andENode = new ENode(OP_AND);  // TODO: fix and width
-          andENode->width = element->hi + 1;
-          mask->width = element->hi + 1;
-          andENode->addChild(enode);
-          andENode->addChild(mask);
-          enode = andENode;
-          // bits->width = element->hi - element->lo + 1;
-          // enode = bits;
-        }
+        int validHi = enode->width - 1;
+        int validLo = 0;
         if (hiBit > element->hi) {
+          validHi += hiBit - element->hi;
+          validLo += hiBit - element->hi;
           ENode* lshift = new ENode(OP_SHL);
           lshift->addVal(hiBit - element->hi);
           lshift->addChild(enode);
-          lshift->width = hiBit + 1;
+          lshift->width = validHi + 1;
           enode = lshift;
         } else if (hiBit < element->hi) {
+          validHi -= element->hi - hiBit;
+          validLo = 0;
           ENode* rshift = new ENode(OP_SHR);
           rshift->addVal(element->hi - hiBit);
           rshift->addChild(enode);
-          rshift->width = hiBit + 1;
+          rshift->width = validHi + 1;
           enode = rshift;
+        }
+
+        if ((validHi - validLo) > (element->hi - element->lo) || validHi > hiBit) {
+          ENode* bits = new ENode(OP_BITS_NOSHIFT);
+          bits->addChild(enode);
+          bits->addVal(hiBit);
+          bits->addVal(hiBit - (element->hi - element->lo));
+          bits->width = hiBit + 1;
+          enode = bits;
         }
       } else {
         mpz_t realVal;

@@ -33,11 +33,15 @@ static void recomputeAllNodes();
 
 static std::stack<std::pair<int*, int*>> tmpStack;
 
-std::set<int> maskWidth;
+std::set<std::pair<int, int>> allMask;
 
 static std::string addMask(int width) {
-  maskWidth.insert(width);
-  return format("MPZ_MASK$%d", width);
+  allMask.insert(std::make_pair(width-1, 0));
+  return format("MPZ_MASK$%d_%d", width-1, 0);
+}
+static std::string addMask(int hi, int lo) {
+  allMask.insert(std::make_pair(hi, lo));
+  return format("MPZ_MASK$%d_%d", hi, lo);
 }
 
 static void tmp_push() {
@@ -107,6 +111,22 @@ static std::string bitMask(int width) {
   std::string ret = std::string(width/4, 'f');
   const char* headTable[] = {"", "1", "3", "7"};
   ret = headTable[width % 4] + ret;
+  if (ret.length() > 16) {
+    ret = ("UINT128(0x" + ret.substr(0, ret.length()-16) + ", 0x" + ret.substr(ret.length()-16, 16) + ")");
+  } else {
+    ret = "0x" + ret;
+  }
+  return ret;
+}
+
+static std::string rangeMask(int hi, int lo) {
+  mpz_t mask;
+  mpz_init(mask);
+  mpz_set_ui(mask, 1);
+  mpz_mul_2exp(mask, mask, hi - lo + 1);
+  mpz_sub_ui(mask, mask, 1);
+  mpz_mul_2exp(mask, mask, lo);
+  std::string ret = mpz_get_str(nullptr, 16, mask);
   if (ret.length() > 16) {
     ret = ("UINT128(0x" + ret.substr(0, ret.length()-16) + ", 0x" + ret.substr(ret.length()-16, 16) + ")");
   } else {
@@ -1051,9 +1071,9 @@ valInfo* ENode::instsAnd(Node* node, std::string lvalue, bool isRoot) {
   } else if ((ChildInfo(0, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(0, consVal)) == 0) ||
             (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0)) {
           ret->setConstantByStr("0");
-  } else if (ChildInfo(0, status) == VAL_CONSTANT && allOnes(ChildInfo(0, consVal), width)) {
+  } else if (ChildInfo(0, status) == VAL_CONSTANT && ChildInfo(0, width) == ChildInfo(1, width) && allOnes(ChildInfo(0, consVal), width)) {
     computeInfo = Child(1, computeInfo);
-  } else if (ChildInfo(1, status) == VAL_CONSTANT && allOnes(ChildInfo(1, consVal), width)) {
+  } else if (ChildInfo(1, status) == VAL_CONSTANT && ChildInfo(0, width) == ChildInfo(1, width) && allOnes(ChildInfo(1, consVal), width)) {
     computeInfo = Child(0, computeInfo);
   } else if (childBasic && enodeBasic) {
     ret->valStr = "(" + ChildInfo(0, valStr) + " & " + ChildInfo(1, valStr) + ")";
@@ -1807,6 +1827,48 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
   return ret;
 }
 
+valInfo* ENode::instsBitsNoShift(Node* node, std::string lvalue, bool isRoot) {
+  valInfo* ret = computeInfo;
+  for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
+
+  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
+  bool enodeBasic = width <= BASIC_WIDTH;
+  bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
+
+  int hi = values[0];
+  int lo = values[1];
+  int w = hi + 1;
+
+  if (isConstant) {
+    if (sign) TODO();
+    u_bits_noshift(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), hi, lo);
+    ret->setConsStr();
+  } else if (lo >= Child(0, width) || lo >= ChildInfo(0, width)) {
+    ret->setConstantByStr("0");
+  } else if (ChildInfo(0, width) <= BASIC_WIDTH && lo == 0 && w == ChildInfo(0, width)) {
+    ret->valStr = ChildInfo(0, valStr);
+    ret->opNum = ChildInfo(0, opNum);
+  } else if (childBasic && enodeBasic) {
+    ret->valStr = "(" + ChildInfo(0, valStr) + " & " + rangeMask(hi, lo) + ")";
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else if (!childBasic && enodeBasic) {
+    if (w > 64) {
+      ret->valStr = format ("(%s & %s)", get128(ChildInfo(0, valStr)).c_str(), rangeMask(hi, lo).c_str());
+    } else {
+      ret->valStr = format("(mpz_get_ui(%s) & %s)", ChildInfo(0, valStr).c_str(), bitMask(w).c_str());
+    }
+    ret->opNum = ChildInfo(0, opNum) + 1;
+  } else if (!childBasic && !enodeBasic){
+    std::string dstName = isRoot ? lvalue : newMpzTmp();
+    ret->insts.push_back(format("mpz_and(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), addMask(hi, lo).c_str()));
+    ret->valStr = dstName;
+    ret->opNum = 0;
+  } else {
+    TODO();
+  }
+  return ret;
+}
+
 valInfo* ENode::instsIndexInt(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
 
@@ -2122,6 +2184,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     case OP_HEAD: instsHead(n, lvalue, isRoot); break;
     case OP_TAIL: instsTail(n, lvalue, isRoot); break;
     case OP_BITS: instsBits(n, lvalue, isRoot); break;
+    case OP_BITS_NOSHIFT: instsBitsNoShift(n, lvalue, isRoot); break;
     case OP_INDEX_INT: instsIndexInt(n, lvalue, isRoot); break;
     case OP_INDEX: instsIndex(n, lvalue, isRoot); break;
     case OP_MUX: instsMux(n, lvalue, isRoot); break;

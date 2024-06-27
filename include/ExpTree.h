@@ -48,6 +48,7 @@ enum OPType {
   OP_TAIL,
 /* 1expr2int */
   OP_BITS,
+  OP_BITS_NOSHIFT, // used for bit operations
 /* index */
   OP_INDEX_INT,
   OP_INDEX,
@@ -105,6 +106,7 @@ private:
   valInfo* instsHead(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsTail(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsBits(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsBitsNoShift(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsWhen(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsStmt(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsIndexInt(Node* n, std::string lvalue, bool isRoot);
@@ -150,6 +152,7 @@ private:
   valInfo* consHead(bool isLvalue);
   valInfo* consTail(bool isLvalue);
   valInfo* consBits(bool isLvalue);
+  valInfo* consBitsNoShift(bool isLvalue);
   valInfo* consWhen(Node* node, bool isLvalue);
   valInfo* consStmt(Node* node, bool isLvalue);
   valInfo* consIndexInt(bool isLvalue);

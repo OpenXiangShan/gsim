@@ -23,7 +23,7 @@ static int superId = 0;
 static int activeFlagNum = 0;
 static std::set<Node*> definedNode;
 static std::map<int, SuperNode*> cppId2Super;
-extern std::set<int> maskWidth;
+extern std::set<std::pair<int, int>> allMask;
 bool nameExist(std::string str);
 
 std::pair<int, int> cppId2flagIdx(int cppId) {
@@ -216,12 +216,14 @@ for (SuperNode* super : sortedSuper) {
   fprintf(header, "for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
 #endif
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_init(MPZ_TMP$%d);\n", i);
-  for (int i : maskWidth) {
-    std::string maskName = format("MPZ_MASK$%d", i);
+  for (auto range : allMask) {
+    std::string maskName = format("MPZ_MASK$%d_%d", range.first, range.second);
     fprintf(header, "mpz_init(%s);\n", maskName.c_str());
     fprintf(header, "mpz_set_ui(%s, 1);\n", maskName.c_str());
-    fprintf(header, "mpz_mul_2exp(%s, %s, %d);\n", maskName.c_str(), maskName.c_str(), i);
+    fprintf(header, "mpz_mul_2exp(%s, %s, %d);\n", maskName.c_str(), maskName.c_str(), range.first - range.second + 1);
     fprintf(header, "mpz_sub_ui(%s, %s, 1);\n", maskName.c_str(), maskName.c_str());
+    if (range.second != 0)
+      fprintf(header, "mpz_mul_2exp(%s, %s, %d);\n", maskName.c_str(), maskName.c_str(), range.second);
   }
   for (SuperNode* super : sortedSuper) {
     if (super->superType != SUPER_VALID) continue;
@@ -243,7 +245,7 @@ for (SuperNode* super : sortedSuper) {
   /* mpz variable used for intermidia values */
   fprintf(header, "mpz_t newValMpz;\n");
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_t MPZ_TMP$%d;\n", i);
-  for (int i : maskWidth) fprintf(header, "mpz_t MPZ_MASK$%d;\n", i);
+  for (auto range : allMask) fprintf(header, "mpz_t MPZ_MASK$%d_%d;\n", range.first, range.second);
   fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);

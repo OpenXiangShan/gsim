@@ -503,6 +503,21 @@ valInfo* ENode::consBits(bool isLvalue) {
   return ret;
 }
 
+valInfo* ENode::consBitsNoShift(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  int hi = values[0];
+  int lo = values[1];
+
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    u_bits_noshift(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), hi, lo);
+    ret->setConsStr();
+  } else if (lo >= Child(0, width) || lo >= ChildCons(0, width)) {
+    ret->setConstantByStr("0");
+  }
+  return ret;
+}
+
+
 valInfo* ENode::consIndexInt(bool isLvalue) {
   return new valInfo(width, sign);
 }
@@ -638,6 +653,7 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
     case OP_HEAD: ret = consHead(isLvalue); break;
     case OP_TAIL: ret = consTail(isLvalue); break;
     case OP_BITS: ret = consBits(isLvalue); break;
+    case OP_BITS_NOSHIFT: ret = consBitsNoShift(isLvalue); break;
     case OP_INDEX_INT: ret = consIndexInt(isLvalue); break;
     case OP_INDEX: ret = consIndex(isLvalue); break;
     case OP_MUX: ret = consMux(isLvalue); break;
