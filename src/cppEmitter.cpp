@@ -300,7 +300,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
   std::set<std::string> allNames;
   std::string diffNodeName = node->name;
   std::string originName = node->name;
-  if (node->type == NODE_MEMORY || node->type == NODE_REG_DST){
+  if (node->type == NODE_MEMORY){
 
   } else if (node->isArrayMember) {
     allNames.insert(node->name);
