@@ -306,6 +306,18 @@ void ExpTree::updateWithNewWidth() {
             newChild = top->getChild(0);
           }
           break;
+        case OP_MUL:
+          if (top->width != top->getChild(0)->width + top->getChild(1)->width) {
+            remove = true;
+            ENode* bits = new ENode(OP_BITS);
+            bits->addChild(top);
+            bits->addVal(top->width-1);
+            bits->addVal(0);
+            bits->width = top->width;
+            bits->sign = top->sign;
+            top->width = top->getChild(0)->width + top->getChild(1)->width;
+            newChild = bits;
+          }
         default:
           break;
       }
