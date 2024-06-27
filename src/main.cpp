@@ -10,6 +10,8 @@
 #include "syntax.hh"
 #include "Parser.h"
 
+#include <getopt.h>
+
 void preorder_traversal(PNode* root);
 graph* AST2Graph(PNode* root);
 void inferAllWidth();
@@ -24,6 +26,37 @@ extern PNode* root;
     printf("{" #func "} = %ld s\n", (end - start) / CLOCKS_PER_SEC); \
   } while(0)
 
+static std::string InputFileName{""};
+
+static void printUsage(const char* ProgName) {
+  std::cout << "Usage: " << ProgName << " [options] <input file>\n"
+            << "Options:\n"
+            << "  -h, --help           Display this help message and exit.\n";
+}
+
+static void parseCommandLine(int argc, char** argv) {
+  if (argc <= 1) {
+    printUsage(argv[0]);
+    exit(EXIT_SUCCESS);
+  }
+
+  const struct option Table[] = {
+      {"help", no_argument, nullptr, 'h'},
+      {nullptr, no_argument, nullptr, 0},
+  };
+
+  int Option{0};
+  while ((Option = getopt_long(argc, argv, "-h", Table, nullptr)) != -1) {
+    switch (Option) {
+      case 1: InputFileName = optarg; return;
+      default: {
+        printUsage(argv[0]);
+        exit(EXIT_SUCCESS);
+      }
+    }
+  }
+}
+
 /**
  * @brief main function.
  *
@@ -32,9 +65,9 @@ extern PNode* root;
  * @return exit state.
  */
 int main(int argc, char** argv) {
-  if (argc <= 1) { std::cout << "Usage: \n"; }
+  parseCommandLine(argc, argv);
 
-  std::ifstream infile(argv[1]);
+  std::ifstream infile(InputFileName);
 
   Parser::Lexical lexical{infile, std::cout};
   Parser::Syntax syntax{&lexical};
