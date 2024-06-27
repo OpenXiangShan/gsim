@@ -80,7 +80,7 @@ void ENode::passWidthToChild() {
       break;
     case OP_HEAD:
       // childBits.push_back(Child(0, width) - (values[0] - usedBit));
-      childBits.push_back(Child(0, width));
+      childBits.push_back(usedBit + values[0]);
       break;
     case OP_BITS:
       childBits.push_back(MIN(usedBit + values[1], values[0] + 1));
