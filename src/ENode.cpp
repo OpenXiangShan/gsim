@@ -155,7 +155,7 @@ void ENode::inferWidth() {
         break;
       case OP_SHR:
         Assert(getChildNum() == 1 && values.size() == 1, "invalid child");
-        setWidth(MAX(w0-values[0], 1), s0);
+        setWidth(MAX(w0-values[0], 0), s0);
         break;
       case OP_HEAD:
         Assert(getChildNum() == 1 && values.size() == 1, "invalid child");

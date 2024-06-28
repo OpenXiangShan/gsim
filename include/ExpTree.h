@@ -282,6 +282,8 @@ public:
     void replace(Node* oldNode, ENode* newENode);
     /* used in commonExpr */
     void replace(std::map<Node*, Node*>& aliasMap);
+    /* used in splitNodes */
+    void replace(Node* oldNode, Node* newNode);
     void clearInfo();
     bool isInvalid() {
       Assert(getRoot(), "empty root");
