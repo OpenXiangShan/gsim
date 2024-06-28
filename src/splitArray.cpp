@@ -319,7 +319,7 @@ Node* Node::arrayMemberNode(int idx) {
   std::string memberName = name;
   size_t i;
   for (i = 0; i < index.size(); i ++) {
-    memberName += "[" + std::to_string(index[i]) + "]";
+    memberName += "__" + std::to_string(index[i]);
   }
 
   Node* member = new Node(type);

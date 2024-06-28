@@ -153,9 +153,8 @@ void graph::genNodeInit(FILE* fp, Node* node) {
   } else {
 #if  defined (MEM_CHECK) || defined (DIFFTEST_PER_SIG)
     static std::set<Node*> initNodes;
-    if (node->isArrayMember && node->name[node->name.length()-1] == ']') node = node->arrayParent;
     if (initNodes.find(node) != initNodes.end()) return;
-    if (node->type == NODE_OTHERS && !node->needActivate() && node->width <= BASIC_WIDTH && !node->isArrayMember && !node->isArray()) return;
+    if (node->type == NODE_OTHERS && !node->needActivate() && node->width <= BASIC_WIDTH && !node->isArray()) return;
     initNodes.insert(node);
     switch (node->type) {
       case NODE_INVALID:
@@ -415,7 +414,6 @@ void graph::genNodeDef(FILE* fp, Node* node) {
 #ifdef GSIM_DIFF
   genDiffSig(fp, node);
 #endif
-  if (node->isArrayMember && node->name[node->name.length()-1] == ']') node = node->arrayParent;
   if (definedNode.find(node) != definedNode.end()) return;
   definedNode.insert(node);
   if (node->width <= BASIC_WIDTH) {
@@ -526,7 +524,7 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
   std::string oldnode;
   if (node->insts.size()) {
     /* local variables */
-    if (node->type == NODE_OTHERS && !node->needActivate() && node->width <= BASIC_WIDTH && !node->isArrayMember && !node->isArray()) {
+    if (node->status == VALID_NODE && node->type == NODE_OTHERS && !node->needActivate() && node->width <= BASIC_WIDTH && !node->isArrayMember && !node->isArray()) {
       fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), node->name.c_str());
     }
     /* save oldVal */
