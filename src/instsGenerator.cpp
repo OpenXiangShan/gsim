@@ -706,6 +706,8 @@ valInfo* ENode::instsMul(Node* node, std::string lvalue, bool isRoot) {
       ret->insts.push_back(format("%s(%s, %s);", funcName.c_str(), rname.c_str(), ChildInfo(1, valStr).c_str()));
     }
     ret->insts.push_back(format("mpz_mul(%s, %s, %s);", dstName.c_str(), lname.c_str(), rname.c_str()));
+    ret->valStr = dstName;
+    ret->opNum = 0;
   } else {
     TODO();
   }
