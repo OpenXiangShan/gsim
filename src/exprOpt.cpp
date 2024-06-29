@@ -41,7 +41,7 @@ void Node::invalidArrayOptimize() {
 }
 
 bool checkENodeEq(ENode* enode1, ENode* enode2);
-static bool subTreeEq(ENode* enode1, ENode* enode2) {
+bool subTreeEq(ENode* enode1, ENode* enode2) {
   if (!checkENodeEq(enode1, enode2)) return false;
   for (size_t i = 0; i < enode1->getChildNum(); i ++) {
     if (!subTreeEq(enode1->getChild(i), enode2->getChild(i))) return false;
