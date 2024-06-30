@@ -4,6 +4,26 @@
 #include "common.h"
 #define MAX_NODES_PER_SUPER 7000
 #define MAX_SUBLINGS 30
+
+void graph::mergeAsyncReset() {
+  for (int i = 0; i < sortedSuper.size(); i++) {
+    for (Node* member: sortedSuper[i]->member) {
+      if (member->type == NODE_REG_SRC && member->reset == ASYRESET && member->prev.size() == 1) {
+        /* if resetVal is constant (using prev.size() == 1, TODO: optimize) */
+        if (member->super->member.size() != 1) member->super->display();
+        Assert(member->super->member.size() == 1, "super already merged %s id %d (size = %ld)", member->name.c_str(), member->super->id, member->super->member.size());
+        Node* prev = *(member->prev.begin());
+        SuperNode* resetSuper = prev->super;
+        resetSuper->superType = SUPER_ASYNC_RESET;
+        member->super = resetSuper;
+        resetSuper->member.push_back(member);
+        sortedSuper[i]->member.clear();
+      }
+    }
+  }
+  removeEmptySuper();
+  reconnectSuper();
+}
 /*
   merge nodes with out-degree=1 to their successors
 */
@@ -116,6 +136,7 @@ void graph::mergeSublings() {
 void graph::mergeNodes() {
   size_t totalSuper = sortedSuper.size();
 
+  mergeAsyncReset();
   mergeOut1();
   mergeIn1();
   mergeSublings();

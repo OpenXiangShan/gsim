@@ -254,6 +254,7 @@ class Node {
 
 enum SuperType {
   SUPER_VALID,
+  SUPER_ASYNC_RESET,
   SUPER_SAVE_REG,
   SUPER_UPDATE_REG,
 };

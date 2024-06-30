@@ -31,6 +31,7 @@ class graph {
   void reconnectAll();
   void resetAnalysis();
   /* defined in mergeNodes */
+  void mergeAsyncReset();
   void mergeOut1();
   void mergeIn1();
   void mergeSublings();

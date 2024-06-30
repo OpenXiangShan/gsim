@@ -225,7 +225,7 @@ for (SuperNode* super : sortedSuper) {
       fprintf(header, "mpz_mul_2exp(%s, %s, %d);\n", maskName.c_str(), maskName.c_str(), range.second);
   }
   for (SuperNode* super : sortedSuper) {
-    if (super->superType != SUPER_VALID) continue;
+    if (super->superType != SUPER_VALID && super->superType != SUPER_ASYNC_RESET) continue;
     for (Node* member : super->member) {
       genNodeInit(header, member);
     }
@@ -827,7 +827,7 @@ void graph::cppEmitter() {
 
   for (SuperNode* super : sortedSuper) {
     // std::string insts;
-    if (super->superType == SUPER_VALID) {
+    if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
       for (Node* n : super->member) genNodeDef(header, n);
     }
   }
