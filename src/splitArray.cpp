@@ -220,12 +220,11 @@ void distributeTree(Node* node, ExpTree* tree) {
       }
       ExpTree* newTree = dupTreeWithIdx(tree, subIdx);
       /* duplicate tree with idx */
-      if (node->arrayMember[idx]->assignTree.size() != 0 && node->arrayMember[idx]->assignTree.back()->getRoot()->opType != OP_WHEN) {
-        ExpTree* oldTree = node->arrayMember[idx]->assignTree.back();
-        fillEmptyWhen(newTree, oldTree->getRoot());
-        node->arrayMember[idx]->assignTree.back() = newTree;
-      } else {
-        node->arrayMember[idx]->assignTree.push_back(newTree);
+      if (node->arrayMember[idx]->assignTree.size() == 0) node->arrayMember[idx]->assignTree.push_back(newTree);
+      else {
+        ExpTree* replaceTree = mergeWhenTree(node->arrayMember[idx]->assignTree.back(), newTree);
+        if (replaceTree) node->arrayMember[idx]->assignTree.back() = replaceTree;
+        else node->arrayMember[idx]->assignTree.push_back(newTree);
       }
     }
   }
