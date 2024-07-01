@@ -184,6 +184,7 @@ ExpTree* mergeWhenTree(ExpTree* tree1, ExpTree* tree2) {
           ENode* enode = new ENode(OP_STMT);
           enode->addChild(enode1);
           enode->addChild(enode2);
+          parent2->setChild(idx2, enode);
           ret = tree2;
         } else Assert(s.empty(), "should not reach here");
       }
