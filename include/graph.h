@@ -25,6 +25,7 @@ class graph {
   void genUpdateRegister(FILE* fp);
   void genMemWrite(FILE* fp);
   void saveDiffRegs(FILE* fp);
+  void genReset(FILE* fp);
   std::string saveOldVal(FILE* fp, Node* node);
   void removeNodesNoConnect(NodeStatus status);
   void reconnectSuper();

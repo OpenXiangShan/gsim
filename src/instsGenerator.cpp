@@ -2645,7 +2645,16 @@ void graph::instsGenerator() {
       } else {
         if (n->assignTree.size() == 0) continue;
         n->compute();
-        if (n->status == MERGED_NODE || n->status == CONSTANT_NODE) continue;
+        if (n->status == MERGED_NODE) continue;
+        if (n->status == CONSTANT_NODE) {
+          if (n->type == NODE_REG_DST && !n->getSrc()->regSplit && n->getSrc()->status != CONSTANT_NODE) {
+
+          } else if (n->type == NODE_REG_UPDATE && n->regNext->status != CONSTANT_NODE) {
+
+          } else {
+            continue;
+          }
+        }
         s.insert(n);
       }
     }
@@ -2655,6 +2664,14 @@ void graph::instsGenerator() {
 
   /* generate assignment instrs */
   for (Node* n : s) {
+    if (n->status == CONSTANT_NODE && (n->type == NODE_REG_DST || n->type == NODE_REG_UPDATE)) {
+      if (n->width <= BASIC_WIDTH)
+        n->insts.push_back(n->name + " = " + n->computeInfo->valStr + ";");
+      else
+        n->insts.push_back(format("mpz_set_str(%s, \"%s\", 16);", n->name.c_str(), mpz_get_str(NULL, 16, n->computeInfo->consVal)));
+    printf("here2 %s\n", n->name.c_str());
+      n->status = VALID_NODE;
+    }
     if (n->status == MERGED_NODE || n->status == CONSTANT_NODE) continue;
     for (ExpTree* tree : n->assignTree) {
       valInfo* assignInfo = tree->getRoot()->computeInfo;

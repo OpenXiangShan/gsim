@@ -97,6 +97,9 @@
     } \
   } while(0)
 
+
+#define ACTIVATE_ALL 0xff
+
 class TypeInfo;
 class PNode;
 class Node;

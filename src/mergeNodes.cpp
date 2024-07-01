@@ -13,6 +13,7 @@ void graph::mergeAsyncReset() {
         if (member->super->member.size() != 1) member->super->display();
         Assert(member->super->member.size() == 1, "super already merged %s id %d (size = %ld)", member->name.c_str(), member->super->id, member->super->member.size());
         Node* prev = *(member->prev.begin());
+        prev->type = NODE_ASYNC_RESET;
         SuperNode* resetSuper = prev->super;
         resetSuper->superType = SUPER_ASYNC_RESET;
         member->super = resetSuper;

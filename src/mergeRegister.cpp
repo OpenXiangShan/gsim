@@ -133,6 +133,7 @@ void graph::constructRegs() {
     if (node->regSplit) {
       Node* nodeUpdate = node->dup(NODE_REG_UPDATE);
       node->regUpdate = nodeUpdate;
+      nodeUpdate->regNext = node;
       nodeUpdate->assignTree.push_back(node->updateTree);
       nodeUpdate->super = new SuperNode(nodeUpdate);
       nodeUpdate->super->superType = SUPER_UPDATE_REG;
