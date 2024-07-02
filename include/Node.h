@@ -172,12 +172,12 @@ class Node {
   }
 
   Node* getDst () {
-    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node is not register");
+    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node %s is not register", name.c_str());
     if (type == NODE_REG_SRC) return this->regNext;
     return this;
   }
   Node* getSrc () {
-    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node is not register");
+    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node %s is not register", name.c_str());
     if (type == NODE_REG_DST) return this->regNext;
     return this;
   }
