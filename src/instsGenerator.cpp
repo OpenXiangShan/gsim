@@ -1941,7 +1941,7 @@ valInfo* ENode::instsBitsNoShift(Node* node, std::string lvalue, bool isRoot) {
     if (w > 64) {
       ret->valStr = format ("(%s & %s)", get128(ChildInfo(0, valStr)).c_str(), rangeMask(hi, lo).c_str());
     } else {
-      ret->valStr = format("(mpz_get_ui(%s) & %s)", ChildInfo(0, valStr).c_str(), bitMask(w).c_str());
+      ret->valStr = format("(mpz_get_ui(%s) & %s)", ChildInfo(0, valStr).c_str(), rangeMask(hi, lo).c_str());
     }
     ret->opNum = ChildInfo(0, opNum) + 1;
   } else if (!childBasic && !enodeBasic){
