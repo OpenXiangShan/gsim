@@ -53,7 +53,11 @@ void ENode::passWidthToChild() {
       childBits.push_back(usedBit);
       childBits.push_back(usedBit);
       break;
-    case OP_MUL: case OP_DIV: case OP_REM: case OP_DSHL: case OP_DSHR:
+    case OP_MUL:
+      childBits.push_back(MIN(usedBit, Child(0, width)));
+      childBits.push_back(MIN(usedBit, Child(1, width)));
+      break;
+    case OP_DIV: case OP_REM: case OP_DSHL: case OP_DSHR:
     case OP_LT: case OP_LEQ: case OP_GT: case OP_GEQ: case OP_EQ: case OP_NEQ:
       childBits.push_back(Child(0, width));
       childBits.push_back(Child(1, width));
