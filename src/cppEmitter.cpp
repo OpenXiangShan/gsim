@@ -4,6 +4,7 @@
 
 #include "common.h"
 
+#include <cstddef>
 #include <cstdio>
 #include <map>
 #include <string>
@@ -685,19 +686,43 @@ void graph::genActivate(FILE* fp) {
   }
 }
 
-void graph::genReset(FILE* fp) {
+void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
+  fprintf(fp, "if(unlikely(%s)) {\n", super->member[0]->name.c_str());
+  std::set<int> allNext;
+  for (size_t i = 1; i < super->member.size(); i ++) {
+    Node* node = super->member[i];
+    for (Node* next : node->next) {
+      if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
+    }
+    if (!node->regSplit) {
+      if (node->getDst()->super->cppId >= 0) allNext.insert(node->getDst()->super->cppId);
+    } else {
+      if (node->getSrc()->regUpdate->super->cppId >= 0) allNext.insert(node->regUpdate->super->cppId);
+    }
+  }
+
+  if (allNext.size() > 100) fprintf(fp, "activateAll();\n");
+  else {
+    std::map<int, uint64_t> bitMapInfo;
+    activeSet2bitMap(allNext, bitMapInfo, -1);
+    for (auto iter : bitMapInfo) {
+      fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
+    }
+  }
+  for (size_t i = 1; i < super->member.size(); i ++) {
+    for (std::string str : isUIntReset ? super->member[i]->resetInsts : super->member[i]->insts) {
+      fprintf(fp, "%s\n", str.c_str());
+    }
+  }
+  fprintf(fp, "}\n");
+}
+
+void graph::genResetAll(FILE* fp) {
   fprintf(fp, "void S%s::resetAll(){\n", name.c_str());
   for (SuperNode* super : sortedSuper) {
     if (super->superType == SUPER_ASYNC_RESET) {
       Assert(super->member[0]->isAsyncReset(), "invalid reset");
-      fprintf(fp, "if(unlikely(%s)) {\n", super->member[0]->name.c_str());
-      fprintf(fp, "activateAll();\n");
-      for (size_t i = 1; i < super->member.size(); i ++) {
-        for (std::string str : super->member[i]->insts) {
-          fprintf(fp, "%s\n", str.c_str());
-        }
-      }
-      fprintf(fp, "}\n");
+      genReset(fp, super, false);
     }
   }
   for (SuperNode* super : uintReset) {
@@ -705,14 +730,7 @@ void graph::genReset(FILE* fp) {
       Assert(mpz_sgn(super->member[0]->computeInfo->consVal) == 0, "reset %s is always true", super->member[0]->name.c_str());
       continue;
     }
-    fprintf(fp, "if(unlikely(%s)) {\n", super->member[0]->name.c_str());
-    fprintf(fp, "activateAll();\n");
-      for (size_t i = 1; i < super->member.size(); i ++) {
-        for (std::string str : super->member[i]->resetInsts) {
-          fprintf(fp, "%s\n", str.c_str());
-        }
-      }
-      fprintf(fp, "}");
+    genReset(fp, super, true);
   }
   fprintf(fp, "}\n");
 }
@@ -897,7 +915,7 @@ void graph::cppEmitter() {
   /* main evaluation loop (step)*/
   genActivate(src);
   genMemWrite(src);
-  genReset(src);
+  genResetAll(src);
   saveDiffRegs(src);
   genStep(src);
   

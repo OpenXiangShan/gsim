@@ -2323,7 +2323,7 @@ valInfo* Node::compute() {
     return computeInfo;
   }
 
-  bool isRoot = anyExtEdge() || next.size() != 1;
+  bool isRoot = anyExtEdge() || next.size() != 1 || isReset();
   if (isArrayMember) {
     for (Node* nextNode : next) {
       if (nextNode->isArray()) isRoot = true;

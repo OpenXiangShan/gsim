@@ -72,6 +72,10 @@ void graph::removeDeadNodes() {
     }
   }
   removeNodes(DEAD_NODE);
+  regsrc.erase(
+    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
+        regsrc.end()
+  );
 
   printf("[removeDeadNodes] remove %ld deadNodes (%ld -> %ld)\n", deadNum, totalNodes, totalNodes - deadNum);
   printf("[removeDeadNodes] remove %ld superNodes (%ld -> %ld)\n", totalSuper - sortedSuper.size(), totalSuper, sortedSuper.size());
