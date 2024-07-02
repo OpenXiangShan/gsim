@@ -27,11 +27,13 @@ extern PNode* root;
   } while(0)
 
 static std::string InputFileName{""};
+static bool EnableDumpGraph{false};
 
 static void printUsage(const char* ProgName) {
   std::cout << "Usage: " << ProgName << " [options] <input file>\n"
             << "Options:\n"
-            << "  -h, --help           Display this help message and exit.\n";
+            << "  -h, --help           Display this help message and exit.\n"
+            << "      --dump           Enable dumping of the graph.\n";
 }
 
 static void parseCommandLine(int argc, char** argv) {
@@ -42,6 +44,7 @@ static void parseCommandLine(int argc, char** argv) {
 
   const struct option Table[] = {
       {"help", no_argument, nullptr, 'h'},
+      {"dump", no_argument, nullptr, 'd'},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -49,6 +52,7 @@ static void parseCommandLine(int argc, char** argv) {
   while ((Option = getopt_long(argc, argv, "-h", Table, nullptr)) != -1) {
     switch (Option) {
       case 1: InputFileName = optarg; return;
+      case 'd': EnableDumpGraph = true; break;
       default: {
         printUsage(argv[0]);
         exit(EXIT_SUCCESS);
@@ -112,6 +116,9 @@ int main(int argc, char** argv) {
   FUNC_WRAPPER(g->instsGenerator());
 
   FUNC_WRAPPER(g->cppEmitter());
+
+  if (EnableDumpGraph)
+    g->dump();
 
   return 0;
 }
