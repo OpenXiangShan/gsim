@@ -13,8 +13,8 @@ void ExpTree::when2mux(int width) {
     s.pop();
     if (top->opType != OP_WHEN) continue;
     /* TODO: optimize invalid */
-    if (top->getChild(1) && (top->getChild(1)->opType != OP_STMT && top->getChild(1)->opType != OP_INVALID)
-      && top->getChild(2) && (top->getChild(2)->opType != OP_STMT && top->getChild(2)->opType != OP_INVALID)) {
+    if (top->getChild(1) && (top->getChild(1)->opType != OP_STMT && top->getChild(1)->opType != OP_WHEN && top->getChild(1)->opType != OP_INVALID)
+      && top->getChild(2) && (top->getChild(2)->opType != OP_STMT && top->getChild(2)->opType != OP_WHEN && top->getChild(2)->opType != OP_INVALID)) {
       whenNodes.insert(top);
       for (ENode* child : top->child) s.push(child);
     } else {
@@ -29,7 +29,6 @@ void ExpTree::when2mux(int width) {
 
 /* add OP_CAT or OP_BITS to match expWidth with nodeWidth */
 void ExpTree::matchWidth(int width) {
-  when2mux(width);
   std::vector<std::pair<ENode*, int>> allNodes;
   std::stack<ENode*>s;
   /* generate all nodes that need to be updated, passing down to when children */

@@ -105,6 +105,10 @@ void Node::display() {
     printf("[updateTree]:\n");
     updateTree->display();
   }
+  if (resetTree) {
+    printf("[resetTree]:\n");
+    resetTree->display();
+  }
 #if 0
   for (Node* nextNode : next) {
     printf("    next %p %s\n", nextNode, nextNode->name.c_str());

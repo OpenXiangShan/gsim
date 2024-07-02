@@ -132,6 +132,7 @@ void graph::aliasAnalysis() {
     if (reg->updateTree) {
       reg->updateTree->replace(aliasMap, reg->isArray());
     }
+    if (reg->resetTree) reg->resetTree->replace(aliasMap, reg->isArray());
   }
   for (auto iter : aliasMap) {
     if(iter.first->isArrayMember) {

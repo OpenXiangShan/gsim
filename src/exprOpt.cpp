@@ -94,6 +94,7 @@ void graph::exprOpt() {
       for (ExpTree* tree : node->arrayVal) tree->treeOpt();
       if (node->resetVal) node->resetVal->treeOpt();
       if (node->updateTree) node->updateTree->treeOpt();
+      if (node->resetTree) node->resetTree->treeOpt();
     }
   }
 

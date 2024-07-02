@@ -5,6 +5,8 @@
 #define MAX_NODES_PER_SUPER 7000
 #define MAX_SUBLINGS 30
 
+void getRepyNodes(ENode* enode, std::set<Node*>& allNodes);
+
 void graph::mergeAsyncReset() {
   for (int i = 0; i < sortedSuper.size(); i++) {
     for (Node* member: sortedSuper[i]->member) {
@@ -13,7 +15,7 @@ void graph::mergeAsyncReset() {
         if (member->super->member.size() != 1) member->super->display();
         Assert(member->super->member.size() == 1, "super already merged %s id %d (size = %ld)", member->name.c_str(), member->super->id, member->super->member.size());
         Node* prev = *(member->prev.begin());
-        prev->type = NODE_ASYNC_RESET;
+        prev->setAsyncReset();
         SuperNode* resetSuper = prev->super;
         resetSuper->superType = SUPER_ASYNC_RESET;
         member->super = resetSuper;
@@ -24,6 +26,35 @@ void graph::mergeAsyncReset() {
   }
   removeEmptySuper();
   reconnectSuper();
+}
+
+void graph::mergeUIntReset() {
+  std::map<Node*, SuperNode*> resetSuper;
+  for (Node* reg : regsrc) {
+    if (reg->reset != UINTRESET) continue;
+    std::set<Node*> prev;
+    if (reg->resetTree->getRoot()->opType == OP_WHEN) {
+      getRepyNodes(reg->resetTree->getRoot()->getChild(0), prev);
+    } else {
+      Panic();
+      reg->resetTree->getRelyNodes(prev);
+    }
+    if (prev.size() != 1) reg->display();
+    Assert(prev.size() == 1, "multiple prevReset %s", reg->name.c_str());
+    Node* prevNode = *prev.begin();
+    SuperNode* prevSuper;
+    if (resetSuper.find(prevNode) == resetSuper.end()) {
+      prevSuper = new SuperNode();
+      prevSuper->superType = SUPER_UINT_RESET;
+      resetSuper[prevNode] = prevSuper;
+      uintReset.push_back(prevSuper);
+      prevSuper->member.push_back(prevNode);
+      prevNode->setUIntReset();
+    } else {
+      prevSuper = resetSuper[prevNode];
+    }
+    prevSuper->member.push_back(reg);
+  }
 }
 /*
   merge nodes with out-degree=1 to their successors
@@ -138,6 +169,7 @@ void graph::mergeNodes() {
   size_t totalSuper = sortedSuper.size();
 
   mergeAsyncReset();
+  mergeUIntReset();
   mergeOut1();
   mergeIn1();
   mergeSublings();

@@ -33,6 +33,7 @@ class graph {
   void resetAnalysis();
   /* defined in mergeNodes */
   void mergeAsyncReset();
+  void mergeUIntReset();
   void mergeOut1();
   void mergeIn1();
   void mergeSublings();
@@ -56,6 +57,7 @@ class graph {
   std::set<SuperNode*> supersrc;
   /* used after toposort */
   std::vector<SuperNode*> sortedSuper;
+  std::vector<SuperNode*> uintReset;
   std::set<Node*> splittedArray;
   std::string name;
   int maxTmp = 0;

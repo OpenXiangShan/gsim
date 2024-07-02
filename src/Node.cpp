@@ -51,6 +51,7 @@ void Node::inferWidth() {
   }
   for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();
   if (updateTree) updateTree->getRoot()->inferWidth();
+  if (resetTree) resetTree->getRoot()->inferWidth();
   if (resetVal) resetVal->getRoot()->inferWidth();
   if (width == -1) {
     int width = 0;
@@ -191,6 +192,13 @@ void Node::addUpdateTree() {
   ENode* dstENode = new ENode(getDst());
   dstENode->width = width;
   updateTree = new ExpTree(dstENode, this);
+  if (resetCond->getRoot()->reset == UINTRESET) {
+    ENode* whenNode = new ENode(OP_WHEN);
+    whenNode->addChild(resetCond->getRoot());
+    whenNode->addChild(resetVal->getRoot());
+    whenNode->addChild(nullptr);
+    resetTree = new ExpTree(whenNode, this);
+  }
 }
 
 bool Node::anyExtEdge() {
@@ -211,7 +219,7 @@ bool Node::regNeedActivate() {
 }
 
 void Node::updateActivate() {
-  if (type == NODE_ASYNC_RESET) nextActiveId.insert(ACTIVATE_ALL);
+  if (isReset()) nextActiveId.insert(ACTIVATE_ALL);
   for (Node* nextNode : next) {
     if (nextNode->super != super) {
       if (nextNode->super->cppId != -1)

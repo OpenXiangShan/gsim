@@ -344,7 +344,7 @@ void graph::splitNodes() {
   std::set<Node*> usedAsWhole;
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) {
-      if (node->isArray() || node->assignTree.size() != 1 || node->sign) {
+      if (node->isArray() || node->assignTree.size() != 1 || node->sign || node->width == 0) {
         NodeComponent* comp = new NodeComponent();
         comp->addElement(new NodeElement(true, node, node->width - 1, 0));
         setComponent(node, comp);
@@ -399,6 +399,7 @@ void graph::splitNodes() {
       componentMap[newDstNode] = componentMap[reg->getDst()]->getbits(hi, lo);
       if (supersrc.find(reg->super) != supersrc.end()) supersrc.insert(newSrcNode->super);
       if (reg->updateTree) newSrcNode->updateTree = dupSplittedTree(reg->updateTree, reg, newSrcNode);
+      if (reg->resetTree) newSrcNode->resetTree = dupSplittedTree(reg->resetTree, reg, newSrcNode);
       for (ExpTree* tree: reg->assignTree) {
         ExpTree* newTree = dupTreeWithBits(tree, hi, lo);
         newTree->setlval(new ENode(newSrcNode));

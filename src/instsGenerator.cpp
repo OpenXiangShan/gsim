@@ -260,6 +260,18 @@ static int countArrayIndex(std::string name) {
   return count;
 }
 
+bool resetConsEq(valInfo* dstInfo, Node* regsrc) {
+  if (!regsrc->resetTree) return true;
+  valInfo* info = regsrc->resetTree->getRoot()->compute(regsrc, regsrc->name.c_str(), true);
+  if (info->status == VAL_EMPTY) return true;
+  mpz_t consVal;
+  mpz_init(consVal);
+  mpz_set(consVal, dstInfo->status == VAL_CONSTANT ? dstInfo->consVal : dstInfo->assignmentCons);
+  if (info->status == VAL_CONSTANT && mpz_cmp(info->consVal, consVal) == 0) return true;
+  if (info->sameConstant && mpz_cmp(info->assignmentCons, consVal) == 0) return true;
+  return false;
+}
+
 void srcUpdateDst(Node* node) {
   if (node->type == NODE_REG_SRC && node->reset == ASYRESET && node->regSplit) {
     std::vector<std::string> newInsts;
@@ -2343,7 +2355,7 @@ valInfo* Node::compute() {
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
     if (type == NODE_REG_DST) {
-      if (getSrc()->status == DEAD_SRC || getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, getSrc()->computeInfo->consVal) == 0)) {
+      if ((getSrc()->status == DEAD_SRC || getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, getSrc()->computeInfo->consVal) == 0)) && resetConsEq(ret, getSrc())) {
         getSrc()->status = CONSTANT_NODE;
         getSrc()->computeInfo = ret;
         if (getSrc()->regUpdate) {
@@ -2379,7 +2391,7 @@ valInfo* Node::compute() {
       recomputeAllNodes();
     }
   } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant &&
-    (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(getSrc()->computeInfo->consVal, ret->assignmentCons) == 0))) {
+    (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(getSrc()->computeInfo->consVal, ret->assignmentCons) == 0)) && resetConsEq(ret, getSrc())) {
     ret->status = VAL_CONSTANT;
     mpz_set(ret->consVal, ret->assignmentCons);
     ret->setConsStr();
@@ -2643,20 +2655,47 @@ void graph::instsGenerator() {
       if (n->dimension.size() != 0) {
         n->compute();
       } else {
-        if (n->assignTree.size() == 0) continue;
         n->compute();
-        if (n->status == MERGED_NODE) continue;
-        if (n->status == CONSTANT_NODE) {
-          if (n->type == NODE_REG_DST && !n->getSrc()->regSplit && n->getSrc()->status != CONSTANT_NODE) {
-
-          } else if (n->type == NODE_REG_UPDATE && n->regNext->status != CONSTANT_NODE) {
-
-          } else {
-            continue;
-          }
-        }
         s.insert(n);
       }
+    }
+  }
+
+  for (Node* reg : regsrc) {
+    if (reg->status != VALID_NODE || !reg->resetTree) continue;
+    if (reg->resetTree) {
+      reg->resetTree->getRoot()->compute(reg, reg->name, true);
+    }
+    valInfo* info = reg->resetTree->getRoot()->computeInfo;
+    for (std::string inst : info->insts) {
+      reg->resetInsts.push_back(inst);
+    }
+    if (info->status == VAL_EMPTY) info->setConstantByStr("0");
+    if (info->opNum < 0) {
+      reg->resetInsts.push_back(info->valStr);
+    } else if (reg->isArray()) {
+      if (info->status == VAL_CONSTANT && reg->width <= BASIC_WIDTH)
+        reg->resetInsts.push_back(format("memset(%s, %s, sizeof(%s));", reg->name.c_str(), info->valStr.c_str(), reg->name.c_str()));
+      else {
+        reg->resetInsts.push_back(arrayCopy(reg->name, reg, info));
+      }
+    } else {
+      if (reg->width <= BASIC_WIDTH)
+        reg->resetInsts.push_back(reg->name + " = " + info->valStr + ";");
+      else
+        reg->resetInsts.push_back(format("mpz_set(%s, %s);", reg->name.c_str(), info->valStr.c_str()));
+    }
+    if (reg->regSplit && reg->getDst()->status == VALID_NODE) {
+      std::vector<std::string> newInsts;
+      size_t start_pos = 0;
+      for (std::string inst : reg->resetInsts) {
+        while((start_pos = inst.find(reg->name, start_pos)) != std::string::npos) {
+          inst.replace(start_pos, reg->name.length(), reg->getDst()->name);
+          start_pos += reg->name.length();
+        }
+        newInsts.push_back(inst);
+      }
+      reg->resetInsts.insert(reg->resetInsts.end(), newInsts.begin(), newInsts.end());
     }
   }
 
@@ -2664,13 +2703,14 @@ void graph::instsGenerator() {
 
   /* generate assignment instrs */
   for (Node* n : s) {
-    if (n->status == CONSTANT_NODE && (n->type == NODE_REG_DST || n->type == NODE_REG_UPDATE)) {
-      if (n->width <= BASIC_WIDTH)
-        n->insts.push_back(n->name + " = " + n->computeInfo->valStr + ";");
-      else
-        n->insts.push_back(format("mpz_set_str(%s, \"%s\", 16);", n->name.c_str(), mpz_get_str(NULL, 16, n->computeInfo->consVal)));
-    printf("here2 %s\n", n->name.c_str());
-      n->status = VALID_NODE;
+    if (n->status == CONSTANT_NODE) {
+      if ((n->type == NODE_REG_DST && !n->getSrc()->regSplit && n->getSrc()->status != CONSTANT_NODE) || (n->type == NODE_REG_UPDATE && n->regNext->status != CONSTANT_NODE)) {
+        if (n->width <= BASIC_WIDTH)
+          n->insts.push_back(n->name + " = " + n->computeInfo->valStr + ";");
+        else
+          n->insts.push_back(format("mpz_set_str(%s, \"%s\", 16);", n->name.c_str(), mpz_get_str(NULL, 16, n->computeInfo->consVal)));
+        n->status = VALID_NODE;
+      }
     }
     if (n->status == MERGED_NODE || n->status == CONSTANT_NODE) continue;
     for (ExpTree* tree : n->assignTree) {

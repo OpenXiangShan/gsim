@@ -150,6 +150,10 @@ void Node::passWidthToPrev() {
     updateTree->getRoot()->usedBit = usedBit;
     updateTree->getRoot()->passWidthToChild();
   }
+  if (resetTree) {
+    resetTree->getRoot()->usedBit = usedBit;
+    resetTree->getRoot()->passWidthToChild();
+  }
   if (assignTree.size() == 0) return;
   Assert(usedBit >= 0, "invalid usedBit %d in node %s", usedBit, name.c_str());
   for (ExpTree* tree : assignTree) {
@@ -229,6 +233,7 @@ void graph::usedBits() {
     for (ExpTree* tree : node->arrayVal) tree->getRoot()->updateWidth();
     if (node->resetVal) node->resetVal->getRoot()->updateWidth();
     if (node->updateTree) node->updateTree->getRoot()->updateWidth();
+    if (node->resetTree) node->resetTree->getRoot()->updateWidth();
   }
 
   for (Node* node : splittedArray) {
@@ -249,9 +254,17 @@ void Node::updateTreeWithNewWIdth() {
   for (ExpTree* tree : arrayVal) tree->updateWithNewWidth();
   if (resetVal) resetVal->updateWithNewWidth();
   if (updateTree) updateTree->updateWithNewWidth();
+  if (resetTree) resetTree->updateWithNewWidth();
 
-  for (ExpTree* tree : assignTree) tree->matchWidth(width);
-  for (ExpTree* tree : arrayVal) tree->matchWidth(width);
+  for (ExpTree* tree : assignTree) {
+    tree->when2mux(width);
+    tree->matchWidth(width);
+  }
+  for (ExpTree* tree : arrayVal) {
+    tree->when2mux(width);
+    tree->matchWidth(width);
+  }
   if (resetVal) resetVal->matchWidth(width);
   if (updateTree) updateTree->matchWidth(width);
+  if (resetTree) resetTree->matchWidth(width);
 }

@@ -470,7 +470,7 @@ std::string graph::saveOldVal(FILE* fp, Node* node) {
 static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep) {
   std::string nodeName = node->name;
   if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
-  if (node->type == NODE_ASYNC_RESET) {
+  if (node->isAsyncReset()) {
     if (node->width > BASIC_WIDTH) {
       fprintf(fp, "if (mpz_sgn(%s) != 0 || mpz_cmp(%s, %s) != 0) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
     } else {
@@ -489,7 +489,7 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
     else
       fprintf(fp, "%s = %s;\n", node->name.c_str(), newName(node).c_str());
   }
-  if (node->type == NODE_ASYNC_RESET) {
+  if (node->isAsyncReset()) {
     fprintf(fp, "activateAll();\n");
     fprintf(fp, "oldFlag = -1;\n");
   }
@@ -689,7 +689,7 @@ void graph::genReset(FILE* fp) {
   fprintf(fp, "void S%s::resetAll(){\n", name.c_str());
   for (SuperNode* super : sortedSuper) {
     if (super->superType == SUPER_ASYNC_RESET) {
-      Assert(super->member[0]->type == NODE_ASYNC_RESET, "invalid reset");
+      Assert(super->member[0]->isAsyncReset(), "invalid reset");
       fprintf(fp, "if(unlikely(%s)) {\n", super->member[0]->name.c_str());
       fprintf(fp, "activateAll();\n");
       for (size_t i = 1; i < super->member.size(); i ++) {
@@ -697,8 +697,22 @@ void graph::genReset(FILE* fp) {
           fprintf(fp, "%s\n", str.c_str());
         }
       }
-      fprintf(fp, "}");
+      fprintf(fp, "}\n");
     }
+  }
+  for (SuperNode* super : uintReset) {
+    if (super->member[0]->status == CONSTANT_NODE) {
+      Assert(mpz_sgn(super->member[0]->computeInfo->consVal) == 0, "reset %s is always true", super->member[0]->name.c_str());
+      continue;
+    }
+    fprintf(fp, "if(unlikely(%s)) {\n", super->member[0]->name.c_str());
+    fprintf(fp, "activateAll();\n");
+      for (size_t i = 1; i < super->member.size(); i ++) {
+        for (std::string str : super->member[i]->resetInsts) {
+          fprintf(fp, "%s\n", str.c_str());
+        }
+      }
+      fprintf(fp, "}");
   }
   fprintf(fp, "}\n");
 }

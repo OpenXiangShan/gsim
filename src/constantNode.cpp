@@ -65,6 +65,18 @@ valInfo* setNodeCons(Node* node, std::string str) {
   return consInfo;
 }
 
+bool cons_resetConsEq(valInfo* dstInfo, Node* regsrc) {
+  if (!regsrc->resetTree) return true;
+  valInfo* info = regsrc->resetTree->getRoot()->computeConstant(regsrc, regsrc->name.c_str());
+  if (info->status == VAL_EMPTY) return true;
+  mpz_t consVal;
+  mpz_init(consVal);
+  mpz_set(consVal, dstInfo->status == VAL_CONSTANT ? dstInfo->consVal : dstInfo->assignmentCons);
+  if (info->status == VAL_CONSTANT && mpz_cmp(info->consVal, consVal) == 0) return true;
+  if (info->sameConstant && mpz_cmp(info->assignmentCons, consVal) == 0) return true;
+  return false;
+}
+
 valInfo* ENode::consMux(bool isLvalue) {
   /* cond is constant */
   if (ChildCons(0, status) == VAL_CONSTANT) {
@@ -948,7 +960,7 @@ valInfo* Node::computeConstant() {
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
     if (type == NODE_REG_DST) {
-      if (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, consMap[getSrc()]->consVal) == 0)) {
+      if ((getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, consMap[getSrc()]->consVal) == 0)) && cons_resetConsEq(ret, getSrc())) {
         getSrc()->status = CONSTANT_NODE;
         consMap[getSrc()] = ret;
         /* re-compute nodes depend on src */
@@ -980,7 +992,8 @@ valInfo* Node::computeConstant() {
       recomputeAllNodes();
     }
   } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant &&
-    (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(consMap[getSrc()]->consVal, ret->assignmentCons) == 0))) {
+    (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(consMap[getSrc()]->consVal, ret->assignmentCons) == 0))
+    && cons_resetConsEq(ret, getSrc())) {
     ret->status = VAL_CONSTANT;
     mpz_set(ret->consVal, ret->assignmentCons);
     ret->setConsStr();

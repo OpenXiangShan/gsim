@@ -299,6 +299,7 @@ public:
     void updateWithNewWidth();
     void updateNewChild(ENode* parent, ENode* child, int idx);
     void treeOpt();
+    void getRelyNodes(std::set<Node*>& allNodes);
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes

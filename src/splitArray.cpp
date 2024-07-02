@@ -1,5 +1,6 @@
 #include "common.h"
 #include <cstdio>
+#include <queue>
 #include <stack>
 #include <set>
 #include <map>
@@ -164,20 +165,21 @@ ExpTree* mergeWhenTree(ExpTree* tree1, ExpTree* tree2) {
     fillEmptyWhen(tree2, tree1->getRoot());
     return tree2;
   }
-  std::stack<std::tuple<ENode*, ENode*, ENode*, int>> s;
+
+  std::queue<std::tuple<ENode*, ENode*, ENode*, int>> s;
   s.push((std::make_tuple(tree1->getRoot(), tree2->getRoot(), nullptr, -1)));
   ExpTree* ret = nullptr;
   while (!s.empty()) {
     ENode* enode1, *enode2, *parent2;
     int idx2;
-    std::tie(enode1, enode2, parent2, idx2) = s.top();
+    std::tie(enode1, enode2, parent2, idx2) = s.front();
     s.pop();
     if (enode1->opType == OP_WHEN && enode2->opType == OP_WHEN) {
       if (subTreeEq(enode1->getChild(0), enode2->getChild(0))) {
-        if (!enode2->getChild(1) && enode1->getChild(1)) enode2->setChild(1, enode1->getChild(1));
-        if (!enode2->getChild(2) && enode1->getChild(2)) enode2->setChild(2, enode1->getChild(2));
         if (enode1->getChild(1) && enode2->getChild(1)) s.push(std::make_tuple(enode1->getChild(1), enode2->getChild(1), enode2, 1));
         if (enode1->getChild(2) && enode2->getChild(2)) s.push(std::make_tuple(enode1->getChild(2), enode2->getChild(2), enode2, 2));
+        if (!enode2->getChild(1) && enode1->getChild(1)) enode2->setChild(1, enode1->getChild(1));
+        if (!enode2->getChild(2) && enode1->getChild(2)) enode2->setChild(2, enode1->getChild(2));
         ret = tree2;
       } else {
         if (ret) { // already merged some nodes
@@ -255,7 +257,7 @@ void graph::splitArrayNode(Node* node) {
   /* distribute arrayVal */
   for (ExpTree* tree : node->assignTree) distributeTree(node, tree);
   for (ExpTree* tree : node->arrayVal) distributeTree(node, tree);
-  if (node->updateTree) {
+  if (node->updateTree || node->resetTree) {
     for (int idx = 0; idx < node->arrayEntryNum(); idx ++) {
       /* compute index for all array operands in tree */
       std::vector<int> subIdx(node->dimension.size());
@@ -264,8 +266,14 @@ void graph::splitArrayNode(Node* node) {
         subIdx[i] = tmp % node->dimension[i];
         tmp /= node->dimension[i];
       }
-      ExpTree* newTree = dupTreeWithIdx(node->updateTree, subIdx);
-      node->arrayMember[idx]->updateTree = newTree;
+      if (node->updateTree) {
+        ExpTree* newTree = dupTreeWithIdx(node->updateTree, subIdx);
+        node->arrayMember[idx]->updateTree = newTree;
+      }
+      if (node->resetTree) {
+        ExpTree* newTree = dupTreeWithIdx(node->resetTree, subIdx);
+        node->arrayMember[idx]->resetTree = newTree;
+      }
     }
   }
   /* construct connections */
