@@ -276,9 +276,10 @@ void ExpTree::updateWithNewWidth() {
             if (top->sign) {
               top->opType = OP_SEXT;
               top->values.clear();
-              top->values.push_back(top->width);
+              top->addVal(top->width);
             } else {
               top->opType = OP_PAD;
+              top->values.clear();
               top->addVal(top->width);
             }
           } else if ((top->values[0] - top->values[1] + 1) > top->width) top->values[0] = top->values[1] + top->width - 1;
