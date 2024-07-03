@@ -318,7 +318,7 @@ ExpTree* dupTreeWithBits(ExpTree* tree, int hi, int lo) {
     int idx;
     std::tie(top, parent, idx) = s.top();
     s.pop();
-    if (top->nodePtr) {
+    if (top->nodePtr || top->opType == OP_INT) {
       ENode* bits = new ENode(OP_BITS);
       bits->addChild(top);
       bits->addVal(hi);
