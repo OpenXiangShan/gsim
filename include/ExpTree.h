@@ -233,7 +233,7 @@ public:
   ArrayMemberList* getArrayMember(Node* node);
   void display();
   uint64_t keyHash();
-  NodeComponent* inferComponent();
+  NodeComponent* inferComponent(Node* node, bool isArith);
 };
 
 /* 
