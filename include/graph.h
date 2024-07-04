@@ -84,7 +84,7 @@ class graph {
   void constructRegs();
   void commonExpr();
   void exprOpt();
-  void dump();
+  void dump(std::string FileName);
 };
 
 #endif

@@ -31,7 +31,7 @@ void GraphDumper::dump(const graph* g) {
 
   for (auto* Super : g->sortedSuper)
     for (auto* Member : Super->member)
-      for (auto* Next : Member->next) std::cout << "\t\t\"" << Member->name << "\" -> \"" << Next->name << "\";\n";
+      for (auto* Next : Member->next) os << "\t\t\"" << Member->name << "\" -> \"" << Next->name << "\";\n";
 
   os << "}\n";
 }
@@ -42,13 +42,13 @@ void GraphDumper::dump(const SuperNode* N) {
   for (auto* node : N->member) {
     auto& Name = node->name;
 
-    std::cout << "\t\t\"" << Name << "\"\n";
+    os << "\t\t\"" << Name << "\"\n";
   }
 
   os << "\t}\n";
 }
 
-void graph::dump() {
-  std::cout << "Dumping graph.\n";
-  GraphDumper(std::cout).dump(this);
+void graph::dump(std::string FileName) {
+  std::ofstream ofs{std::string{OBJ_DIR} + "/" + this->name + "_" + FileName + ".dot"};
+  GraphDumper(ofs).dump(this);
 }

@@ -117,8 +117,7 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->cppEmitter());
 
-  if (EnableDumpGraph)
-    g->dump();
+  if (EnableDumpGraph) g->dump("Final");
 
   return 0;
 }
