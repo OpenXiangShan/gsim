@@ -7,6 +7,9 @@ class GraphDumper {
   void dump(const graph* g);
 
  private:
+  template <typename T>
+  void dumpSuperNode(const T& Super);
+
   void dump(const SuperNode* N);
 
   std::string& fixName(std::string& Name);
@@ -27,13 +30,21 @@ void GraphDumper::dump(const graph* g) {
 
   os << "digraph GSimGraph {\n";
 
-  for (auto* N : g->sortedSuper) dump(N);
-
-  for (auto* Super : g->sortedSuper)
-    for (auto* Member : Super->member)
-      for (auto* Next : Member->next) os << "\t\t\"" << Member->name << "\" -> \"" << Next->name << "\";\n";
+  if (!g->sortedSuper.empty())
+    dumpSuperNode(g->sortedSuper);  // Used after toposort
+  else
+    dumpSuperNode(g->supersrc);  // Used before toposort
 
   os << "}\n";
+}
+
+template <typename T>
+void GraphDumper::dumpSuperNode(const T& Super) {
+  for (auto* N : Super) dump(N);
+
+  for (auto* Super : Super)
+    for (auto* Member : Super->member)
+      for (auto* Next : Member->next) os << "\t\t\"" << Member->name << "\" -> \"" << Next->name << "\";\n";
 }
 
 void GraphDumper::dump(const SuperNode* N) {
