@@ -79,6 +79,7 @@ int main(int argc, char** argv) {
   FUNC_WRAPPER(syntax.parse());
   graph* g;
   FUNC_WRAPPER(g = AST2Graph(root));
+  if (EnableDumpGraph) g->dump("00Init");
 
   FUNC_WRAPPER(g->splitArray());
 
@@ -87,29 +88,41 @@ int main(int argc, char** argv) {
   FUNC_WRAPPER(inferAllWidth());
 
   FUNC_WRAPPER(g->topoSort());
+  if (EnableDumpGraph) g->dump("01TopoSort");
 
   FUNC_WRAPPER(g->clockOptimize());
+  if (EnableDumpGraph) g->dump("02ClockOptimize");
 
   FUNC_WRAPPER(g->removeDeadNodes());
+  if (EnableDumpGraph) g->dump("03RemoveDeadNodes");
 
   FUNC_WRAPPER(g->exprOpt());
+  if (EnableDumpGraph) g->dump("04ExprOpt");
   // FUNC_WRAPPER(g->traversal());
   FUNC_WRAPPER(g->usedBits());
 
   FUNC_WRAPPER(g->constantAnalysis());
+  if (EnableDumpGraph) g->dump("05ConstantAnalysis");
 
   FUNC_WRAPPER(g->removeDeadNodes());
+  if (EnableDumpGraph) g->dump("06RemoveDeadNodes");
 
   FUNC_WRAPPER(g->aliasAnalysis());
+  if (EnableDumpGraph) g->dump("07AliasAnalysis");
 
   FUNC_WRAPPER(g->commonExpr());
+  if (EnableDumpGraph) g->dump("08CommonExpr");
 
   FUNC_WRAPPER(g->removeDeadNodes());
+  if (EnableDumpGraph) g->dump("09RemoveDeadNodes");
 
   FUNC_WRAPPER(g->mergeNodes());
+  if (EnableDumpGraph) g->dump("10MergeNodes");
 
   FUNC_WRAPPER(g->mergeRegister());
+  if (EnableDumpGraph) g->dump("11MergeRegister");
   FUNC_WRAPPER(g->constructRegs());
+  if (EnableDumpGraph) g->dump("12ConstructRegs");
 
   // g->mergeRegister();
  
@@ -117,7 +130,7 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->cppEmitter());
 
-  if (EnableDumpGraph) g->dump("Final");
+  if (EnableDumpGraph) g->dump("13Final");
 
   return 0;
 }
