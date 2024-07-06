@@ -27,11 +27,13 @@ extern PNode* root;
   } while(0)
 
 static std::string InputFileName{""};
+static bool EnableDumpGraph{false};
 
 static void printUsage(const char* ProgName) {
   std::cout << "Usage: " << ProgName << " [options] <input file>\n"
             << "Options:\n"
-            << "  -h, --help           Display this help message and exit.\n";
+            << "  -h, --help           Display this help message and exit.\n"
+            << "      --dump           Enable dumping of the graph.\n";
 }
 
 static void parseCommandLine(int argc, char** argv) {
@@ -42,6 +44,7 @@ static void parseCommandLine(int argc, char** argv) {
 
   const struct option Table[] = {
       {"help", no_argument, nullptr, 'h'},
+      {"dump", no_argument, nullptr, 'd'},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -49,6 +52,7 @@ static void parseCommandLine(int argc, char** argv) {
   while ((Option = getopt_long(argc, argv, "-h", Table, nullptr)) != -1) {
     switch (Option) {
       case 1: InputFileName = optarg; return;
+      case 'd': EnableDumpGraph = true; break;
       default: {
         printUsage(argv[0]);
         exit(EXIT_SUCCESS);
@@ -75,6 +79,7 @@ int main(int argc, char** argv) {
   FUNC_WRAPPER(syntax.parse());
   graph* g;
   FUNC_WRAPPER(g = AST2Graph(root));
+  if (EnableDumpGraph) g->dump("00Init");
 
   FUNC_WRAPPER(g->splitArray());
 
@@ -83,35 +88,49 @@ int main(int argc, char** argv) {
   FUNC_WRAPPER(inferAllWidth());
 
   FUNC_WRAPPER(g->topoSort());
+  if (EnableDumpGraph) g->dump("01TopoSort");
 
   FUNC_WRAPPER(g->clockOptimize());
+  if (EnableDumpGraph) g->dump("02ClockOptimize");
 
   FUNC_WRAPPER(g->removeDeadNodes());
+  if (EnableDumpGraph) g->dump("03RemoveDeadNodes");
 
   FUNC_WRAPPER(g->exprOpt());
+  if (EnableDumpGraph) g->dump("04ExprOpt");
   // FUNC_WRAPPER(g->traversal());
   FUNC_WRAPPER(g->usedBits());
 
   FUNC_WRAPPER(g->constantAnalysis());
+  if (EnableDumpGraph) g->dump("05ConstantAnalysis");
 
   FUNC_WRAPPER(g->removeDeadNodes());
+  if (EnableDumpGraph) g->dump("06RemoveDeadNodes");
 
   FUNC_WRAPPER(g->aliasAnalysis());
+  if (EnableDumpGraph) g->dump("07AliasAnalysis");
 
   FUNC_WRAPPER(g->commonExpr());
+  if (EnableDumpGraph) g->dump("08CommonExpr");
 
   FUNC_WRAPPER(g->removeDeadNodes());
+  if (EnableDumpGraph) g->dump("09RemoveDeadNodes");
 
   FUNC_WRAPPER(g->mergeNodes());
+  if (EnableDumpGraph) g->dump("10MergeNodes");
 
   FUNC_WRAPPER(g->mergeRegister());
+  if (EnableDumpGraph) g->dump("11MergeRegister");
   FUNC_WRAPPER(g->constructRegs());
+  if (EnableDumpGraph) g->dump("12ConstructRegs");
 
   // g->mergeRegister();
  
   FUNC_WRAPPER(g->instsGenerator());
 
   FUNC_WRAPPER(g->cppEmitter());
+
+  if (EnableDumpGraph) g->dump("13Final");
 
   return 0;
 }
