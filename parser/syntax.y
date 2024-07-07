@@ -80,7 +80,7 @@ int p_stoi(const char* str);
 
 %%
 /* remove version */
-circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, synlineno(), $6, $3, $8); root = $$; }
+circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, synlineno(), $6, $3, $8); root = $$; (void)yynerrs_;}
 	;
 ALLID: ID {$$ = $1; }
     | Inst { $$ = strdup("inst"); }
