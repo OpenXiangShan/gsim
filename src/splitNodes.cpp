@@ -9,25 +9,30 @@
 class NodeElement;
 bool compMergable(NodeElement* ele1, NodeElement* ele2);
 
+enum ElementType { ELE_EMPTY, ELE_NODE, ELE_INT, ELE_SPACE};
 class NodeElement {
 public:
-  bool isNode = false;
+  ElementType eleType = ELE_EMPTY;
   Node* node = nullptr;
   mpz_t val;
   int hi, lo;
-  NodeElement(bool _isNode = false, Node* _node = nullptr, int _hi = -1, int _lo = -1) {
+  std::set<std::tuple<Node*, int, int>> referNodes;
+  NodeElement(ElementType type = ELE_EMPTY, Node* _node = nullptr, int _hi = -1, int _lo = -1) {
     mpz_init(val);
-    isNode = _isNode;
+    eleType = type;
     node = _node;
     hi = _hi;
     lo = _lo;
+    if (type == ELE_NODE) {
+      referNodes.insert(std::make_tuple(_node, _hi, _lo));
+    }
   }
   NodeElement(std::string str, int base = 16, int _hi = -1, int _lo = -1) {
     mpz_init(val);
     mpz_set_str(val, str.c_str(), base);
     hi = _hi;
     lo = _lo;
-    isNode = false;
+    eleType = ELE_INT;
     updateWidth();
   }
   void updateWidth() {
@@ -44,17 +49,18 @@ public:
   NodeElement* dup() {
     NodeElement* ret = new NodeElement();
     mpz_set(ret->val, val);
-    ret->isNode = isNode;
+    ret->eleType = eleType;
     ret->node = node;
     ret->hi = hi;
     ret->lo = lo;
+    ret->referNodes.insert(referNodes.begin(), referNodes.end());
     return ret;
   }
   /* select [_hi, lo] */
   NodeElement* getBits(int _hi, int _lo) {
     Assert(_hi <= hi - lo + 1, "invalid range [%d, %d]", _hi, lo);
     NodeElement* ret = dup();
-    if (isNode) {
+    if (eleType == ELE_NODE) {
       ret->hi = _hi + ret->lo;
       ret->lo = _lo + ret->lo;
     } else {
@@ -62,11 +68,17 @@ public:
       ret->lo = _lo;
       ret->updateWidth();
     }
+    if (eleType != ELE_SPACE) {
+      for (auto iter : ret->referNodes) {
+        std::get<1>(iter) = std::get<2>(iter) + _hi;
+        std::get<2>(iter) = std::get<2>(iter) + _lo;
+      }
+    }
     return ret;
   }
   void merge(NodeElement* ele) {
     Assert(compMergable(this, ele), "not mergable");
-    if (isNode) {
+    if (eleType == ELE_NODE) {
       lo = ele->lo;
     } else {
       mpz_mul_2exp(val, val, ele->hi - lo + 1);
@@ -74,13 +86,13 @@ public:
       hi += ele->hi + 1;
       updateWidth();
     }
+    referNodes.insert(ele->referNodes.begin(), ele->referNodes.end());
   }
 };
 
 class NodeComponent{
 public:
   std::vector<NodeElement*> elements;
-  // std::vector<std::pair<int, int>> bits;
   int width;
   NodeComponent() {
     width = 0;
@@ -110,7 +122,6 @@ public:
     int w = width;
     bool start = false;
     NodeComponent* comp = new NodeComponent();
-    // comp->width = hi - lo + 1;
     if (hi >= width) {
       comp->addElement(new NodeElement("0", 16, hi - MAX(lo, width), 0));
       hi = MAX(lo, width - 1);
@@ -138,12 +149,37 @@ public:
     for (NodeElement* comp : elements) w += comp->hi - comp->lo + 1;
     if (w != width) {
       for (size_t i = 0; i < elements.size(); i ++) {
-        printf("  %s [%d, %d] (totalWidth = %d)\n", elements[i]->isNode ? elements[i]->node->name.c_str() : (std::string("0x") + mpz_get_str(nullptr, 16, elements[i]->val)).c_str(),
+        printf("  %s [%d, %d] (totalWidth = %d)\n", elements[i]->eleType == ELE_NODE ? elements[i]->node->name.c_str() : (elements[i]->eleType == ELE_INT ? (std::string("0x") + mpz_get_str(nullptr, 16, elements[i]->val)).c_str() : "EMPTY"),
              elements[i]->hi, elements[i]->lo, width);
       }
     }
     Assert(w == width, "width not match %d != %d\n", w, width);
     return width;
+  }
+  bool assignSegEq(NodeComponent* comp) {
+    if (comp->width != width || comp->elements.size() != elements.size()) return false;
+    for (size_t i = 0; i < elements.size(); i ++) {
+      if ((elements[i]->hi - elements[i]->lo) != (comp->elements[i]->hi - comp->elements[i]->lo)) return false;
+    }
+    return true;
+  }
+  void invalidateAsWhole() {
+    elements.clear();
+    elements.push_back(new NodeElement(ELE_SPACE, nullptr, width - 1, 0));
+  }
+  void invalidateAll() {
+    for (NodeElement* element : elements) {
+      element->eleType = ELE_SPACE;
+      element->hi -= element->lo;
+      element->lo = 0;
+      element->node = nullptr;
+    }
+  }
+  bool fullValid() {
+    for (NodeElement* element : elements) {
+      if (element->eleType == ELE_SPACE) return false;
+    }
+    return true;
   }
 };
 
@@ -195,10 +231,36 @@ std::map <ENode*, NodeComponent*> componentEMap;
 static std::vector<Node*> checkNodes;
 static std::map<Node*, Node*> aliasMap;
 
+NodeComponent* spaceComp(int width) {
+  NodeComponent* comp = new NodeComponent();
+  comp->addElement(new NodeElement(ELE_SPACE, nullptr, width - 1, 0));
+  return comp;
+}
+
+void addRefer(NodeComponent* dst, NodeComponent* comp) {
+  for (size_t i = 0; i < comp->elements.size(); i ++)
+    dst->elements[0]->referNodes.insert(comp->elements[i]->referNodes.begin(), comp->elements[i]->referNodes.end());
+}
+
+NodeComponent* mergeMux(NodeComponent* comp1, NodeComponent* comp2) {
+  NodeComponent* ret;
+  if (comp1->assignSegEq(comp2)) {
+    ret = comp1->dup();
+    ret->invalidateAll();
+    for (size_t i = 0; i < comp1->elements.size(); i ++) {
+      ret->elements[i]->referNodes.insert(comp2->elements[i]->referNodes.begin(), comp2->elements[i]->referNodes.end());
+    }
+  } else {
+    ret = spaceComp(comp1->width);
+    addRefer(ret, comp1);
+    addRefer(ret, comp2);
+  }
+  return ret;
+}
 
 bool compMergable(NodeElement* ele1, NodeElement* ele2) {
-  if (ele1->isNode != ele2->isNode) return false;
-  if (ele1->isNode) return ele1->node == ele2->node && ele1->lo == ele2->hi + 1;
+  if (ele1->eleType != ele2->eleType) return false;
+  if (ele1->eleType == ELE_NODE) return ele1->node == ele2->node && ele1->lo == ele2->hi + 1;
   else return true;
 }
 
@@ -212,22 +274,24 @@ NodeComponent* merge2(NodeComponent* comp1, NodeComponent* comp2) {
 Node* getLeafNode(bool isArray, ENode* enode);
 
 void setUpdateArith(Node* node) {
-  if (nodeSegments.find(node) == nodeSegments.end()) nodeSegments[node] = std::make_pair(new Segments(node->width), new Segments(node->width));
   nodeSegments[node].NODE_UPDATE->isArith = true;
 }
 
 void setRefArith(Node* node) {
-  if (nodeSegments.find(node) == nodeSegments.end()) nodeSegments[node] = std::make_pair(new Segments(node->width), new Segments(node->width));
   nodeSegments[node].NODE_REF->isArith = true;
 }
 
 NodeComponent* ENode::inferComponent(Node* n, bool isArith) {
   if (nodePtr) {
     Node* node = getLeafNode(true, this);
-    if (node->isArray()) return nullptr;
+    if (node->isArray()) return spaceComp(node->width);
     Assert(componentMap.find(node) != componentMap.end(), "%s is not visited", node->name.c_str());
     NodeComponent* ret = componentMap[node]->getbits(width-1, 0);
-    if (ret) componentEMap[this] = ret;
+    if (!ret->fullValid()) {
+      ret = new NodeComponent();
+      ret->addElement(new NodeElement(ELE_NODE, node, width - 1, 0));
+    }
+    componentEMap[this] = ret;
     if (isArith) setRefArith(n);
     return ret;
   }
@@ -240,21 +304,23 @@ NodeComponent* ENode::inferComponent(Node* n, bool isArith) {
     case OP_DSHL: case OP_DSHR: case OP_AND: case OP_OR: case OP_XOR:
     case OP_ASUINT: case OP_ASSINT: case OP_CVT: case OP_NEG: case OP_NOT:
     case OP_ANDR: case OP_ORR: case OP_XORR:
+      ret = spaceComp(width);
       for (ENode* childENode : child) {
-        if (childENode) childENode->inferComponent(n, true);
+        if (childENode) {
+          NodeComponent* childComp = childENode->inferComponent(n, true);
+          addRefer(ret, childComp);
+        }
       }
       setUpdateArith(n);
     break;
     case OP_BITS:
       child1 = getChild(0)->inferComponent(n, isArith);
-      if (child1) ret = child1->getbits(values[0], values[1]);
+      ret = child1->getbits(values[0], values[1]);
       break;
     case OP_CAT: 
       child1 = getChild(0)->inferComponent(n, isArith);
       child2 = getChild(1)->inferComponent(n, isArith);
-      if (child1 && child2) {
-        ret = merge2(child1, child2);
-      }
+      ret = merge2(child1, child2);
       break;
     case OP_INT: {
       std::string str;
@@ -266,45 +332,83 @@ NodeComponent* ENode::inferComponent(Node* n, bool isArith) {
     }
     case OP_HEAD:
       child1 = getChild(0)->inferComponent(n, isArith);
-      if (child1) ret = child1->getbits(child1->width - 1, values[0]);
+      ret = child1->getbits(child1->width - 1, values[0]);
       break;
     case OP_TAIL:
       child1 = getChild(0)->inferComponent(n, isArith);
-      if (child1) ret = child1->getbits(values[0]-1, 0);
+      ret = child1->getbits(values[0]-1, 0);
       break;
     case OP_SHL:
       child1 = getChild(0)->inferComponent(n, isArith);
-      if (child1) {
-        ret = child1->dup();
-        ret->addElement(new NodeElement("0", 16, values[0] - 1, 0));
-      }
+      ret = child1->dup();
+      ret->addElement(new NodeElement("0", 16, values[0] - 1, 0));
       break;
     case OP_SHR:
       child1 = getChild(0)->inferComponent(n, isArith);
-      if (child1) ret = child1->getbits(child1->width - 1, values[0]);
+      ret = child1->getbits(child1->width - 1, values[0]);
       break;
     case OP_PAD:
       child1 = getChild(0)->inferComponent(n, isArith);
-      if (child1) {
-        ret = child1->getbits(values[0]-1, 0);
+      ret = child1->getbits(values[0]-1, 0);
+      break;
+    case OP_WHEN:
+      if (!getChild(1) && !getChild(2)) break;
+      if (!getChild(1)) {
+        child2 = getChild(2)->inferComponent(n, isArith);
+        ret = child2->dup();
+        ret->invalidateAll();
+        break;
+      } else if (!getChild(2)) {
+        child1 = getChild(1)->inferComponent(n, isArith);
+        ret = child1->dup();
+        ret->invalidateAll();
+        break;
       }
+      /* otherwise continue... */
+    case OP_MUX:
+      getChild(0)->inferComponent(n, true);
+      child1 = getChild(1)->inferComponent(n, isArith);
+      child2 = getChild(2)->inferComponent(n, isArith);
+      ret = mergeMux(child1, child2);
       break;
     default:
+      ret = spaceComp(width);
       for (ENode* childENode : child) {
-        if (childENode) childENode->inferComponent(n, isArith);
+        if (childENode) {
+          NodeComponent* childComp = childENode->inferComponent(n, isArith);
+          addRefer(ret, childComp);
+        }
       }
       break;
   }
-  if (ret) componentEMap[this] = ret;
+  if (!ret) ret = spaceComp(width);
+  componentEMap[this] = ret;
   return ret;
 }
 
 NodeComponent* Node::inferComponent() {
-  Assert(assignTree.size() == 1, "invalid assignTree %s", name.c_str());
+  if (assignTree.size() != 1 || isArray() || sign || width == 0) {
+    NodeComponent* ret = spaceComp(width);
+    for (ExpTree* tree : assignTree) {
+      NodeComponent* comp = tree->getRoot()->inferComponent(this, false);
+      addRefer(ret, comp);
+    }
+    for (ExpTree* tree : arrayVal) {
+      NodeComponent* comp = tree->getRoot()->inferComponent(this, false);
+      addRefer(ret, comp);
+    }
+    return ret;
+  }
   return assignTree[0]->getRoot()->inferComponent(this, false);
 }
 
 void setComponent(Node* node, NodeComponent* comp) {
+  if (comp->fullValid()) {
+    for (NodeElement* element : comp->elements) {
+      element->referNodes.clear();
+      if (element->eleType == ELE_NODE) element->referNodes.insert(std::make_tuple(element->node, element->hi, element->lo));
+    }
+  }
   componentMap[node] = comp;
 /* update node segment */
   if (nodeSegments.find(node) == nodeSegments.end()) nodeSegments[node] = std::make_pair(new Segments(node->width), new Segments(node->width));
@@ -374,28 +478,24 @@ ExpTree* dupTreeWithBits(ExpTree* tree, int hi, int lo) {
 
 void graph::splitNodes() {
   int num = 0;
+  /* initialize nodeSegments */
+  for (SuperNode* super : sortedSuper) {
+    for (Node* node : super->member) nodeSegments[node] = std::make_pair(new Segments(node->width), new Segments(node->width));
+  }
 /* update nodeComponent & nodeSegments */
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) {
-      if (node->isArray() || node->assignTree.size() != 1 || node->sign || node->width == 0) {
-        NodeComponent* comp = new NodeComponent();
-        comp->addElement(new NodeElement(true, node, node->width - 1, 0));
-        setComponent(node, comp);
-        continue;
-      }
       NodeComponent* comp = node->inferComponent();
-      if (comp) setComponent(node, comp);
-      else {
-        NodeComponent* comp = new NodeComponent();
-        comp->addElement(new NodeElement(true, node, node->width - 1, 0));
-        setComponent(node, comp);
-      }
+      setComponent(node, comp);
       // printf("after infer %s\n", node->name.c_str());
       // node->display();
       // for (size_t i = 0; i < componentMap[node]->elements.size(); i ++) {
       //   NodeElement* element = componentMap[node]->elements[i];
-      //   printf("=>  %s [%d, %d] (totalWidth = %d)\n", element->isNode ? element->node->name.c_str() : (std::string("0x") + mpz_get_str(nullptr, 16, element->val)).c_str(),
+      //   printf("=>  %s [%d, %d] (totalWidth = %d)\n", element->eleType == ELE_NODE ? element->node->name.c_str() : (element->eleType == ELE_INT ? (std::string("0x") + mpz_get_str(nullptr, 16, element->val)).c_str() : "EMPTY"),
       //        element->hi, element->lo, componentMap[node]->width);
+      //   for (auto iter : element->referNodes) {
+      //     printf("    -> %s [%d %d]\n", std::get<0>(iter)->name.c_str(), std::get<1>(iter), std::get<2>(iter));
+      //   }
       // }
       Assert(node->width == componentMap[node]->countWidth(), "%s width not match %d != %d", node->name.c_str(), node->width, comp->width);
     }
@@ -407,29 +507,29 @@ void graph::splitNodes() {
       NodeComponent* comp = componentMap[node];
       bool isValid = false;
       if (node->type != NODE_OTHERS) isValid = true;
-      else if (comp->elements.size() == 1 && comp->elements[0]->isNode && comp->elements[0]->node == node) {
+      else if (comp->elements.size() == 1 && ((comp->elements[0]->eleType == ELE_NODE && comp->elements[0]->node == node) || comp->elements[0]->eleType == ELE_SPACE)) {
         isValid = true;
-      } else if (comp->elements.size() == 1 && !comp->elements[0]->isNode) {
+      } else if (comp->elements.size() == 1 && comp->elements[0]->eleType == ELE_INT) {
 
       } else {
         isValid = validNodes.find(node) != validNodes.end();
       }
       if (isValid) {
         validNodes.insert(node);
-        if (comp->elements.size() == 1 && comp->elements[0]->isNode && comp->elements[0]->node == node) {
-          for (Node* prev : node->prev) {
-            validNodes.insert(prev);
-            if (nodeSegments.find(prev) == nodeSegments.end()) nodeSegments[prev] = std::make_pair(new Segments(prev->width), new Segments(prev->width));
-            nodeSegments[prev].first->addRange(prev->width - 1, 0);
-          }
-        } else {
-          for (NodeElement* element : comp->elements) {
-            if (!element->isNode) continue;
-            validNodes.insert(element->node);
-            Node* compNode = element->node;
-            if (compNode == node) continue;
-            if (nodeSegments.find(compNode) == nodeSegments.end()) nodeSegments[compNode] = std::make_pair(new Segments(compNode->width), new Segments(compNode->width));
-            nodeSegments[compNode].first->addRange(element->hi, element->lo);
+        for (NodeElement* element : comp->elements) {
+          if (element->eleType == ELE_SPACE) {
+            for (auto iter : element->referNodes) {
+              Node* referNode = std::get<0>(iter);
+              int hi = std::get<1>(iter), lo = std::get<2>(iter);
+              if (node == referNode) continue;
+              validNodes.insert(referNode);
+              nodeSegments[referNode].first->addRange(hi, lo);
+            }
+          } else if (element->eleType == ELE_NODE) {
+            Node* referNode = element->node;
+            if (node == referNode) continue;
+            validNodes.insert(referNode);
+            nodeSegments[referNode].first->addRange(element->hi, element->lo);
           }
         }
       }
@@ -441,9 +541,16 @@ void graph::splitNodes() {
   std::map<Node*, std::set<Node*>> splittedNodesSet;
   for (Node* reg : regsrc) {
     if (reg->status != VALID_NODE || reg->isArray() || reg->assignTree.size() > 1 || reg->sign || reg->width == 0) continue;
-
+    if (nodeSegments[reg].first->cuts.size() > 1 || nodeSegments[reg->getDst()].second->cuts.size() > 1) {
+      // printf("node %s(w = %d): overlap %d isArith %d %d\n", reg->name.c_str(), reg->width, nodeSegments[reg].first->overlap, nodeSegments[reg].first->isArith, nodeSegments[reg->getDst()].second->isArith);
+      // for (int cut : nodeSegments[reg].first->cuts) printf("%d ", cut);
+      // printf("\n-------\n");
+      // for (int cut : nodeSegments[reg->getDst()].second->cuts) printf("%d ", cut);
+      // printf("\n-------\n");
+    }
     if (nodeSegments[reg].first->cuts.size() <= 1|| nodeSegments[reg].first->overlap || nodeSegments[reg].first->cuts != nodeSegments[reg->getDst()].second->cuts) continue;
     Segments* seg = nodeSegments[reg].first;
+    printf("splitNode %s\n", reg->name.c_str());
     splittedNodes[reg] = std::vector<Node*>();
     splittedNodes[reg].resize(reg->width);
     int lo = 0;
@@ -485,10 +592,13 @@ void graph::splitNodes() {
   for (auto iter : componentMap) {
     Node* node = iter.first;
     NodeComponent* comp = iter.second;
-    if (comp->elements.size() == 1 && comp->elements[0]->isNode && node == comp->elements[0]->node) continue;
+    bool missingReferred = false;
+    if (comp->elements.size() == 1 && comp->elements[0]->eleType == ELE_NODE && node == comp->elements[0]->node) missingReferred = true;
+    else missingReferred = !comp->fullValid();
+    if (missingReferred) continue;
     for (size_t i = 0; i < comp->elements.size(); i ++) {
       NodeElement* element = comp->elements[i];
-      if (!element->isNode) continue;
+      if (element->eleType != ELE_NODE) continue;
       if (splittedNodes.find(element->node) != splittedNodes.end()) {
         std::vector<NodeElement*> replaceElements;
         int width = element->hi - element->lo + 1;
@@ -496,7 +606,7 @@ void graph::splitNodes() {
         while (width != 0) {
           Assert(splittedNodes[element->node][start], "empty entry");
           Node* referNode = splittedNodes[element->node][start];
-          replaceElements.push_back(new NodeElement(true, referNode, referNode->width - 1, 0));
+          replaceElements.push_back(new NodeElement(ELE_NODE, referNode, referNode->width - 1, 0));
           start -= referNode->width;
           width -= referNode->width;
         }
@@ -514,14 +624,17 @@ void graph::splitNodes() {
   for (auto iter : componentMap) {
     Node* node = iter.first;
     NodeComponent* comp = iter.second;
-    if (comp->elements.size() == 1 && comp->elements[0]->isNode && node == comp->elements[0]->node) continue;
+    bool missingReferred = false;
+    if (comp->elements.size() == 1 && comp->elements[0]->eleType == ELE_NODE && node == comp->elements[0]->node) missingReferred = true;
+    else missingReferred = !comp->fullValid();
+    if (missingReferred) continue;
     // if (comp->elements.size() != 1) continue;
     ENode* newRoot = nullptr;
     int hiBit = node->width - 1;
     for (size_t i = 0; i < comp->elements.size(); i ++) {
       NodeElement* element = comp->elements[i];
       ENode* enode;
-      if (element->isNode) {
+      if (element->eleType == ELE_NODE) {
         enode = new ENode(element->node);
         enode->width = element->node->width;
         int validHi = enode->width - 1;
