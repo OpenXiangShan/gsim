@@ -951,6 +951,8 @@ valInfo* Node::computeConstant() {
     if ((ret->status == VAL_INVALID || ret->status == VAL_CONSTANT) && (i < assignTree.size() - 1) ) {
       // TODO: replace using OP_INT
       fillEmptyWhen(assignTree[i+1], tree->getRoot());
+      assignTree.erase(assignTree.begin() + i);
+      i --;
     }
   }
 
