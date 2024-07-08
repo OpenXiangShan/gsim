@@ -1680,6 +1680,9 @@ void inferAllWidth() {
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     it->second->inferWidth();
   }
+  for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
+    it->second->updateTreeWithNewWIdth();
+  }
 }
 
 bool ExpTree::isConstant() {
