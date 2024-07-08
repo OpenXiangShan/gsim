@@ -284,6 +284,12 @@ void ExpTree::updateWithNewWidth() {
             }
           } else if ((top->values[0] - top->values[1] + 1) > top->width) top->values[0] = top->values[1] + top->width - 1;
           break;
+        case OP_PAD:
+          if (top->width == top->getChild(0)->width) {
+            remove = true;
+            newChild = top->getChild(0);
+          } else if (top->values[0] > top->width) top->values[0] = top->width;
+          break;
         case OP_SEXT:
           if (top->width == top->getChild(0)->width) {
             remove = true;
