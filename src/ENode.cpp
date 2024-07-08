@@ -199,7 +199,7 @@ void ENode::inferWidth() {
         setWidth(0, false);
         break;
       case OP_RESET:
-        setWidth(1, false);
+        setWidth(w1, false);
         break;
       case OP_PRINTF:
       case OP_ASSERT:
