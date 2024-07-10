@@ -11,7 +11,7 @@ static inline bool potentialDead(Node* node) {
   return (node->type == NODE_OTHERS || node->type == NODE_REG_SRC || (node->type == NODE_MEM_MEMBER && node->parent->type == NODE_READER)) && nodesInUpdateTree.find(node) == nodesInUpdateTree.end();
 }
 
-void getRepyNodes(ENode* enode, std::set<Node*>& allNodes) {
+void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes) {
   std::stack<ENode*> s;
   s.push(enode);
   while (!s.empty()) {
@@ -35,7 +35,7 @@ void getRepyNodes(ENode* enode, std::set<Node*>& allNodes) {
 }
 
 void ExpTree::getRelyNodes(std::set<Node*>& allNodes) {
-  getRepyNodes(getRoot(), allNodes);
+  getENodeRelyNodes(getRoot(), allNodes);
 }
 
 

@@ -5,9 +5,10 @@
 #define MAX_NODES_PER_SUPER 7000
 #define MAX_SUBLINGS 30
 
-void getRepyNodes(ENode* enode, std::set<Node*>& allNodes);
+void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
 
 void graph::mergeAsyncReset() {
+  std::map<Node*, SuperNode*> resetMap;
   for (int i = 0; i < sortedSuper.size(); i++) {
     for (Node* member: sortedSuper[i]->member) {
       if (member->type == NODE_REG_SRC && member->reset == ASYRESET && member->prev.size() == 1) {
@@ -16,11 +17,18 @@ void graph::mergeAsyncReset() {
         Assert(member->super->member.size() == 1, "super already merged %s id %d (size = %ld)", member->name.c_str(), member->super->id, member->super->member.size());
         Node* prev = *(member->prev.begin());
         prev->setAsyncReset();
-        SuperNode* resetSuper = prev->super;
-        resetSuper->superType = SUPER_ASYNC_RESET;
-        member->super = resetSuper;
-        resetSuper->member.push_back(member);
-        sortedSuper[i]->member.clear();
+        SuperNode* resetSuper;
+        if (resetMap.find(prev) == resetMap.end()) {
+          resetSuper = member->super;
+          resetSuper->superType = SUPER_ASYNC_RESET;
+          resetSuper->resetNode = prev;
+          resetMap[prev] = resetSuper;
+        } else {
+          resetSuper = resetMap[prev];
+          member->super = resetSuper;
+          resetSuper->member.push_back(member);
+          sortedSuper[i]->member.clear();
+        }
       }
     }
   }
@@ -34,7 +42,7 @@ void graph::mergeUIntReset() {
     if (reg->reset != UINTRESET) continue;
     std::set<Node*> prev;
     if (reg->resetTree->getRoot()->opType == OP_WHEN) {
-      getRepyNodes(reg->resetTree->getRoot()->getChild(0), prev);
+      getENodeRelyNodes(reg->resetTree->getRoot()->getChild(0), prev);
     } else {
       Panic();
       reg->resetTree->getRelyNodes(prev);
@@ -48,7 +56,7 @@ void graph::mergeUIntReset() {
       prevSuper->superType = SUPER_UINT_RESET;
       resetSuper[prevNode] = prevSuper;
       uintReset.push_back(prevSuper);
-      prevSuper->member.push_back(prevNode);
+      prevSuper->resetNode = prevNode;
       prevNode->setUIntReset();
     } else {
       prevSuper = resetSuper[prevNode];

@@ -233,7 +233,7 @@ public:
   ArrayMemberList* getArrayMember(Node* node);
   void display();
   uint64_t keyHash();
-  NodeComponent* inferComponent(Node* node, bool isArith);
+  NodeComponent* inferComponent(Node* node);
 };
 
 /* 
@@ -300,6 +300,7 @@ public:
     void updateNewChild(ENode* parent, ENode* child, int idx);
     void treeOpt();
     void getRelyNodes(std::set<Node*>& allNodes);
+    void updateWithSplittedNode();
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes

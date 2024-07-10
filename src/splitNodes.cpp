@@ -1,4 +1,6 @@
 #include <gmp.h>
+#include <algorithm>
+#include <cstddef>
 #include <cstdio>
 #include <queue>
 #include <stack>
@@ -10,13 +12,20 @@ class NodeElement;
 bool compMergable(NodeElement* ele1, NodeElement* ele2);
 
 enum ElementType { ELE_EMPTY, ELE_NODE, ELE_INT, ELE_SPACE};
+enum OPLevel {OPL_BITS, OPL_LOGI, OPL_ARITH};
+#define referNode(iter) (std::get<0>(iter))
+#define referHi(iter) (std::get<1>(iter))
+#define referLo(iter) (std::get<2>(iter))
+#define referLevel(iter) (std::get<3>(iter))
+
 class NodeElement {
 public:
   ElementType eleType = ELE_EMPTY;
   Node* node = nullptr;
   mpz_t val;
   int hi, lo;
-  std::set<std::tuple<Node*, int, int>> referNodes;
+  std::set<std::tuple<Node*, int, int, OPLevel>> referNodes;
+  OPLevel referType;
   NodeElement(ElementType type = ELE_EMPTY, Node* _node = nullptr, int _hi = -1, int _lo = -1) {
     mpz_init(val);
     eleType = type;
@@ -24,7 +33,7 @@ public:
     hi = _hi;
     lo = _lo;
     if (type == ELE_NODE) {
-      referNodes.insert(std::make_tuple(_node, _hi, _lo));
+      referNodes.insert(std::make_tuple(_node, _hi, _lo, OPL_BITS));
     }
   }
   NodeElement(std::string str, int base = 16, int _hi = -1, int _lo = -1) {
@@ -68,10 +77,10 @@ public:
       ret->lo = _lo;
       ret->updateWidth();
     }
-    if (eleType != ELE_SPACE) {
-      for (auto iter : ret->referNodes) {
-        std::get<1>(iter) = std::get<2>(iter) + _hi;
-        std::get<2>(iter) = std::get<2>(iter) + _lo;
+    for (auto iter : ret->referNodes) {
+      if (referLevel(iter) != OPL_ARITH) {
+        referHi(iter) = std::get<2>(iter) + _hi;
+        referLo(iter) = std::get<2>(iter) + _lo;
       }
     }
     return ret;
@@ -181,15 +190,31 @@ public:
     }
     return true;
   }
+  void setReferArith() {
+    for (NodeElement* element : elements) {
+      for (auto iter : element->referNodes) {
+        referLevel(iter) = OPL_ARITH;
+      }
+    }
+  }
+  void setReferLogi() {
+    for (NodeElement* element : elements) {
+      for (auto iter : element->referNodes) {
+        if (referLevel(iter) < OPL_LOGI) referLevel(iter) = OPL_LOGI;
+      }
+    }
+  }
 };
 
 class Segments {
 public:
   std::set<int> cuts;
-  std::set<std::pair<int, int>> seg;
+  std::set<std::pair<int, int>> arithSeg;
+  std::set<std::pair<int, int>> logiSeg;
+  std::set<std::pair<int, int>> bitsSeg;
+  std::set<int> invalidCut;
   int width = 0;
   bool overlap = false;
-  bool isArith = false; // used in arith / updated by arith
   Segments(int _width) {
     width = _width;
     cuts.insert(_width - 1);
@@ -210,15 +235,45 @@ public:
     if (idx >= width - 1 || idx < 0) return;
     cuts.insert(idx);
   }
-  void addRange(int hi, int lo) {
-    for (auto range : seg) {
+  void addRange(int hi, int lo, OPLevel level) {
+    for (auto range : arithSeg) {
       if (hi == range.first && lo == range.second) continue;
       if (hi < range.second || lo > range.first) continue;
       overlap = true;
     }
-    addCut(hi);
-    addCut(lo-1);
-    seg.insert(std::make_pair(hi, lo));
+    for (auto range : logiSeg) {
+      if (hi == range.first && lo == range.second) continue;
+      if (hi < range.second || lo > range.first) continue;
+      overlap = true;
+    }
+    for (auto range : bitsSeg) {
+      if (hi == range.first && lo == range.second) continue;
+      if (hi < range.second || lo > range.first) continue;
+      overlap = true;
+    }
+
+    if(level == OPL_ARITH) arithSeg.insert(std::make_pair(hi, lo));
+    else if(level == OPL_LOGI) logiSeg.insert(std::make_pair(hi, lo));
+    else if(level == OPL_BITS) bitsSeg.insert(std::make_pair(hi, lo));
+    else Panic();
+  }
+  void updateCut() {
+    for (auto iter : arithSeg) {
+      for (int i = iter.second; i < iter.first; i ++) invalidCut.insert(i);
+      addCut(iter.first);
+      addCut(iter.second - 1);
+    }
+    for (auto iter : logiSeg) {
+      addCut(iter.first);
+      addCut(iter.second - 1);
+    }
+    for (auto iter : bitsSeg) {
+      addCut(iter.first);
+      addCut(iter.second - 1);
+    }
+    std::set<int> oldCuts(cuts);
+    cuts.clear();
+    std::set_difference(oldCuts.begin(),oldCuts.end(),invalidCut.begin(),invalidCut.end(),inserter(cuts , cuts.begin()));
   }
 };
 #define NODE_REF first
@@ -230,6 +285,8 @@ std::map <Node*, NodeComponent*> componentMap;
 std::map <ENode*, NodeComponent*> componentEMap;
 static std::vector<Node*> checkNodes;
 static std::map<Node*, Node*> aliasMap;
+static std::map<Node*, std::vector<std::pair<Node*, int>>> splittedNodes;
+static std::map<Node*, std::set<Node*>> splittedNodesSet;
 
 NodeComponent* spaceComp(int width) {
   NodeComponent* comp = new NodeComponent();
@@ -273,18 +330,15 @@ NodeComponent* merge2(NodeComponent* comp1, NodeComponent* comp2) {
 
 Node* getLeafNode(bool isArray, ENode* enode);
 
-void setUpdateArith(Node* node) {
-  nodeSegments[node].NODE_UPDATE->isArith = true;
-}
-
-void setRefArith(Node* node) {
-  nodeSegments[node].NODE_REF->isArith = true;
-}
-
-NodeComponent* ENode::inferComponent(Node* n, bool isArith) {
+NodeComponent* ENode::inferComponent(Node* n) {
   if (nodePtr) {
+    for (ENode* childENode : child) childENode->inferComponent(n);
     Node* node = getLeafNode(true, this);
-    if (node->isArray()) return spaceComp(node->width);
+    if (node->isArray()) {
+      NodeComponent* ret = spaceComp(node->width);
+      componentEMap[this] = ret;
+      return ret;
+    }
     Assert(componentMap.find(node) != componentMap.end(), "%s is not visited", node->name.c_str());
     NodeComponent* ret = componentMap[node]->getbits(width-1, 0);
     if (!ret->fullValid()) {
@@ -292,35 +346,44 @@ NodeComponent* ENode::inferComponent(Node* n, bool isArith) {
       ret->addElement(new NodeElement(ELE_NODE, node, width - 1, 0));
     }
     componentEMap[this] = ret;
-    if (isArith) setRefArith(n);
     return ret;
+  }
+  std::vector<NodeComponent*> childComp;
+  for (ENode* childENode : child) {
+    if (childENode) {
+      NodeComponent* comp = childENode->inferComponent(n);
+      childComp.push_back(comp);
+    } else {
+      childComp.push_back(nullptr);
+    }
   }
 
   NodeComponent* ret = nullptr;
-  NodeComponent* child1, *child2;
   switch (opType) {
     case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_REM:
     case OP_LT: case OP_LEQ: case OP_GT: case OP_GEQ: case OP_EQ: case OP_NEQ:
-    case OP_DSHL: case OP_DSHR: case OP_AND: case OP_OR: case OP_XOR:
-    case OP_ASUINT: case OP_ASSINT: case OP_CVT: case OP_NEG: case OP_NOT:
-    case OP_ANDR: case OP_ORR: case OP_XORR:
+    case OP_DSHL: case OP_DSHR:
+    case OP_ASUINT: case OP_ASSINT: case OP_CVT: case OP_NEG:
+    case OP_ANDR: case OP_ORR: case OP_XORR: case OP_INDEX:
       ret = spaceComp(width);
-      for (ENode* childENode : child) {
-        if (childENode) {
-          NodeComponent* childComp = childENode->inferComponent(n, true);
-          addRefer(ret, childComp);
-        }
+      for (NodeComponent* comp : childComp) {
+        addRefer(ret, comp);
       }
-      setUpdateArith(n);
+      /* set all refer segments to arith */
+      ret->setReferArith();
+      break;
+    case OP_AND: case OP_OR: case OP_XOR: case OP_NOT:
+      ret = spaceComp(width);
+      for (NodeComponent* comp : childComp) {
+        addRefer(ret, comp);
+      }
+      ret->setReferLogi();
     break;
     case OP_BITS:
-      child1 = getChild(0)->inferComponent(n, isArith);
-      ret = child1->getbits(values[0], values[1]);
+      ret = childComp[0]->getbits(values[0], values[1]);
       break;
     case OP_CAT: 
-      child1 = getChild(0)->inferComponent(n, isArith);
-      child2 = getChild(1)->inferComponent(n, isArith);
-      ret = merge2(child1, child2);
+      ret = merge2(childComp[0], childComp[1]);
       break;
     case OP_INT: {
       std::string str;
@@ -331,53 +394,40 @@ NodeComponent* ENode::inferComponent(Node* n, bool isArith) {
       break;
     }
     case OP_HEAD:
-      child1 = getChild(0)->inferComponent(n, isArith);
-      ret = child1->getbits(child1->width - 1, values[0]);
+      ret = childComp[0]->getbits(childComp[0]->width - 1, values[0]);
       break;
     case OP_TAIL:
-      child1 = getChild(0)->inferComponent(n, isArith);
-      ret = child1->getbits(values[0]-1, 0);
+      ret = childComp[0]->getbits(values[0]-1, 0);
       break;
     case OP_SHL:
-      child1 = getChild(0)->inferComponent(n, isArith);
-      ret = child1->dup();
+      ret = childComp[0]->dup();
       ret->addElement(new NodeElement("0", 16, values[0] - 1, 0));
       break;
     case OP_SHR:
-      child1 = getChild(0)->inferComponent(n, isArith);
-      ret = child1->getbits(child1->width - 1, values[0]);
+      ret = childComp[0]->getbits(childComp[0]->width - 1, values[0]);
       break;
     case OP_PAD:
-      child1 = getChild(0)->inferComponent(n, isArith);
-      ret = child1->getbits(values[0]-1, 0);
+      ret = childComp[0]->getbits(values[0]-1, 0);
       break;
     case OP_WHEN:
       if (!getChild(1) && !getChild(2)) break;
       if (!getChild(1)) {
-        child2 = getChild(2)->inferComponent(n, isArith);
-        ret = child2->dup();
+        ret = childComp[2]->dup();
         ret->invalidateAll();
         break;
       } else if (!getChild(2)) {
-        child1 = getChild(1)->inferComponent(n, isArith);
-        ret = child1->dup();
+        ret = childComp[1]->dup();
         ret->invalidateAll();
         break;
       }
       /* otherwise continue... */
     case OP_MUX:
-      getChild(0)->inferComponent(n, true);
-      child1 = getChild(1)->inferComponent(n, isArith);
-      child2 = getChild(2)->inferComponent(n, isArith);
-      ret = mergeMux(child1, child2);
+      ret = mergeMux(childComp[1], childComp[2]);
       break;
     default:
       ret = spaceComp(width);
-      for (ENode* childENode : child) {
-        if (childENode) {
-          NodeComponent* childComp = childENode->inferComponent(n, isArith);
-          addRefer(ret, childComp);
-        }
+      for (NodeComponent* comp : childComp) {
+        addRefer(ret, comp);
       }
       break;
   }
@@ -390,23 +440,23 @@ NodeComponent* Node::inferComponent() {
   if (assignTree.size() != 1 || isArray() || sign || width == 0) {
     NodeComponent* ret = spaceComp(width);
     for (ExpTree* tree : assignTree) {
-      NodeComponent* comp = tree->getRoot()->inferComponent(this, false);
+      NodeComponent* comp = tree->getRoot()->inferComponent(this);
       addRefer(ret, comp);
     }
     for (ExpTree* tree : arrayVal) {
-      NodeComponent* comp = tree->getRoot()->inferComponent(this, false);
+      NodeComponent* comp = tree->getRoot()->inferComponent(this);
       addRefer(ret, comp);
     }
     return ret;
   }
-  return assignTree[0]->getRoot()->inferComponent(this, false);
+  return assignTree[0]->getRoot()->inferComponent(this);
 }
 
 void setComponent(Node* node, NodeComponent* comp) {
   if (comp->fullValid()) {
     for (NodeElement* element : comp->elements) {
       element->referNodes.clear();
-      if (element->eleType == ELE_NODE) element->referNodes.insert(std::make_tuple(element->node, element->hi, element->lo));
+      if (element->eleType == ELE_NODE) element->referNodes.insert(std::make_tuple(element->node, element->hi, element->lo, OPL_BITS));
     }
   }
   componentMap[node] = comp;
@@ -466,7 +516,7 @@ ExpTree* dupTreeWithBits(ExpTree* tree, int hi, int lo) {
     } else {
       if (top->opType == OP_WHEN || top->opType == OP_MUX) {
         if (top->getChild(1)) s.push(std::make_tuple(top->getChild(1), top, 1));
-        if (top->getChild(2)) s.push(std::make_tuple(top->getChild(1), top, 2));
+        if (top->getChild(2)) s.push(std::make_tuple(top->getChild(2), top, 2));
       } else if (top->opType == OP_RESET) {
         if (top->getChild(1)) s.push(std::make_tuple(top->getChild(1), top, 1));
       }
@@ -474,6 +524,56 @@ ExpTree* dupTreeWithBits(ExpTree* tree, int hi, int lo) {
   }
   ExpTree* ret = new ExpTree(rvalue, lvalue);
   return ret;
+}
+
+void ExpTree::updateWithSplittedNode() {
+  display();
+  std::stack<std::tuple<ENode*, ENode*, int>> s;
+  s.push(std::make_tuple(getRoot(), nullptr, -1));
+  while (!s.empty()) {
+    ENode* top, *parent;
+    int idx;
+    std::tie(top, parent, idx) = s.top();
+    s.pop();
+    if (componentEMap[top]->elements.size() == 1 && componentEMap[top]->elements[0]->eleType == ELE_NODE && splittedNodes.find(componentEMap[top]->elements[0]->node) != splittedNodes.end()) {
+      Node* splitNode = componentEMap[top]->elements[0]->node;
+      int hi = componentEMap[top]->elements[0]->hi, lo = componentEMap[top]->elements[0]->lo;
+      int width = hi - lo + 1;
+      ENode* replaceENode = nullptr;
+      while (width != 0) {
+        Node* curNode = splittedNodes[splitNode][hi].first;
+        int elementHi = splittedNodes[splitNode][hi].second;
+        int elementLo = MAX(0, elementHi - width + 1);
+        ENode* newENode = new ENode(curNode);
+        newENode->width = curNode->width;
+        if (elementHi != splitNode->width - 1 || elementLo != 0) {
+          ENode* bits = new ENode(OP_BITS);
+          bits->addVal(elementHi);
+          bits->addVal(elementLo);
+          bits->width = elementHi - elementLo + 1;
+          bits->addChild(newENode);
+          newENode = bits;
+        }
+        if (replaceENode) {
+          ENode* cat = new ENode(OP_CAT);
+          cat->addChild(replaceENode);
+          cat->addChild(newENode);
+          cat->width = replaceENode->width + newENode->width;
+          replaceENode = cat;
+        } else replaceENode = newENode;
+        width -= elementHi - elementLo + 1;
+        hi -= elementHi - elementLo + 1;
+      }
+      /* replace top by replaceENode*/
+      if (parent) {
+        parent->setChild(idx, replaceENode);
+      } else setRoot(replaceENode);
+    } else {
+      for (size_t i = 0; i < top->child.size(); i ++) {
+        if (top->child[i]) s.push(std::make_tuple(top->child[i], top, i));
+      }
+    }
+  }
 }
 
 void graph::splitNodes() {
@@ -500,6 +600,7 @@ void graph::splitNodes() {
       Assert(node->width == componentMap[node]->countWidth(), "%s width not match %d != %d", node->name.c_str(), node->width, comp->width);
     }
   }
+  /* update refer & update segments for each node */
   std::set<Node*> validNodes;
   for (int i = sortedSuper.size() - 1; i >= 0; i --) {
     for (int j = sortedSuper[i]->member.size() - 1; j >= 0; j --) {
@@ -519,39 +620,47 @@ void graph::splitNodes() {
         for (NodeElement* element : comp->elements) {
           if (element->eleType == ELE_SPACE) {
             for (auto iter : element->referNodes) {
-              Node* referNode = std::get<0>(iter);
-              int hi = std::get<1>(iter), lo = std::get<2>(iter);
+              Node* referNode = referNode(iter);
               if (node == referNode) continue;
               validNodes.insert(referNode);
-              nodeSegments[referNode].first->addRange(hi, lo);
+              int hi = referHi(iter), lo = referLo(iter);
+              nodeSegments[referNode].first->addRange(hi, lo, referLevel(iter));
             }
           } else if (element->eleType == ELE_NODE) {
             Node* referNode = element->node;
             if (node == referNode) continue;
             validNodes.insert(referNode);
-            nodeSegments[referNode].first->addRange(element->hi, element->lo);
+            nodeSegments[referNode].first->addRange(element->hi, element->lo, OPL_BITS);
           }
         }
       }
     }
   }
+  for (Node* node : validNodes) nodeSegments[node].first->updateCut();
 
 /* creating nodes */
-  std::map<Node*, std::vector<Node*>> splittedNodes;
-  std::map<Node*, std::set<Node*>> splittedNodesSet;
   for (Node* reg : regsrc) {
     if (reg->status != VALID_NODE || reg->isArray() || reg->assignTree.size() > 1 || reg->sign || reg->width == 0) continue;
-    if (nodeSegments[reg].first->cuts.size() > 1 || nodeSegments[reg->getDst()].second->cuts.size() > 1) {
-      // printf("node %s(w = %d): overlap %d isArith %d %d\n", reg->name.c_str(), reg->width, nodeSegments[reg].first->overlap, nodeSegments[reg].first->isArith, nodeSegments[reg->getDst()].second->isArith);
-      // for (int cut : nodeSegments[reg].first->cuts) printf("%d ", cut);
-      // printf("\n-------\n");
-      // for (int cut : nodeSegments[reg->getDst()].second->cuts) printf("%d ", cut);
-      // printf("\n-------\n");
+    // if (nodeSegments[reg].first->cuts.size() > 1 || nodeSegments[reg->getDst()].second->cuts.size() > 1) {
+    //   printf("node %s(w = %d): overlap %d size %ld %ld\n", reg->name.c_str(), reg->width, nodeSegments[reg].first->overlap, nodeSegments[reg].first->cuts.size(), nodeSegments[reg->getDst()].second->cuts.size());
+    //   for (int cut : nodeSegments[reg].first->cuts) printf("%d ", cut);
+    //   printf("\n-------\n");
+    //   for (int cut : nodeSegments[reg->getDst()].second->cuts) printf("%d ", cut);
+    //   printf("\n-------\n");
+    // }
+    // if (nodeSegments[reg].first->cuts.size() <= 1|| nodeSegments[reg].first->overlap || nodeSegments[reg].first->cuts != nodeSegments[reg->getDst()].second->cuts) continue;
+    // if (nodeSegments[reg].first->cuts.size() <= 1|| nodeSegments[reg].first->overlap) continue;
+    Segments* seg;
+    if (includes(nodeSegments[reg].first->cuts.begin(), nodeSegments[reg].first->cuts.end(), nodeSegments[reg->getDst()].second->cuts.begin(), nodeSegments[reg->getDst()].second->cuts.end())) {
+      seg = nodeSegments[reg->getDst()].second;
+    } else if (includes(nodeSegments[reg->getDst()].second->cuts.begin(), nodeSegments[reg->getDst()].second->cuts.end(), nodeSegments[reg].first->cuts.begin(), nodeSegments[reg].first->cuts.end())) {
+      seg = nodeSegments[reg].first;
+    } else {
+      continue;
     }
-    if (nodeSegments[reg].first->cuts.size() <= 1|| nodeSegments[reg].first->overlap || nodeSegments[reg].first->cuts != nodeSegments[reg->getDst()].second->cuts) continue;
-    Segments* seg = nodeSegments[reg].first;
+    if (seg->cuts.size() <= 1) continue;
     printf("splitNode %s\n", reg->name.c_str());
-    splittedNodes[reg] = std::vector<Node*>();
+    splittedNodes[reg] = std::vector<std::pair<Node*, int>>();
     splittedNodes[reg].resize(reg->width);
     int lo = 0;
     for (int hi : seg->cuts) {
@@ -564,9 +673,10 @@ void graph::splitNodes() {
 
       newSrcNode->bindReg(newDstNode);
 
-      splittedNodes[reg][lo] = splittedNodes[reg][hi] = newSrcNode;
+      for (int i = lo; i <= hi; i ++) splittedNodes[reg][i] = std::make_pair(newSrcNode, i - lo);
       splittedNodesSet[reg].insert(newSrcNode);
       componentMap[newDstNode] = componentMap[reg->getDst()]->getbits(hi, lo);
+
       if (supersrc.find(reg->super) != supersrc.end()) supersrc.insert(newSrcNode->super);
       if (reg->updateTree) newSrcNode->updateTree = dupSplittedTree(reg->updateTree, reg, newSrcNode);
       if (reg->resetTree) newSrcNode->resetTree = dupSplittedTree(reg->resetTree, reg, newSrcNode);
@@ -604,11 +714,12 @@ void graph::splitNodes() {
         int width = element->hi - element->lo + 1;
         int start = element->hi;
         while (width != 0) {
-          Assert(splittedNodes[element->node][start], "empty entry");
-          Node* referNode = splittedNodes[element->node][start];
-          replaceElements.push_back(new NodeElement(ELE_NODE, referNode, referNode->width - 1, 0));
-          start -= referNode->width;
-          width -= referNode->width;
+          Node* referNode = splittedNodes[element->node][start].first;
+          int elementHi = splittedNodes[element->node][start].second;
+          int elementLo = MAX(0, splittedNodes[element->node][start].second - width + 1);
+          replaceElements.push_back(new NodeElement(ELE_NODE, referNode, elementHi, elementLo));
+          start -= elementHi - elementLo + 1;
+          width -= elementHi - elementLo + 1;
         }
         if (replaceElements.size() == 1) {
           comp->elements[i] = replaceElements[0];
@@ -620,7 +731,15 @@ void graph::splitNodes() {
       }
     }
   }
-
+  /* update assignTree*/
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->width == 0) continue;
+      for (ExpTree* tree : member->assignTree) tree->updateWithSplittedNode();
+      for (ExpTree* tree : member->arrayVal) tree->updateWithSplittedNode();
+    }
+  }
+  /* update node connection */
   for (auto iter : componentMap) {
     Node* node = iter.first;
     NodeComponent* comp = iter.second;

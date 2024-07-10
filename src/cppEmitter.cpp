@@ -21,6 +21,8 @@ static int displayNum = 0;
 static const int nodePerDisplay = 5000;
 #endif
 
+#define RESET_NAME(node) (node->name + "$RESET")
+
 static int superId = 0;
 static int activeFlagNum = 0;
 static std::set<Node*> definedNode;
@@ -433,6 +435,11 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   genDiffSig(fp, node);
 #endif
   fprintf(fp, "; // width = %d\n", node->width);
+  /* save reset registers */
+  if (node->isReset() && node->type == NODE_REG_SRC) {
+    Assert(!node->isArray() && node->width <= BASIC_WIDTH, "%s is treated as reset (isArray: %d width: %d)", node->name.c_str(), node->isArray(), node->width);
+    fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), RESET_NAME(node).c_str());
+  }
 
 }
 
@@ -487,8 +494,10 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   if (inStep) {
     if (node->width > BASIC_WIDTH)
       fprintf(fp, "mpz_set(%s, %s);\n", node->name.c_str(), newName(node).c_str());
-    else
+    else {
+      if (node->isReset() && node->type == NODE_REG_SRC) fprintf(fp, "%s = %s;\n", RESET_NAME(node).c_str(), newName(node).c_str());
       fprintf(fp, "%s = %s;\n", node->name.c_str(), newName(node).c_str());
+    }
   }
   if (node->isAsyncReset()) {
     fprintf(fp, "activateAll();\n");
@@ -687,9 +696,9 @@ void graph::genActivate(FILE* fp) {
 }
 
 void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
-  fprintf(fp, "if(unlikely(%s)) {\n", super->member[0]->name.c_str());
+  fprintf(fp, "if(unlikely(%s)) {\n", super->resetNode->type == NODE_REG_SRC ? RESET_NAME(super->resetNode).c_str() : super->resetNode->name.c_str());
   std::set<int> allNext;
-  for (size_t i = 1; i < super->member.size(); i ++) {
+  for (size_t i = 0; i < super->member.size(); i ++) {
     Node* node = super->member[i];
     for (Node* next : node->next) {
       if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
@@ -709,9 +718,11 @@ void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
       fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
     }
   }
-  for (size_t i = 1; i < super->member.size(); i ++) {
+  for (size_t i = 0; i < super->member.size(); i ++) {
     for (std::string str : isUIntReset ? super->member[i]->resetInsts : super->member[i]->insts) {
-      fprintf(fp, "%s\n", str.c_str());
+      if (super->resetNode->type == NODE_REG_SRC)
+        fprintf(fp, "%s\n", strReplace(str, "(" + super->resetNode->name + ")", "(" + RESET_NAME(super->resetNode) + ")").c_str());
+      else fprintf(fp, "%s\n", str.c_str());
     }
   }
   fprintf(fp, "}\n");
@@ -721,13 +732,13 @@ void graph::genResetAll(FILE* fp) {
   fprintf(fp, "void S%s::resetAll(){\n", name.c_str());
   for (SuperNode* super : sortedSuper) {
     if (super->superType == SUPER_ASYNC_RESET) {
-      Assert(super->member[0]->isAsyncReset(), "invalid reset");
+      Assert(super->resetNode->isAsyncReset(), "invalid reset");
       genReset(fp, super, false);
     }
   }
   for (SuperNode* super : uintReset) {
-    if (super->member[0]->status == CONSTANT_NODE) {
-      Assert(mpz_sgn(super->member[0]->computeInfo->consVal) == 0, "reset %s is always true", super->member[0]->name.c_str());
+    if (super->resetNode->status == CONSTANT_NODE) {
+      Assert(mpz_sgn(super->resetNode->computeInfo->consVal) == 0, "reset %s is always true", super->resetNode->name.c_str());
       continue;
     }
     genReset(fp, super, true);
@@ -839,6 +850,14 @@ void graph::saveDiffRegs(FILE* fp) {
 
 void graph::genStep(FILE* fp) {
   fprintf(fp, "void S%s::step() {\n", name.c_str());
+
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->isReset() && member->type == NODE_REG_SRC) {
+        fprintf(fp, "%s = %s;\n", RESET_NAME(member).c_str(), member->name.c_str());
+      }
+    }
+  }
 
   for (int i = 0; i < subStepNum; i ++) {
     fprintf(fp, "subStep%d();\n", i);
