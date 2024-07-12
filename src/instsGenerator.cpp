@@ -1282,7 +1282,9 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
     } else if (Child(0, width) <= BASIC_WIDTH || ChildInfo(0, status) == VAL_CONSTANT) {
       firstName = set128_tmp(Child(0, computeInfo), ret);
     }
-    if (Child(1, width) <= 64) {
+    if (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0) {
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), firstName.c_str(), Child(1, width)));
+    } else if (Child(1, width) <= 64) {
       ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width)));
       ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
     } else if (Child(1, width) <= BASIC_WIDTH) {
