@@ -53,12 +53,6 @@ static void tmp_pop() {
   tmpStack.pop();
 }
 
-struct ordercmp {
-  bool operator()(Node* n1, Node* n2) {
-    return n1->order > n2->order;
-  }
-};
-
 static std::priority_queue<Node*, std::vector<Node*>, ordercmp> recomputeQueue;
 static std::set<Node*> uniqueRecompute;
 

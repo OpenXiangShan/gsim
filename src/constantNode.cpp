@@ -24,12 +24,6 @@ static void recomputeAllNodes();
 static std::map<Node*, valInfo*> consMap;
 static std::map<ENode*, valInfo*> consEMap;
 
-struct ordercmp {
-  bool operator()(Node* n1, Node* n2) {
-    return n1->order > n2->order;
-  }
-};
-
 static std::priority_queue<Node*, std::vector<Node*>, ordercmp> recomputeQueue;
 static std::set<Node*> uniqueRecompute;
 

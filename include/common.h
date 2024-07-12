@@ -129,4 +129,10 @@ std::string arrayMemberName(Node* node, std::string suffix);
 #include "perf.h"
 
 
+struct ordercmp {
+  bool operator()(Node* n1, Node* n2) {
+    return n1->order > n2->order;
+  }
+};
+
 #endif
