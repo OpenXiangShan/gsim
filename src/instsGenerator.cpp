@@ -2224,6 +2224,8 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       }
       computeInfo->opNum = 1;
     }
+
+    for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
     return computeInfo;
   }
 
