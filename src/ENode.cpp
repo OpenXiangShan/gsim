@@ -173,6 +173,10 @@ void ENode::inferWidth() {
         // Assert(w0 > values[0] && values[0] >= values[1], "invalid bits(%d, %d) with argument(%d) ", values[0], values[1], w0);
         setWidth(values[0]-values[1] + 1, false);
         break;
+      case OP_BITS_NOSHIFT:
+        Assert(getChildNum() == 1 && values.size() == 2, "invalid child");
+        setWidth(values[0] + 1, false);
+        break;
       case OP_MUX:
       case OP_WHEN:
         if (getChild(1) && getChild(2)) {
@@ -209,9 +213,17 @@ void ENode::inferWidth() {
       case OP_INDEX:
         break;
       default:
-        Panic();
+        Assert(0, "invalid operand %d", opType);
     }
   }
+}
+
+void ENode::clearWidth() {
+  std::stack<ENode*> s;
+  for (ENode* childENode : child) {
+    if (childENode) childENode->clearWidth();
+  }
+  if (!nodePtr && opType != OP_INT) width = -1;
 }
 
 void ENode::updateWidth() {

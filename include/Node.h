@@ -270,6 +270,7 @@ class Node {
   void fillArrayInvalid(ExpTree* tree);
   uint64_t keyHash();
   NodeComponent* inferComponent();
+  NodeComponent* reInferComponent();
   void updateTreeWithNewWIdth();
 };
 

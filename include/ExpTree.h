@@ -217,6 +217,7 @@ public:
     sign = _sign;
   }
   void inferWidth();
+  void clearWidth();
   valInfo* compute(Node* n, std::string lvalue, bool isRoot);
   valInfo* computeConstant(Node* node, bool isLvalue);
   void passWidthToChild();
@@ -301,6 +302,7 @@ public:
     void treeOpt();
     void getRelyNodes(std::set<Node*>& allNodes);
     void updateWithSplittedNode();
+    void clearComponent();
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes
