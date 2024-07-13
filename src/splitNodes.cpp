@@ -105,7 +105,15 @@ void addRefer(NodeComponent* dst, NodeComponent* comp) {
 
 NodeComponent* mergeMux(NodeComponent* comp1, NodeComponent* comp2, int width) {
   NodeComponent* ret;
-  if (comp1->assignSegEq(comp2)) {
+  if (comp1->elements.size() == 1 && comp1->elements[0]->eleType == ELE_INT) {
+    ret = comp2->dup();
+    if (comp1->width > comp2->width) ret->addfrontElement(new NodeElement(ELE_EMPTY, nullptr, comp1->width - comp2->width - 1, 0));
+    ret->invalidateAll();
+  } else if (comp2->elements.size() == 1 && comp2->elements[0]->eleType == ELE_INT) {
+    ret = comp1->dup();
+    if (comp2->width > comp1->width) ret->addfrontElement(new NodeElement(ELE_EMPTY, nullptr, comp2->width - comp1->width - 1, 0));
+    ret->invalidateAll();
+  } else if (comp1->assignSegEq(comp2)) {
     ret = comp1->dup();
     ret->invalidateAll();
     for (size_t i = 0; i < comp1->elements.size(); i ++) {
@@ -122,6 +130,7 @@ NodeComponent* mergeMux(NodeComponent* comp1, NodeComponent* comp2, int width) {
 bool compMergable(NodeElement* ele1, NodeElement* ele2) {
   if (ele1->eleType != ele2->eleType) return false;
   if (ele1->eleType == ELE_NODE) return ele1->node == ele2->node && ele1->lo == ele2->hi + 1;
+  if (ele1->eleType == ELE_SPACE) return false;
   else return true;
 }
 
@@ -315,7 +324,9 @@ NodeComponent* Node::inferComponent() {
     }
     return ret;
   }
-  return assignTree[0]->getRoot()->inferComponent(this);
+  NodeComponent* ret = assignTree[0]->getRoot()->inferComponent(this);
+  ret->mergeNeighbor();
+  return ret;
 }
 
 void setComponent(Node* node, NodeComponent* comp) {
@@ -361,15 +372,16 @@ ExpTree* dupSplittedTree(ExpTree* tree, Node* regold, Node* regnew) {
   return ret;
 }
 
-ExpTree* dupTreeWithBits(ExpTree* tree, int hi, int lo) {
+ExpTree* dupTreeWithBits(ExpTree* tree, int _hi, int _lo) {
+  tree->display();
   ENode* lvalue = tree->getlval()->dup();
   ENode* rvalue = tree->getRoot()->dup();
-  std::stack<std::tuple<ENode*, ENode*, int>> s;
-  s.push(std::make_tuple(rvalue, nullptr, -1));
+  std::stack<std::tuple<ENode*, ENode*, int, int, int>> s;
+  s.push(std::make_tuple(rvalue, nullptr, -1, _hi, _lo));
   while(!s.empty()) {
     ENode* top, *parent;
-    int idx;
-    std::tie(top, parent, idx) = s.top();
+    int idx, hi, lo;
+    std::tie(top, parent, idx, hi, lo) = s.top();
     s.pop();
     if (top->nodePtr || top->opType == OP_INT) {
       ENode* bits = new ENode(OP_BITS);
@@ -380,15 +392,65 @@ ExpTree* dupTreeWithBits(ExpTree* tree, int hi, int lo) {
       if (parent) parent->child[idx] = bits;
       else rvalue = bits;
     } else {
-      if (top->opType == OP_WHEN || top->opType == OP_MUX) {
-        if (top->getChild(1)) s.push(std::make_tuple(top->getChild(1), top, 1));
-        if (top->getChild(2)) s.push(std::make_tuple(top->getChild(2), top, 2));
-      } else if (top->opType == OP_RESET) {
-        if (top->getChild(1)) s.push(std::make_tuple(top->getChild(1), top, 1));
-      } else {
-        for (size_t i = 0; i < top->child.size(); i ++) {
-          if (top->getChild(i)) s.push(std::make_tuple(top->getChild(i), top, i));
-        }
+      switch(top->opType) {
+        case OP_WHEN: case OP_MUX:
+          if (top->getChild(1)) s.push(std::make_tuple(top->getChild(1), top, 1, hi, lo));
+          if (top->getChild(2)) s.push(std::make_tuple(top->getChild(2), top, 2, hi, lo));
+          break;
+        case OP_RESET:
+          if (top->getChild(1)) s.push(std::make_tuple(top->getChild(1), top, 1, hi, lo));
+          break;
+        case OP_CAT:
+          if (lo >= top->getChild(1)->width) {
+            if (parent) parent->child[idx] = top->getChild(0);
+            else rvalue = top->getChild(0);
+            s.push(std::make_tuple(top->getChild(0), top, 0, hi - top->getChild(1)->width, lo - top->getChild(1)->width));
+          } else if (hi < top->getChild(1)->width) {
+            if (parent) parent->child[idx] = top->getChild(1);
+            else rvalue = top->getChild(1);
+            s.push(std::make_tuple(top->getChild(1), top, 1, hi, lo));
+          } else {
+            s.push(std::make_tuple(top->getChild(0), top, 0, hi - top->getChild(1)->width, 0));
+            s.push(std::make_tuple(top->getChild(1), top, 1, top->getChild(1)->width - 1, lo));
+          }
+          break;
+        case OP_PAD:
+          Assert(hi < top->width, "invalid bits %p [%d, %d]", top, hi, lo);
+          if (lo >= top->getChild(0)->width) {
+            Assert(!top->sign, "invalid sign");
+            top->opType = OP_INT;
+            top->strVal = "0";
+            top->values.clear();
+            top->width = hi - lo + 1;
+          } else if (hi < top->getChild(0)->width) {
+            if (parent) parent->child[idx] = top->getChild(0);
+            else rvalue = top->getChild(0);
+            s.push(std::make_tuple(top->getChild(0), top, 0, hi, lo));
+          } else {
+            top->values[0] = hi;
+            s.push(std::make_tuple(top->getChild(0), top, 0, top->getChild(0)->width - 1, lo));
+          }
+          break;
+        case OP_BITS:
+          Assert(hi < top->width, "invalid bits %p [%d, %d]", top, hi, lo);
+          top->values[0] = top->values[1] + hi;
+          top->values[1] = top->values[1] + lo;
+          break;
+        case OP_AND:
+        case OP_OR:
+        case OP_NOT:
+        case OP_XOR:
+          for (size_t i = 0; i < top->child.size(); i ++) {
+            if (top->getChild(i)) s.push(std::make_tuple(top->getChild(i), top, i, hi, lo));
+          }
+          break;
+        case OP_SHR:
+        case OP_SHL:
+        default:
+          Assert(0, "invalid opType %d", top->opType);
+          for (size_t i = 0; i < top->child.size(); i ++) {
+            if (top->getChild(i)) s.push(std::make_tuple(top->getChild(i), top, i, hi, lo));
+          }
       }
     }
   }
@@ -413,7 +475,7 @@ void ExpTree::updateWithSplittedNode() {
         if (element->eleType == ELE_NODE) {
           enode = new ENode(element->node);
           enode->width = element->node->width;
-          if (element->hi - element->lo != element->node->width) {
+          if (element->hi - element->lo + 1 != element->node->width) {
             ENode* bits = new ENode(OP_BITS);
             bits->addVal(element->hi);
             bits->addVal(element->lo);

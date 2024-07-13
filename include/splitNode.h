@@ -102,6 +102,10 @@ public:
     elements.push_back(element);
     width += element->hi - element->lo + 1;
   }
+  void addfrontElement(NodeElement* element) {
+    elements.insert(elements.begin(), element);
+    width += element->hi - element->lo + 1;
+  }
   void merge(NodeComponent* node) {
     if (elements.size() != 0 && node->elements.size() != 0 && compMergable(elements.back(), node->elements[0])) {
       elements.back()->merge(node->elements[0]);
@@ -205,6 +209,16 @@ public:
         if (referLevel(iter) < OPL_LOGI) referLevel(iter) = OPL_LOGI;
       }
     }
+  }
+  void mergeNeighbor() {
+    std::vector<NodeElement*> newElements;
+    for (size_t i = 0; i < elements.size(); i ++) {
+      if (newElements.size() != 0 && compMergable(newElements.back(), elements[i])) {
+        newElements.back()->merge(elements[i]);
+      } else newElements.push_back(elements[i]);
+    }
+    elements.clear();
+    elements.insert(elements.end(), newElements.begin(), newElements.end());
   }
   void display() {
     printf("comp width %d %p\n", width, this);
