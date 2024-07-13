@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <queue>
+#include <set>
 #include <stack>
 #include <tuple>
 #include <utility>
@@ -57,6 +58,8 @@ void createSplittedNode(Node* node, Segments* seg) {
       componentMap[newDstNode]->addElement(new NodeElement(ELE_SPACE));
       componentMap[newSrcNode] = new NodeComponent();
       componentMap[newSrcNode]->addElement(new NodeElement(ELE_SPACE));
+      nodeSegments[newDstNode] = std::make_pair(new Segments(newDstNode->width), new Segments(newDstNode->width));
+      nodeSegments[newSrcNode] = std::make_pair(new Segments(newSrcNode->width), new Segments(newSrcNode->width));
       if (node->updateTree) newSrcNode->updateTree = dupSplittedTree(node->updateTree, node, newSrcNode);
       if (node->resetTree) newSrcNode->resetTree = dupSplittedTree(node->resetTree, node, newSrcNode);
       splittedNode = newSrcNode;
@@ -65,12 +68,14 @@ void createSplittedNode(Node* node, Segments* seg) {
         newTree->setlval(new ENode(newDstNode));
         newDstNode->assignTree.push_back(newTree);
       }
+      splittedNodesSet[node->getDst()].insert(newDstNode);
     } else {
       splittedNode = node->dup(node->type, node->name + format("$%d_%d", hi, lo));
       splittedNode->width = hi - lo + 1;
       splittedNode->super = new SuperNode(splittedNode);
       componentMap[splittedNode] = new NodeComponent();
       componentMap[splittedNode]->addElement(new NodeElement(ELE_SPACE));
+      nodeSegments[splittedNode] = std::make_pair(new Segments(splittedNode->width), new Segments(splittedNode->width));
     }
     elements.push_back(new NodeElement(ELE_NODE, splittedNode, splittedNode->width - 1, 0));
 
@@ -271,7 +276,7 @@ NodeComponent* Node::reInferComponent() {
   return newComp;
 }
 
-void reInferAll() {
+void reInferAll(bool record, std::set<Node*>& reinferNodes) {
   while(!reInferQueue.empty()) {
     Node* node = reInferQueue.top();
     reInferQueue.pop();
@@ -280,8 +285,14 @@ void reInferAll() {
       for (Node* nextNode : splittedNodesSet[node]) addReInfer(nextNode);
       continue;
     }
+    if (record) reinferNodes.insert(node);
     node->reInferComponent();
   }
+}
+
+void reInferAll() {
+  std::set<Node*> tmp;
+  reInferAll(false, tmp);
 }
 
 void addReInfer(Node* node) {
@@ -388,7 +399,6 @@ ExpTree* dupTreeWithBits(ExpTree* tree, int hi, int lo) {
 }
 
 void ExpTree::updateWithSplittedNode() {
-  display();
   std::stack<std::tuple<ENode*, ENode*, int>> s;
   s.push(std::make_tuple(getRoot(), nullptr, -1));
   while (!s.empty()) {
@@ -528,39 +538,42 @@ void graph::splitNodes() {
     reg->getDst()->status = DEAD_NODE;
 
     for (Node* next : reg->next) addReInfer(next);
+    for (Node* node : splittedNodesSet[reg]) addReInfer(node);
+    for (Node* node : splittedNodesSet[reg->getDst()]) addReInfer(node);
   }
   reInferAll();
-  for (Node* node : validNodes) {
-    printf("node %s(w = %d, type %d): overlap %d size %ld %ld\n", node->name.c_str(), node->width, node->type, nodeSegments[node].first->overlap, nodeSegments[node].first->cuts.size(), nodeSegments[node].second->cuts.size());
-    for (int cut : nodeSegments[node].first->cuts) printf("%d ", cut);
-    printf("\n-------\n");
-    for (int cut : nodeSegments[node].second->cuts) printf("%d ", cut);
-    printf("\n-------\n");
-  }
-  /* split common nodes */
-  for (Node* node : validNodes) {
-    if (node->type != NODE_OTHERS) continue;
-    Segments* seg;
-    if (includes(nodeSegments[node].first->cuts.begin(), nodeSegments[node].first->cuts.end(), nodeSegments[node].second->cuts.begin(), nodeSegments[node].second->cuts.end())) {
-      seg = nodeSegments[node].second;
-    } else if (includes(nodeSegments[node].second->cuts.begin(), nodeSegments[node].second->cuts.end(), nodeSegments[node].first->cuts.begin(), nodeSegments[node].first->cuts.end())) {
-      seg = nodeSegments[node].first;
-    } else {
-      continue;
+  std::set<Node*> checkNodes(validNodes);
+  while (!checkNodes.empty()) {
+    /* split common nodes */
+    for (Node* node : checkNodes) {
+      // printf("node %s(w = %d, type %d): overlap %d size %ld %ld\n", node->name.c_str(), node->width, node->type, nodeSegments[node].first->overlap, nodeSegments[node].first->cuts.size(), nodeSegments[node].second->cuts.size());
+      // for (int cut : nodeSegments[node].first->cuts) printf("%d ", cut);
+      // printf("\n-------\n");
+      // for (int cut : nodeSegments[node].second->cuts) printf("%d ", cut);
+      // printf("\n-------\n");
+      if (node->type != NODE_OTHERS) continue;
+      Segments* seg;
+      if (includes(nodeSegments[node].first->cuts.begin(), nodeSegments[node].first->cuts.end(), nodeSegments[node].second->cuts.begin(), nodeSegments[node].second->cuts.end())) {
+        seg = nodeSegments[node].second;
+      } else if (includes(nodeSegments[node].second->cuts.begin(), nodeSegments[node].second->cuts.end(), nodeSegments[node].first->cuts.begin(), nodeSegments[node].first->cuts.end())) {
+        seg = nodeSegments[node].first;
+      } else {
+        continue;
+      }
+      if (seg->cuts.size() <= 1) continue;
+      printf("splitNode %s %p\n", node->name.c_str(), node);
+      createSplittedNode(node, seg);
+      componentMap[node]->display();
+      for (Node* n : splittedNodesSet[node]) {
+        n->display();
+        addReInfer(n);
+      }
+      node->status = DEAD_NODE;
+      for (Node* next : node->next) addReInfer(next);
     }
-    if (seg->cuts.size() <= 1) continue;
-    printf("splitNode %s %p\n", node->name.c_str(), node);
-    createSplittedNode(node, seg);
-    componentMap[node]->display();
-    for (Node* n : splittedNodesSet[node]) {
-      n->display();
-      addReInfer(n);
-    }
-    node->status = DEAD_NODE;
-    for (Node* next : node->next) addReInfer(next);
+    checkNodes.clear();
+    reInferAll(true, checkNodes);
   }
-  /* TODO: while(1) until no nodes can be splitted*/
-  reInferAll();
 
 /* updating componentMap */
   for (auto iter : componentMap) {
