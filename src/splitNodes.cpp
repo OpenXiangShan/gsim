@@ -22,6 +22,8 @@ static std::vector<Node*> checkNodes;
 static std::map<Node*, Node*> aliasMap;
 static std::map<Node*, std::vector<std::pair<Node*, int>>> splittedNodesSeg;
 static std::map<Node*, std::set<Node*>> splittedNodesSet;
+/* all nodes after splitting */
+static std::set<Node*> allSplittedNodes;
 
 static std::priority_queue<Node*, std::vector<Node*>, ordercmp> reInferQueue;
 static std::set<Node*> uniqueReinfer;
@@ -38,7 +40,7 @@ NodeComponent* spaceComp(int width) {
   comp->addElement(new NodeElement(ELE_SPACE, nullptr, width - 1, 0));
   return comp;
 }
-
+/* split node according to seg */
 void createSplittedNode(Node* node, Segments* seg) {
   splittedNodesSeg[node] = std::vector<std::pair<Node*, int>>();
   splittedNodesSeg[node].resize(node->width);
@@ -81,6 +83,7 @@ void createSplittedNode(Node* node, Segments* seg) {
 
     for (int i = lo; i <= hi; i ++) splittedNodesSeg[node][i] = std::make_pair(splittedNode, i - lo);
     splittedNodesSet[node].insert(splittedNode);
+    allSplittedNodes.insert(splittedNode);
     for (ExpTree* tree: node->assignTree) {
       ExpTree* newTree = dupTreeWithBits(tree, hi, lo);
       newTree->setlval(new ENode(splittedNode));
@@ -89,6 +92,7 @@ void createSplittedNode(Node* node, Segments* seg) {
     if (node->type == NODE_REG_SRC) {
       for (int i = lo; i <= hi; i ++) splittedNodesSeg[node->getDst()][i] = std::make_pair(splittedNode->getDst(), i - lo);
       splittedNodesSet[node->getDst()].insert(splittedNode->getDst());
+      allSplittedNodes.insert(splittedNode->getDst());
       for (ExpTree* tree: node->getDst()->assignTree) {
         ExpTree* newTree = dupTreeWithBits(tree, hi, lo);
         newTree->setlval(new ENode(splittedNode->getDst()));
@@ -147,6 +151,17 @@ NodeComponent* merge2(NodeComponent* comp1, NodeComponent* comp2) {
   ret->merge(comp1->dup());
   ret->merge(comp2->dup());
   return ret;
+}
+
+bool enodeNeedReplace(NodeComponent* comp) {
+  if (!comp->fullValid()) return false;
+  for (NodeElement* element : comp->elements) {
+    if (element->eleType == ELE_NODE) {
+      if (allSplittedNodes.find(element->node) != allSplittedNodes.end()) return true;
+    }
+  }
+  if (comp->elements.size() == 1) return true;
+  return false;
 }
 
 NodeComponent* ENode::inferComponent(Node* n) {
@@ -539,7 +554,7 @@ void ExpTree::updateWithSplittedNode() {
     int idx;
     std::tie(top, parent, idx) = s.top();
     s.pop();
-    if (componentEMap.find(top) != componentEMap.end() && componentEMap[top]->fullValid()) {
+    if (componentEMap.find(top) != componentEMap.end() && enodeNeedReplace(componentEMap[top])) {
       ENode* replaceENode = nullptr;
       componentEMap[top]->mergeNeighbor();
 
@@ -585,32 +600,21 @@ void graph::splitNodes() {
     for (int j = sortedSuper[i]->member.size() - 1; j >= 0; j --) {
       Node* node = sortedSuper[i]->member[j];
       NodeComponent* comp = componentMap[node];
-      bool isValid = false;
-      if (node->type != NODE_OTHERS) isValid = true;
-      else if (comp->elements.size() == 1 && ((comp->elements[0]->eleType == ELE_NODE && comp->elements[0]->node == node) || comp->elements[0]->eleType == ELE_SPACE)) {
-        isValid = true;
-      } else if (comp->elements.size() == 1 && comp->elements[0]->eleType == ELE_INT) {
-
-      } else {
-        isValid = validNodes.find(node) != validNodes.end();
-      }
-      if (isValid) {
-        validNodes.insert(node);
-        for (NodeElement* element : comp->elements) {
-          if (element->eleType == ELE_SPACE) {
-            for (auto iter : element->referNodes) {
-              Node* referNode = referNode(iter);
-              if (node == referNode) continue;
-              validNodes.insert(referNode);
-              int hi = referHi(iter), lo = referLo(iter);
-              nodeSegments[referNode].first->addRange(hi, lo, referLevel(iter));
-            }
-          } else if (element->eleType == ELE_NODE) {
-            Node* referNode = element->node;
+      validNodes.insert(node);
+      for (NodeElement* element : comp->elements) {
+        if (element->eleType == ELE_SPACE) {
+          for (auto iter : element->referNodes) {
+            Node* referNode = referNode(iter);
             if (node == referNode) continue;
             validNodes.insert(referNode);
-            nodeSegments[referNode].first->addRange(element->hi, element->lo, OPL_BITS);
+            int hi = referHi(iter), lo = referLo(iter);
+            nodeSegments[referNode].first->addRange(hi, lo, referLevel(iter));
           }
+        } else if (element->eleType == ELE_NODE) {
+          Node* referNode = element->node;
+          if (node == referNode) continue;
+          validNodes.insert(referNode);
+          nodeSegments[referNode].first->addRange(element->hi, element->lo, OPL_BITS);
         }
       }
     }
@@ -685,39 +689,6 @@ void graph::splitNodes() {
     reInferAll(true, checkNodes);
   }
 
-/* updating componentMap */
-  for (auto iter : componentMap) {
-    Node* node = iter.first;
-    NodeComponent* comp = iter.second;
-    bool missingReferred = false;
-    if (comp->elements.size() == 1 && comp->elements[0]->eleType == ELE_NODE && node == comp->elements[0]->node) missingReferred = true;
-    else missingReferred = !comp->fullValid();
-    if (missingReferred) continue;
-    for (size_t i = 0; i < comp->elements.size(); i ++) {
-      NodeElement* element = comp->elements[i];
-      if (element->eleType != ELE_NODE) continue;
-      if (splittedNodesSeg.find(element->node) != splittedNodesSeg.end()) {
-        std::vector<NodeElement*> replaceElements;
-        int width = element->hi - element->lo + 1;
-        int start = element->hi;
-        while (width != 0) {
-          Node* referNode = splittedNodesSeg[element->node][start].first;
-          int elementHi = splittedNodesSeg[element->node][start].second;
-          int elementLo = MAX(0, splittedNodesSeg[element->node][start].second - width + 1);
-          replaceElements.push_back(new NodeElement(ELE_NODE, referNode, elementHi, elementLo));
-          start -= elementHi - elementLo + 1;
-          width -= elementHi - elementLo + 1;
-        }
-        if (replaceElements.size() == 1) {
-          comp->elements[i] = replaceElements[0];
-        } else {
-          comp->elements.erase(comp->elements.begin() + i);
-          comp->elements.insert(comp->elements.begin() + i, replaceElements.begin(), replaceElements.end());
-        }
-        i += replaceElements.size() - 1;
-      }
-    }
-  }
   /* update assignTree*/
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
