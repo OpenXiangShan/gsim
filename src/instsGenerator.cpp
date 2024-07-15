@@ -1579,8 +1579,15 @@ valInfo* ENode::instsPad(Node* node, std::string lvalue, bool isRoot) {
   if (!sign || (width <= ChildInfo(0, width))) {
     if (width > BASIC_WIDTH && ChildInfo(0, width) <= BASIC_WIDTH) {
       computeInfo->valStr = set128_tmp(Child(0, computeInfo), computeInfo);
+      computeInfo->opNum = 0;
     } else {
-      computeInfo = getChild(0)->computeInfo;
+      if (ChildInfo(0, opNum) >= 0 && widthBits(ChildInfo(0, width)) < width && width <= BASIC_WIDTH) {
+        computeInfo->valStr = format("(%s)%s", widthUType(width).c_str(), ChildInfo(0, valStr).c_str());
+      } else {
+        computeInfo->valStr = ChildInfo(0, valStr);
+      }
+      computeInfo->opNum = ChildInfo(0, opNum);
+      computeInfo->fullyUpdated = ChildInfo(0, fullyUpdated);
     }
     return computeInfo;
   }

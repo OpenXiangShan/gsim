@@ -68,6 +68,9 @@ void createSplittedNode(Node* node, Segments* seg) {
         newTree->setlval(new ENode(newDstNode));
         newDstNode->assignTree.push_back(newTree);
       }
+      splittedNodes[node->getDst()] = std::vector<std::pair<Node*, int>>();
+      splittedNodes[node->getDst()].resize(node->width);
+      for (int i = lo; i <= hi; i ++) splittedNodes[node->getDst()][i] = std::make_pair(newDstNode, i - lo);
       splittedNodesSet[node->getDst()].insert(newDstNode);
     } else {
       splittedNode = node->dup(node->type, node->name + format("$%d_%d", hi, lo));
@@ -136,8 +139,8 @@ bool compMergable(NodeElement* ele1, NodeElement* ele2) {
 
 NodeComponent* merge2(NodeComponent* comp1, NodeComponent* comp2) {
   NodeComponent* ret = new NodeComponent();
-  ret->merge(comp1);
-  ret->merge(comp2);
+  ret->merge(comp1->dup());
+  ret->merge(comp2->dup());
   return ret;
 }
 
@@ -155,8 +158,14 @@ NodeComponent* ENode::inferComponent(Node* n) {
     Assert(componentMap.find(node) != componentMap.end(), "%s is not visited", node->name.c_str());
     NodeComponent* ret = componentMap[node]->getbits(width-1, 0);
     if (!ret->fullValid()) {
+      NodeComponent* updateComp = ret;
       ret = new NodeComponent();
-      ret->addElement(new NodeElement(ELE_NODE, node, width - 1, 0));
+      int hi = node->width - 1;
+      for (NodeElement* element : updateComp->elements) {
+        int segWidth = element->hi - element->lo + 1;
+        ret->addElement(new NodeElement(ELE_NODE, node, hi, hi - segWidth + 1));
+        hi -= segWidth;
+      }
     }
     componentEMap[this] = ret;
     return ret;
@@ -373,7 +382,6 @@ ExpTree* dupSplittedTree(ExpTree* tree, Node* regold, Node* regnew) {
 }
 
 ExpTree* dupTreeWithBits(ExpTree* tree, int _hi, int _lo) {
-  tree->display();
   ENode* lvalue = tree->getlval()->dup();
   ENode* rvalue = tree->getRoot()->dup();
   std::stack<std::tuple<ENode*, ENode*, int, int, int>> s;
@@ -404,11 +412,11 @@ ExpTree* dupTreeWithBits(ExpTree* tree, int _hi, int _lo) {
           if (lo >= top->getChild(1)->width) {
             if (parent) parent->child[idx] = top->getChild(0);
             else rvalue = top->getChild(0);
-            s.push(std::make_tuple(top->getChild(0), top, 0, hi - top->getChild(1)->width, lo - top->getChild(1)->width));
+            s.push(std::make_tuple(top->getChild(0), parent, idx, hi - top->getChild(1)->width, lo - top->getChild(1)->width));
           } else if (hi < top->getChild(1)->width) {
             if (parent) parent->child[idx] = top->getChild(1);
             else rvalue = top->getChild(1);
-            s.push(std::make_tuple(top->getChild(1), top, 1, hi, lo));
+            s.push(std::make_tuple(top->getChild(1), parent, idx, hi, lo));
           } else {
             s.push(std::make_tuple(top->getChild(0), top, 0, hi - top->getChild(1)->width, 0));
             s.push(std::make_tuple(top->getChild(1), top, 1, top->getChild(1)->width - 1, lo));
@@ -425,7 +433,7 @@ ExpTree* dupTreeWithBits(ExpTree* tree, int _hi, int _lo) {
           } else if (hi < top->getChild(0)->width) {
             if (parent) parent->child[idx] = top->getChild(0);
             else rvalue = top->getChild(0);
-            s.push(std::make_tuple(top->getChild(0), top, 0, hi, lo));
+            s.push(std::make_tuple(top->getChild(0), parent, idx, hi, lo));
           } else {
             top->values[0] = hi;
             s.push(std::make_tuple(top->getChild(0), top, 0, top->getChild(0)->width - 1, lo));
@@ -460,6 +468,66 @@ ExpTree* dupTreeWithBits(ExpTree* tree, int _hi, int _lo) {
   return ret;
 }
 
+ENode* constructRootFromComponent(NodeComponent* comp) {
+  int hiBit = comp->width - 1;
+  ENode* newRoot = nullptr;
+  for (NodeElement* element : comp->elements) {
+    ENode* enode;
+    if (element->eleType == ELE_NODE) {
+      enode = new ENode(element->node);
+      enode->width = element->node->width;
+      int validHi = enode->width - 1;
+      int validLo = 0;
+      if (hiBit > element->hi) {
+        validHi += hiBit - element->hi;
+        validLo += hiBit - element->hi;
+        ENode* lshift = new ENode(OP_SHL);
+        lshift->addVal(hiBit - element->hi);
+        lshift->addChild(enode);
+        lshift->width = validHi + 1;
+        enode = lshift;
+      } else if (hiBit < element->hi) {
+        validHi -= element->hi - hiBit;
+        validLo = 0;
+        ENode* rshift = new ENode(OP_SHR);
+        rshift->addVal(element->hi - hiBit);
+        rshift->addChild(enode);
+        rshift->width = validHi + 1;
+        enode = rshift;
+      }
+
+      if ((validHi - validLo) > (element->hi - element->lo) || validHi > hiBit) {
+        ENode* bits = new ENode(OP_BITS_NOSHIFT);
+        bits->addChild(enode);
+        bits->addVal(hiBit);
+        bits->addVal(hiBit - (element->hi - element->lo));
+        bits->width = hiBit + 1;
+        enode = bits;
+      }
+    } else {
+      mpz_t realVal;
+      mpz_init(realVal);
+      if (hiBit > element->hi) mpz_mul_2exp(realVal, element->val, hiBit - element->hi);
+      else if (hiBit < element->hi) mpz_tdiv_q_2exp(realVal, element->val, element->hi - hiBit);
+      else mpz_set(realVal, element->val);
+
+      enode = new ENode(OP_INT);
+      enode->strVal = mpz_get_str(nullptr, 10, realVal);
+      enode->width = hiBit + 1;
+
+    }
+    if (newRoot) {
+      ENode* orNode = new ENode(OP_OR);
+      orNode->addChild(newRoot);
+      orNode->addChild(enode);
+      orNode->width = MAX(newRoot->width, enode->width);
+      newRoot = orNode;
+    } else newRoot = enode;
+    hiBit -= element->hi - element->lo + 1;
+  }
+  return newRoot;
+}
+
 void ExpTree::updateWithSplittedNode() {
   std::stack<std::tuple<ENode*, ENode*, int>> s;
   s.push(std::make_tuple(getRoot(), nullptr, -1));
@@ -470,32 +538,9 @@ void ExpTree::updateWithSplittedNode() {
     s.pop();
     if (componentEMap.find(top) != componentEMap.end() && componentEMap[top]->fullValid()) {
       ENode* replaceENode = nullptr;
-      for (NodeElement* element : componentEMap[top]->elements) {
-        ENode* enode;
-        if (element->eleType == ELE_NODE) {
-          enode = new ENode(element->node);
-          enode->width = element->node->width;
-          if (element->hi - element->lo + 1 != element->node->width) {
-            ENode* bits = new ENode(OP_BITS);
-            bits->addVal(element->hi);
-            bits->addVal(element->lo);
-            bits->width = element->hi - element->lo + 1;
-            bits->addChild(enode);
-            enode = bits;
-          }
-        } else if (element->eleType == ELE_INT) {
-          enode = new ENode(OP_INT);
-          enode->strVal = mpz_get_str(nullptr, 10, element->val);
-          enode->width = element->hi + 1;
-        } else Panic();
-        if (replaceENode) {
-          ENode* cat = new ENode(OP_CAT);
-          cat->addChild(replaceENode);
-          cat->addChild(enode);
-          cat->width = replaceENode->width + enode->width;
-          replaceENode = cat;
-        } else replaceENode = enode;
-      }
+      componentEMap[top]->mergeNeighbor();
+
+      replaceENode = constructRootFromComponent(componentEMap[top]);
       if (parent) {
         parent->setChild(idx, replaceENode);
       } else setRoot(replaceENode);
@@ -693,64 +738,8 @@ void graph::splitNodes() {
     else missingReferred = !comp->fullValid();
     if (missingReferred) continue;
     // if (comp->elements.size() != 1) continue;
-    ENode* newRoot = nullptr;
-    int hiBit = node->width - 1;
-    for (size_t i = 0; i < comp->elements.size(); i ++) {
-      NodeElement* element = comp->elements[i];
-      ENode* enode;
-      if (element->eleType == ELE_NODE) {
-        enode = new ENode(element->node);
-        enode->width = element->node->width;
-        int validHi = enode->width - 1;
-        int validLo = 0;
-        if (hiBit > element->hi) {
-          validHi += hiBit - element->hi;
-          validLo += hiBit - element->hi;
-          ENode* lshift = new ENode(OP_SHL);
-          lshift->addVal(hiBit - element->hi);
-          lshift->addChild(enode);
-          lshift->width = validHi + 1;
-          enode = lshift;
-        } else if (hiBit < element->hi) {
-          validHi -= element->hi - hiBit;
-          validLo = 0;
-          ENode* rshift = new ENode(OP_SHR);
-          rshift->addVal(element->hi - hiBit);
-          rshift->addChild(enode);
-          rshift->width = validHi + 1;
-          enode = rshift;
-        }
+    ENode* newRoot = constructRootFromComponent(comp);
 
-        if ((validHi - validLo) > (element->hi - element->lo) || validHi > hiBit) {
-          ENode* bits = new ENode(OP_BITS_NOSHIFT);
-          bits->addChild(enode);
-          bits->addVal(hiBit);
-          bits->addVal(hiBit - (element->hi - element->lo));
-          bits->width = hiBit + 1;
-          enode = bits;
-        }
-      } else {
-        mpz_t realVal;
-        mpz_init(realVal);
-        if (hiBit > element->hi) mpz_mul_2exp(realVal, element->val, hiBit - element->hi);
-        else if (hiBit < element->hi) mpz_tdiv_q_2exp(realVal, element->val, element->hi - hiBit);
-        else mpz_set(realVal, element->val);
-        
-        enode = new ENode(OP_INT);
-        enode->strVal = mpz_get_str(nullptr, 10, realVal);
-        enode->width = hiBit + 1;
-
-      }
-      if (newRoot) {
-        ENode* cat = new ENode(OP_OR);
-        cat->addChild(newRoot);
-        cat->addChild(enode);
-        cat->width = MAX(newRoot->width, enode->width);
-        newRoot = cat;
-      } else newRoot = enode;
-      hiBit -= comp->elements[i]->hi - comp->elements[i]->lo + 1;
-
-    }
     node->assignTree.clear();
     node->assignTree.push_back(new ExpTree(newRoot, new ENode(node)));
     num ++;

@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <tuple>
 #include "common.h"
 class NodeElement;
 bool compMergable(NodeElement* ele1, NodeElement* ele2);
@@ -67,7 +68,7 @@ public:
     } else {
       ret->hi = _hi;
       ret->lo = _lo;
-      ret->updateWidth();
+      if (eleType == ELE_INT) ret->updateWidth();
     }
     for (auto iter : ret->referNodes) {
       if (referLevel(iter) != OPL_ARITH) {
@@ -81,13 +82,14 @@ public:
     Assert(compMergable(this, ele), "not mergable");
     if (eleType == ELE_NODE) {
       lo = ele->lo;
-    } else {
+      referNodes.clear();
+      referNodes.insert(std::make_tuple(ele->node, hi, lo, OPL_BITS));
+    } else if (eleType == ELE_INT) {
       mpz_mul_2exp(val, val, ele->hi - lo + 1);
       mpz_add(val, val, ele->val);
       hi += ele->hi + 1;
       updateWidth();
     }
-    referNodes.insert(ele->referNodes.begin(), ele->referNodes.end());
   }
 };
 
