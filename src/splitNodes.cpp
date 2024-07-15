@@ -20,7 +20,7 @@ std::map <Node*, NodeComponent*> componentMap;
 std::map <ENode*, NodeComponent*> componentEMap;
 static std::vector<Node*> checkNodes;
 static std::map<Node*, Node*> aliasMap;
-static std::map<Node*, std::vector<std::pair<Node*, int>>> splittedNodes;
+static std::map<Node*, std::vector<std::pair<Node*, int>>> splittedNodesSeg;
 static std::map<Node*, std::set<Node*>> splittedNodesSet;
 
 static std::priority_queue<Node*, std::vector<Node*>, ordercmp> reInferQueue;
@@ -31,6 +31,7 @@ static std::map<Node*, int> reinferCount;
 ExpTree* dupSplittedTree(ExpTree* tree, Node* regold, Node* regnew);
 ExpTree* dupTreeWithBits(ExpTree* tree, int hi, int lo);
 void addReInfer(Node* node);
+Node* getLeafNode(bool isArray, ENode* enode);
 
 NodeComponent* spaceComp(int width) {
   NodeComponent* comp = new NodeComponent();
@@ -39,13 +40,18 @@ NodeComponent* spaceComp(int width) {
 }
 
 void createSplittedNode(Node* node, Segments* seg) {
-  splittedNodes[node] = std::vector<std::pair<Node*, int>>();
-  splittedNodes[node].resize(node->width);
+  splittedNodesSeg[node] = std::vector<std::pair<Node*, int>>();
+  splittedNodesSeg[node].resize(node->width);
+  if (node->type == NODE_REG_SRC) {
+    splittedNodesSeg[node->getDst()] = std::vector<std::pair<Node*, int>>();
+    splittedNodesSeg[node->getDst()].resize(node->width);
+  }
   int lo = 0;
   NodeComponent* comp = new NodeComponent();
   std::vector<NodeElement*> elements;
   for (int hi : seg->cuts) {
     Node* splittedNode = nullptr;
+    /* allocate component & update cut */
     if (node->type == NODE_REG_SRC) {
       Node* newSrcNode = node->dup(node->type, node->name + format("$%d_%d", hi, lo));
       newSrcNode->width = hi - lo + 1;
@@ -56,22 +62,13 @@ void createSplittedNode(Node* node, Segments* seg) {
       newSrcNode->bindReg(newDstNode);
       componentMap[newDstNode] = new NodeComponent();
       componentMap[newDstNode]->addElement(new NodeElement(ELE_SPACE));
+      nodeSegments[newDstNode] = std::make_pair(new Segments(newDstNode->width), new Segments(newDstNode->width));
       componentMap[newSrcNode] = new NodeComponent();
       componentMap[newSrcNode]->addElement(new NodeElement(ELE_SPACE));
-      nodeSegments[newDstNode] = std::make_pair(new Segments(newDstNode->width), new Segments(newDstNode->width));
       nodeSegments[newSrcNode] = std::make_pair(new Segments(newSrcNode->width), new Segments(newSrcNode->width));
       if (node->updateTree) newSrcNode->updateTree = dupSplittedTree(node->updateTree, node, newSrcNode);
       if (node->resetTree) newSrcNode->resetTree = dupSplittedTree(node->resetTree, node, newSrcNode);
       splittedNode = newSrcNode;
-      for (ExpTree* tree: node->getDst()->assignTree) {
-        ExpTree* newTree = dupTreeWithBits(tree, hi, lo);
-        newTree->setlval(new ENode(newDstNode));
-        newDstNode->assignTree.push_back(newTree);
-      }
-      splittedNodes[node->getDst()] = std::vector<std::pair<Node*, int>>();
-      splittedNodes[node->getDst()].resize(node->width);
-      for (int i = lo; i <= hi; i ++) splittedNodes[node->getDst()][i] = std::make_pair(newDstNode, i - lo);
-      splittedNodesSet[node->getDst()].insert(newDstNode);
     } else {
       splittedNode = node->dup(node->type, node->name + format("$%d_%d", hi, lo));
       splittedNode->width = hi - lo + 1;
@@ -82,13 +79,21 @@ void createSplittedNode(Node* node, Segments* seg) {
     }
     elements.push_back(new NodeElement(ELE_NODE, splittedNode, splittedNode->width - 1, 0));
 
-    for (int i = lo; i <= hi; i ++) splittedNodes[node][i] = std::make_pair(splittedNode, i - lo);
+    for (int i = lo; i <= hi; i ++) splittedNodesSeg[node][i] = std::make_pair(splittedNode, i - lo);
     splittedNodesSet[node].insert(splittedNode);
-
     for (ExpTree* tree: node->assignTree) {
       ExpTree* newTree = dupTreeWithBits(tree, hi, lo);
       newTree->setlval(new ENode(splittedNode));
       splittedNode->assignTree.push_back(newTree);
+    }
+    if (node->type == NODE_REG_SRC) {
+      for (int i = lo; i <= hi; i ++) splittedNodesSeg[node->getDst()][i] = std::make_pair(splittedNode->getDst(), i - lo);
+      splittedNodesSet[node->getDst()].insert(splittedNode->getDst());
+      for (ExpTree* tree: node->getDst()->assignTree) {
+        ExpTree* newTree = dupTreeWithBits(tree, hi, lo);
+        newTree->setlval(new ENode(splittedNode->getDst()));
+        splittedNode->getDst()->assignTree.push_back(newTree);
+      }
     }
     lo = hi + 1;
   }
@@ -143,8 +148,6 @@ NodeComponent* merge2(NodeComponent* comp1, NodeComponent* comp2) {
   ret->merge(comp2->dup());
   return ret;
 }
-
-Node* getLeafNode(bool isArray, ENode* enode);
 
 NodeComponent* ENode::inferComponent(Node* n) {
   if (nodePtr) {
@@ -299,7 +302,7 @@ void reInferAll(bool record, std::set<Node*>& reinferNodes) {
     Node* node = reInferQueue.top();
     reInferQueue.pop();
     uniqueReinfer.erase(node);
-    if (splittedNodes.find(node) != splittedNodes.end()) {
+    if (splittedNodesSeg.find(node) != splittedNodesSeg.end()) {
       for (Node* nextNode : splittedNodesSet[node]) addReInfer(nextNode);
       continue;
     }
@@ -693,14 +696,14 @@ void graph::splitNodes() {
     for (size_t i = 0; i < comp->elements.size(); i ++) {
       NodeElement* element = comp->elements[i];
       if (element->eleType != ELE_NODE) continue;
-      if (splittedNodes.find(element->node) != splittedNodes.end()) {
+      if (splittedNodesSeg.find(element->node) != splittedNodesSeg.end()) {
         std::vector<NodeElement*> replaceElements;
         int width = element->hi - element->lo + 1;
         int start = element->hi;
         while (width != 0) {
-          Node* referNode = splittedNodes[element->node][start].first;
-          int elementHi = splittedNodes[element->node][start].second;
-          int elementLo = MAX(0, splittedNodes[element->node][start].second - width + 1);
+          Node* referNode = splittedNodesSeg[element->node][start].first;
+          int elementHi = splittedNodesSeg[element->node][start].second;
+          int elementLo = MAX(0, splittedNodesSeg[element->node][start].second - width + 1);
           replaceElements.push_back(new NodeElement(ELE_NODE, referNode, elementHi, elementLo));
           start -= elementHi - elementLo + 1;
           width -= elementHi - elementLo + 1;
@@ -787,5 +790,5 @@ void graph::splitNodes() {
   reconnectAll();
 
   printf("[splitNode] update %d nodes (total %ld)\n", num, countNodes());
-  printf("[splitNode] split %ld registers (total %ld)\n", splittedNodes.size(), regsrc.size());
+  printf("[splitNode] split %ld registers (total %ld)\n", splittedNodesSeg.size(), regsrc.size());
 }
