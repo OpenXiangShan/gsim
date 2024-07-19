@@ -1120,9 +1120,13 @@ void graph::constantAnalysis() {
     for (Node* member : super->member) {
       if (member->status == CONSTANT_NODE) {
         member->assignTree.clear();
+        member->arrayVal.clear();
         ENode* enode = new ENode(OP_INT);
         enode->computeInfo = member->computeInfo;
-        member->assignTree.push_back(new ExpTree(enode, member));
+        enode->width = member->width;
+        enode->strVal = mpz_get_str(NULL, 10, member->computeInfo->consVal);
+        if (member->isArray()) member->arrayVal.push_back(new ExpTree(enode, member));
+        else member->assignTree.push_back(new ExpTree(enode, member));
         continue;
       }
       for (ExpTree* tree : member->arrayVal) {

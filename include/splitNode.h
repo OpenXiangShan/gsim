@@ -179,10 +179,6 @@ public:
     }
     return true;
   }
-  void invalidateAsWhole() {
-    elements.clear();
-    elements.push_back(new NodeElement(ELE_SPACE, nullptr, width - 1, 0));
-  }
   void invalidateAll() {
     for (NodeElement* element : elements) {
       element->eleType = ELE_SPACE;
@@ -223,11 +219,11 @@ public:
     elements.insert(elements.end(), newElements.begin(), newElements.end());
   }
   void display() {
-    printf("comp width %d %p\n", width, this);
+    printf("comp width %d\n", width);
     for (size_t i = 0; i < elements.size(); i ++) {
       NodeElement* element = elements[i];
-      printf("=>  %s [%d, %d] (totalWidth = %d)\n", element->eleType == ELE_NODE ? element->node->name.c_str() : (element->eleType == ELE_INT ? (std::string("0x") + mpz_get_str(nullptr, 16, element->val)).c_str() : "EMPTY"),
-            element->hi, element->lo, width);
+      printf("=>  %s [%d, %d] (totalWidth = %d %p)\n", element->eleType == ELE_NODE ? element->node->name.c_str() : (element->eleType == ELE_INT ? (std::string("0x") + mpz_get_str(nullptr, 16, element->val)).c_str() : "EMPTY"),
+            element->hi, element->lo, width, element);
       for (auto iter : element->referNodes) {
         printf("    -> %s [%d %d]\n", std::get<0>(iter)->name.c_str(), std::get<1>(iter), std::get<2>(iter));
       }
@@ -237,71 +233,56 @@ public:
 
 class Segments {
 public:
-  std::set<int> cuts;
-  std::set<std::pair<int, int>> arithSeg;
-  std::set<std::pair<int, int>> logiSeg;
-  std::set<std::pair<int, int>> bitsSeg;
-  std::set<int> invalidCut;
+  std::map<int, int> boundCount;
+  std::map<int, int> concatCount;
   int width = 0;
   bool overlap = false;
   Segments(int _width) {
     width = _width;
-    cuts.insert(_width - 1);
   }
   Segments(NodeComponent* comp) {
     construct(comp);
   }
   void construct(NodeComponent* comp) {
+    boundCount.clear();
+    concatCount.clear();
     width = comp->width;
     int hi = comp->width - 1;
     for (NodeElement* element : comp->elements) {
-      addCut(hi);
+      addBound(hi);
       hi -= (element->hi - element->lo + 1);
+      for (int i = element->lo; i < element->hi; i ++) addConcat(i);
     }
   }
 
-  void addCut(int idx) {
+  void addConcat(int idx, int count = 1) {
     if (idx >= width || idx < 0) return;
-    cuts.insert(idx);
+    if (concatCount.find(idx) == concatCount.end()) concatCount[idx] = 0;
+    concatCount[idx] += count;
+  }
+  void eraseConcat(int idx, int count = 1) {
+    if (idx >= width || idx < 0) return;
+    Assert(concatCount.find(idx) != concatCount.end() || concatCount[idx] <= 0, "bound missing");
+    concatCount[idx] += count;
+  }
+  void addBound(int idx, int count = 1) {
+    if (idx >= width || idx < 0) return;
+    if (boundCount.find(idx) == boundCount.end()) boundCount[idx] = 0;
+    boundCount[idx] += count;
+  }
+  void eraseBound(int idx, int count = 1) {
+    if (idx >= width || idx < 0) return;
+    Assert(boundCount.find(idx) != boundCount.end() || boundCount[idx] <= 0, "bound missing");
+    boundCount[idx] -= count;
   }
   void addRange(int hi, int lo, OPLevel level) {
-    for (auto range : arithSeg) {
-      if (hi == range.first && lo == range.second) continue;
-      if (hi < range.second || lo > range.first) continue;
-      overlap = true;
-    }
-    for (auto range : logiSeg) {
-      if (hi == range.first && lo == range.second) continue;
-      if (hi < range.second || lo > range.first) continue;
-      overlap = true;
-    }
-    for (auto range : bitsSeg) {
-      if (hi == range.first && lo == range.second) continue;
-      if (hi < range.second || lo > range.first) continue;
-      overlap = true;
-    }
-
-    if(level == OPL_ARITH) arithSeg.insert(std::make_pair(hi, lo));
-    else if(level == OPL_LOGI) logiSeg.insert(std::make_pair(hi, lo));
-    else if(level == OPL_BITS) bitsSeg.insert(std::make_pair(hi, lo));
-    else Panic();
+    addBound(hi);
+    addBound(lo - 1);
+    for (int i = lo; i < hi; i ++) addConcat(i);
   }
-  void updateCut() {
-    for (auto iter : arithSeg) {
-      for (int i = iter.second; i < iter.first; i ++) invalidCut.insert(i);
-      addCut(iter.first);
-      addCut(iter.second - 1);
-    }
-    for (auto iter : logiSeg) {
-      addCut(iter.first);
-      addCut(iter.second - 1);
-    }
-    for (auto iter : bitsSeg) {
-      addCut(iter.first);
-      addCut(iter.second - 1);
-    }
-    std::set<int> oldCuts(cuts);
-    cuts.clear();
-    std::set_difference(oldCuts.begin(),oldCuts.end(),invalidCut.begin(),invalidCut.end(),inserter(cuts , cuts.begin()));
+  void eraseRange(int hi, int lo, OPLevel level) {
+    eraseBound(hi);
+    eraseBound(lo - 1);
+    for (int i = lo; i < hi; i ++) eraseConcat(i);
   }
 };

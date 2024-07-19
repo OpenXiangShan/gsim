@@ -217,6 +217,7 @@ public:
     sign = _sign;
   }
   void inferWidth();
+  void usedBitWithFixRoot(int width);
   void clearWidth();
   valInfo* compute(Node* n, std::string lvalue, bool isRoot);
   valInfo* computeConstant(Node* node, bool isLvalue);

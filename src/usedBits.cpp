@@ -49,7 +49,7 @@ void ENode::passWidthToChild() {
   }
   if (child.size() == 0) return;
   switch (opType) {
-    case OP_ADD:  case OP_SUB: case OP_OR: case OP_XOR: case OP_AND:
+    case OP_ADD: case OP_SUB: case OP_OR: case OP_XOR: case OP_AND:
       childBits.push_back(usedBit);
       childBits.push_back(usedBit);
       break;
@@ -88,6 +88,9 @@ void ENode::passWidthToChild() {
       break;
     case OP_BITS:
       childBits.push_back(MIN(usedBit + values[1], values[0] + 1));
+      break;
+    case OP_BITS_NOSHIFT:
+      childBits.push_back(usedBit);
       break;
     case OP_SEXT:
       childBits.push_back(usedBit);
@@ -199,6 +202,7 @@ void graph::usedBits() {
       }
     }
   }
+
   for (Node* node: checkNodes) {
     node->usedBit = node->width;
   }

@@ -267,7 +267,7 @@ bool resetConsEq(valInfo* dstInfo, Node* regsrc) {
 }
 
 void srcUpdateDst(Node* node) {
-  if (node->type == NODE_REG_SRC && node->reset == ASYRESET && node->regSplit) {
+  if (node->type == NODE_REG_SRC && node->reset == ASYRESET && node->regSplit && node->getDst()->status == VALID_NODE) {
     std::vector<std::string> newInsts;
     size_t start_pos = 0;
     for (std::string inst : node->insts) {
@@ -1003,6 +1003,11 @@ valInfo* ENode::instsDshl(Node* node, std::string lvalue, bool isRoot) {
       ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
       ret->valStr = dstName;
       ret->opNum = 0;
+    } else if (ChildInfo(1, width) < 64) {
+      std::string midName = set128_tmp(Child(0, computeInfo), ret);
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
+      ret->valStr = dstName;
+      ret->opNum = 0;
     } else {
       TODO();
     }
@@ -1577,16 +1582,18 @@ valInfo* ENode::instsXorr(Node* node, std::string lvalue, bool isRoot) {
 valInfo* ENode::instsPad(Node* node, std::string lvalue, bool isRoot) {
   /* no operation for UInt variable */
   if (!sign || (width <= ChildInfo(0, width))) {
+    for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
     if (width > BASIC_WIDTH && ChildInfo(0, width) <= BASIC_WIDTH) {
       computeInfo->valStr = set128_tmp(Child(0, computeInfo), computeInfo);
       computeInfo->opNum = 0;
     } else {
       if (ChildInfo(0, opNum) >= 0 && widthBits(ChildInfo(0, width)) < width && width <= BASIC_WIDTH) {
         computeInfo->valStr = format("(%s)%s", widthUType(width).c_str(), ChildInfo(0, valStr).c_str());
+        computeInfo->opNum = ChildInfo(0, opNum) + 1;
       } else {
         computeInfo->valStr = ChildInfo(0, valStr);
+        computeInfo->opNum = ChildInfo(0, opNum);
       }
-      computeInfo->opNum = ChildInfo(0, opNum);
       computeInfo->fullyUpdated = ChildInfo(0, fullyUpdated);
     }
     return computeInfo;
@@ -2551,6 +2558,7 @@ valInfo* Node::computeArray() {
           allIdx.insert(i);
         }
       }
+      for (std::string inst : lindex->insts) insts.push_back(inst);
     } else {
       display();
       TODO();
@@ -2567,6 +2575,7 @@ valInfo* Node::computeArray() {
         lindex = tree->getlval()->compute(this, INVALID_LVALUE, false);
         std::string lvalue = lindex->valStr;
         valInfo* info = tree->getRoot()->compute(this, lvalue, false);
+        for (std::string inst : lindex->insts) insts.push_back(inst);
         for (std::string inst : info->insts) insts.push_back(inst);
         info->insts.clear();
         finalConnect(lindex->valStr, info);
@@ -2649,16 +2658,18 @@ valInfo* Node::computeArray() {
   for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
     if (computeInfo->memberInfo[i] && computeInfo->memberInfo[i]->valStr.find("TMP$") != computeInfo->memberInfo[i]->valStr.npos) computeInfo->memberInfo[i] = nullptr;
   }
-  srcUpdateDst(this);
+
   return computeInfo;
 }
 
 void graph::instsGenerator() {
-  std::set<Node*>s;
+  std::set<Node*> s;
+  std::set<Node*> s_array;
   for (SuperNode* super : sortedSuper) {
     for (Node* n : super->member) {
       if (n->dimension.size() != 0) {
         n->compute();
+        s_array.insert(n);
       } else {
         n->compute();
         s.insert(n);
@@ -2705,6 +2716,8 @@ void graph::instsGenerator() {
   }
 
   for (SuperNode* super : sortedSuper) maxTmp = MAX(maxTmp, super->mpzTmpNum);
+
+  for (Node* n: s_array) srcUpdateDst(n);
 
   /* generate assignment instrs */
   for (Node* n : s) {

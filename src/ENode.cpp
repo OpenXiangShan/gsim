@@ -5,6 +5,8 @@
 
 int ENode::counter = 1;
 
+#define Child(id, name) getChild(id)->name
+
 #define w0 getChild(0)->width
 #define w1 getChild(1)->width
 #define w2 getChild(2)->width
@@ -218,12 +220,99 @@ void ENode::inferWidth() {
   }
 }
 
+void ENode::usedBitWithFixRoot(int rootWidth) {
+  if (nodePtr) {
+    return;
+  }
+  std::vector<int>childBits;
+  if (child.size() == 0) return;
+  switch (opType) {
+    case OP_ADD: case OP_SUB: case OP_OR: case OP_XOR: case OP_AND:
+      childBits.push_back(rootWidth);
+      childBits.push_back(rootWidth);
+      break;
+    case OP_MUL:
+      childBits.push_back(MIN(rootWidth, Child(0, width)));
+      childBits.push_back(MIN(rootWidth, Child(1, width)));
+      break;
+    case OP_DIV: case OP_REM: case OP_DSHL: case OP_DSHR:
+    case OP_LT: case OP_LEQ: case OP_GT: case OP_GEQ: case OP_EQ: case OP_NEQ:
+      childBits.push_back(Child(0, width));
+      childBits.push_back(Child(1, width));
+      break;
+    case OP_CAT:
+      childBits.push_back(MAX(rootWidth - Child(1, width), 0));
+      childBits.push_back(MIN(Child(1, width), rootWidth));
+      break;
+    case OP_CVT:
+      childBits.push_back(Child(0, sign) ? rootWidth : rootWidth - 1);
+      break;
+    case OP_ASCLOCK: case OP_ASASYNCRESET: case OP_ANDR:
+    case OP_ORR: case OP_XORR: case OP_INDEX_INT: case OP_INDEX:
+      childBits.push_back(Child(0, width));
+      break;
+    case OP_ASUINT: case OP_ASSINT: case OP_NOT: case OP_NEG: case OP_PAD: case OP_TAIL:
+      childBits.push_back(rootWidth);
+      break;
+    case OP_SHL:
+      childBits.push_back(MAX(0, rootWidth - values[0]));
+      break;
+    case OP_SHR:
+      childBits.push_back(rootWidth + values[0]);
+      break;
+    case OP_HEAD:
+      childBits.push_back(rootWidth + values[0]);
+      break;
+    case OP_BITS:
+      childBits.push_back(MIN(rootWidth + values[1], values[0] + 1));
+      break;
+    case OP_BITS_NOSHIFT:
+      childBits.push_back(rootWidth);
+      break;
+    case OP_SEXT:
+      childBits.push_back(rootWidth);
+      break;
+    case OP_MUX:
+    case OP_WHEN:
+      childBits.push_back(1);
+      childBits.push_back(rootWidth);
+      childBits.push_back(rootWidth);
+      break;
+    case OP_STMT:
+      for (int i = 0; i < getChildNum(); i ++) childBits.push_back(rootWidth);
+      break;
+    case OP_READ_MEM:
+      childBits.push_back(Child(0, width));
+      break;
+    case OP_RESET:
+      childBits.push_back(1);
+      childBits.push_back(rootWidth);
+      break;
+    case OP_PRINTF:
+    case OP_ASSERT:
+      for (int i = 0; i < getChildNum(); i ++) {
+        childBits.push_back(Child(i, width));
+      }
+      break;
+    default:
+      printf("invalid op %d\n", opType);
+      Panic();
+   }
+
+  Assert(child.size() == childBits.size(), "child.size %ld childBits.size %ld in op %d", child.size(), childBits.size(), opType);
+  for (size_t i = 0; i < child.size(); i ++) {
+    if (!child[i]) continue;
+    child[i]->usedBitWithFixRoot(childBits[i]);
+  }
+  width = MIN(width, rootWidth);
+}
+
 void ENode::clearWidth() {
   std::stack<ENode*> s;
   for (ENode* childENode : child) {
     if (childENode) childENode->clearWidth();
   }
-  if (!nodePtr && opType != OP_INT) width = -1;
+  if (opType != OP_INT) width = -1;
 }
 
 void ENode::updateWidth() {
@@ -337,6 +426,25 @@ void ExpTree::updateWithNewWidth() {
             top->width = top->getChild(0)->width + top->getChild(1)->width;
             newChild = bits;
           }
+          break;
+        case OP_OR: case OP_XOR:
+          if (top->getChild(0)->width < top->width) {
+            ENode* pad = new ENode(OP_PAD);
+            pad->width = top->width;
+            pad->sign = top->getChild(0)->sign;
+            pad->addVal(top->width);
+            pad->addChild(top->getChild(0));
+            top->setChild(0, pad);
+          }
+          if (top->getChild(1)->width < top->width) {
+            ENode* pad = new ENode(OP_PAD);
+            pad->width = top->width;
+            pad->sign = top->getChild(1)->sign;
+            pad->addVal(top->width);
+            pad->addChild(top->getChild(1));
+            top->setChild(1, pad);
+          }
+          break;
         default:
           break;
       }
