@@ -96,6 +96,7 @@ public:
 class NodeComponent{
 public:
   std::vector<NodeElement*> elements;
+  std::vector<NodeElement*> directElements;
   int width;
   NodeComponent() {
     width = 0;
@@ -103,6 +104,13 @@ public:
   void addElement(NodeElement* element) {
     elements.push_back(element);
     width += element->hi - element->lo + 1;
+  }
+  void addDirectElement(NodeElement* element) {
+    directElements.push_back(element);
+  }
+  void addElementAll(NodeElement* element) {
+    addElement(element);
+    addDirectElement(element->dup());
   }
   void addfrontElement(NodeElement* element) {
     elements.insert(elements.begin(), element);
@@ -115,6 +123,12 @@ public:
     } else {
       elements.insert(elements.end(), node->elements.begin(), node->elements.end());
     }
+    if (directElements.size() != 0 && node->directElements.size() != 0 && compMergable(directElements.back(), node->directElements[0])) {
+      directElements.back()->merge(node->directElements[0]);
+      directElements.insert(directElements.end(), node->directElements.begin() + 1, node->directElements.end());
+    } else {
+      directElements.insert(directElements.end(), node->directElements.begin(), node->directElements.end());
+    }
     width += node->countWidth();
     countWidth();
   }
@@ -123,31 +137,61 @@ public:
     for (size_t i = 0; i < elements.size(); i ++) {
       ret->addElement(elements[i]->dup());
     }
+    for (size_t i = 0; i < directElements.size(); i ++) {
+      ret->addDirectElement(directElements[i]->dup());
+    }
     return ret;
   }
-  NodeComponent* getbits(int hi, int lo) {
-    int w = width;
+  void getElementBits(NodeComponent* src, int hi, int lo) {
+    int w = src->width;
     bool start = false;
-    NodeComponent* comp = new NodeComponent();
-    if (hi >= width) {
-      comp->addElement(new NodeElement("0", 16, hi - MAX(lo, width), 0));
-      hi = MAX(lo, width - 1);
+    if (hi >= src->width) {
+      addElement(new NodeElement("0", 16, hi - MAX(lo, src->width), 0));
+      hi = MAX(lo, src->width - 1);
     }
-    if (hi < width) {
-      for (size_t i = 0; i < elements.size(); i ++) {
-        int memberWidth = elements[i]->hi - elements[i]->lo + 1;
+    if (hi < src->width) {
+      for (size_t i = 0; i < src->elements.size(); i ++) {
+        int memberWidth = src->elements[i]->hi - src->elements[i]->lo + 1;
         if ((w > hi && (w - memberWidth) <= hi)) {
           start = true;
         }
         if (start) {
           int selectHigh = MIN(hi, w-1) - (w - memberWidth);
           int selectLo = MAX(lo, w - memberWidth) - (w - memberWidth);
-          comp->addElement(elements[i]->getBits(selectHigh, selectLo));
+          addElement(src->elements[i]->getBits(selectHigh, selectLo));
           if ((w - memberWidth) <= lo) break;
         }
         w = w - memberWidth;
       }
     }
+  }
+  void getDirectBits(NodeComponent* src, int hi, int lo) {
+    int w = src->width;
+    bool start = false;
+    if (hi >= src->width) {
+      addDirectElement(new NodeElement("0", 16, hi - MAX(lo, src->width), 0));
+      hi = MAX(lo, src->width - 1);
+    }
+    if (hi < src->width) {
+      for (size_t i = 0; i < src->directElements.size(); i ++) {
+        int memberWidth = src->directElements[i]->hi - src->directElements[i]->lo + 1;
+        if ((w > hi && (w - memberWidth) <= hi)) {
+          start = true;
+        }
+        if (start) {
+          int selectHigh = MIN(hi, w-1) - (w - memberWidth);
+          int selectLo = MAX(lo, w - memberWidth) - (w - memberWidth);
+          addDirectElement(src->directElements[i]->getBits(selectHigh, selectLo));
+          if ((w - memberWidth) <= lo) break;
+        }
+        w = w - memberWidth;
+      }
+    }
+  }
+  NodeComponent* getbits(int hi, int lo) {
+    NodeComponent* comp = new NodeComponent();
+    comp->getElementBits(this, hi, lo);
+    comp->getDirectBits(this, hi, lo);
     countWidth();
     return comp;
   }
@@ -177,6 +221,12 @@ public:
       if (elements[i]->eleType != comp->elements[i]->eleType) return false;
       if (elements[i]->eleType == ELE_NODE && elements[i]->node != comp->elements[i]->node) return false;
     }
+    if (comp->directElements.size() != directElements.size()) return false;
+    for (size_t i = 0; i < directElements.size(); i ++) {
+      if ((directElements[i]->hi - directElements[i]->lo) != (comp->directElements[i]->hi - comp->directElements[i]->lo)) return false;
+      if (directElements[i]->eleType != comp->directElements[i]->eleType) return false;
+      if (directElements[i]->eleType == ELE_NODE && directElements[i]->node != comp->directElements[i]->node) return false;
+    }
     return true;
   }
   void invalidateAll() {
@@ -186,6 +236,10 @@ public:
       element->lo = 0;
       element->node = nullptr;
     }
+  }
+  void invalidateDirectAsWhole() {
+    directElements.clear();
+    directElements.push_back(new NodeElement(ELE_SPACE, nullptr, width - 1, 0));
   }
   bool fullValid() {
     if (elements.size() == 0) return false;
@@ -217,11 +271,30 @@ public:
     }
     elements.clear();
     elements.insert(elements.end(), newElements.begin(), newElements.end());
+
+    std::vector<NodeElement*> newDirectElements;
+    for (size_t i = 0; i < directElements.size(); i ++) {
+      if (newDirectElements.size() != 0 && compMergable(newDirectElements.back(), directElements[i])) {
+        newDirectElements.back()->merge(directElements[i]);
+      } else newDirectElements.push_back(directElements[i]);
+    }
+    directElements.clear();
+    directElements.insert(directElements.end(), newDirectElements.begin(), newDirectElements.end());
+    countWidth();
   }
   void display() {
     printf("comp width %d\n", width);
     for (size_t i = 0; i < elements.size(); i ++) {
       NodeElement* element = elements[i];
+      printf("=>  %s [%d, %d] (totalWidth = %d %p)\n", element->eleType == ELE_NODE ? element->node->name.c_str() : (element->eleType == ELE_INT ? (std::string("0x") + mpz_get_str(nullptr, 16, element->val)).c_str() : "EMPTY"),
+            element->hi, element->lo, width, element);
+      for (auto iter : element->referNodes) {
+        printf("    -> %s [%d %d]\n", std::get<0>(iter)->name.c_str(), std::get<1>(iter), std::get<2>(iter));
+      }
+    }
+    printf("==============\n");
+    for (size_t i = 0; i < directElements.size(); i ++) {
+      NodeElement* element = directElements[i];
       printf("=>  %s [%d, %d] (totalWidth = %d %p)\n", element->eleType == ELE_NODE ? element->node->name.c_str() : (element->eleType == ELE_INT ? (std::string("0x") + mpz_get_str(nullptr, 16, element->val)).c_str() : "EMPTY"),
             element->hi, element->lo, width, element);
       for (auto iter : element->referNodes) {

@@ -1110,6 +1110,7 @@ void graph::constantAnalysis() {
       if (member->status == CONSTANT_NODE) {
           consNum ++;
           member->computeInfo = consMap[member];
+          member->computeInfo->setConsStr();
       }
     }
   }

@@ -21,7 +21,7 @@ std::map <ENode*, NodeComponent*> componentEMap;
 static std::vector<Node*> checkNodes;
 static std::map<Node*, Node*> aliasMap;
 static std::map<Node*, std::vector<std::pair<Node*, int>>> splittedNodesSeg;
-static std::map<Node*, std::set<Node*>> splittedNodesSet;
+static std::map<Node*, std::vector<Node*>> splittedNodesSet;
 /* all nodes after splitting */
 static std::set<Node*> allSplittedNodes;
 
@@ -38,7 +38,7 @@ void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
 
 NodeComponent* spaceComp(int width) {
   NodeComponent* comp = new NodeComponent();
-  comp->addElement(new NodeElement(ELE_SPACE, nullptr, width - 1, 0));
+  comp->addElementAll(new NodeElement(ELE_SPACE, nullptr, width - 1, 0));
   return comp;
 }
 /* split node according to seg */
@@ -50,8 +50,6 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
     splittedNodesSeg[node->getDst()].resize(node->width);
   }
   int lo = 0;
-  NodeComponent* comp = new NodeComponent();
-  std::vector<NodeElement*> elements;
   for (int hi : cuts) {
     Node* splittedNode = nullptr;
     /* allocate component & update cut */
@@ -64,10 +62,10 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
       newDstNode->super = new SuperNode(newDstNode);
       newSrcNode->bindReg(newDstNode);
       componentMap[newDstNode] = new NodeComponent();
-      componentMap[newDstNode]->addElement(new NodeElement(ELE_SPACE));
+      componentMap[newDstNode]->addElementAll(new NodeElement(ELE_SPACE));
       nodeSegments[newDstNode] = std::make_pair(new Segments(newDstNode->width), new Segments(newDstNode->width));
       componentMap[newSrcNode] = new NodeComponent();
-      componentMap[newSrcNode]->addElement(new NodeElement(ELE_SPACE));
+      componentMap[newSrcNode]->addElementAll(new NodeElement(ELE_SPACE));
       nodeSegments[newSrcNode] = std::make_pair(new Segments(newSrcNode->width), new Segments(newSrcNode->width));
       if (node->updateTree) newSrcNode->updateTree = dupSplittedTree(node->updateTree, node, newSrcNode);
       if (node->resetTree) newSrcNode->resetTree = dupSplittedTree(node->resetTree, node, newSrcNode);
@@ -77,13 +75,12 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
       splittedNode->width = hi - lo + 1;
       splittedNode->super = new SuperNode(splittedNode);
       componentMap[splittedNode] = new NodeComponent();
-      componentMap[splittedNode]->addElement(new NodeElement(ELE_SPACE));
+      componentMap[splittedNode]->addElementAll(new NodeElement(ELE_SPACE));
       nodeSegments[splittedNode] = std::make_pair(new Segments(splittedNode->width), new Segments(splittedNode->width));
     }
-    elements.push_back(new NodeElement(ELE_NODE, splittedNode, splittedNode->width - 1, 0));
 
     for (int i = lo; i <= hi; i ++) splittedNodesSeg[node][i] = std::make_pair(splittedNode, i - lo);
-    splittedNodesSet[node].insert(splittedNode);
+    splittedNodesSet[node].push_back(splittedNode);
     allSplittedNodes.insert(splittedNode);
     for (ExpTree* tree: node->assignTree) {
       ExpTree* newTree = dupTreeWithBits(tree, hi, lo);
@@ -92,33 +89,40 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
     }
     if (node->type == NODE_REG_SRC) {
       for (int i = lo; i <= hi; i ++) splittedNodesSeg[node->getDst()][i] = std::make_pair(splittedNode->getDst(), i - lo);
-      splittedNodesSet[node->getDst()].insert(splittedNode->getDst());
+      splittedNodesSet[node->getDst()].push_back(splittedNode->getDst());
       allSplittedNodes.insert(splittedNode->getDst());
       for (ExpTree* tree: node->getDst()->assignTree) {
         ExpTree* newTree = dupTreeWithBits(tree, hi, lo);
         newTree->setlval(new ENode(splittedNode->getDst()));
         splittedNode->getDst()->assignTree.push_back(newTree);
       }
+      splittedNode->getDst()->order = node->getDst()->order - 1;
+      splittedNode->getDst()->next.insert(node->getDst());
     }
-    splittedNode->next.insert(node->next.begin(), node->next.end());
+    splittedNode->order = node->order - 1;
+    splittedNode->next.insert(node);
     lo = hi + 1;
   }
-  for (Node* prev : node->prev) {
-    prev->next.erase(node);
-    prev->next.insert(splittedNodesSet[node].begin(), splittedNodesSet[node].end());
-  }
-  for (int i = (int)elements.size() - 1; i >= 0; i--) comp->addElement(elements[i]);
+  for (Node* n : splittedNodesSet[node]) n->updateConnect();
+  node->prev.clear();
+  node->prev.insert(splittedNodesSet[node].begin(), splittedNodesSet[node].end());
+  componentMap[node]->invalidateAll();
 
-  componentMap[node] = comp;
   if (node->type == NODE_REG_SRC) {
-    NodeComponent* dstcomp = new NodeComponent();
-    for (NodeElement* element : comp->elements) dstcomp->addElement(new NodeElement(ELE_NODE, element->node->getDst(), element->hi, element->lo));
+    for (Node* n : splittedNodesSet[node->getDst()]) n->updateConnect();
+    node->getDst()->prev.clear();
+    node->getDst()->prev.insert(splittedNodesSet[node->getDst()].begin(), splittedNodesSet[node->getDst()].end());
   }
 }
 
 void addRefer(NodeComponent* dst, NodeComponent* comp) {
   for (size_t i = 0; i < comp->elements.size(); i ++)
     dst->elements[0]->referNodes.insert(comp->elements[i]->referNodes.begin(), comp->elements[i]->referNodes.end());
+}
+
+void addDirectRef(NodeComponent* dst, NodeComponent* comp) {
+  for (size_t i = 0; i < comp->directElements.size(); i ++)
+    dst->directElements[0]->referNodes.insert(comp->directElements[i]->referNodes.begin(), comp->directElements[i]->referNodes.end());
 }
 
 NodeComponent* mergeMux(NodeComponent* comp1, NodeComponent* comp2, int width) {
@@ -142,6 +146,9 @@ NodeComponent* mergeMux(NodeComponent* comp1, NodeComponent* comp2, int width) {
     addRefer(ret, comp1);
     addRefer(ret, comp2);
   }
+  ret->invalidateDirectAsWhole();
+  addDirectRef(ret, comp1);
+  addDirectRef(ret, comp2);
   return ret;
 }
 
@@ -171,6 +178,8 @@ bool enodeNeedReplace(ENode* enode, NodeComponent* comp) {
   for (Node* rely : relyNodes) {
     if (rely->status == DEAD_NODE) anyDead = true;
   }
+  if (anyDead) return true;
+  return false;
   if (!anyDead) return false;
   for (NodeElement* element : comp->elements) {
     if (element->eleType == ELE_NODE) {
@@ -196,6 +205,8 @@ NodeComponent* ENode::inferComponent(Node* n) {
       ret = new NodeComponent();
       ret->addElement(new NodeElement(ELE_NODE, node, width - 1, 0));
     }
+    ret->directElements.clear();
+    ret->addDirectElement(new NodeElement(ELE_NODE, node, width - 1, 0));
     componentEMap[this] = ret;
     return ret;
   }
@@ -243,7 +254,7 @@ NodeComponent* ENode::inferComponent(Node* n) {
       int base;
       std::tie(base, str) = firStrBase(strVal);
       ret = new NodeComponent();
-      ret->addElement(new NodeElement(str, base, width-1, 0));
+      ret->addElementAll(new NodeElement(str, base, width-1, 0));
       break;
     }
     case OP_HEAD:
@@ -254,7 +265,7 @@ NodeComponent* ENode::inferComponent(Node* n) {
       break;
     case OP_SHL:
       ret = childComp[0]->dup();
-      ret->addElement(new NodeElement("0", 16, values[0] - 1, 0));
+      ret->addElementAll(new NodeElement("0", 16, values[0] - 1, 0));
       break;
     case OP_SHR:
       ret = childComp[0]->getbits(childComp[0]->width - 1, values[0]);
@@ -306,44 +317,37 @@ void ExpTree::clearComponent() {
 }
 
 void genReferSegment(Node* node, NodeComponent* comp) {
-  for (NodeElement* element : comp->elements) {
+  for (NodeElement* element : comp->directElements) {
     if (element->eleType == ELE_SPACE) {
       for (auto iter : element->referNodes) {
         Node* referNode = referNode(iter);
         if (node == referNode) continue;
         int hi = referHi(iter), lo = referLo(iter);
-        if (referNode->next.find(node) != referNode->next.end()) {
-          printf("refer %s [%d, %d] from %s\n", referNode->name.c_str(), hi, lo, node->name.c_str());
-          nodeSegments[referNode].first->addRange(hi, lo, referLevel(iter));
-        }
+        // printf("refer %s [%d, %d] from %s\n", referNode->name.c_str(), hi, lo, node->name.c_str());
+        nodeSegments[referNode].first->addRange(hi, lo, referLevel(iter));
       }
     } else if (element->eleType == ELE_NODE) {
       Node* referNode = element->node;
       if (node == referNode) continue;
-      if (referNode->next.find(node) != referNode->next.end()) {
-        printf("refer %s [%d, %d] from %s\n", referNode->name.c_str(), element->hi, element->lo, node->name.c_str());
-        nodeSegments[referNode].first->addRange(element->hi, element->lo, OPL_BITS);
-      }
+      // printf("refer %s [%d, %d] from %s\n", referNode->name.c_str(), element->hi, element->lo, node->name.c_str());
+      nodeSegments[referNode].first->addRange(element->hi, element->lo, OPL_BITS);
     }
   }
 }
 
 void eraseReferSegment(Node* node, NodeComponent* comp) {
-  for (NodeElement* element : comp->elements) {
+  for (NodeElement* element : comp->directElements) {
     if (element->eleType == ELE_SPACE) {
       for (auto iter : element->referNodes) {
         Node* referNode = referNode(iter);
         if (node == referNode) continue;
-        if (referNode->next.find(node) != referNode->next.end()) {
-          int hi = referHi(iter), lo = referLo(iter);
-          nodeSegments[referNode].first->eraseRange(hi, lo, referLevel(iter));
-        }
+        int hi = referHi(iter), lo = referLo(iter);
+        nodeSegments[referNode].first->eraseRange(hi, lo, referLevel(iter));
       }
     } else if (element->eleType == ELE_NODE) {
       Node* referNode = element->node;
       if (node == referNode) continue;
-      if (referNode->next.find(node) != referNode->next.end() || comp->elements.size() == 1)
-        nodeSegments[referNode].first->eraseRange(element->hi, element->lo, OPL_BITS);
+      nodeSegments[referNode].first->eraseRange(element->hi, element->lo, OPL_BITS);
     }
   }
 }
@@ -365,9 +369,9 @@ NodeComponent* Node::reInferComponent() {
   }
   componentMap[this] = newComp;
   nodeSegments[this].second = new Segments(newComp);
-  printf("reinfer node %s (times %d)\n", name.c_str(), reinferCount[this]);
-  display();
-  newComp->display();
+  // printf("reinfer node %s (times %d %p) eq %d iter %d\n", name.c_str(), reinferCount[this], this, oldComp->assignAllEq(newComp), reInferCount);
+  // display();
+  // newComp->display();
   genReferSegment(this, newComp);
   return newComp;
 }
@@ -377,11 +381,11 @@ void reInferAll(bool record, std::set<Node*>& reinferNodes) {
     Node* node = reInferQueue.top();
     reInferQueue.pop();
     uniqueReinfer.erase(node);
-    if (splittedNodesSeg.find(node) != splittedNodesSeg.end()) {
-      for (Node* nextNode : splittedNodesSet[node]) addReInfer(nextNode);
-      continue;
-    }
-    if (record) reinferNodes.insert(node);
+    // if (splittedNodesSeg.find(node) != splittedNodesSeg.end()) {
+    //   for (Node* nextNode : splittedNodesSet[node]) addReInfer(nextNode);
+      // continue;
+    // }
+    if (splittedNodesSeg.find(node) == splittedNodesSeg.end() && record) reinferNodes.insert(node);
     node->reInferComponent();
   }
 }
@@ -399,6 +403,15 @@ void addReInfer(Node* node) {
 }
 
 NodeComponent* Node::inferComponent() {
+  if (splittedNodesSet.find(this) != splittedNodesSet.end()) {
+    NodeComponent* ret = new NodeComponent();
+    for (int i = splittedNodesSet[this].size() - 1; i >= 0; i --) {
+      NodeComponent* comp = componentMap[splittedNodesSet[this][i]];
+      if (comp->fullValid()) ret->merge(comp->dup());
+      else ret->addElement(new NodeElement(ELE_NODE, splittedNodesSet[this][i], splittedNodesSet[this][i]->width - 1, 0));
+    }
+    return ret;
+  }
   if (assignTree.size() != 1 || isArray() || sign || width == 0) {
     NodeComponent* ret = spaceComp(width);
     for (ExpTree* tree : assignTree) {
@@ -425,6 +438,10 @@ NodeComponent* Node::inferComponent() {
 void setComponent(Node* node, NodeComponent* comp) {
   if (comp->fullValid()) {
     for (NodeElement* element : comp->elements) {
+      element->referNodes.clear();
+      if (element->eleType == ELE_NODE) element->referNodes.insert(std::make_tuple(element->node, element->hi, element->lo, OPL_BITS));
+    }
+    for (NodeElement* element : comp->directElements) {
       element->referNodes.clear();
       if (element->eleType == ELE_NODE) element->referNodes.insert(std::make_tuple(element->node, element->hi, element->lo, OPL_BITS));
     }
@@ -710,7 +727,7 @@ void getCut(std::set<int>& cuts, Segments* seg1, Segments* seg2) {
     int concatNum = 0;
     if (seg1->concatCount.find(cut) != seg1->concatCount.end()) concatNum += seg1->concatCount[cut];
     if (seg2->concatCount.find(cut) != seg2->concatCount.end()) concatNum += seg2->concatCount[cut];
-    if (allCut[cut] > concatNum + 2 || (allCut[cut] >= concatNum && (cut - lo > 32))) {
+    if (allCut[cut] > concatNum + 2 || (allCut[cut] > concatNum && (cut - lo >= 64))) {
       cuts.insert(cut);
       lo = cut;
     }
@@ -773,7 +790,8 @@ void graph::splitNodes() {
     reg->status = DEAD_NODE;
     reg->getDst()->status = DEAD_NODE;
 
-    for (Node* next : reg->next) addReInfer(next);
+    addReInfer(reg);
+    addReInfer(reg->getDst());
     for (Node* node : splittedNodesSet[reg]) addReInfer(node);
     for (Node* node : splittedNodesSet[reg->getDst()]) addReInfer(node);
   }
@@ -815,7 +833,7 @@ void graph::splitNodes() {
         addReInfer(n);
       }
       node->status = DEAD_NODE;
-      for (Node* next : node->next) addReInfer(next);
+      addReInfer(node);
     }
     checkNodes.clear();
     reInferAll(true, checkNodes);
@@ -825,13 +843,11 @@ void graph::splitNodes() {
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->width == 0) continue;
-      printf("update tree %s\n", member->name.c_str());
       for (ExpTree* tree : member->assignTree) tree->updateWithSplittedNode();
       for (ExpTree* tree : member->arrayVal) tree->updateWithSplittedNode();
     }
   }
   for (Node* node : allSplittedNodes) {
-    printf("update tree %s\n", node->name.c_str());
     for (ExpTree* tree : node->assignTree) tree->updateWithSplittedNode();
     for (ExpTree* tree : node->arrayVal) tree->updateWithSplittedNode();
   }
