@@ -322,9 +322,9 @@ public:
     width = comp->width;
     int hi = comp->width - 1;
     for (NodeElement* element : comp->elements) {
-      addBound(hi);
-      hi -= (element->hi - element->lo + 1);
-      for (int i = element->lo; i < element->hi; i ++) addConcat(i);
+      int nextHi = hi - (element->hi - element->lo + 1);
+      addRange(hi, nextHi + 1, OPL_BITS);
+      hi = nextHi;
     }
   }
 

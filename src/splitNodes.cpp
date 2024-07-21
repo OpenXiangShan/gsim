@@ -205,8 +205,14 @@ NodeComponent* ENode::inferComponent(Node* n) {
       ret = new NodeComponent();
       ret->addElement(new NodeElement(ELE_NODE, node, width - 1, 0));
     }
+    /* update directElement */
     ret->directElements.clear();
-    ret->addDirectElement(new NodeElement(ELE_NODE, node, width - 1, 0));
+    if (splittedNodesSet.find(node) != splittedNodesSet.end()) {
+      for (Node* splittedNode : splittedNodesSet[node]) {
+        ret->addDirectElement(new NodeElement(ELE_NODE, splittedNode, splittedNode->width - 1, 0));
+      }
+    } else
+      ret->addDirectElement(new NodeElement(ELE_NODE, node, width - 1, 0));
     componentEMap[this] = ret;
     return ret;
   }
@@ -230,6 +236,7 @@ NodeComponent* ENode::inferComponent(Node* n) {
       ret = spaceComp(width);
       for (NodeComponent* comp : childComp) {
         addRefer(ret, comp);
+        addDirectRef(ret, comp);
       }
       /* set all refer segments to arith */
       ret->setReferArith();
@@ -292,6 +299,7 @@ NodeComponent* ENode::inferComponent(Node* n) {
       ret = spaceComp(width);
       for (NodeComponent* comp : childComp) {
         addRefer(ret, comp);
+        addDirectRef(ret, comp);
       }
       break;
   }
@@ -417,14 +425,17 @@ NodeComponent* Node::inferComponent() {
     for (ExpTree* tree : assignTree) {
       NodeComponent* comp = tree->getRoot()->inferComponent(this);
       addRefer(ret, comp);
+      addDirectRef(ret, comp);
     }
     for (ExpTree* tree : arrayVal) {
       NodeComponent* comp = tree->getRoot()->inferComponent(this);
       addRefer(ret, comp);
+      addDirectRef(ret, comp);
       if (tree->getlval() && tree->getlval()->child.size() != 0) {
         for (ENode* child : tree->getlval()->child) {
           NodeComponent* indexComp = child->inferComponent(this);
           addRefer(ret, indexComp);
+          addDirectRef(ret, comp);
         }
       }
     }
@@ -727,7 +738,7 @@ void getCut(std::set<int>& cuts, Segments* seg1, Segments* seg2) {
     int concatNum = 0;
     if (seg1->concatCount.find(cut) != seg1->concatCount.end()) concatNum += seg1->concatCount[cut];
     if (seg2->concatCount.find(cut) != seg2->concatCount.end()) concatNum += seg2->concatCount[cut];
-    if (allCut[cut] > concatNum + 2 || (allCut[cut] > concatNum && (cut - lo >= 64))) {
+    if (allCut[cut] > concatNum + 2 || (allCut[cut] > concatNum && (cut - lo >= 64)) || (allCut[cut] >= concatNum && (cut - lo >= BASIC_WIDTH))) {
       cuts.insert(cut);
       lo = cut;
     }
