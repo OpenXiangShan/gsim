@@ -336,7 +336,7 @@ public:
   void eraseConcat(int idx, int count = 1) {
     if (idx >= width || idx < 0) return;
     Assert(concatCount.find(idx) != concatCount.end() || concatCount[idx] <= 0, "bound missing");
-    concatCount[idx] += count;
+    concatCount[idx] -= count;
   }
   void addBound(int idx, int count = 1) {
     if (idx >= width || idx < 0) return;
