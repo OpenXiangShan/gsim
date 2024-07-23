@@ -25,12 +25,16 @@ class graph {
   void genUpdateRegister(FILE* fp);
   void genMemWrite(FILE* fp);
   void saveDiffRegs(FILE* fp);
+  void genResetAll(FILE* fp);
+  void genReset(FILE* fp, SuperNode* super, bool isUIntReset);
   std::string saveOldVal(FILE* fp, Node* node);
   void removeNodesNoConnect(NodeStatus status);
   void reconnectSuper();
   void reconnectAll();
   void resetAnalysis();
   /* defined in mergeNodes */
+  void mergeAsyncReset();
+  void mergeUIntReset();
   void mergeOut1();
   void mergeIn1();
   void mergeSublings();
@@ -54,6 +58,7 @@ class graph {
   std::set<SuperNode*> supersrc;
   /* used after toposort */
   std::vector<SuperNode*> sortedSuper;
+  std::vector<SuperNode*> uintReset;
   std::set<Node*> splittedArray;
   std::string name;
   int maxTmp = 0;
@@ -83,6 +88,8 @@ class graph {
   void constantAnalysis();
   void constructRegs();
   void commonExpr();
+  void splitNodes();
+  void replicationOpt();
   void exprOpt();
   void dump(std::string FileName);
 };

@@ -1,5 +1,6 @@
 #include "common.h"
 #include <stack>
+#include <tuple>
 
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
@@ -41,7 +42,7 @@ void Node::invalidArrayOptimize() {
 }
 
 bool checkENodeEq(ENode* enode1, ENode* enode2);
-static bool subTreeEq(ENode* enode1, ENode* enode2) {
+bool subTreeEq(ENode* enode1, ENode* enode2) {
   if (!checkENodeEq(enode1, enode2)) return false;
   for (size_t i = 0; i < enode1->getChildNum(); i ++) {
     if (!subTreeEq(enode1->getChild(i), enode2->getChild(i))) return false;
@@ -65,9 +66,20 @@ void ExpTree::treeOpt() {
         } else {
           setRoot(top->getChild(1));
         }
-        top = top->getChild(1);
+        s.push(std::make_tuple(top->getChild(1), parent, idx));
+        continue;
       }
     }
+    if (top->opType == OP_ASASYNCRESET) {
+      if (parent) {
+        parent->setChild(idx, top->getChild(0));
+      } else {
+        setRoot(top->getChild(0));
+      }
+      s.push(std::make_tuple(top->getChild(0), parent, idx));
+      continue;
+    }
+    /* width = 1 xor 0*/
     for (size_t i = 0; i < top->child.size(); i ++) {
       if (top->child[i]) s.push(std::make_tuple(top->child[i], top, i));
     }
@@ -82,6 +94,7 @@ void graph::exprOpt() {
       for (ExpTree* tree : node->arrayVal) tree->treeOpt();
       if (node->resetVal) node->resetVal->treeOpt();
       if (node->updateTree) node->updateTree->treeOpt();
+      if (node->resetTree) node->resetTree->treeOpt();
     }
   }
 

@@ -24,12 +24,6 @@ static void recomputeAllNodes();
 static std::map<Node*, valInfo*> consMap;
 static std::map<ENode*, valInfo*> consEMap;
 
-struct ordercmp {
-  bool operator()(Node* n1, Node* n2) {
-    return n1->order > n2->order;
-  }
-};
-
 static std::priority_queue<Node*, std::vector<Node*>, ordercmp> recomputeQueue;
 static std::set<Node*> uniqueRecompute;
 
@@ -63,6 +57,18 @@ valInfo* setNodeCons(Node* node, std::string str) {
   consInfo->setConstantByStr(str);
   consMap[node] = consInfo;
   return consInfo;
+}
+
+bool cons_resetConsEq(valInfo* dstInfo, Node* regsrc) {
+  if (!regsrc->resetTree) return true;
+  valInfo* info = regsrc->resetTree->getRoot()->computeConstant(regsrc, regsrc->name.c_str());
+  if (info->status == VAL_EMPTY) return true;
+  mpz_t consVal;
+  mpz_init(consVal);
+  mpz_set(consVal, dstInfo->status == VAL_CONSTANT ? dstInfo->consVal : dstInfo->assignmentCons);
+  if (info->status == VAL_CONSTANT && mpz_cmp(info->consVal, consVal) == 0) return true;
+  if (info->sameConstant && mpz_cmp(info->assignmentCons, consVal) == 0) return true;
+  return false;
 }
 
 valInfo* ENode::consMux(bool isLvalue) {
@@ -503,6 +509,21 @@ valInfo* ENode::consBits(bool isLvalue) {
   return ret;
 }
 
+valInfo* ENode::consBitsNoShift(bool isLvalue) {
+  valInfo* ret = new valInfo(width, sign);
+  int hi = values[0];
+  int lo = values[1];
+
+  if (ChildCons(0, status) == VAL_CONSTANT) {
+    u_bits_noshift(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), hi, lo);
+    ret->setConsStr();
+  } else if (lo >= Child(0, width) || lo >= ChildCons(0, width)) {
+    ret->setConstantByStr("0");
+  }
+  return ret;
+}
+
+
 valInfo* ENode::consIndexInt(bool isLvalue) {
   return new valInfo(width, sign);
 }
@@ -638,6 +659,7 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
     case OP_HEAD: ret = consHead(isLvalue); break;
     case OP_TAIL: ret = consTail(isLvalue); break;
     case OP_BITS: ret = consBits(isLvalue); break;
+    case OP_BITS_NOSHIFT: ret = consBitsNoShift(isLvalue); break;
     case OP_INDEX_INT: ret = consIndexInt(isLvalue); break;
     case OP_INDEX: ret = consIndex(isLvalue); break;
     case OP_MUX: ret = consMux(isLvalue); break;
@@ -923,6 +945,8 @@ valInfo* Node::computeConstant() {
     if ((ret->status == VAL_INVALID || ret->status == VAL_CONSTANT) && (i < assignTree.size() - 1) ) {
       // TODO: replace using OP_INT
       fillEmptyWhen(assignTree[i+1], tree->getRoot());
+      assignTree.erase(assignTree.begin() + i);
+      i --;
     }
   }
 
@@ -932,7 +956,7 @@ valInfo* Node::computeConstant() {
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
     if (type == NODE_REG_DST) {
-      if (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, consMap[getSrc()]->consVal) == 0)) {
+      if ((getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, consMap[getSrc()]->consVal) == 0)) && cons_resetConsEq(ret, getSrc())) {
         getSrc()->status = CONSTANT_NODE;
         consMap[getSrc()] = ret;
         /* re-compute nodes depend on src */
@@ -964,7 +988,8 @@ valInfo* Node::computeConstant() {
       recomputeAllNodes();
     }
   } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant &&
-    (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(consMap[getSrc()]->consVal, ret->assignmentCons) == 0))) {
+    (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(consMap[getSrc()]->consVal, ret->assignmentCons) == 0))
+    && cons_resetConsEq(ret, getSrc())) {
     ret->status = VAL_CONSTANT;
     mpz_set(ret->consVal, ret->assignmentCons);
     ret->setConsStr();
@@ -1085,6 +1110,7 @@ void graph::constantAnalysis() {
       if (member->status == CONSTANT_NODE) {
           consNum ++;
           member->computeInfo = consMap[member];
+          member->computeInfo->setConsStr();
       }
     }
   }
@@ -1095,9 +1121,13 @@ void graph::constantAnalysis() {
     for (Node* member : super->member) {
       if (member->status == CONSTANT_NODE) {
         member->assignTree.clear();
+        member->arrayVal.clear();
         ENode* enode = new ENode(OP_INT);
         enode->computeInfo = member->computeInfo;
-        member->assignTree.push_back(new ExpTree(enode, member));
+        enode->width = member->width;
+        enode->strVal = mpz_get_str(NULL, 10, member->computeInfo->consVal);
+        if (member->isArray()) member->arrayVal.push_back(new ExpTree(enode, member));
+        else member->assignTree.push_back(new ExpTree(enode, member));
         continue;
       }
       for (ExpTree* tree : member->arrayVal) {

@@ -109,10 +109,10 @@ static inline std::string lastField(std::string s) {
   return pos == std::string::npos ? "" : s.substr(pos + 1);
 }
 
-int countEmptyWhen(ExpTree* tree) {
+int countEmptyENodeWhen(ENode* enode) {
   int ret = 0;
   std::stack<ENode*> s;
-  s.push(tree->getRoot());
+  s.push(enode);
   while(!s.empty()) {
     ENode* top = s.top();
     s.pop();
@@ -134,6 +134,10 @@ int countEmptyWhen(ExpTree* tree) {
     }
   }
   return ret;
+}
+
+int countEmptyWhen(ExpTree* tree) {
+  return countEmptyENodeWhen(tree->getRoot());
 }
 
 /*
@@ -1675,6 +1679,9 @@ graph* AST2Graph(PNode* root) {
 void inferAllWidth() {
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     it->second->inferWidth();
+  }
+  for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
+    it->second->updateTreeWithNewWIdth();
   }
 }
 

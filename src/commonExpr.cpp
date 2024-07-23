@@ -179,6 +179,7 @@ void graph::commonExpr() {
       }
       for (ExpTree* tree : member->assignTree) tree->replace(aliasMap);
       if (member->updateTree) member->updateTree->replace(aliasMap);
+      if (member->resetTree) member->resetTree->replace(aliasMap);
     }
   }
 /* apdate arrayMember */

@@ -97,6 +97,9 @@
     } \
   } while(0)
 
+
+#define ACTIVATE_ALL 0xff
+
 class TypeInfo;
 class PNode;
 class Node;
@@ -125,5 +128,11 @@ std::string arrayMemberName(Node* node, std::string suffix);
 #include "valInfo.h"
 #include "perf.h"
 
+
+struct ordercmp {
+  bool operator()(Node* n1, Node* n2) {
+    return n1->order > n2->order;
+  }
+};
 
 #endif

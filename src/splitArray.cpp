@@ -1,7 +1,11 @@
 #include "common.h"
+#include <cstdio>
+#include <queue>
 #include <stack>
 #include <set>
 #include <map>
+#include <tuple>
+#include <utility>
 
 static std::set<Node*> fullyVisited;
 static std::set<Node*> partialVisited;
@@ -122,9 +126,9 @@ Node* getSplitArray(graph* g) {
 
 }
 
-void fillEmptyWhen(ExpTree* newTree, ENode* oldNode) {
+void fillEmptyENodeWhen(ENode* newENode, ENode* oldENode) {
   std::stack<ENode*> s;
-  s.push(newTree->getRoot());
+  s.push(newENode);
   while(!s.empty()) {
     ENode* top = s.top();
     s.pop();
@@ -141,22 +145,71 @@ void fillEmptyWhen(ExpTree* newTree, ENode* oldNode) {
       }
     }
     if (top->opType == OP_WHEN) {
-      if (!top->getChild(1)) top->setChild(1, oldNode);
-      if (!top->getChild(2)) top->setChild(2, oldNode);
+      if (!top->getChild(1)) top->setChild(1, oldENode);
+      if (!top->getChild(2)) top->setChild(2, oldENode);
     }
   }
+}
+
+void fillEmptyWhen(ExpTree* newTree, ENode* oldNode) {
+  fillEmptyENodeWhen(newTree->getRoot(), oldNode);
+}
+
+bool subTreeEq(ENode* enode1, ENode* enode2);
+int countEmptyENodeWhen(ENode* enode);
+
+ExpTree* mergeWhenTree(ExpTree* tree1, ExpTree* tree2) {
+  int emptyWhen = countEmptyENodeWhen(tree2->getRoot());
+  if (emptyWhen == 0) return tree2;
+  if (emptyWhen == 1 && tree1->getRoot()->opType != OP_WHEN) {
+    fillEmptyWhen(tree2, tree1->getRoot());
+    return tree2;
+  }
+
+  std::queue<std::tuple<ENode*, ENode*, ENode*, int>> s;
+  s.push((std::make_tuple(tree1->getRoot(), tree2->getRoot(), nullptr, -1)));
+  ExpTree* ret = nullptr;
+  while (!s.empty()) {
+    ENode* enode1, *enode2, *parent2;
+    int idx2;
+    std::tie(enode1, enode2, parent2, idx2) = s.front();
+    s.pop();
+    if (enode1->opType == OP_WHEN && enode2->opType == OP_WHEN) {
+      if (subTreeEq(enode1->getChild(0), enode2->getChild(0))) {
+        if (enode1->getChild(1) && enode2->getChild(1)) s.push(std::make_tuple(enode1->getChild(1), enode2->getChild(1), enode2, 1));
+        if (enode1->getChild(2) && enode2->getChild(2)) s.push(std::make_tuple(enode1->getChild(2), enode2->getChild(2), enode2, 2));
+        if (!enode2->getChild(1) && enode1->getChild(1)) enode2->setChild(1, enode1->getChild(1));
+        if (!enode2->getChild(2) && enode1->getChild(2)) enode2->setChild(2, enode1->getChild(2));
+        ret = tree2;
+      } else {
+        if (ret) { // already merged some nodes
+          ENode* enode = new ENode(OP_STMT);
+          enode->addChild(enode1);
+          enode->addChild(enode2);
+          parent2->setChild(idx2, enode);
+          ret = tree2;
+        } else Assert(s.empty(), "should not reach here");
+      }
+    } else {
+      if (ret) fillEmptyENodeWhen(enode2, enode1);
+      else {
+        Assert(s.empty(), "should not reach here");
+      }
+    }
+  }
+
+  return ret;
 }
 
 void distributeTree(Node* node, ExpTree* tree) {
   ArrayMemberList* list = tree->getlval()->getArrayMember(node);
   if (list->member.size() == 1) {
     int idx = list->idx[0];
-    if (node->arrayMember[idx]->assignTree.size() != 0 && node->arrayMember[idx]->assignTree.back()->getRoot()->opType != OP_WHEN) {
-      ExpTree* oldTree = node->arrayMember[idx]->assignTree.back();
-      fillEmptyWhen(tree, oldTree->getRoot());
-      node->arrayMember[idx]->assignTree.back() = tree;
-    } else {
-      node->arrayMember[idx]->assignTree.push_back(tree);
+    if (node->arrayMember[idx]->assignTree.size() == 0) node->arrayMember[idx]->assignTree.push_back(tree);
+    else {
+      ExpTree* replaceTree = mergeWhenTree(node->arrayMember[idx]->assignTree.back(), tree);
+      if (replaceTree) node->arrayMember[idx]->assignTree.back() = replaceTree;
+      else node->arrayMember[idx]->assignTree.push_back(tree);
     }
   } else {
     for (size_t i = 0; i < list->member.size(); i ++) {
@@ -170,12 +223,11 @@ void distributeTree(Node* node, ExpTree* tree) {
       }
       ExpTree* newTree = dupTreeWithIdx(tree, subIdx);
       /* duplicate tree with idx */
-      if (node->arrayMember[idx]->assignTree.size() != 0 && node->arrayMember[idx]->assignTree.back()->getRoot()->opType != OP_WHEN) {
-        ExpTree* oldTree = node->arrayMember[idx]->assignTree.back();
-        fillEmptyWhen(newTree, oldTree->getRoot());
-        node->arrayMember[idx]->assignTree.back() = newTree;
-      } else {
-        node->arrayMember[idx]->assignTree.push_back(newTree);
+      if (node->arrayMember[idx]->assignTree.size() == 0) node->arrayMember[idx]->assignTree.push_back(newTree);
+      else {
+        ExpTree* replaceTree = mergeWhenTree(node->arrayMember[idx]->assignTree.back(), newTree);
+        if (replaceTree) node->arrayMember[idx]->assignTree.back() = replaceTree;
+        else node->arrayMember[idx]->assignTree.push_back(newTree);
       }
     }
   }
@@ -205,7 +257,7 @@ void graph::splitArrayNode(Node* node) {
   /* distribute arrayVal */
   for (ExpTree* tree : node->assignTree) distributeTree(node, tree);
   for (ExpTree* tree : node->arrayVal) distributeTree(node, tree);
-  if (node->updateTree) {
+  if (node->updateTree || node->resetTree) {
     for (int idx = 0; idx < node->arrayEntryNum(); idx ++) {
       /* compute index for all array operands in tree */
       std::vector<int> subIdx(node->dimension.size());
@@ -214,8 +266,14 @@ void graph::splitArrayNode(Node* node) {
         subIdx[i] = tmp % node->dimension[i];
         tmp /= node->dimension[i];
       }
-      ExpTree* newTree = dupTreeWithIdx(node->updateTree, subIdx);
-      node->arrayMember[idx]->updateTree = newTree;
+      if (node->updateTree) {
+        ExpTree* newTree = dupTreeWithIdx(node->updateTree, subIdx);
+        node->arrayMember[idx]->updateTree = newTree;
+      }
+      if (node->resetTree) {
+        ExpTree* newTree = dupTreeWithIdx(node->resetTree, subIdx);
+        node->arrayMember[idx]->resetTree = newTree;
+      }
     }
   }
   /* construct connections */
@@ -319,7 +377,7 @@ Node* Node::arrayMemberNode(int idx) {
   std::string memberName = name;
   size_t i;
   for (i = 0; i < index.size(); i ++) {
-    memberName += "[" + std::to_string(index[i]) + "]";
+    memberName += "__" + std::to_string(index[i]);
   }
 
   Node* member = new Node(type);

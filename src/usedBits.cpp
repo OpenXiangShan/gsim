@@ -49,11 +49,15 @@ void ENode::passWidthToChild() {
   }
   if (child.size() == 0) return;
   switch (opType) {
-    case OP_ADD:  case OP_SUB: case OP_OR: case OP_XOR: case OP_AND:
+    case OP_ADD: case OP_SUB: case OP_OR: case OP_XOR: case OP_AND:
       childBits.push_back(usedBit);
       childBits.push_back(usedBit);
       break;
-    case OP_MUL: case OP_DIV: case OP_REM: case OP_DSHL: case OP_DSHR:
+    case OP_MUL:
+      childBits.push_back(MIN(usedBit, Child(0, width)));
+      childBits.push_back(MIN(usedBit, Child(1, width)));
+      break;
+    case OP_DIV: case OP_REM: case OP_DSHL: case OP_DSHR:
     case OP_LT: case OP_LEQ: case OP_GT: case OP_GEQ: case OP_EQ: case OP_NEQ:
       childBits.push_back(Child(0, width));
       childBits.push_back(Child(1, width));
@@ -80,10 +84,13 @@ void ENode::passWidthToChild() {
       break;
     case OP_HEAD:
       // childBits.push_back(Child(0, width) - (values[0] - usedBit));
-      childBits.push_back(Child(0, width));
+      childBits.push_back(usedBit + values[0]);
       break;
     case OP_BITS:
       childBits.push_back(MIN(usedBit + values[1], values[0] + 1));
+      break;
+    case OP_BITS_NOSHIFT:
+      childBits.push_back(usedBit);
       break;
     case OP_SEXT:
       childBits.push_back(usedBit);
@@ -150,6 +157,10 @@ void Node::passWidthToPrev() {
     updateTree->getRoot()->usedBit = usedBit;
     updateTree->getRoot()->passWidthToChild();
   }
+  if (resetTree) {
+    resetTree->getRoot()->usedBit = usedBit;
+    resetTree->getRoot()->passWidthToChild();
+  }
   if (assignTree.size() == 0) return;
   Assert(usedBit >= 0, "invalid usedBit %d in node %s", usedBit, name.c_str());
   for (ExpTree* tree : assignTree) {
@@ -191,6 +202,7 @@ void graph::usedBits() {
       }
     }
   }
+
   for (Node* node: checkNodes) {
     node->usedBit = node->width;
   }
@@ -229,6 +241,7 @@ void graph::usedBits() {
     for (ExpTree* tree : node->arrayVal) tree->getRoot()->updateWidth();
     if (node->resetVal) node->resetVal->getRoot()->updateWidth();
     if (node->updateTree) node->updateTree->getRoot()->updateWidth();
+    if (node->resetTree) node->resetTree->getRoot()->updateWidth();
   }
 
   for (Node* node : splittedArray) {
@@ -249,9 +262,17 @@ void Node::updateTreeWithNewWIdth() {
   for (ExpTree* tree : arrayVal) tree->updateWithNewWidth();
   if (resetVal) resetVal->updateWithNewWidth();
   if (updateTree) updateTree->updateWithNewWidth();
+  if (resetTree) resetTree->updateWithNewWidth();
 
-  for (ExpTree* tree : assignTree) tree->matchWidth(width);
-  for (ExpTree* tree : arrayVal) tree->matchWidth(width);
+  for (ExpTree* tree : assignTree) {
+    tree->when2mux(width);
+    tree->matchWidth(width);
+  }
+  for (ExpTree* tree : arrayVal) {
+    tree->when2mux(width);
+    tree->matchWidth(width);
+  }
   if (resetVal) resetVal->matchWidth(width);
   if (updateTree) updateTree->matchWidth(width);
+  if (resetTree) resetTree->matchWidth(width);
 }

@@ -6,6 +6,7 @@
 
 class Node;
 class valInfo;
+class NodeComponent;
 
 enum OPType {
   OP_EMPTY,
@@ -47,6 +48,7 @@ enum OPType {
   OP_TAIL,
 /* 1expr2int */
   OP_BITS,
+  OP_BITS_NOSHIFT, // used for bit operations
 /* index */
   OP_INDEX_INT,
   OP_INDEX,
@@ -104,6 +106,7 @@ private:
   valInfo* instsHead(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsTail(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsBits(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsBitsNoShift(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsWhen(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsStmt(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsIndexInt(Node* n, std::string lvalue, bool isRoot);
@@ -149,6 +152,7 @@ private:
   valInfo* consHead(bool isLvalue);
   valInfo* consTail(bool isLvalue);
   valInfo* consBits(bool isLvalue);
+  valInfo* consBitsNoShift(bool isLvalue);
   valInfo* consWhen(Node* node, bool isLvalue);
   valInfo* consStmt(Node* node, bool isLvalue);
   valInfo* consIndexInt(bool isLvalue);
@@ -213,6 +217,8 @@ public:
     sign = _sign;
   }
   void inferWidth();
+  void usedBitWithFixRoot(int width);
+  void clearWidth();
   valInfo* compute(Node* n, std::string lvalue, bool isRoot);
   valInfo* computeConstant(Node* node, bool isLvalue);
   void passWidthToChild();
@@ -229,6 +235,7 @@ public:
   ArrayMemberList* getArrayMember(Node* node);
   void display();
   uint64_t keyHash();
+  NodeComponent* inferComponent(Node* node);
 };
 
 /* 
@@ -277,6 +284,9 @@ public:
     void replace(Node* oldNode, ENode* newENode);
     /* used in commonExpr */
     void replace(std::map<Node*, Node*>& aliasMap);
+    /* used in splitNodes */
+    void replaceAndUpdateWidth(Node* oldNode, Node* newNode);
+    void replace(Node* oldNode, Node* newNode);
     void clearInfo();
     bool isInvalid() {
       Assert(getRoot(), "empty root");
@@ -292,6 +302,9 @@ public:
     void updateWithNewWidth();
     void updateNewChild(ENode* parent, ENode* child, int idx);
     void treeOpt();
+    void getRelyNodes(std::set<Node*>& allNodes);
+    void updateWithSplittedNode();
+    void clearComponent();
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes

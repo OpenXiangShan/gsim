@@ -4,6 +4,66 @@
 #include "common.h"
 #define MAX_NODES_PER_SUPER 7000
 #define MAX_SUBLINGS 30
+
+void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
+
+void graph::mergeAsyncReset() {
+  std::map<Node*, SuperNode*> resetMap;
+  for (int i = 0; i < sortedSuper.size(); i++) {
+    for (Node* member: sortedSuper[i]->member) {
+      if (member->type == NODE_REG_SRC && member->reset == ASYRESET && member->prev.size() == 1) {
+        /* if resetVal is constant (using prev.size() == 1, TODO: optimize) */
+        if (member->super->member.size() != 1) member->super->display();
+        Assert(member->super->member.size() == 1, "super already merged %s id %d (size = %ld)", member->name.c_str(), member->super->id, member->super->member.size());
+        Node* prev = *(member->prev.begin());
+        prev->setAsyncReset();
+        SuperNode* resetSuper;
+        if (resetMap.find(prev) == resetMap.end()) {
+          resetSuper = member->super;
+          resetSuper->superType = SUPER_ASYNC_RESET;
+          resetSuper->resetNode = prev;
+          resetMap[prev] = resetSuper;
+        } else {
+          resetSuper = resetMap[prev];
+          member->super = resetSuper;
+          resetSuper->member.push_back(member);
+          sortedSuper[i]->member.clear();
+        }
+      }
+    }
+  }
+  removeEmptySuper();
+  reconnectSuper();
+}
+
+void graph::mergeUIntReset() {
+  std::map<Node*, SuperNode*> resetSuper;
+  for (Node* reg : regsrc) {
+    if (reg->reset != UINTRESET) continue;
+    std::set<Node*> prev;
+    if (reg->resetTree->getRoot()->opType == OP_WHEN) {
+      getENodeRelyNodes(reg->resetTree->getRoot()->getChild(0), prev);
+    } else {
+      Panic();
+      reg->resetTree->getRelyNodes(prev);
+    }
+    if (prev.size() != 1) reg->display();
+    Assert(prev.size() == 1, "multiple prevReset %s", reg->name.c_str());
+    Node* prevNode = *prev.begin();
+    SuperNode* prevSuper;
+    if (resetSuper.find(prevNode) == resetSuper.end()) {
+      prevSuper = new SuperNode();
+      prevSuper->superType = SUPER_UINT_RESET;
+      resetSuper[prevNode] = prevSuper;
+      uintReset.push_back(prevSuper);
+      prevSuper->resetNode = prevNode;
+      prevNode->setUIntReset();
+    } else {
+      prevSuper = resetSuper[prevNode];
+    }
+    prevSuper->member.push_back(reg);
+  }
+}
 /*
   merge nodes with out-degree=1 to their successors
 */
@@ -116,6 +176,8 @@ void graph::mergeSublings() {
 void graph::mergeNodes() {
   size_t totalSuper = sortedSuper.size();
 
+  mergeAsyncReset();
+  mergeUIntReset();
   mergeOut1();
   mergeIn1();
   mergeSublings();

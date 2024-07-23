@@ -4,8 +4,10 @@
 
 #include "common.h"
 
+#include <cstddef>
 #include <cstdio>
 #include <map>
+#include <string>
 #include <utility>
 
 #define ACTIVE_WIDTH 8
@@ -19,11 +21,13 @@ static int displayNum = 0;
 static const int nodePerDisplay = 5000;
 #endif
 
+#define RESET_NAME(node) (node->name + "$RESET")
+
 static int superId = 0;
 static int activeFlagNum = 0;
 static std::set<Node*> definedNode;
 static std::map<int, SuperNode*> cppId2Super;
-extern std::set<int> maskWidth;
+extern std::set<std::pair<int, int>> allMask;
 bool nameExist(std::string str);
 
 std::pair<int, int> cppId2flagIdx(int cppId) {
@@ -153,8 +157,8 @@ void graph::genNodeInit(FILE* fp, Node* node) {
   } else {
 #if  defined (MEM_CHECK) || defined (DIFFTEST_PER_SIG)
     static std::set<Node*> initNodes;
-    if (node->isArrayMember && node->name[node->name.length()-1] == ']') node = node->arrayParent;
     if (initNodes.find(node) != initNodes.end()) return;
+    if (node->type == NODE_OTHERS && !node->needActivate() && node->width <= BASIC_WIDTH && !node->isArray()) return;
     initNodes.insert(node);
     switch (node->type) {
       case NODE_INVALID:
@@ -205,7 +209,7 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   /* constrcutor */
   fprintf(header, "S%s() {\n", name.c_str());
   /* some initialization */
-  fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
+  fprintf(header, "activateAll();\n");
 #ifdef PERF
   fprintf(header, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
   fprintf(header, "for (int i = 0; i < %d; i ++) activator[i] = std::map<int, int>();\n", superId);
@@ -215,15 +219,17 @@ for (SuperNode* super : sortedSuper) {
   fprintf(header, "for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
 #endif
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_init(MPZ_TMP$%d);\n", i);
-  for (int i : maskWidth) {
-    std::string maskName = format("MPZ_MASK$%d", i);
+  for (auto range : allMask) {
+    std::string maskName = format("MPZ_MASK$%d_%d", range.first, range.second);
     fprintf(header, "mpz_init(%s);\n", maskName.c_str());
     fprintf(header, "mpz_set_ui(%s, 1);\n", maskName.c_str());
-    fprintf(header, "mpz_mul_2exp(%s, %s, %d);\n", maskName.c_str(), maskName.c_str(), i);
+    fprintf(header, "mpz_mul_2exp(%s, %s, %d);\n", maskName.c_str(), maskName.c_str(), range.first - range.second + 1);
     fprintf(header, "mpz_sub_ui(%s, %s, 1);\n", maskName.c_str(), maskName.c_str());
+    if (range.second != 0)
+      fprintf(header, "mpz_mul_2exp(%s, %s, %d);\n", maskName.c_str(), maskName.c_str(), range.second);
   }
   for (SuperNode* super : sortedSuper) {
-    if (super->superType != SUPER_VALID) continue;
+    if (super->superType != SUPER_VALID && super->superType != SUPER_ASYNC_RESET) continue;
     for (Node* member : super->member) {
       genNodeInit(header, member);
     }
@@ -239,10 +245,14 @@ for (SuperNode* super : sortedSuper) {
 #endif
   fprintf(header, "}\n");
 
+  fprintf(header, "void activateAll() {\n");
+  fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
+  fprintf(header, "}\n");
+
   /* mpz variable used for intermidia values */
   fprintf(header, "mpz_t newValMpz;\n");
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_t MPZ_TMP$%d;\n", i);
-  for (int i : maskWidth) fprintf(header, "mpz_t MPZ_MASK$%d;\n", i);
+  for (auto range : allMask) fprintf(header, "mpz_t MPZ_MASK$%d_%d;\n", range.first, range.second);
   fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
@@ -299,7 +309,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
   std::set<std::string> allNames;
   std::string diffNodeName = node->name;
   std::string originName = node->name;
-  if (node->type == NODE_MEMORY || node->type == NODE_REG_DST){
+  if (node->type == NODE_MEMORY){
 
   } else if (node->isArrayMember) {
     allNames.insert(node->name);
@@ -412,7 +422,6 @@ void graph::genNodeDef(FILE* fp, Node* node) {
 #ifdef GSIM_DIFF
   genDiffSig(fp, node);
 #endif
-  if (node->isArrayMember && node->name[node->name.length()-1] == ']') node = node->arrayParent;
   if (definedNode.find(node) != definedNode.end()) return;
   definedNode.insert(node);
   if (node->width <= BASIC_WIDTH) {
@@ -426,6 +435,11 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   genDiffSig(fp, node);
 #endif
   fprintf(fp, "; // width = %d\n", node->width);
+  /* save reset registers */
+  if (node->isReset() && node->type == NODE_REG_SRC) {
+    Assert(!node->isArray() && node->width <= BASIC_WIDTH, "%s is treated as reset (isArray: %d width: %d)", node->name.c_str(), node->isArray(), node->width);
+    fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), RESET_NAME(node).c_str());
+  }
 
 }
 
@@ -464,30 +478,46 @@ std::string graph::saveOldVal(FILE* fp, Node* node) {
 static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep) {
   std::string nodeName = node->name;
   if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
-  if (node->width > BASIC_WIDTH) {
-    fprintf(fp, "if (mpz_cmp(%s, %s) != 0) {\n", nodeName.c_str(), oldName.c_str());
+  if (node->isAsyncReset()) {
+    if (node->width > BASIC_WIDTH) {
+      fprintf(fp, "if (mpz_sgn(%s) != 0 || mpz_cmp(%s, %s) != 0) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
+    } else {
+      fprintf(fp, "if (%s || (%s != %s)) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
+    }
   } else {
-    fprintf(fp, "if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
+    if (node->width > BASIC_WIDTH) {
+      fprintf(fp, "if (mpz_cmp(%s, %s) != 0) {\n", nodeName.c_str(), oldName.c_str());
+    } else {
+      fprintf(fp, "if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
+    }
   }
   if (inStep) {
     if (node->width > BASIC_WIDTH)
       fprintf(fp, "mpz_set(%s, %s);\n", node->name.c_str(), newName(node).c_str());
-    else
+    else {
+      if (node->isReset() && node->type == NODE_REG_SRC) fprintf(fp, "%s = %s;\n", RESET_NAME(node).c_str(), newName(node).c_str());
       fprintf(fp, "%s = %s;\n", node->name.c_str(), newName(node).c_str());
+    }
   }
-  std::map<int, uint64_t> bitMapInfo;
-  uint64_t curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
-  if (curMask != 0) fprintf(fp, "oldFlag |= 0x%lx;\n", curMask);
-  for (auto iter : bitMapInfo) {
-    fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
+  if (node->isAsyncReset()) {
+    fprintf(fp, "activateAll();\n");
+    fprintf(fp, "oldFlag = -1;\n");
   }
-#ifdef PERF
-  for (int id : nextNodeId) {
-    fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\nactivator[%d][%d] ++;\n",
-                id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
+  else {
+    std::map<int, uint64_t> bitMapInfo;
+    uint64_t curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
+    if (curMask != 0) fprintf(fp, "oldFlag |= 0x%lx;\n", curMask);
+    for (auto iter : bitMapInfo) {
+      fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
+    }
+  #ifdef PERF
+    for (int id : nextNodeId) {
+      fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\nactivator[%d][%d] ++;\n",
+                  id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
+    }
+    if (inStep) fprintf(fp, "isActivateValid = true;\n");
+  #endif
   }
-  if (inStep) fprintf(fp, "isActivateValid = true;\n");
-#endif
   fprintf(fp, "}\n");
 }
 
@@ -508,29 +538,18 @@ static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bo
 }
 
 void graph::genNodeInsts(FILE* fp, Node* node) {
-  if (node->type == NODE_REG_SRC && node->reset == ASYRESET && node->regSplit && node->getDst()->status == VALID_NODE) {
-    if (node->getDst()->super->cppId != -1) {
-      if (!node->isArray()) {
-        if (node->width <= BASIC_WIDTH) fprintf(fp, "if (%s != %s)\n", node->name.c_str(), node->getDst()->name.c_str());
-        else fprintf(fp, "if(mpz_cmp(%s, %s) != 0) ", node->name.c_str(), node->getDst()->name.c_str());
-      }
-      int bitMapId;
-      uint64_t bitMapMask;
-      std::tie(bitMapId, bitMapMask) = setIdxMask(node->getDst()->super->cppId);
-      fprintf(fp, "activeFlags[%d] |= 0x%lx;\n", bitMapId, bitMapMask);
-    }
-  }
   std::string oldnode;
   if (node->insts.size()) {
     /* local variables */
-    if (node->type == NODE_OTHERS && !node->needActivate() && node->width <= BASIC_WIDTH && !node->isArrayMember && !node->isArray()) {
+    if (node->status == VALID_NODE && node->type == NODE_OTHERS && !node->needActivate() && node->width <= BASIC_WIDTH && !node->isArrayMember && !node->isArray()) {
       fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), node->name.c_str());
     }
+    std::vector<std::string> newInsts(node->insts);
     /* save oldVal */
     if (node->needActivate() && !node->isArray()) {
       oldnode = saveOldVal(fp, node);
-      for (size_t i = 0; i < node->insts.size(); i ++) {
-        std::string inst = node->insts[i];
+      for (size_t i = 0; i < newInsts.size(); i ++) {
+        std::string inst = newInsts[i];
         size_t start_pos = 0;
         if (node->width <= BASIC_WIDTH) {
           std::string basicSet = node->name + " = ";
@@ -547,11 +566,11 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
             start_pos += replaceStr.length();
           }
         }
-        node->insts[i] = inst;
+        newInsts[i] = inst;
       }
     }
     /* display all insts */
-    for (std::string inst : node->insts) {
+    for (std::string inst : newInsts) {
       fprintf(fp, "%s\n", inst.c_str());
     }
   }
@@ -676,6 +695,57 @@ void graph::genActivate(FILE* fp) {
   }
 }
 
+void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
+  fprintf(fp, "if(unlikely(%s)) {\n", super->resetNode->type == NODE_REG_SRC ? RESET_NAME(super->resetNode).c_str() : super->resetNode->name.c_str());
+  std::set<int> allNext;
+  for (size_t i = 0; i < super->member.size(); i ++) {
+    Node* node = super->member[i];
+    for (Node* next : node->next) {
+      if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
+    }
+    if (!node->regSplit) {
+      if (node->getDst()->super->cppId >= 0) allNext.insert(node->getDst()->super->cppId);
+    } else {
+      if (node->getSrc()->regUpdate->super->cppId >= 0) allNext.insert(node->regUpdate->super->cppId);
+    }
+  }
+
+  if (allNext.size() > 100) fprintf(fp, "activateAll();\n");
+  else {
+    std::map<int, uint64_t> bitMapInfo;
+    activeSet2bitMap(allNext, bitMapInfo, -1);
+    for (auto iter : bitMapInfo) {
+      fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
+    }
+  }
+  for (size_t i = 0; i < super->member.size(); i ++) {
+    for (std::string str : isUIntReset ? super->member[i]->resetInsts : super->member[i]->insts) {
+      if (super->resetNode->type == NODE_REG_SRC)
+        fprintf(fp, "%s\n", strReplace(str, "(" + super->resetNode->name + ")", "(" + RESET_NAME(super->resetNode) + ")").c_str());
+      else fprintf(fp, "%s\n", str.c_str());
+    }
+  }
+  fprintf(fp, "}\n");
+}
+
+void graph::genResetAll(FILE* fp) {
+  fprintf(fp, "void S%s::resetAll(){\n", name.c_str());
+  for (SuperNode* super : sortedSuper) {
+    if (super->superType == SUPER_ASYNC_RESET) {
+      Assert(super->resetNode->isAsyncReset(), "invalid reset");
+      genReset(fp, super, false);
+    }
+  }
+  for (SuperNode* super : uintReset) {
+    if (super->resetNode->status == CONSTANT_NODE) {
+      Assert(mpz_sgn(super->resetNode->computeInfo->consVal) == 0, "reset %s is always true", super->resetNode->name.c_str());
+      continue;
+    }
+    genReset(fp, super, true);
+  }
+  fprintf(fp, "}\n");
+}
+
 void graph::genMemWrite(FILE* fp) {
   /* update memory*/
   /* writer affects other nodes through reader, no need to activate in writer */
@@ -781,12 +851,20 @@ void graph::saveDiffRegs(FILE* fp) {
 void graph::genStep(FILE* fp) {
   fprintf(fp, "void S%s::step() {\n", name.c_str());
 
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->isReset() && member->type == NODE_REG_SRC) {
+        fprintf(fp, "%s = %s;\n", RESET_NAME(member).c_str(), member->name.c_str());
+      }
+    }
+  }
+
   for (int i = 0; i < subStepNum; i ++) {
     fprintf(fp, "subStep%d();\n", i);
   }
 
   fprintf(fp, "writeMem();\n");
-
+  fprintf(fp, "resetAll();\n");
   fprintf(fp, "cycles ++;\n");
   fprintf(fp, "}\n");
 }
@@ -826,7 +904,7 @@ void graph::cppEmitter() {
 
   for (SuperNode* super : sortedSuper) {
     // std::string insts;
-    if (super->superType == SUPER_VALID) {
+    if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
       for (Node* n : super->member) genNodeDef(header, n);
     }
   }
@@ -847,6 +925,7 @@ void graph::cppEmitter() {
   }
 
   fprintf(header, "void writeMem();\n");
+  fprintf(header, "void resetAll();\n");
 
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
   fprintf(header, "void saveDiffRegs();\n");
@@ -855,6 +934,7 @@ void graph::cppEmitter() {
   /* main evaluation loop (step)*/
   genActivate(src);
   genMemWrite(src);
+  genResetAll(src);
   saveDiffRegs(src);
   genStep(src);
   

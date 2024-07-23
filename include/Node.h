@@ -8,6 +8,8 @@
 #include "debug.h"
 std::string format(const char *fmt, ...);
 
+class NodeComponent;
+
 enum NodeType{
   NODE_INVALID,
   NODE_REG_SRC,
@@ -24,8 +26,9 @@ enum NodeType{
   NODE_REG_UPDATE,
 };
 
-enum NodeStatus{ VALID_NODE, DEAD_NODE, CONSTANT_NODE, MERGED_NODE, DEAD_SRC };
+enum NodeStatus{ VALID_NODE, DEAD_NODE, CONSTANT_NODE, MERGED_NODE, DEAD_SRC, REPLICATION_NODE, SPLITTED_NODE };
 enum IndexType{ INDEX_INT, INDEX_NODE };
+enum AsReset { EMPTY, NODE_ASYNC_RESET, NODE_UINT_RESET, NODE_ALL_RESET};
 
 enum ReaderMember { READER_ADDR = 0, READER_EN, READER_CLK, READER_DATA, READER_MEMBER_NUM};
 enum WriterMember { WRITER_ADDR = 0, WRITER_EN, WRITER_CLK, WRITER_DATA, WRITER_MASK, WRITER_MEMBER_NUM};
@@ -127,6 +130,7 @@ class Node {
   Node* regNext = nullptr;
   Node* regUpdate = nullptr;
   ExpTree* updateTree = nullptr;
+  ExpTree* resetTree = nullptr;
   bool regSplit = true;
 /* used for instGerator */
   valInfo* computeInfo = nullptr;
@@ -138,6 +142,7 @@ class Node {
   Node* clock;
   bool isClock = false;
   ResetType reset = UNCERTAIN;
+  AsReset asReset = EMPTY;
   bool isArrayMember = false;
 /* used for visitWhen in AST2Graph */
 
@@ -151,6 +156,7 @@ class Node {
   std::set<int> regActivate;
 
   std::vector<std::string> insts;
+  std::vector<std::string> resetInsts;
   std::vector<std::string> initInsts;
 
   void updateInfo(TypeInfo* info);
@@ -166,12 +172,12 @@ class Node {
   }
 
   Node* getDst () {
-    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node is not register");
+    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node %s is not register", name.c_str());
     if (type == NODE_REG_SRC) return this->regNext;
     return this;
   }
   Node* getSrc () {
-    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node is not register");
+    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node %s is not register", name.c_str());
     if (type == NODE_REG_DST) return this->regNext;
     return this;
   }
@@ -214,6 +220,23 @@ class Node {
   void update_usedBit(int bits) {
     usedBit = MIN(width, MAX(bits, usedBit));
   }
+  void setAsyncReset() {
+    if (asReset == NODE_UINT_RESET || asReset == NODE_ALL_RESET) asReset = NODE_ALL_RESET;
+    else asReset = NODE_ASYNC_RESET;
+  }
+  void setUIntReset() {
+    if (asReset == NODE_ASYNC_RESET || asReset == NODE_ALL_RESET) asReset = NODE_ALL_RESET;
+    else asReset = NODE_UINT_RESET;
+  }
+  bool isAsyncReset() {
+    return asReset == NODE_ASYNC_RESET || asReset == NODE_ALL_RESET;
+  }
+  bool isUIntReset() {
+    return asReset == NODE_UINT_RESET || asReset == NODE_ALL_RESET;
+  }
+  bool isReset() {
+    return asReset == NODE_UINT_RESET || asReset == NODE_ASYNC_RESET || asReset == NODE_ALL_RESET;
+  }
   void updateConnect();
   void inferWidth();
   void addReset();
@@ -246,11 +269,16 @@ class Node {
   void invalidArrayOptimize();
   void fillArrayInvalid(ExpTree* tree);
   uint64_t keyHash();
+  NodeComponent* inferComponent();
+  NodeComponent* reInferComponent();
   void updateTreeWithNewWIdth();
+  int repOpCount();
 };
 
 enum SuperType {
   SUPER_VALID,
+  SUPER_ASYNC_RESET,
+  SUPER_UINT_RESET,
   SUPER_SAVE_REG,
   SUPER_UPDATE_REG,
 };
@@ -267,6 +295,7 @@ public:
   int order;
   int cppId = -1;
   SuperType superType = SUPER_VALID;
+  Node* resetNode = nullptr;
   int localTmpNum = 0;
   int mpzTmpNum = 0;
   SuperNode() {

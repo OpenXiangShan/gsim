@@ -52,6 +52,7 @@ void u_cat(mpz_t& dst, mpz_t& src1, mp_bitcnt_t bitcnt1, mpz_t& src2, mp_bitcnt_
 
 void invalidExpr1Int2(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t h, mp_bitcnt_t l);
 void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t h, mp_bitcnt_t l);
+void u_bits_noshift(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t h, mp_bitcnt_t l);
 
 void us_mux(mpz_t& dst, mpz_t& cond, mpz_t& src1, mpz_t& src2);
 
