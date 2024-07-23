@@ -724,11 +724,11 @@ void ExpTree::updateWithSplittedNode() {
 
 int splitDelta(Node* node, int interval) {
   if (interval >= BASIC_WIDTH) return 0;
-  if (interval >= 64) return 1;
-  if (interval >= 32) return 2;
-  if (interval >= 16) return 4;
-  if (interval >= 8) return 8;
-  return 8;
+  if (interval >= 64) return 2;
+  if (interval >= 32) return 4;
+  if (interval >= 16) return 8;
+  if (interval >= 8) return 16;
+  return 16;
 }
 
 void getCut(Node* node, std::set<int>& cuts, Segments* seg1, Segments* seg2) {
