@@ -170,13 +170,13 @@ bool enodeNeedReplace(ENode* enode, NodeComponent* comp) {
   if (!comp->fullValid()) return false;
   if (comp->elements.size() == 1) {
     if (comp->elements[0]->eleType == ELE_INT) return true;
-    if (comp->elements[0]->hi - comp->elements[0]->lo + 1 == comp->elements[0]->node->width) return true;
+    // if (comp->elements[0]->hi - comp->elements[0]->lo + 1 == comp->elements[0]->node->width) return true;
   }
   std::set<Node*> relyNodes;
   getENodeRelyNodes(enode, relyNodes);
   bool anyDead = false;
   for (Node* rely : relyNodes) {
-    if (rely->status == DEAD_NODE) anyDead = true;
+    if (rely->status == SPLITTED_NODE) anyDead = true;
   }
   if (anyDead) return true;
   return false;
@@ -464,7 +464,7 @@ void setComponent(Node* node, NodeComponent* comp) {
   nodeSegments[node].second->construct(comp);
 }
 
-void ExpTree::replace(Node* oldNode, Node* newNode) {
+void ExpTree::replaceAndUpdateWidth(Node* oldNode, Node* newNode) {
   std::stack<ENode*> s;
   if (getRoot()) s.push(getRoot());
   if (getlval()) s.push(getlval());
@@ -725,7 +725,16 @@ void ExpTree::updateWithSplittedNode() {
   }
 }
 
-void getCut(std::set<int>& cuts, Segments* seg1, Segments* seg2) {
+int splitDelta(Node* node, int interval) {
+  if (interval >= BASIC_WIDTH) return 0;
+  if (interval >= 64) return 2;
+  if (interval >= 32) return 4;
+  if (interval >= 16) return 8;
+  if (interval >= 8) return 16;
+  return 5;
+}
+
+void getCut(Node* node, std::set<int>& cuts, Segments* seg1, Segments* seg2) {
   /* merge boundCount */
   std::map<int, int> allCut(seg1->boundCount);
   for (auto iter : seg2->boundCount) {
@@ -738,7 +747,7 @@ void getCut(std::set<int>& cuts, Segments* seg1, Segments* seg2) {
     int concatNum = 0;
     if (seg1->concatCount.find(cut) != seg1->concatCount.end()) concatNum += seg1->concatCount[cut];
     if (seg2->concatCount.find(cut) != seg2->concatCount.end()) concatNum += seg2->concatCount[cut];
-    if (allCut[cut] > concatNum + 2 || (allCut[cut] > concatNum && (cut - lo >= 64)) || (allCut[cut] >= concatNum && (cut - lo >= BASIC_WIDTH))) {
+    if (allCut[cut] >= concatNum + splitDelta(node, cut - lo)) {
       cuts.insert(cut);
       lo = cut;
     }
@@ -773,40 +782,6 @@ void graph::splitNodes() {
     }
   }
 
-/* spliting registers */
-  for (Node* reg : regsrc) {
-    if (reg->status != VALID_NODE || reg->isArray() || reg->assignTree.size() > 1 || reg->sign || reg->width == 0) continue;
-    printf("node %s(w = %d)\n", reg->name.c_str(), reg->width);
-    for (auto cut : nodeSegments[reg].first->boundCount) printf("[%d]=%d ", cut.first, cut.second);
-    for (auto cut : nodeSegments[reg->getDst()].second->boundCount) printf("[%d]=%d ", cut.first, cut.second);
-    printf("\n-------\n");
-    for (auto cut : nodeSegments[reg].first->concatCount) printf("[%d]=%d ", cut.first, cut.second);
-    for (auto cut : nodeSegments[reg->getDst()].second->concatCount) printf("[%d]=%d ", cut.first, cut.second);
-    printf("\n-------\n");
-    std::set<int>nodeCuts;
-    getCut(nodeCuts, nodeSegments[reg].first, nodeSegments[reg->getDst()].second);
-    nodeCuts.insert(reg->width - 1);
-    if (nodeCuts.size() <= 1) {
-      Assert(nodeCuts.size() == 1 && *nodeCuts.begin() == reg->width - 1, "invalid cut %ld %d %s", nodeCuts.size(), nodeCuts.size() == 0 ? -1 : *nodeCuts.begin(), reg->name.c_str());
-      continue;
-    }
-    printf("splitReg %s\n", reg->name.c_str());
-    for (int cut : nodeCuts) printf("%d ", cut);
-    printf("\n");
-    createSplittedNode(reg, nodeCuts);
-    if (supersrc.find(reg->super) != supersrc.end()) {
-      supersrc.erase(reg->super);
-    }
-    for (Node* splittedNode : splittedNodesSet[reg]) regsrc.push_back(splittedNode);
-    reg->status = DEAD_NODE;
-    reg->getDst()->status = DEAD_NODE;
-
-    addReInfer(reg);
-    addReInfer(reg->getDst());
-    for (Node* node : splittedNodesSet[reg]) addReInfer(node);
-    for (Node* node : splittedNodesSet[reg->getDst()]) addReInfer(node);
-  }
-  reInferAll();
   std::set<Node*> checkNodes(validNodes);
   std::set<Node*> arrayMember;
   for (Node* node : validNodes) {
@@ -818,23 +793,24 @@ void graph::splitNodes() {
     /* split common nodes */
     for (Node* node : checkNodes) {
       printf("node %s(w = %d, type %d):\n", node->name.c_str(), node->width, node->type);
+      Node* updateNode = node->type == NODE_REG_SRC ? node->getDst() : node;
       for (auto cut : nodeSegments[node].first->boundCount) printf("[%d]=%d ", cut.first, cut.second);
-      for (auto cut : nodeSegments[node].second->boundCount) printf("[%d]=%d ", cut.first, cut.second);
+      for (auto cut : nodeSegments[updateNode].second->boundCount) printf("[%d]=%d ", cut.first, cut.second);
       printf("\n-------\n");
       for (auto cut : nodeSegments[node].first->concatCount) printf("[%d]=%d ", cut.first, cut.second);
-      for (auto cut : nodeSegments[node].second->concatCount) printf("[%d]=%d ", cut.first, cut.second);
+      for (auto cut : nodeSegments[updateNode].second->concatCount) printf("[%d]=%d ", cut.first, cut.second);
       printf("\n-------\n");
-      if (node->type != NODE_OTHERS || node->width == 0 || node->sign || allSplittedNodes.find(node) != allSplittedNodes.end()) continue;
+      if ((node->type != NODE_OTHERS && node->type != NODE_REG_SRC) || node->width == 0 || node->sign || allSplittedNodes.find(node) != allSplittedNodes.end()) continue;
       if (arrayMember.find(node) != arrayMember.end()) continue;
       std::set<int>nodeCuts;
-      getCut(nodeCuts, nodeSegments[node].first, nodeSegments[node].second);
+      getCut(node, nodeCuts, nodeSegments[node].first, nodeSegments[updateNode].second);
       nodeCuts.insert(node->width - 1);
       if (nodeCuts.size() <= 1) {
         Assert(nodeCuts.size() == 1 && *nodeCuts.begin() == node->width - 1, "invalid cut %ld %d %s", nodeCuts.size(), nodeCuts.size() == 0 ? -1 : *nodeCuts.begin(), node->name.c_str());
         continue;
       }
 
-      printf("splitNode %s %p\n", node->name.c_str(), node);
+      printf("splitNode %s %p (type %d)\n", node->name.c_str(), node, node->type);
       for (int cut : nodeCuts) printf("%d ", cut);
       printf("\n");
       createSplittedNode(node, nodeCuts);
@@ -843,8 +819,18 @@ void graph::splitNodes() {
         n->display();
         addReInfer(n);
       }
-      node->status = DEAD_NODE;
+      node->status = SPLITTED_NODE;
       addReInfer(node);
+      /* extra update for registers */
+      if (node->type == NODE_REG_SRC) {
+        if (supersrc.find(node->super) != supersrc.end()) {
+          supersrc.erase(node->super);
+        }
+        for (Node* splittedNode : splittedNodesSet[node]) regsrc.push_back(splittedNode);
+        addReInfer(node->getDst());
+        for (Node* dst : splittedNodesSet[node->getDst()]) addReInfer(dst);
+        node->getDst()->status = SPLITTED_NODE;
+      }
     }
     checkNodes.clear();
     reInferAll(true, checkNodes);
@@ -890,10 +876,10 @@ void graph::splitNodes() {
     }
   }
   regsrc.erase(
-    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
+    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == SPLITTED_NODE; }),
         regsrc.end()
   );
-  removeNodesNoConnect(DEAD_NODE);
+  removeNodesNoConnect(SPLITTED_NODE);
 /* update connection */
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {

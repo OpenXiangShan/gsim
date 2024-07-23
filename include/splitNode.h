@@ -130,7 +130,6 @@ public:
       directElements.insert(directElements.end(), node->directElements.begin(), node->directElements.end());
     }
     width += node->countWidth();
-    countWidth();
   }
   NodeComponent* dup() {
     NodeComponent* ret = new NodeComponent();
@@ -192,19 +191,9 @@ public:
     NodeComponent* comp = new NodeComponent();
     comp->getElementBits(this, hi, lo);
     comp->getDirectBits(this, hi, lo);
-    countWidth();
     return comp;
   }
   int countWidth() {
-    int w = 0;
-    for (NodeElement* comp : elements) w += comp->hi - comp->lo + 1;
-    if (w != width) {
-      for (size_t i = 0; i < elements.size(); i ++) {
-        printf("  %s [%d, %d] (totalWidth = %d)\n", elements[i]->eleType == ELE_NODE ? elements[i]->node->name.c_str() : (elements[i]->eleType == ELE_INT ? (std::string("0x") + mpz_get_str(nullptr, 16, elements[i]->val)).c_str() : "EMPTY"),
-             elements[i]->hi, elements[i]->lo, width);
-      }
-    }
-    Assert(w == width, "width not match %d != %d\n", w, width);
     return width;
   }
   bool assignSegEq(NodeComponent* comp) {
@@ -280,7 +269,6 @@ public:
     }
     directElements.clear();
     directElements.insert(directElements.end(), newDirectElements.begin(), newDirectElements.end());
-    countWidth();
   }
   void display() {
     printf("comp width %d\n", width);

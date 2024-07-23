@@ -89,8 +89,8 @@ class graph {
   void constructRegs();
   void commonExpr();
   void splitNodes();
-  void exprOpt();
   void replicationOpt();
+  void exprOpt();
 };
 
 #endif
