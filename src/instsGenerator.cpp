@@ -2364,7 +2364,7 @@ valInfo* Node::compute() {
   Assert(ret, "empty info in %s\n", name.c_str());
   if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) ret->setConstantByStr("0");
   if (ret->status == VAL_EMPTY_SRC && assignTree.size() == 1) status = DEAD_SRC;
-
+  bool needRecompute = false;
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
     if (type == NODE_REG_DST) {
@@ -2381,7 +2381,7 @@ valInfo* Node::compute() {
             addRecompute(next);
           }
         }
-        recomputeAllNodes();
+        needRecompute = true;
       }
     } else if (type == NODE_MEM_MEMBER && mpz_sgn(ret->consVal) == 0) {
       Node* port = parent;
@@ -2401,7 +2401,7 @@ valInfo* Node::compute() {
           if (this != port->get_member(WRITER_MASK)) port->get_member(WRITER_MASK)->setConstantZero();
         }
       }
-      recomputeAllNodes();
+      needRecompute = true;
     }
   } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant &&
     (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(getSrc()->computeInfo->consVal, ret->assignmentCons) == 0)) && resetConsEq(ret, getSrc())) {
@@ -2420,7 +2420,7 @@ valInfo* Node::compute() {
         addRecompute(next);
       }
     }
-    recomputeAllNodes();
+    needRecompute = true;
   } else if (isRoot || assignTree.size() > 1 || ret->opNum < 0){  // TODO: count validInfoNum, replace assignTree by validInfuNum
     ret->valStr = name;
     ret->opNum = 0;
@@ -2437,6 +2437,7 @@ valInfo* Node::compute() {
     for (std::string inst : tree->getRoot()->computeInfo->insts) insts.push_back(inst);
   }
   tmp_pop();
+  if (needRecompute) recomputeAllNodes();
   return ret;
 }
 
