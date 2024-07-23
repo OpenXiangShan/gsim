@@ -489,8 +489,8 @@ ExpTree* dupSplittedTree(ExpTree* tree, Node* regold, Node* regnew) {
   ENode* lvalue = tree->getlval()->dup();
   ENode* rvalue = tree->getRoot()->dup();
   ExpTree* ret = new ExpTree(rvalue, lvalue);
-  ret->replace(regold, regnew);
-  ret->replace(regold->getDst(), regnew->getDst());
+  ret->replaceAndUpdateWidth(regold, regnew);
+  ret->replaceAndUpdateWidth(regold->getDst(), regnew->getDst());
   ret->getRoot()->clearWidth();
   ret->getRoot()->inferWidth();
   ret->getRoot()->usedBitWithFixRoot(regnew->width);

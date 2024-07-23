@@ -4,24 +4,30 @@
 
 #include "common.h"
 #include <stack>
+#include <tuple>
 Node* getLeafNode(bool isArray, ENode* enode);
 
 void ExpTree::replace(Node* oldNode, ENode* newENode) {
-  std::stack<ENode*> s;
-  if (getRoot()->getNode() && (getLeafNode(true, getRoot()) == oldNode)) {
-    setRoot(newENode);
-    return;
+  std::stack<std::tuple<ENode*, ENode*, int>> s;
+  s.push(std::make_tuple(getRoot(), nullptr, -1));
+  if (getlval()) {
+    for (int i = 0; i < getlval()->getChildNum(); i ++) s.push(std::make_tuple(getlval()->getChild(i), getlval(), i));
   }
-  if (getRoot()) s.push(getRoot());
 
   while(!s.empty()) {
-    ENode* top = s.top();
+    ENode* top, *parent;
+    int idx;
+    std::tie(top, parent, idx) = s.top();
     s.pop();
+    if (top->getNode() && getLeafNode(true, top) == oldNode) {
+      if (parent) parent->setChild(idx, newENode);
+      else setRoot(newENode);
+    }
+
     for (int i = 0; i < top->getChildNum(); i ++) {
       ENode* enode = top->getChild(i);
       if (!enode) continue;
-      if (enode->getNode() && getLeafNode(true, enode) == oldNode) top->setChild(i, newENode);
-      else s.push(enode);
+      s.push(std::make_tuple(enode, top, i));
     }
   }
 }

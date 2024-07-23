@@ -285,6 +285,7 @@ public:
     /* used in commonExpr */
     void replace(std::map<Node*, Node*>& aliasMap);
     /* used in splitNodes */
+    void replaceAndUpdateWidth(Node* oldNode, Node* newNode);
     void replace(Node* oldNode, Node* newNode);
     void clearInfo();
     bool isInvalid() {

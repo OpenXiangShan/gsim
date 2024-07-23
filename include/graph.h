@@ -90,6 +90,7 @@ class graph {
   void commonExpr();
   void splitNodes();
   void exprOpt();
+  void replicationOpt();
 };
 
 #endif

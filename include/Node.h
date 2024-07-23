@@ -26,7 +26,7 @@ enum NodeType{
   NODE_REG_UPDATE,
 };
 
-enum NodeStatus{ VALID_NODE, DEAD_NODE, CONSTANT_NODE, MERGED_NODE, DEAD_SRC };
+enum NodeStatus{ VALID_NODE, DEAD_NODE, CONSTANT_NODE, MERGED_NODE, DEAD_SRC, REPLICATION_NODE };
 enum IndexType{ INDEX_INT, INDEX_NODE };
 enum AsReset { EMPTY, NODE_ASYNC_RESET, NODE_UINT_RESET, NODE_ALL_RESET};
 
@@ -272,6 +272,7 @@ class Node {
   NodeComponent* inferComponent();
   NodeComponent* reInferComponent();
   void updateTreeWithNewWIdth();
+  int repOpCount();
 };
 
 enum SuperType {
