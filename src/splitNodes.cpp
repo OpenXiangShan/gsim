@@ -28,8 +28,6 @@ static std::set<Node*> allSplittedNodes;
 static std::priority_queue<Node*, std::vector<Node*>, ordercmp> reInferQueue;
 static std::set<Node*> uniqueReinfer;
 
-static std::map<Node*, int> reinferCount;
-
 ExpTree* dupSplittedTree(ExpTree* tree, Node* regold, Node* regnew);
 ExpTree* dupTreeWithBits(ExpTree* tree, int hi, int lo);
 void addReInfer(Node* node);
@@ -107,11 +105,13 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
   node->prev.clear();
   node->prev.insert(splittedNodesSet[node].begin(), splittedNodesSet[node].end());
   componentMap[node]->invalidateAll();
+  std::reverse(splittedNodesSet[node].begin(), splittedNodesSet[node].end());
 
   if (node->type == NODE_REG_SRC) {
     for (Node* n : splittedNodesSet[node->getDst()]) n->updateConnect();
     node->getDst()->prev.clear();
     node->getDst()->prev.insert(splittedNodesSet[node->getDst()].begin(), splittedNodesSet[node->getDst()].end());
+    std::reverse(splittedNodesSet[node->getDst()].begin(), splittedNodesSet[node->getDst()].end());
   }
 }
 
@@ -361,9 +361,6 @@ void eraseReferSegment(Node* node, NodeComponent* comp) {
 }
 
 NodeComponent* Node::reInferComponent() {
-  if (reinferCount.find(this) == reinferCount.end()) reinferCount[this] = 0;
-  reinferCount[this] ++;
-
   NodeComponent* oldComp = componentMap[this];
   /* eliminate effects on segments */
   eraseReferSegment(this, oldComp);
@@ -377,7 +374,7 @@ NodeComponent* Node::reInferComponent() {
   }
   componentMap[this] = newComp;
   nodeSegments[this].second = new Segments(newComp);
-  // printf("reinfer node %s (times %d %p) eq %d iter %d\n", name.c_str(), reinferCount[this], this, oldComp->assignAllEq(newComp), reInferCount);
+  // printf("reinfer node %s (%p) eq %d\n", name.c_str(), this, oldComp->assignAllEq(newComp));
   // display();
   // newComp->display();
   genReferSegment(this, newComp);
@@ -638,7 +635,7 @@ ExpTree* dupTreeWithBits(ExpTree* tree, int _hi, int _lo) {
 ENode* constructRootFromComponent(NodeComponent* comp) {
   int hiBit = comp->width - 1;
   ENode* newRoot = nullptr;
-  for (NodeElement* element : comp->elements) {
+  for (NodeElement* element : comp->directElements) {
     ENode* enode;
     if (element->eleType == ELE_NODE) {
       enode = new ENode(element->node);
@@ -727,11 +724,11 @@ void ExpTree::updateWithSplittedNode() {
 
 int splitDelta(Node* node, int interval) {
   if (interval >= BASIC_WIDTH) return 0;
-  if (interval >= 64) return 2;
-  if (interval >= 32) return 4;
-  if (interval >= 16) return 8;
-  if (interval >= 8) return 16;
-  return 5;
+  if (interval >= 64) return 1;
+  if (interval >= 32) return 2;
+  if (interval >= 16) return 4;
+  if (interval >= 8) return 8;
+  return 8;
 }
 
 void getCut(Node* node, std::set<int>& cuts, Segments* seg1, Segments* seg2) {
@@ -792,14 +789,14 @@ void graph::splitNodes() {
   while (!checkNodes.empty()) {
     /* split common nodes */
     for (Node* node : checkNodes) {
-      printf("node %s(w = %d, type %d):\n", node->name.c_str(), node->width, node->type);
+      // printf("node %s(w = %d, type %d):\n", node->name.c_str(), node->width, node->type);
       Node* updateNode = node->type == NODE_REG_SRC ? node->getDst() : node;
-      for (auto cut : nodeSegments[node].first->boundCount) printf("[%d]=%d ", cut.first, cut.second);
-      for (auto cut : nodeSegments[updateNode].second->boundCount) printf("[%d]=%d ", cut.first, cut.second);
-      printf("\n-------\n");
-      for (auto cut : nodeSegments[node].first->concatCount) printf("[%d]=%d ", cut.first, cut.second);
-      for (auto cut : nodeSegments[updateNode].second->concatCount) printf("[%d]=%d ", cut.first, cut.second);
-      printf("\n-------\n");
+      // for (auto cut : nodeSegments[node].first->boundCount) printf("[%d]=%d ", cut.first, cut.second);
+      // for (auto cut : nodeSegments[updateNode].second->boundCount) printf("[%d]=%d ", cut.first, cut.second);
+      // printf("\n-------\n");
+      // for (auto cut : nodeSegments[node].first->concatCount) printf("[%d]=%d ", cut.first, cut.second);
+      // for (auto cut : nodeSegments[updateNode].second->concatCount) printf("[%d]=%d ", cut.first, cut.second);
+      // printf("\n-------\n");
       if ((node->type != NODE_OTHERS && node->type != NODE_REG_SRC) || node->width == 0 || node->sign || allSplittedNodes.find(node) != allSplittedNodes.end()) continue;
       if (arrayMember.find(node) != arrayMember.end()) continue;
       std::set<int>nodeCuts;
@@ -810,9 +807,9 @@ void graph::splitNodes() {
         continue;
       }
 
-      printf("splitNode %s %p (type %d)\n", node->name.c_str(), node, node->type);
-      for (int cut : nodeCuts) printf("%d ", cut);
-      printf("\n");
+      // printf("splitNode %s %p (type %d, width %d)\n", node->name.c_str(), node, node->type, node->width);
+      // for (int cut : nodeCuts) printf("%d ", cut);
+      // printf("\n");
       createSplittedNode(node, nodeCuts);
       componentMap[node]->display();
       for (Node* n : splittedNodesSet[node]) {
@@ -891,5 +888,5 @@ void graph::splitNodes() {
   reconnectAll();
 
   printf("[splitNode] update %d nodes (total %ld)\n", num, countNodes());
-  printf("[splitNode] split %ld registers (total %ld)\n", splittedNodesSeg.size(), regsrc.size());
+  printf("[splitNode] split %ld nodes (total %ld)\n", splittedNodesSeg.size(), countNodes());
 }
