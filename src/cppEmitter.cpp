@@ -18,7 +18,6 @@ FILE* sigFile = nullptr;
 #endif
 #ifdef EMU_LOG
 static int displayNum = 0;
-static const int nodePerDisplay = 5000;
 #endif
 
 #define RESET_NAME(node) (node->name + "$RESET")
@@ -598,15 +597,7 @@ void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
 
 void graph::nodeDisplay(FILE* fp, SuperNode* super) {
 #ifdef EMU_LOG
-  int nodeNum = 0;
-  fprintf(fp, "void S%s::display%d(){\n", name.c_str(), displayNum ++);
   for (Node* member : super->member) {
-    nodeNum ++;
-    if (nodeNum == nodePerDisplay) {
-      nodeNum = 0;
-      fprintf(fp, "}\n");
-      fprintf(fp, "void S%s::display%d(){\n", name.c_str(), displayNum ++);
-    }
     if (member->status != VALID_NODE) continue;
     fprintf(fp, "if (cycles >= %d && cycles <= %d) {\n", LOG_START, LOG_END);
     if (member->dimension.size() != 0) {
@@ -646,19 +637,12 @@ void graph::nodeDisplay(FILE* fp, SuperNode* super) {
     }
     fprintf(fp, "}\n");
   }
-  fprintf(fp, "}\n");
 #endif
 }
 
 void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
 #ifdef PERF
   fprintf(fp, "validActive[%d] += isActivateValid;\n", node->cppId);
-#endif
-#ifdef EMU_LOG
-  int num = (node->member.size() + nodePerDisplay - 1) / nodePerDisplay;
-  for (int i = 0; i < num; i ++) {
-    fprintf(fp, "display%d();\n", displayNum + i);
-  }
 #endif
 
   nodeDisplay(fp, node);
@@ -875,7 +859,6 @@ bool SuperNode::instsEmpty() {
   }
   return true;
 }
-
 
 void graph::cppEmitter() {
   for (SuperNode* super : sortedSuper) {
