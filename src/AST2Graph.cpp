@@ -1594,6 +1594,7 @@ graph* AST2Graph(PNode* root) {
         addrRegSrc->bindReg(addrRegDst);
         addrRegSrc->clock = addrRegDst->clock = port->get_member(READER_CLK);
         ENode* resetCond = new ENode(OP_INT);
+        resetCond->width = 1;
         resetCond->strVal = "h0";
         addrRegSrc->resetCond = new ExpTree(resetCond, addrRegSrc);
         addrRegSrc->resetVal = new ExpTree(new ENode(addrRegSrc), addrRegSrc);
@@ -1730,8 +1731,16 @@ void ExpTree::removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::s
   }
 }
 
+void setZeroTree(Node* node) {
+  ENode* zero = new ENode(OP_INT);
+  zero->strVal = "h0";
+  zero->width = 1;
+  node->assignTree.clear();
+  node->assignTree.push_back(new ExpTree(zero, node));
+}
+
 void removeDummyDim(graph* g) {
-  /* get all arrays with 1 dims */
+  /* remove dimensions of size 1 rom the array */
   std::map<Node*, std::vector<int>> arrayMap;
   for (auto iter : allSignals) {
     Node* node = iter.second;
@@ -1775,4 +1784,65 @@ void removeDummyDim(graph* g) {
     if (validDim.size() == mem->dimension.size()) continue;
     mem->dimension = std::vector<int>(validDim);
   }
+  /* transform memory of depth 1 to register */
+  for (Node* mem : g->memory) {
+    if (mem->depth > 1) continue;
+    if (mem->dimension.size() != 0) continue;
+    /* TODO: all ports must share the same clock */
+    Node* clock = nullptr;
+    int readerCount = 0, writerCount = 0;
+    for (Node* port : mem->member) {
+      Node* newClock = port->get_port_clock();
+      // Assert(!clock || clock == newClock, "memory %s has multiple clocks", mem->name.c_str());
+      clock = newClock;
+      if (port->type == NODE_READER) readerCount ++;
+      if (port->type == NODE_WRITER) writerCount ++;
+    }
+    Assert(writerCount == 1, "memory %s has multiple writers", mem->name.c_str());
+    /* creating registers */
+    Node* regSrc = mem->dup(NODE_REG_SRC, mem->name);
+    Node* regDst = regSrc->dup(NODE_REG_DST, mem->name + "$NEXT");
+    regSrc->bindReg(regDst);
+    g->addReg(regSrc);
+    addSignal(regSrc->name, regSrc);
+    addSignal(regDst->name, regDst);
+    regSrc->clock = regDst->clock = clock;
+    ENode* resetCond = new ENode(OP_INT);
+    resetCond->width = 1;
+    resetCond->strVal = "h0";
+    regSrc->resetCond = new ExpTree(resetCond, regSrc);
+    regSrc->resetVal = new ExpTree(new ENode(regSrc), regSrc);
+    /* update all ports */
+    for (Node* port : mem->member) {
+      if (port->type == NODE_READER) {
+        Node* addr = port->get_member(READER_ADDR);
+        setZeroTree(addr);
+        Node* data = port->get_member(READER_DATA);
+        data->type = NODE_OTHERS;
+        data->assignTree.clear();
+        data->assignTree.push_back(new ExpTree(new ENode(regSrc), data));
+      } else if (port->type == NODE_WRITER) {
+        setZeroTree(port->get_member(WRITER_ADDR));
+        Node* mask = port->get_member(WRITER_MASK);
+        mask->type = NODE_OTHERS;
+        Node* data = port->get_member(WRITER_DATA);
+        data->type = NODE_OTHERS;
+        Node* en = port->get_member(WRITER_EN);
+        en->type = NODE_OTHERS;
+        ENode* andENode = new ENode(OP_AND);
+        andENode->addChild(new ENode(en));
+        andENode->addChild(new ENode(mask));
+        ENode* root = new ENode(OP_WHEN);
+        root->addChild(andENode);
+        root->addChild(new ENode(data));
+        root->addChild(nullptr);
+        regSrc->assignTree.push_back(new ExpTree(root, regSrc));
+      }
+    }
+      mem->status = DEAD_NODE;
+  }
+  g->memory.erase(
+    std::remove_if(g->memory.begin(), g->memory.end(), [](const Node* n) {return n->status == DEAD_NODE; }),
+    g->memory.end()
+  );
 }
