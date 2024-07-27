@@ -90,6 +90,16 @@ void graph::exprOpt() {
   for (SuperNode* super : sortedSuper) {
     if (super->superType != SUPER_VALID) continue;
     for (Node* node : super->member) {
+      if (node->width == 0) {
+        node->assignTree.clear();
+        node->arrayVal.clear();
+        ENode* enodeInt = new ENode(OP_INT);
+        enodeInt->width = 0;
+        enodeInt->strVal = "h0";
+        if (node->isArray()) node->arrayVal.push_back(new ExpTree(enodeInt, node));
+        else node->assignTree.push_back(new ExpTree(enodeInt, node));
+        continue;
+      }
       for (ExpTree* tree : node->assignTree) tree->treeOpt();
       for (ExpTree* tree : node->arrayVal) tree->treeOpt();
       if (node->resetVal) node->resetVal->treeOpt();
