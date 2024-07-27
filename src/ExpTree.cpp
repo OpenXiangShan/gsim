@@ -36,6 +36,7 @@ void ExpTree::matchWidth(int width) {
     allNodes.push_back(std::make_pair(nullptr, -1));
   } else {
     s.push(getRoot());
+    getRoot()->width = width;
   }
   while (!s.empty()) {
     ENode* top = s.top();
@@ -43,7 +44,10 @@ void ExpTree::matchWidth(int width) {
     for (int i = top->opType == OP_STMT ? 0 : 1; i < top->getChildNum(); i ++) {
       ENode* child = top->getChild(i);
       if (child) {
-        if (child->opType == OP_WHEN || child->opType == OP_STMT) s.push(child);
+        if (child->opType == OP_WHEN || child->opType == OP_STMT) {
+          s.push(child);
+          child->width = width;
+        }
         else allNodes.push_back(std::make_pair(top, i));
       }
     }
