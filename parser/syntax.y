@@ -16,6 +16,7 @@ int p_stoi(const char* str);
 
 %define api.parser.class {Syntax}
 %define api.namespace {Parser}
+%define parse.error verbose
 %parse-param {Lexical* scanner}
 
 %code requires
@@ -256,5 +257,9 @@ cir_mods:                       { $$ = new PList(); }
 %%
 
 void Parser::Syntax::error(const std::string& msg) {
-    std::cerr << msg << '\n';
+    auto Line = scanner->lineno();
+    auto UnexpectedToken = std::string(scanner->YYText());
+    std::cerr << "Error at line " << Line << ": " << msg 
+          << " (unexpected token: '" << UnexpectedToken << "')." << std::endl;
+    exit(EXIT_FAILURE);
 }
