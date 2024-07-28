@@ -1798,7 +1798,7 @@ void removeDummyDim(graph* g) {
       if (port->type == NODE_READER) readerCount ++;
       if (port->type == NODE_WRITER) writerCount ++;
     }
-    Assert(writerCount == 1, "memory %s has multiple writers", mem->name.c_str());
+    Assert(writerCount == 1 && readerCount > 0, "memory %s has multiple writers", mem->name.c_str());
     /* creating registers */
     Node* regSrc = mem->dup(NODE_REG_SRC, mem->name);
     Node* regDst = regSrc->dup(NODE_REG_DST, mem->name + "$NEXT");
