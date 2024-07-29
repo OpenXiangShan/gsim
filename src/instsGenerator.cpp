@@ -73,10 +73,16 @@ static bool mpzOutOfBound(mpz_t& val, int width) {
   return false;
 }
 
+std::string legalCppCons(std::string str) {
+  if (str.length() <= 16) return "0x" + str;
+  else if (str.length() <= 32) return format("UINT128(0x%s, 0x%s)", str.substr(0, str.length() - 16).c_str(), str.substr(str.length()-16, 16).c_str());
+  else if (str.length() <= 48) return format("UINT256_3(0x%s, 0x%s, 0x%s)", str.substr(0, str.length() - 32).c_str(), str.substr(str.length()-32, 16).c_str(), str.substr(str.length()-16, 16).c_str());
+  else return format("UINT256_4(0x%s, 0x%s, 0x%s, 0x%s)", str.substr(0, str.length() - 48).c_str(), str.substr(str.length()-48, 16).c_str(), str.substr(str.length()-32, 16).c_str(), str.substr(str.length()-16, 16).c_str());
+}
+
 static std::string getConsStr(mpz_t& val) {
   std::string str = mpz_get_str(NULL, 16, val);
-  if (str.length() <= 16) return "0x" + str;
-  else return format("UINT128(0x%s, 0x%s)", str.substr(0, str.length() - 16).c_str(), str.substr(str.length()-16, 16).c_str());
+  return legalCppCons(str);
 }
 static bool allOnes(mpz_t& val, int width) {
   mpz_t tmp;
@@ -105,11 +111,7 @@ static std::string bitMask(int width) {
   std::string ret = std::string(width/4, 'f');
   const char* headTable[] = {"", "1", "3", "7"};
   ret = headTable[width % 4] + ret;
-  if (ret.length() > 16) {
-    ret = ("UINT128(0x" + ret.substr(0, ret.length()-16) + ", 0x" + ret.substr(ret.length()-16, 16) + ")");
-  } else {
-    ret = "0x" + ret;
-  }
+  ret = legalCppCons(ret);
   return ret;
 }
 
@@ -120,12 +122,7 @@ static std::string rangeMask(int hi, int lo) {
   mpz_mul_2exp(mask, mask, hi - lo + 1);
   mpz_sub_ui(mask, mask, 1);
   mpz_mul_2exp(mask, mask, lo);
-  std::string ret = mpz_get_str(nullptr, 16, mask);
-  if (ret.length() > 16) {
-    ret = ("UINT128(0x" + ret.substr(0, ret.length()-16) + ", 0x" + ret.substr(ret.length()-16, 16) + ")");
-  } else {
-    ret = "0x" + ret;
-  }
+  std::string ret = getConsStr(mask);
   return ret;
 }
 
@@ -200,13 +197,20 @@ static std::string setMpz(std::string dstName, ENode* enode, valInfo* dstInfo, N
 }
 
 static std::string get128(std::string name) {
-  return format("(mpz_size(%s) == 1 ? mpz_get_ui(%s) : ((__uint128_t)mpz_getlimbn(%s, 1) << 64 | mpz_get_ui(%s)))",
+  return format("(mpz_size(%s) == 1 ? mpz_get_ui(%s) : ((uint128_t)mpz_getlimbn(%s, 1) << 64 | mpz_get_ui(%s)))",
               name.c_str(), name.c_str(), name.c_str(), name.c_str());
 }
-
-static std::string set128_tmp(valInfo* info, valInfo* parent) {
+static std::string get256(std::string name, int width) { // TODO: replace by getFromMpz
+  if (width <= 128) return get128(name);
+  return format("((uint256_t)(mpz_size(%s) >= 4 ? mpz_getlimbn(%s, 3) : 0) << 192 | \
+                      (uint256_t)(mpz_size(%s) >= 3 ? mpz_getlimbn(%s, 2) : 0) << 128 | \
+                      (uint256_t)(mpz_size(%s) >= 2 ? mpz_getlimbn(%s, 1) : 0) << 64 | \
+                      (uint256_t)mpz_get_ui(%s))",
+              name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str());
+}
+static std::string set256_tmp(valInfo* info, valInfo* parent, std::string str = "") {
   std::string localName = info->valStr;
-  std::string ret = newMpzTmp();
+  std::string ret = str.length() == 0 ? newMpzTmp() : str;
   if (info->status == VAL_CONSTANT) {
     if (mpz_cmp_ui(info->consVal, MAX_U64) > 0) parent->insts.push_back(format("mpz_set_str(%s, \"%s\", 16);", ret.c_str(), mpz_get_str(NULL, 16, info->consVal)));
     else parent->insts.push_back(format("mpz_set_ui(%s, %s);", ret.c_str(), info->valStr.c_str()));
@@ -219,13 +223,9 @@ static std::string set128_tmp(valInfo* info, valInfo* parent) {
       localName = newLocalTmp();
       parent->insts.push_back(format("%s %s = %s;", widthUType(info->width).c_str(), localName.c_str(), info->valStr.c_str()));
     }
-    parent->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", ret.c_str(), localName.c_str()));
+    int count = info->width > 128 ? 4 : 2;
+    parent->insts.push_back(format("mpz_import(%s, %d, -1, 8, 0, 0, (mp_limb_t*)&%s);", ret.c_str(), count, localName.c_str()));
   }
-  return ret;
-}
-static std::string set64_tmp(valInfo* info, valInfo* parent) {
-  std::string ret = newMpzTmp();
-  parent->insts.push_back(format("mpz_set_ui(%s, %s);", ret.c_str(), info->valStr.c_str()));
   return ret;
 }
 
@@ -901,29 +901,21 @@ valInfo* ENode::instsEq(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = format("(mpz_cmp(%s, %s) == 0)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
       ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     } else if (ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) > BASIC_WIDTH){
-      std::string tmp = newMpzTmp();
+      std::string tmp;
       if (ChildInfo(0, width) > 64) {
-        std::string val128 = ChildInfo(0, valStr);
-        if (ChildInfo(0, opNum) > 1) {
-          val128 = newLocalTmp();
-          computeInfo->insts.push_back(format("uint128_t %s = %s;", val128.c_str(), ChildInfo(0, valStr).c_str()));
-        }
-        computeInfo->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", tmp.c_str(), val128.c_str()));
+        std::string tmp = set256_tmp(Child(0, computeInfo), computeInfo);
       } else {
+        tmp = newMpzTmp();
         computeInfo->insts.push_back(format("mpz_set_ui(%s, %s);", tmp.c_str(), ChildInfo(0, valStr).c_str()));
       }
       ret->valStr = format("(mpz_cmp(%s, %s) == 0)", tmp.c_str(), ChildInfo(1, valStr).c_str());
       ret->opNum = 1;
     } else if (ChildInfo(0, width) > BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH){
-      std::string tmp = newMpzTmp();
+      std::string tmp;
       if (ChildInfo(1, width) > 64) {
-        std::string val128 = ChildInfo(1, valStr);
-        if (ChildInfo(1, opNum) > 1) {
-          val128 = newLocalTmp();
-          computeInfo->insts.push_back(format("uint128_t %s = %s;", val128.c_str(), ChildInfo(1, valStr).c_str()));
-        }
-        computeInfo->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", tmp.c_str(), val128.c_str()));
+        tmp = set256_tmp(Child(1, computeInfo), computeInfo);
       } else {
+        tmp = newMpzTmp();
         computeInfo->insts.push_back(format("mpz_set_ui(%s, %s);", tmp.c_str(), ChildInfo(1, valStr).c_str()));
       }
       ret->valStr = format("(mpz_cmp(%s, %s) == 0)", tmp.c_str(), ChildInfo(0, valStr).c_str());
@@ -1005,7 +997,7 @@ valInfo* ENode::instsDshl(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = dstName;
       ret->opNum = 0;
     } else if (ChildInfo(1, width) < 64) {
-      std::string midName = set128_tmp(Child(0, computeInfo), ret);
+      std::string midName = set256_tmp(Child(0, computeInfo), ret);
       ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
       ret->valStr = dstName;
       ret->opNum = 0;
@@ -1158,10 +1150,8 @@ valInfo* ENode::instsOr(Node* node, std::string lvalue, bool isRoot) {
     } else {
       std::string lname = ChildInfo(0, valStr).c_str();
       std::string rname = ChildInfo(1, valStr).c_str();
-      if (ChildInfo(0, width) <= 64) lname = set64_tmp(Child(0, computeInfo), ret);
-      else if (ChildInfo(0, width) <= 128) lname = set128_tmp(Child(0, computeInfo), ret);
-      if (ChildInfo(1, width) <= 64) rname = set64_tmp(Child(1, computeInfo), ret);
-      else if (ChildInfo(1, width) <= 128) rname = set128_tmp(Child(1, computeInfo), ret);
+      if (ChildInfo(0, width) <= BASIC_WIDTH) lname = set256_tmp(Child(0, computeInfo), ret);
+      if (ChildInfo(1, width) <= BASIC_WIDTH) rname = set256_tmp(Child(1, computeInfo), ret);
       ret->insts.push_back(format("mpz_ior(%s, %s, %s);", dstName.c_str(), lname.c_str(), rname.c_str()));
       ret->valStr = dstName;
       ret->opNum = 0;
@@ -1248,45 +1238,30 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = "(" + hi + " | " + ChildInfo(1, valStr) + ")";
       ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     }
-  } else if (childBasic && !enodeBasic) { // child <= 128, cur > 128
+  } else if (childBasic && !enodeBasic) { // child <= BASIC_WIDTH, cur > BASIC_WIDTH
     Assert(ChildInfo(0, opNum) >= 0 && ChildInfo(1, opNum) >= 0, "invalid opNum (%d %s) (%d, %s)", ChildInfo(0, opNum), ChildInfo(0, valStr).c_str(), ChildInfo(1, opNum), ChildInfo(1, valStr).c_str());
     std::string dstName = isRoot ? lvalue : newMpzTmp();
     std::string midName;
     /* set first value */
-    if (ChildInfo(0, width) > 64) {
-      std::string leftName = ChildInfo(0, valStr);
-      midName = set128_tmp(Child(0, computeInfo), ret);
-    } else {
-      midName = newMpzTmp();
-      ret->insts.push_back("mpz_set_ui(" + midName + ", " + ChildInfo(0, valStr) + ");");
-    }
+    midName = set256_tmp(Child(0, computeInfo), ret);
     /* concat second value*/
     if (ChildInfo(1, width) > 64) {
-      std::string rightName = ChildInfo(1, valStr);
-      if (ChildInfo(1, opNum) > 0) {
-        rightName = newLocalTmp();
-        ret->insts.push_back(format("%s %s = %s;", widthUType(Child(1, width)).c_str(), rightName.c_str(), ChildInfo(1, valStr).c_str()));
-      }
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), midName.c_str(), Child(1, width) - 64));
-      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s >> 64);", midName.c_str(), midName.c_str(), rightName.c_str()));
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, 64);", midName.c_str(), midName.c_str()));
-      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), midName.c_str(), rightName.c_str()));
+      std::string rightName = set256_tmp(Child(1, computeInfo), ret);
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);\n", midName.c_str(), midName.c_str(), Child(1, width)));
+      ret->insts.push_back(format("mpz_add(%s, %s, %s);", dstName.c_str(), midName.c_str(), rightName.c_str()));
     } else {
       ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), midName.c_str(), Child(1, width)));
       ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
     }
     ret->valStr = dstName;
     ret->opNum = 0;
-  } else if (!childBasic && !enodeBasic) { // child > 128, cur > 128
+  } else if (!childBasic && !enodeBasic) { // child > BASIC, cur > BASIC
     std::string midName = newMpzTmp();
     std::string dstName = isRoot ? lvalue : newMpzTmp();
     std::string firstName = ChildInfo(0, valStr);
     /* one of child is basic */
-    if (Child(0, width) <= 64) {
-      ret->insts.push_back(format("mpz_set_ui(%s, %s);", midName.c_str(), ChildInfo(0, valStr).c_str()));
-      firstName = midName;
-    } else if (Child(0, width) <= BASIC_WIDTH || ChildInfo(0, status) == VAL_CONSTANT) {
-      firstName = set128_tmp(Child(0, computeInfo), ret);
+    if (ChildInfo(0, width) <= BASIC_WIDTH || ChildInfo(0, status) == VAL_CONSTANT) {
+      firstName = set256_tmp(Child(0, computeInfo), ret);
     }
     if (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0) {
       ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), firstName.c_str(), Child(1, width)));
@@ -1294,10 +1269,9 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
       ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width)));
       ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
     } else if (Child(1, width) <= BASIC_WIDTH) {
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width) - 64));
-      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s >> 64);", midName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, 64);", midName.c_str(), midName.c_str()));
-      ret->insts.push_back(format("mpz_add_ui(%s, %s, (uint64_t)%s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
+      set256_tmp(Child(1, computeInfo), ret, midName);
+      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);\n", midName.c_str(), firstName.c_str(), Child(1, width)));
+      ret->insts.push_back(format("mpz_add(%s, %s, %s);", dstName.c_str(), midName.c_str(), midName.c_str()));
     } else {
       ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width)));
       ret->insts.push_back(format("mpz_add(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
@@ -1570,10 +1544,10 @@ valInfo* ENode::instsXorr(Node* node, std::string lvalue, bool isRoot) {
     if (Child(0, width) <= 64) {
       ret->valStr = "__builtin_parityl(" + ChildInfo(0, valStr) + ")";
       ret->opNum = ChildInfo(0, opNum) + 1;
-    } else {
+    } else if (Child(0, width) <= 128) {
       ret->valStr = format("(__builtin_parityl(%s >> 64) ^ __builtin_parityl(%s))", ChildInfo(0, valStr).c_str(), ChildInfo(0, valStr).c_str());
       ret->opNum = ChildInfo(0, opNum) + 1;
-    }
+    } else TODO();
   } else {
     TODO();
   }
@@ -1585,7 +1559,7 @@ valInfo* ENode::instsPad(Node* node, std::string lvalue, bool isRoot) {
   if (!sign || (width <= ChildInfo(0, width))) {
     for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
     if (width > BASIC_WIDTH && ChildInfo(0, width) <= BASIC_WIDTH) {
-      computeInfo->valStr = set128_tmp(Child(0, computeInfo), computeInfo);
+      computeInfo->valStr = set256_tmp(Child(0, computeInfo), computeInfo);
       computeInfo->opNum = 0;
     } else {
       if (ChildInfo(0, opNum) >= 0 && widthBits(ChildInfo(0, width)) < width && width <= BASIC_WIDTH) {
@@ -1655,13 +1629,7 @@ valInfo* ENode::instsShl(Node* node, std::string lvalue, bool isRoot) {
     if (Child(0, width) <= 64) {
       ret->insts.push_back(format("mpz_set_ui(%s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str()));
     } else {
-      std::string val128 = ChildInfo(0, valStr);
-      if (ChildInfo(0, opNum) > 0) {
-        std::string localName = newLocalTmp();
-        computeInfo->insts.push_back(format("uint128_t %s = %s;", localName.c_str(), ChildInfo(0, valStr).c_str()));
-        val128 = localName;
-      }
-      computeInfo->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", dstName.c_str(), val128.c_str()));
+      set256_tmp(Child(0, computeInfo), ret, dstName);
     }
     ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), dstName.c_str(), n));
     ret->valStr = dstName;
@@ -1696,7 +1664,7 @@ valInfo* ENode::instsShr(Node* node, std::string lvalue, bool isRoot) {
     std::string tmp = newMpzTmp();
     ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", tmp.c_str(), ChildInfo(0, valStr).c_str(), n));
     if (width > 64) {
-      ret->valStr = get128(tmp);
+      ret->valStr = get256(tmp, width);
       ret->opNum = 1;
     } else {
       ret->valStr = format("mpz_get_ui(%s)", tmp.c_str());
@@ -1736,7 +1704,7 @@ valInfo* ENode::instsHead(Node* node, std::string lvalue, bool isRoot) {
   } else if (!childBasic && enodeBasic) {
     std::string tmp = newMpzTmp();
     ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", tmp.c_str(), ChildInfo(0, valStr).c_str(), n));
-    if (width > 64) ret->valStr = get128(tmp);
+    if (width > 64) ret->valStr = get256(tmp, width);
     else ret->valStr = format("mpz_get_ui(%s)", tmp.c_str());
     ret->opNum = 1;
   } else {
@@ -1773,7 +1741,7 @@ valInfo* ENode::instsTail(Node* node, std::string lvalue, bool isRoot) {
     if (width <= 64) {
       ret->valStr = format("(mpz_get_ui(%s) & %s)", ChildInfo(0, valStr).c_str(), bitMask(n).c_str());
     } else {
-      ret->valStr = format("(%s & %s)", get128(ChildInfo(0, valStr)).c_str(), bitMask(n).c_str());
+      ret->valStr = format("(%s & %s)", get256(ChildInfo(0, valStr), width).c_str(), bitMask(n).c_str());
     }
     ret->opNum = ChildInfo(0, opNum) + 1;
   } else if (!childBasic && !enodeBasic) {
@@ -1827,7 +1795,7 @@ void infoBits(valInfo* ret, ENode* enode, valInfo* childInfo) {
     }
     if (w > 64) {
       ret->insts.push_back(format("mpz_and(%s, %s, %s);", mpzTmp2.c_str(), shiftVal.c_str(), addMask(enode->width).c_str()));
-      ret->valStr = get128(mpzTmp2);
+      ret->valStr = get256(mpzTmp2, w);
     } else {
       ret->valStr = format("(mpz_get_ui(%s) & %s)", shiftVal.c_str(), bitMask(w).c_str());
     }
@@ -1893,7 +1861,6 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
     }
   } else if (!childBasic && enodeBasic) {
     std::string mpzTmp1 = newMpzTmp();
-    std::string mpzTmp2 = newMpzTmp(); // mask
     std::string shiftVal = mpzTmp1;
     if (lo != 0) {
       ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", mpzTmp1.c_str(), ChildInfo(0, valStr).c_str(), lo));
@@ -1901,8 +1868,9 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
       shiftVal = ChildInfo(0, valStr);
     }
     if (w > 64) {
+      std::string mpzTmp2 = newMpzTmp(); // mask
       ret->insts.push_back(format("mpz_and(%s, %s, %s);", mpzTmp2.c_str(), shiftVal.c_str(), addMask(width).c_str()));
-      ret->valStr = get128(mpzTmp2);
+      ret->valStr = get256(mpzTmp2, w);
     } else {
       ret->valStr = format("(mpz_get_ui(%s) & %s)", shiftVal.c_str(), bitMask(w).c_str());
     }
@@ -1950,7 +1918,7 @@ valInfo* ENode::instsBitsNoShift(Node* node, std::string lvalue, bool isRoot) {
     ret->opNum = ChildInfo(0, opNum) + 1;
   } else if (!childBasic && enodeBasic) {
     if (w > 64) {
-      ret->valStr = format ("(%s & %s)", get128(ChildInfo(0, valStr)).c_str(), rangeMask(hi, lo).c_str());
+      ret->valStr = format ("(%s & %s)", get256(ChildInfo(0, valStr), w).c_str(), rangeMask(hi, lo).c_str());
     } else {
       ret->valStr = format("(mpz_get_ui(%s) & %s)", ChildInfo(0, valStr).c_str(), rangeMask(hi, lo).c_str());
     }
@@ -2208,13 +2176,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->insts.push_back(format("mpz_set_ui(%s, %s);", mpz.c_str(), computeInfo->valStr.c_str()));
           computeInfo->width = width;
         } else if (computeInfo->width <= BASIC_WIDTH) {
-          if (nodePtr->computeInfo->opNum > 0) {
-            std::string localName = newLocalTmp();
-            computeInfo->insts.push_back(format("uint128_t %s = %s;", localName.c_str(), computeInfo->valStr.c_str()));
-            computeInfo->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", mpz.c_str(), localName.c_str()));
-          } else {
-            computeInfo->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", mpz.c_str(), computeInfo->valStr.c_str()));
-          }
+          set256_tmp(computeInfo, computeInfo, mpz);
           computeInfo->width = width;
         }
         computeInfo->valStr = mpz;
@@ -2224,8 +2186,8 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
         /* do nothing */
       } else if (width <= 64) {
         computeInfo->valStr = format("mpz_get_ui(%s)", computeInfo->valStr.c_str());
-      } else if (width <= 128) {
-        computeInfo->valStr = get128(computeInfo->valStr);
+      } else if (width <= BASIC_WIDTH) {
+        computeInfo->valStr = get256(computeInfo->valStr, width);
       }
       if (computeInfo->width > width && width <= BASIC_WIDTH) {
         if (computeInfo->status == VAL_CONSTANT) {

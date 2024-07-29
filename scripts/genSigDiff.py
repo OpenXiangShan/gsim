@@ -43,6 +43,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
     for line in self.reffp.readlines():
       match = re.search(r'(uint[0-9]*_t)|mpz_t ', line)
       if match:
+        line = line.split(";")[0]
         line = line.strip(" ;\n")
         line = re.split(' |\[', line)
         all_sigs[line[1]] = 0
@@ -67,7 +68,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
         modName = "mod->" + line[2]
 
         if mod_width <= 64:
-          mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((__uint128_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
+          mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((uint256_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
 
           self.dstfp.writelines( \
           "if(display || (" + modName + " & " + mask + ") != (" + refName + " & " + mask + ")){\n" + \
@@ -77,7 +78,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
             (refName if mod_width <= 64 else "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName) + "<< std::endl;\n" + \
           "} \n")
         elif mod_width <= 128 and not sign:
-          mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((__uint128_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
+          mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((uint256_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
           self.dstfp.writelines( \
           "if(display || (" + modName + " & " + mask + ") != (" + refName + " & " + mask + ")){\n" + \
           "  ret = true;\n" + \
@@ -85,7 +86,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
           (modName if mod_width <= 64 else "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName) + " << \"  \" << +" + \
             (refName if not mod_width else "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName) + "<< std::endl;\n" + \
           "} \n")
-        elif mod_width > 128:
+        elif mod_width > 256:
           self.dstfp.writelines( \
           "if(display || mpz_cmp(" + modName + ", " + refName + ") != 0){\n" + \
           "  ret = true;\n" + \

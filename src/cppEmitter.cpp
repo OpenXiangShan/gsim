@@ -200,7 +200,11 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   fprintf(header, "#define unlikely(x) __builtin_expect(!!(x), 0)\n");
   fprintf(header, "#define uint128_t __uint128_t\n");
   fprintf(header, "#define int128_t __int128_t\n");
+  fprintf(header, "#define uint256_t unsigned _BitInt(256)\n");
+  fprintf(header, "#define int256_t _BitInt(256)\n");
   fprintf(header, "#define UINT128(hi, lo) ((uint128_t)(hi) << 64 | (lo))\n");
+  fprintf(header, "#define UINT256_3(_2, _1, _0) ((uint256_t)(_2) << 128 | (uint256_t)(_1) << 64 | (_0))\n");
+  fprintf(header, "#define UINT256_4(_3, _2, _1, _0) ((uint256_t)(_3) << 192 | UINT256_3(_2, _1, _0))\n");
   newLine(header);
   /* class start*/
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
@@ -609,7 +613,7 @@ void graph::nodeDisplay(FILE* fp, SuperNode* super) {
         bracket += "}\n";
       }
       std::string nameIdx = member->name + idxStr;
-      if (member->width > 128) {
+      if (member->width > BASIC_WIDTH) {
         fprintf(fp, "mpz_out_str(stdout, 16, %s);\n", nameIdx.c_str());
       } else if (member->width > 64) {
         fprintf(fp, "printf(\"%%lx|%%lx \", (uint64_t)(%s >> 64), (uint64_t(%s)));", nameIdx.c_str(), nameIdx.c_str());
@@ -618,11 +622,11 @@ void graph::nodeDisplay(FILE* fp, SuperNode* super) {
       }
       fprintf(fp, "\n%s", bracket.c_str());
       fprintf(fp, "printf(\"\\n\");\n");
-    } else if (member->width > 128) {
+    } else if (member->width > BASIC_WIDTH) {
       fprintf(fp, "printf(\"%%ld %d %s: \", cycles);\n", super->cppId, member->name.c_str());
       fprintf(fp, "mpz_out_str(stdout, 16, %s);\n", member->name.c_str());
       fprintf(fp, "printf(\"\\n\");\n");
-    } else if (member->width > 64 && member->width <= 128) {
+    } else if (member->width > 64 && member->width <= BASIC_WIDTH) {
       if (member->needActivate()) {// display old value and new value
         fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t(%s)));", super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
       } else if (member->type != NODE_SPECIAL) {
