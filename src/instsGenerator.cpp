@@ -202,10 +202,10 @@ static std::string get128(std::string name) {
 }
 static std::string get256(std::string name, int width) { // TODO: replace by getFromMpz
   if (width <= 128) return get128(name);
-  return format("((uint256_t)(mpz_size(%s) >= 4 ? mpz_getlimbn(%s, 3) : 0) << 192 | \
-                      (uint256_t)(mpz_size(%s) >= 3 ? mpz_getlimbn(%s, 2) : 0) << 128 | \
-                      (uint256_t)(mpz_size(%s) >= 2 ? mpz_getlimbn(%s, 1) : 0) << 64 | \
-                      (uint256_t)mpz_get_ui(%s))",
+  return format("((uint256_t)(mpz_size(%s) >= 4 ? mpz_getlimbn(%s, 3) : 0) << 192 | "
+                "(uint256_t)(mpz_size(%s) >= 3 ? mpz_getlimbn(%s, 2) : 0) << 128 | "
+                "(uint256_t)(mpz_size(%s) >= 2 ? mpz_getlimbn(%s, 1) : 0) << 64 | "
+                "(uint256_t)mpz_get_ui(%s))",
               name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str());
 }
 static std::string set256_tmp(valInfo* info, valInfo* parent, std::string str = "") {

@@ -199,7 +199,7 @@ NodeComponent* ENode::inferComponent(Node* n) {
       componentEMap[this] = ret;
       return ret;
     }
-    Assert(componentMap.find(node) != componentMap.end(), "%s is not visited", node->name.c_str());
+    Assert(componentMap.find(node) != componentMap.end(), "%s is not visited when infer %s %p", node->name.c_str(), n->name.c_str(), this);
     NodeComponent* ret = componentMap[node]->getbits(width-1, 0);
     if (!ret->fullValid()) {
       ret = new NodeComponent();
