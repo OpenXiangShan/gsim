@@ -723,7 +723,7 @@ void ExpTree::updateWithSplittedNode() {
 }
 
 int splitDelta(Node* node, int interval) {
-  if (interval >= BASIC_WIDTH) return 0;
+  if (interval >= 128) return 0;
   if (interval >= 64) return 2;
   if (interval >= 32) return 4;
   if (interval >= 16) return 8;
