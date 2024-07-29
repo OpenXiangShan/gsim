@@ -199,6 +199,12 @@ class Node {
     Assert(idx < (int)member.size(), "idx %d is out of bound [0, %ld)", idx, member.size());
     return member[idx];
   }
+  Node* get_port_clock() {
+    Assert(type == NODE_READER || type == NODE_WRITER, "invalid type %d in node %s", type, name.c_str());
+    if (type == NODE_READER) return get_member(READER_CLK);
+    else if (type == NODE_WRITER) return get_member(WRITER_CLK);
+    Panic();
+  }
   void set_parent(Node* _parent) {
     Assert(!parent, "parent in %s is already set", name.c_str());
     parent = _parent;

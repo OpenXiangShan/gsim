@@ -321,7 +321,7 @@ void ENode::updateWidth() {
   }
   width = usedBit;
 }
-
+/* add extention/bits for nodePtr when enode->width != nodePtr->width*/
 void ExpTree::updateWithNewWidth() {
   std::stack<std::pair<ENode*, ENode*>> s;
   s.push(std::make_pair(getRoot(), nullptr));

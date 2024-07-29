@@ -37,7 +37,8 @@
   std::string(node->width <= 8 ? "uint8_t" : \
             ((node->width <= 16 ? "uint16_t" : \
             ((node->width <= 32 ? "uint32_t" : \
-            (node->width <= 64 ? "uint64_t" : "uint128_t"))))))
+            (node->width <= 64 ? "uint64_t" : \
+            (node->width <= 128 ? "uint128_t" : "uint256_t")))))))
 
 #define Cast(width, sign)                     \
   ("(" + (sign ? widthSType(width) : widthUType(width)) + ")")
@@ -49,21 +50,24 @@
   std::string(width <= 8 ? "uint8_t" : \
             ((width <= 16 ? "uint16_t" : \
             ((width <= 32 ? "uint32_t" : \
-            (width <= 64 ? "uint64_t" : "uint128_t"))))))
+            (width <= 64 ? "uint64_t" : \
+            (width <= 128 ? "uint128_t" : "uint256_t")))))))
 
 #define widthSType(width) \
   std::string(width <= 8 ? "int8_t" : \
             ((width <= 16 ? "int16_t" : \
             ((width <= 32 ? "int32_t" : \
-            (width <= 64 ? "int64_t" : "int128_t"))))))
+            (width <= 64 ? "int64_t" : \
+            (width <= 128 ? "int128_t" : "int256_t")))))))
 
 #define widthBits(width) \
         (width <= 8 ? 8 : \
         ((width <= 16 ? 16 : \
         ((width <= 32 ? 32 : \
-        (width <= 64 ? 64 : 128))))))
+        (width <= 64 ? 64 : \
+        (width <= 128 ? 128 :256)))))))
 
-#define BASIC_WIDTH 128
+#define BASIC_WIDTH 256
 #define BASIC_TYPE __uint128_t
 #define uint128_t __uint128_t
 #define MAX_U8 0xff
