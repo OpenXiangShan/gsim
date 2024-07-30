@@ -134,6 +134,7 @@ void graph::constructRegs() {
   updateReg->superType = SUPER_SAVE_REG;
   sortedSuper.push_back(updateReg);
 #endif
+  std::map<SuperNode*, SuperNode*> dstSuper2updateSuper;
   for (Node* node : regsrc) {
     if (node->status != VALID_NODE) continue;
     if (node->regSplit) {
@@ -141,9 +142,16 @@ void graph::constructRegs() {
       node->regUpdate = nodeUpdate;
       nodeUpdate->regNext = node;
       nodeUpdate->assignTree.push_back(node->updateTree);
-      nodeUpdate->super = new SuperNode(nodeUpdate);
-      nodeUpdate->super->superType = SUPER_UPDATE_REG;
-      sortedSuper.push_back(nodeUpdate->super);
+      SuperNode* dstSuper = node->getDst()->super;
+      if (dstSuper2updateSuper.find(dstSuper) != dstSuper2updateSuper.end()) {
+        nodeUpdate->super = dstSuper2updateSuper[dstSuper];
+        dstSuper2updateSuper[dstSuper]->member.push_back(nodeUpdate);
+      } else {
+        nodeUpdate->super = new SuperNode(nodeUpdate);
+        nodeUpdate->super->superType = SUPER_UPDATE_REG;
+        sortedSuper.push_back(nodeUpdate->super);
+        dstSuper2updateSuper[dstSuper] = nodeUpdate->super;
+      }
       nodeUpdate->next.insert(node->next.begin(), node->next.end());
       nodeUpdate->isArrayMember = node->isArrayMember;
       nodeUpdate->updateConnect();
