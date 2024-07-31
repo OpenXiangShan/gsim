@@ -51,34 +51,38 @@ std::pair<int, uint64_t>clearIdxMask(int cppId) {
   return std::make_pair(id, mask);
 }
 
-uint64_t activeSet2bitMap(std::set<int>& activeId, std::map<int, uint64_t>& bitMapInfo, int curId) {
+std::pair<uint64_t, std::string> activeSet2bitMap(std::set<int>& activeId, std::map<uint64_t, std::pair<uint64_t, std::string>>& bitMapInfo, int curId) {
   uint64_t ret = 0;
+  std::string comment = "";
   for (int id : activeId) {
     int bitMapId;
     uint64_t bitMapMask;
     std::tie(bitMapId, bitMapMask) = setIdxMask(id);
     int num = 64 / ACTIVE_WIDTH;
     bool find = false;
-    if (curId >= 0 && id > curId && bitMapId == curId / ACTIVE_WIDTH) ret |= bitMapMask;
-    else {
+    if (curId >= 0 && id > curId && bitMapId == curId / ACTIVE_WIDTH) {
+      ret |= bitMapMask;
+      comment += " " + std::to_string(id);
+    } else {
       for (int i = 0; i < num; i ++) {
         int newId = bitMapId - i;
         if (bitMapInfo.find(newId) != bitMapInfo.end()) {
-          bitMapInfo[newId] |= bitMapMask << (i * ACTIVE_WIDTH);
+          bitMapInfo[newId].first |= bitMapMask << (i * ACTIVE_WIDTH);
+          bitMapInfo[newId].second += " " + std::to_string(id);
           find = true;
         }
       }
-      if (!find) bitMapInfo[bitMapId] = bitMapMask;
+      if (!find) bitMapInfo[bitMapId] = std::make_pair(bitMapMask, std::to_string(id));
     }
   }
-  return ret;
+  return std::make_pair(ret, comment);
 }
 
 std::string updateActiveStr(int idx, uint64_t mask) {
-  if (mask <= MAX_U8) return format("activeFlags[%d] |= 0x%lx;\n", idx, mask);
-  if (mask <= MAX_U16) return format("*(uint16_t*)&activeFlags[%d] |= 0x%lx;\n", idx, mask);
-  if (mask <= MAX_U32) return format("*(uint32_t*)&activeFlags[%d] |= 0x%lx;\n", idx, mask);
-  return format("*(uint64_t*)&activeFlags[%d] |= 0x%lx;\n", idx, mask);
+  if (mask <= MAX_U8) return format("activeFlags[%d] |= 0x%lx;", idx, mask);
+  if (mask <= MAX_U16) return format("*(uint16_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
+  if (mask <= MAX_U32) return format("*(uint32_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
+  return format("*(uint64_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
 }
 
 std::string strRepeat(std::string str, int times) {
@@ -507,11 +511,11 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
     fprintf(fp, "oldFlag = -1;\n");
   }
   else {
-    std::map<int, uint64_t> bitMapInfo;
-    uint64_t curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
-    if (curMask != 0) fprintf(fp, "oldFlag |= 0x%lx;\n", curMask);
+    std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
+    std::pair<uint64_t, std::string> curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
+    if (curMask.first != 0) fprintf(fp, "oldFlag |= 0x%lx; // %s\n", curMask.first, curMask.second.c_str());
     for (auto iter : bitMapInfo) {
-      fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
+      fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, iter.second.first).c_str(), iter.second.second.c_str());
     }
   #ifdef PERF
     for (int id : nextNodeId) {
@@ -525,11 +529,11 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
 }
 
 static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bool inStep) {
-  std::map<int, uint64_t> bitMapInfo;
-  uint64_t curMask = activeSet2bitMap(activateId, bitMapInfo, node->super->cppId);
-  if (curMask != 0) fprintf(fp, "oldFlag |= 0x%lx;\n", curMask);
+  std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
+  auto curMask = activeSet2bitMap(activateId, bitMapInfo, node->super->cppId);
+  if (curMask.first != 0) fprintf(fp, "oldFlag |= 0x%lx; // %s\n", curMask.first, curMask.second.c_str());
   for (auto iter : bitMapInfo) {
-    fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
+    fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, iter.second.first).c_str(), iter.second.second.c_str());
   }
 #ifdef PERF
   for (int id : activateId) {
@@ -700,10 +704,10 @@ void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
 
   if (allNext.size() > 100) fprintf(fp, "activateAll();\n");
   else {
-    std::map<int, uint64_t> bitMapInfo;
+    std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
     activeSet2bitMap(allNext, bitMapInfo, -1);
     for (auto iter : bitMapInfo) {
-      fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
+      fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, iter.second.first).c_str(), iter.second.second.c_str());
     }
   }
   for (size_t i = 0; i < super->member.size(); i ++) {
@@ -787,10 +791,10 @@ void graph::genMemWrite(FILE* fp) {
             fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
           }
         }
-        std::map<int, uint64_t> bitMapInfo;
+        std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
         activeSet2bitMap(readerNextId, bitMapInfo, -1);
         for (auto iter : bitMapInfo) {
-          fprintf(fp, "%s", updateActiveStr(iter.first, iter.second).c_str());
+          fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, iter.second.first).c_str(), iter.second.second.c_str());
         }
         fprintf(fp, "}\n");
 
