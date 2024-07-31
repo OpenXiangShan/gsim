@@ -134,6 +134,22 @@ bool memberValid(valInfo* info, size_t num) {
   }
   return ret;
 }
+/* 0 : not all constant; 1 : constant but not equal; 2: equal constant*/
+int memberConstant(valInfo* info) {
+  int ret = 2;
+  mpz_t val;
+  mpz_init(val);
+  bool isStart = true;
+  for (valInfo* member : info->memberInfo) {
+    if (member->status != VAL_CONSTANT) return 0; // not all constant
+    if (isStart) {
+      isStart = false;
+      mpz_set(val, member->consVal);
+    }
+    if (mpz_cmp(val, member->consVal) != 0) ret = 1;
+  }
+  return ret;
+}
 
 static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo) {
   std::string ret;
@@ -141,22 +157,45 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo) {
   int dimIdx = countArrayIndex(lvalue);
   for (size_t i = dimIdx; i < node->dimension.size(); i ++) num *= node->dimension[i];
   if (memberValid(rinfo, num)) {
-    for (int i = 0; i < num; i ++) {
-      valInfo* assignInfo = rinfo->getMemberInfo(i);
-      if (node->width > BASIC_WIDTH) {
-        if (assignInfo->status == VAL_CONSTANT) {
-          if (mpz_cmp_ui(assignInfo->consVal, MAX_U64) > 0) {
-            ret += format("mpz_set_str(%s%s, \"%s\", 16);\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), mpz_get_str(NULL, 16, assignInfo->consVal));
+    int consType = memberConstant(rinfo);
+    if (consType == 0 || consType == 1) {
+      for (int i = 0; i < num; i ++) {
+        valInfo* assignInfo = rinfo->getMemberInfo(i);
+        if (node->width > BASIC_WIDTH) {
+          if (assignInfo->status == VAL_CONSTANT) {
+            if (mpz_cmp_ui(assignInfo->consVal, MAX_U64) > 0) {
+              ret += format("mpz_set_str(%s%s, \"%s\", 16);\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), mpz_get_str(NULL, 16, assignInfo->consVal));
+            } else {
+              ret += format("mpz_set_ui(%s%s, %s);\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
+            }
           } else {
-            ret += format("mpz_set_ui(%s%s, %s);\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
+            ret += format("mpz_set(%s%s, %s);\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
           }
         } else {
-          ret += format("mpz_set(%s%s, %s);\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
+          ret += format("%s%s = %s;\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
         }
-      } else {
-        ret += format("%s%s = %s;\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
       }
-    }
+    } else if (consType == 2) {
+      if(node->width <= BASIC_WIDTH && mpz_sgn(rinfo->memberInfo[0]->consVal) == 0) {
+        ret = format("memset(%s, 0, sizeof(%s));", lvalue.c_str(), lvalue.c_str());
+      } else {
+        std::string idxStr, bracket;
+        for (int i = 0; i < node->dimension.size() - dimIdx; i ++) {
+          ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i + dimIdx], i);
+          idxStr += "[i" + std::to_string(i) + "]";
+          bracket += "}\n";
+        }
+        if (node->width > BASIC_WIDTH) {
+          if (mpz_cmp_ui(rinfo->memberInfo[0]->consVal, MAX_U64) <= 0)
+            ret += format("mpz_set_ui(%s%s, 0x%s);\n", lvalue.c_str(), idxStr.c_str(), rinfo->memberInfo[0]->valStr.c_str());
+          else
+            TODO();
+        } else { // not mpz
+          ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->memberInfo[0]->valStr.c_str());
+        }
+        ret += bracket;
+      }
+    } else Panic();
 
   } else {
     std::string idxStr, bracket;
