@@ -153,7 +153,6 @@ class Node {
 
 /* used in cppEmitter */
   std::set<int> nextActiveId;
-  std::set<int> regActivate;
 
   std::vector<std::string> insts;
   std::vector<std::string> resetInsts;
@@ -260,7 +259,6 @@ class Node {
   ENode* isAlias();
   bool anyExtEdge();
   bool needActivate();
-  bool regNeedActivate();
   void updateActivate();
   void removeConnection();
   void allocArrayVal();

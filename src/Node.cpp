@@ -214,10 +214,6 @@ bool Node::needActivate() {
   return nextActiveId.size() != 0;
 }
 
-bool Node::regNeedActivate() {
-  return regActivate.size() != 0;
-}
-
 void Node::updateActivate() {
   if (isReset()) nextActiveId.insert(ACTIVATE_ALL);
   for (Node* nextNode : next) {
@@ -228,10 +224,6 @@ void Node::updateActivate() {
       if (super->cppId != -1)
         nextActiveId.insert(super->cppId);
     }
-    if (nextNode->super->cppId != -1) regActivate.insert(nextNode->super->cppId);
-  }
-  if (type == NODE_REG_DST) {
-    regActivate.insert(getSrc()->nextActiveId.begin(), getSrc()->nextActiveId.end());
   }
   if (type == NODE_REG_DST && !regSplit) {
     for (Node* nextNode : getSrc()->next) {
