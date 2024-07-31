@@ -11,24 +11,33 @@ void graph::mergeAsyncReset() {
   std::map<Node*, SuperNode*> resetMap;
   for (int i = 0; i < sortedSuper.size(); i++) {
     for (Node* member: sortedSuper[i]->member) {
-      if (member->type == NODE_REG_SRC && member->reset == ASYRESET && member->prev.size() == 1) {
-        /* if resetVal is constant (using prev.size() == 1, TODO: optimize) */
-        if (member->super->member.size() != 1) member->super->display();
-        Assert(member->super->member.size() == 1, "super already merged %s id %d (size = %ld)", member->name.c_str(), member->super->id, member->super->member.size());
-        Node* prev = *(member->prev.begin());
-        prev->setAsyncReset();
-        SuperNode* resetSuper;
-        if (resetMap.find(prev) == resetMap.end()) {
-          resetSuper = member->super;
-          resetSuper->superType = SUPER_ASYNC_RESET;
-          resetSuper->resetNode = prev;
-          resetMap[prev] = resetSuper;
-        } else {
-          resetSuper = resetMap[prev];
-          member->super = resetSuper;
-          resetSuper->member.push_back(member);
-          sortedSuper[i]->member.clear();
-        }
+      if (member->type != NODE_REG_SRC || member->reset != ASYRESET) continue;
+      if (member->assignTree.size() != 1) continue;
+      Assert(member->assignTree[0]->getRoot()->opType == OP_RESET, "reset not found %s", member->name.c_str());
+      std::set<Node*> resetNoeds;
+      getENodeRelyNodes(member->assignTree[0]->getRoot()->getChild(0), resetNoeds);
+      Assert(resetNoeds.size() == 1, "multiple reset %s", member->name.c_str());
+      bool resetConstant = true;
+      for (Node* prev : member->prev) {
+        if (resetNoeds.find(prev) == resetNoeds.end() && prev->status != CONSTANT_NODE) resetConstant = false;
+      }
+      if (!resetConstant) continue;
+      /* if resetVal is constant (using prev.size() == 1, TODO: optimize) */
+      if (member->super->member.size() != 1) member->super->display();
+      Assert(member->super->member.size() == 1, "super already merged %s id %d (size = %ld)", member->name.c_str(), member->super->id, member->super->member.size());
+      Node* resetNode = *(resetNoeds.begin());
+      resetNode->setAsyncReset();
+      SuperNode* resetSuper;
+      if (resetMap.find(resetNode) == resetMap.end()) {
+        resetSuper = member->super;
+        resetSuper->superType = SUPER_ASYNC_RESET;
+        resetSuper->resetNode = resetNode;
+        resetMap[resetNode] = resetSuper;
+      } else {
+        resetSuper = resetMap[resetNode];
+        member->super = resetSuper;
+        resetSuper->member.push_back(member);
+        sortedSuper[i]->member.clear();
       }
     }
   }
