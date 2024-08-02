@@ -79,7 +79,6 @@ void graph::replicationOpt() {
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       int op = member->repOpCount();
-      printf("node %s op %d next %ld status %d\n", member->name.c_str(), op, member->next.size(), member->status);
       int threadHold = super->member.size() == 1 ? 3 : 0;
       if (mustNodes.find(member) != mustNodes.end() || op < 0 || op * member->next.size() >= threadHold || !member->anyExtEdge()) {
         opNum[member] = -1; // mark node is valid
