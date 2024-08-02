@@ -1616,7 +1616,6 @@ valInfo* ENode::instsPad(Node* node, std::string lvalue, bool isRoot) {
         computeInfo->valStr = ChildInfo(0, valStr);
         computeInfo->opNum = ChildInfo(0, opNum);
       }
-      computeInfo->fullyUpdated = ChildInfo(0, fullyUpdated);
     }
     return computeInfo;
   }
