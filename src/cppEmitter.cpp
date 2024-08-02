@@ -693,7 +693,8 @@ void graph::genActivate(FILE* fp) {
 }
 
 void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
-  fprintf(fp, "if(unlikely(%s)) {\n", super->resetNode->type == NODE_REG_SRC ? RESET_NAME(super->resetNode).c_str() : super->resetNode->name.c_str());
+  std::string resetName = super->resetNode->type == NODE_REG_SRC ? RESET_NAME(super->resetNode).c_str() : super->resetNode->name.c_str();
+  fprintf(fp, "if(unlikely(%s)) {\n", resetName.c_str());
   std::set<int> allNext;
   for (size_t i = 0; i < super->member.size(); i ++) {
     Node* node = super->member[i];
@@ -718,6 +719,7 @@ void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
   for (size_t i = 0; i < super->member.size(); i ++) {
     for (std::string str : isUIntReset ? super->member[i]->resetInsts : super->member[i]->insts) {
       str = strReplace(str, ASSIGN_LABLE, "");
+      str = strReplace(str, format("if(%s)", resetName.c_str()), "");
       if (super->resetNode->type == NODE_REG_SRC)
         fprintf(fp, "%s\n", strReplace(str, "(" + super->resetNode->name + ")", "(" + RESET_NAME(super->resetNode) + ")").c_str());
       else fprintf(fp, "%s\n", str.c_str());
