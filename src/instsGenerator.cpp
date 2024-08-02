@@ -1282,7 +1282,11 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = upperCast(width, ChildInfo(1, width), ChildInfo(1, sign)) + ChildInfo(1, valStr);
       ret->opNum = ChildInfo(1, opNum) + 1;
     } else {
-      ret->valStr = "(" + hi + " | " + ChildInfo(1, valStr) + ")";
+      if (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0) {
+        ret->valStr = hi;
+      } else {
+        ret->valStr = "(" + hi + " | " + ChildInfo(1, valStr) + ")";
+      }
       ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     }
   } else if (childBasic && !enodeBasic) { // child <= BASIC_WIDTH, cur > BASIC_WIDTH
