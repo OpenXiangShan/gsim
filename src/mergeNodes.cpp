@@ -50,7 +50,7 @@ void graph::mergeUIntReset() {
   for (Node* reg : regsrc) {
     if (reg->reset != UINTRESET) continue;
     std::set<Node*> prev;
-    if (reg->resetTree->getRoot()->opType == OP_WHEN) {
+    if (reg->resetTree->getRoot()->opType == OP_RESET) {
       getENodeRelyNodes(reg->resetTree->getRoot()->getChild(0), prev);
     } else {
       Panic();

@@ -193,10 +193,9 @@ void Node::addUpdateTree() {
   dstENode->width = width;
   updateTree = new ExpTree(dstENode, this);
   if (resetCond->getRoot()->reset == UINTRESET) {
-    ENode* whenNode = new ENode(OP_WHEN);
+    ENode* whenNode = new ENode(OP_RESET);
     whenNode->addChild(resetCond->getRoot());
     whenNode->addChild(resetVal->getRoot());
-    whenNode->addChild(nullptr);
     resetTree = new ExpTree(whenNode, this);
   }
 }
