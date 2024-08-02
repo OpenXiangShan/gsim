@@ -22,6 +22,7 @@ public:
   bool sameConstant = false;
   mpz_t assignmentCons;
   bool fullyUpdated = true;
+  bool directUpdate = true;
 
   valInfo(int _width = 0, bool _sign = 0) {
     mpz_init(consVal);

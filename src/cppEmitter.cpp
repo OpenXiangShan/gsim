@@ -180,7 +180,7 @@ void graph::genNodeInit(FILE* fp, Node* node) {
     }
 #endif
   }
-  for (std::string inst : node->initInsts) fprintf(fp, "%s\n", inst.c_str());
+  for (std::string inst : node->initInsts) fprintf(fp, "%s\n", strReplace(inst, ASSIGN_LABLE, "").c_str());
 }
 
 FILE* graph::genHeaderStart(std::string headerFile) {
@@ -529,6 +529,7 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
 }
 
 static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bool inStep) {
+  if (!node->fullyUpdated) fprintf(fp, "if (%s) {\n", ASSIGN_INDI(node).c_str());
   std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
   auto curMask = activeSet2bitMap(activateId, bitMapInfo, node->super->cppId);
   if (curMask.first != 0) fprintf(fp, "oldFlag |= 0x%lx; // %s\n", curMask.first, curMask.second.c_str());
@@ -542,6 +543,7 @@ static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bo
   }
   if (inStep) fprintf(fp, "isActivateValid = true;\n");
 #endif
+  if (!node->fullyUpdated) fprintf(fp, "}\n");
 }
 
 void graph::genNodeInsts(FILE* fp, Node* node) {
@@ -551,6 +553,8 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
     if (node->status == VALID_NODE && node->type == NODE_OTHERS && !node->needActivate() && node->width <= BASIC_WIDTH && !node->isArrayMember && !node->isArray()) {
       fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), node->name.c_str());
     }
+    if (node->isArray() && !node->fullyUpdated) fprintf(fp, "bool %s = false;\n", ASSIGN_INDI(node).c_str());
+    if (node->isArray()) printf("node %s fullyUpdated %d\n", node->name.c_str(), node->fullyUpdated);
     std::vector<std::string> newInsts(node->insts);
     /* save oldVal */
     if (node->needActivate() && !node->isArray()) {
@@ -577,12 +581,13 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
       }
     }
     /* display all insts */
+    std::string indiStr = node->fullyUpdated || !node->isArray() ? "" : format("\n%s = true;\n", ASSIGN_INDI(node).c_str());
     for (std::string inst : newInsts) {
-      fprintf(fp, "%s\n", inst.c_str());
+      fprintf(fp, "%s\n", strReplace(inst, ASSIGN_LABLE, indiStr).c_str());
     }
   }
   if (!node->needActivate()) ;
-  else if(node->dimension.size() == 0 || node->arrayEntryNum() == 1) activateNext(fp, node, node->nextActiveId, newName(node), true);
+  else if(!node->isArray()) activateNext(fp, node, node->nextActiveId, newName(node), true);
   else activateUncondNext(fp, node, node->nextActiveId, true);
 }
 
@@ -712,6 +717,7 @@ void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
   }
   for (size_t i = 0; i < super->member.size(); i ++) {
     for (std::string str : isUIntReset ? super->member[i]->resetInsts : super->member[i]->insts) {
+      str = strReplace(str, ASSIGN_LABLE, "");
       if (super->resetNode->type == NODE_REG_SRC)
         fprintf(fp, "%s\n", strReplace(str, "(" + super->resetNode->name + ")", "(" + RESET_NAME(super->resetNode) + ")").c_str());
       else fprintf(fp, "%s\n", str.c_str());

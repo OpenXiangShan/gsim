@@ -542,8 +542,13 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     falseStr = falseInst + falseStr;
     getChild(2)->computeInfo->insts.clear();
   }
+  if (node->isArray()) {
+    if (getChild(1) && ChildInfo(1, directUpdate)) trueStr += ASSIGN_LABLE;
+    if (getChild(2) && ChildInfo(2, directUpdate)) falseStr += ASSIGN_LABLE;
+  }
   ret->valStr = format("if(%s) { %s } else { %s }", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
   ret->opNum = -1;
+  ret->directUpdate = false;
   if (trueStr.length() == 0 || falseStr.length() == 0 || !ChildInfo(1, fullyUpdated) || !ChildInfo(2, fullyUpdated)) ret->fullyUpdated = false;
 
   if (!getChild(1) && getChild(2)) {
@@ -610,8 +615,10 @@ valInfo* ENode::instsStmt(Node* node, std::string lvalue, bool isRoot) {
   }
   for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
   bool updated = false;
+  bool direct = false;
   for (ENode* childENode : child) {
     updated |= childENode->computeInfo->fullyUpdated;
+    direct |= childENode->computeInfo->directUpdate;
     if (childENode->computeInfo->status == VAL_INVALID || childENode->computeInfo->status == VAL_EMPTY) continue;
     else if (childENode->computeInfo->opNum < 0) {
       computeInfo->valStr += childENode->computeInfo->valStr;
@@ -630,6 +637,7 @@ valInfo* ENode::instsStmt(Node* node, std::string lvalue, bool isRoot) {
   }
   computeInfo->opNum = -1;
   computeInfo->fullyUpdated = updated;
+  computeInfo->directUpdate = direct;
   return computeInfo;
 }
 
@@ -2107,7 +2115,8 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
       ret = format("%s = %s;", lvalue.c_str(), resetVal->valStr.c_str());
     }
   }
-  computeInfo->valStr = format("if(%s) { %s }", ChildInfo(0, valStr).c_str(), ret.c_str());
+
+  computeInfo->valStr = format("if(%s) { %s %s }", ChildInfo(0, valStr).c_str(), ret.c_str(), ASSIGN_LABLE.c_str());
   computeInfo->fullyUpdated = false;
   computeInfo->opNum = -1;
   return computeInfo;
@@ -2594,6 +2603,16 @@ valInfo* Node::computeArray() {
         TODO();
       }
   }
+  bool updated = false;
+  for (size_t i = 0; i < assignTree.size(); i ++) {
+    if (assignTree[i]->getRoot()->computeInfo->fullyUpdated) {
+      updated = true;
+      break;
+    }
+  }
+  for (ExpTree* tree : arrayVal) updated |= tree->getRoot()->computeInfo->fullyUpdated;
+  fullyUpdated = updated;
+
   if (!anyVarIdx) {
     int num = arrayEntryNum();
     computeInfo->memberInfo.resize(num, nullptr);

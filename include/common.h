@@ -121,7 +121,8 @@ std::string arrayMemberName(Node* node, std::string suffix);
 #define newBasic(node) (node->isArrayMember ? arrayMemberName(node, "new") : (node->name + "$new"))
 #define newMpz(node) std::string("newValMpz")
 #define newName(node) (node->width > BASIC_WIDTH ? newMpz(node) : newBasic(node))
-
+#define ASSIGN_LABLE std::string("ASSIGN$$$LABEL")
+#define ASSIGN_INDI(node) (node->name + "$$UPDATE")
 #include "opFuncs.h"
 #include "debug.h"
 #include "Node.h"
