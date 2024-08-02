@@ -1010,15 +1010,29 @@ valInfo* Node::computeConstant() {
 }
 
 bool isConsZero(ENode* enode) {
+  if (!enode) return false;
   if (consEMap.find(enode) == consEMap.end()) return false;
   if (consEMap[enode]->status != VAL_CONSTANT) return false;
   if (mpz_sgn(consEMap[enode]->consVal) == 0) return true;
   return false;
 }
 
+bool isConsNoZero(ENode* enode) {
+  if (!enode) return false;
+  if (consEMap.find(enode) == consEMap.end()) return false;
+  if (consEMap[enode]->status != VAL_CONSTANT) return false;
+  if (mpz_sgn(consEMap[enode]->consVal) != 0) return true;
+  return false;
+}
+
 void ExpTree::updateNewChild(ENode* parent, ENode* child, int idx) {
   if (parent) parent->child[idx] = child;
   else setRoot(child);
+}
+
+static bool enodeConstant(ENode* enode) {
+  if (!enode) return false;
+  return consEMap.find(enode) != consEMap.end() && consEMap[enode]->status == VAL_CONSTANT;
 }
 
 void ExpTree::removeConstant() {
@@ -1035,7 +1049,7 @@ void ExpTree::removeConstant() {
     s.pop();
     bool remove = false;
     Assert(parent || consEMap.find(top) == consEMap.end() || consEMap[top]->status != VAL_CONSTANT, "constant not removed");
-    if (consEMap.find(top) != consEMap.end() && consEMap[top]->status == VAL_CONSTANT) {
+    if (enodeConstant(top)) {
       if (parent && parent->opType == OP_INDEX) {
           Assert(parent->child.size() == 1, "opIndex with child %ld\n", top->child.size());
           parent->opType = OP_INDEX_INT;
@@ -1048,11 +1062,13 @@ void ExpTree::removeConstant() {
         top->child.clear();
         top->strVal = mpz_get_str(NULL, 10, consEMap[top]->consVal);
       }
-    } else if ((top->opType == OP_MUX || top->opType == OP_WHEN) &&
-          consEMap.find(top->getChild(0)) != consEMap.end() && consEMap[top->getChild(0)]->status == VAL_CONSTANT) {
+    } else if ((top->opType == OP_MUX || top->opType == OP_WHEN) && enodeConstant(top->getChild(0))) {
       valInfo* info = consEMap[top->getChild(0)];
-      if (mpz_cmp_ui(info->consVal, 0) == 0) updateNewChild(parent, top->getChild(2), idx);//parent->child[idx] = top->getChild(2);
+      if (mpz_cmp_ui(info->consVal, 0) == 0) updateNewChild(parent, top->getChild(2), idx);
       else updateNewChild(parent, top->getChild(1), idx);
+      remove = true;
+    } else if ((top->opType == OP_MUX || top->opType == OP_WHEN) && top->width == 1 && isConsNoZero(top->getChild(1)) && isConsZero(top->getChild(2))) {
+      updateNewChild(parent, top->getChild(0), idx);
       remove = true;
     } else if (top->opType == OP_OR && (isConsZero(top->getChild(0)) || isConsZero(top->getChild(1)))) {
       if (isConsZero(top->getChild(0))) {
