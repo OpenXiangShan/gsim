@@ -90,6 +90,7 @@ class graph {
   void splitNodes();
   void replicationOpt();
   void exprOpt();
+  void patternDetect();
   void dump(std::string FileName);
 };
 

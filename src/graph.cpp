@@ -33,6 +33,7 @@ void graph::removeNodesNoConnect(NodeStatus status) {
       super->member.end()
     );
   }
+  removeEmptySuper();
 }
 
 size_t graph::countNodes() {

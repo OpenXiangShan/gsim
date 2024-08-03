@@ -119,6 +119,8 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->aliasAnalysis(), "AliasAnalysis");
 
+  FUNC_WRAPPER(g->patternDetect(), "PatternDetect");
+
   FUNC_WRAPPER(g->commonExpr(), "CommonExpr");
 
   FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
