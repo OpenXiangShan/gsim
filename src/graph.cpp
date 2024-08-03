@@ -53,7 +53,3 @@ void graph::removeEmptySuper() {
     sortedSuper.end()
   );
 }
-
-bool graph::inSrc(SuperNode* super) {
-  return supersrc.find(super) != supersrc.end();
-}
