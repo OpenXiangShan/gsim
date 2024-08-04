@@ -15,7 +15,6 @@ public:
   int width = 0;
   bool sign = 0;
   int consLength = 0;
-  Node* splittedArray = nullptr;
   int beg = -1;
   int end = -1;
   std::vector<valInfo*> memberInfo;

@@ -461,33 +461,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
       if (isStmt) return expr;
       if (expr.length() == 0 || expr == lvalue) return std::string("");
-      else if (isSubArray(lvalue, node)) {
-        if (info->splittedArray) {
-          std::string ret;
-          int num = info->end - info->beg + 1;
-          std::vector<std::string>suffix(num);
-          int pairNum = 1;
-          for (size_t i = countArrayIndex(lvalue); i < node->dimension.size(); i ++) {
-            int suffixIdx = 0;
-            for (int l = 0; l < pairNum; l ++) {
-              for (int j = 0; j < node->dimension[i]; j ++) {
-                int suffixNum = num / node->dimension[i];
-                for (int k = 0; k < suffixNum; k ++) suffix[suffixIdx ++] += "[" + std::to_string(j) + "]";
-              }
-            }
-            num = num / node->dimension[i];
-            pairNum *= node->dimension[i];
-          }
-          for (int i = info->beg; i <= info->end; i ++) ret += format("%s%s = %s;\n", lvalue.c_str(), suffix[i - info->beg].c_str(), info->splittedArray->arrayMember[i]->compute()->valStr.c_str());
-          return ret;
-        }
-        else {
-          if (info->status == VAL_CONSTANT)
-            return format("memset(%s, %s, sizeof(%s));", lvalue.c_str(), expr.c_str(), lvalue.c_str());
-          else
-            return arrayCopy(lvalue, node, info);
-        }
-      }
+      else if (isSubArray(lvalue, node)) return arrayCopy(lvalue, node, info);
       else if (node->width < width) return format("%s = (%s & %s);", lvalue.c_str(), expr.c_str(), bitMask(node->width).c_str());
       else if (node->sign && node->width != width) return format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), expr.c_str());
       return lvalue + " = " + expr + ";";
@@ -2151,7 +2125,6 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->width = nodePtr->width;
           computeInfo->sign = nodePtr->sign;
           computeInfo->valStr = nodePtr->name;
-          computeInfo->splittedArray = nodePtr;
           for (ENode* childENode : child)
             computeInfo->valStr += childENode->computeInfo->valStr;
           if (!IS_INVALID_LVALUE(lvalue)) {

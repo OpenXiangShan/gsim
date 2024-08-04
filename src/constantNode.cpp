@@ -592,7 +592,6 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
           ret->end = end;
           ret->width = nodePtr->width;
           ret->sign = nodePtr->sign;
-          ret->splittedArray = nodePtr;
           if (ret->beg >= 0) {
             for (int i = ret->beg; i <= ret->end; i ++) {
               Node* member = nodePtr->getArrayMember(i);
