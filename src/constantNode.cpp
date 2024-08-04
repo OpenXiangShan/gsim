@@ -207,6 +207,8 @@ valInfo* ENode::consLt(bool isLvalue) {
   if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
     us_lt(ret->consVal, ChildCons(0, consVal), ChildCons(0, width), ChildCons(1, consVal), ChildCons(1, width));
     ret->setConsStr();
+  } else if (!Child(0, sign) && ChildCons(1, status) == VAL_CONSTANT && mpz_sgn(ChildCons(1, consVal)) == 0) {
+    ret->setConstantByStr("0");
   }
   return ret;
 }
