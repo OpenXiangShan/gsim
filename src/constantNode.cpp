@@ -119,9 +119,10 @@ valInfo* ENode::consWhen(Node* node, bool isLvalue) {
     consInfo->status = VAL_EMPTY;
     return consInfo;
   }
+
   valInfo* ret = new valInfo(width, sign);
 
-  if (!getChild(1) && getChild(2)) {
+  if ((!getChild(1) || ChildCons(1, status) == VAL_EMPTY) && getChild(2)) {
     if (ChildCons(2, sameConstant)) {
       ret->sameConstant = true;
       mpz_set(ret->assignmentCons, ChildCons(2, assignmentCons));
@@ -138,7 +139,7 @@ valInfo* ENode::consWhen(Node* node, bool isLvalue) {
         }
       }
     }
-  } else if (getChild(1) && !getChild(2)) {
+  } else if (getChild(1) && (!getChild(2) || ChildCons(2, status) == VAL_EMPTY)) {
     if (ChildCons(1, sameConstant)) {
       ret->sameConstant = true;
       mpz_set(ret->assignmentCons, ChildCons(1, assignmentCons));
@@ -562,6 +563,7 @@ valInfo* ENode::consReset(bool isLvalue) {
       ret = consEMap[getChild(1)];
     }
   }
+  ret->sameConstant = consEMap[getChild(1)]->sameConstant;
   return ret;
 }
 

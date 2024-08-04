@@ -551,7 +551,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   ret->directUpdate = false;
   if (trueStr.length() == 0 || falseStr.length() == 0 || !ChildInfo(1, fullyUpdated) || !ChildInfo(2, fullyUpdated)) ret->fullyUpdated = false;
 
-  if (!getChild(1) && getChild(2)) {
+  if ((!getChild(1) || ChildInfo(1, status) == VAL_EMPTY) && getChild(2)) {
     if (ChildInfo(2, sameConstant)) {
       ret->sameConstant = true;
       mpz_set(ret->assignmentCons, ChildInfo(2, assignmentCons));
@@ -568,7 +568,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
         }
       }
     }
-  } else if (getChild(1) && !getChild(2)) {
+  } else if (getChild(1) && (!getChild(2) || ChildInfo(2, status) == VAL_EMPTY)) {
     if (ChildInfo(1, sameConstant)) {
       ret->sameConstant = true;
       mpz_set(ret->assignmentCons, ChildInfo(1, assignmentCons));
@@ -2122,6 +2122,7 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
   computeInfo->valStr = format("if(%s) { %s %s }", ChildInfo(0, valStr).c_str(), ret.c_str(), ASSIGN_LABLE.c_str());
   computeInfo->fullyUpdated = false;
   computeInfo->opNum = -1;
+  computeInfo->sameConstant = resetVal->sameConstant;
   return computeInfo;
 }
 
