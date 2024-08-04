@@ -1027,6 +1027,14 @@ bool isConsNoZero(ENode* enode) {
   return false;
 }
 
+ENode* whenChildInvalid(ENode* enode) {
+  if (!enode->getChild(1) || !enode->getChild(2)) return nullptr;
+  if (consEMap.find(enode->getChild(1)) == consEMap.end() || consEMap.find(enode->getChild(2)) == consEMap.end()) return nullptr;
+  if(consEMap[enode->getChild(1)]->status == VAL_INVALID) return enode->getChild(2);
+  if(consEMap[enode->getChild(2)]->status == VAL_INVALID) return enode->getChild(1);
+  return nullptr;
+}
+
 void ExpTree::updateNewChild(ENode* parent, ENode* child, int idx) {
   if (parent) parent->child[idx] = child;
   else setRoot(child);
@@ -1050,6 +1058,7 @@ void ExpTree::removeConstant() {
     std::tie(top, parent, idx) = s.top();
     s.pop();
     bool remove = false;
+    ENode* enodePtr = nullptr;
     Assert(parent || consEMap.find(top) == consEMap.end() || consEMap[top]->status != VAL_CONSTANT, "constant not removed");
     if (enodeConstant(top)) {
       if (parent && parent->opType == OP_INDEX) {
@@ -1068,6 +1077,9 @@ void ExpTree::removeConstant() {
       valInfo* info = consEMap[top->getChild(0)];
       if (mpz_cmp_ui(info->consVal, 0) == 0) updateNewChild(parent, top->getChild(2), idx);
       else updateNewChild(parent, top->getChild(1), idx);
+      remove = true;
+    } else if (top->opType == OP_WHEN && (enodePtr = whenChildInvalid(top))) {
+      updateNewChild(parent, enodePtr, idx);
       remove = true;
     } else if ((top->opType == OP_MUX || top->opType == OP_WHEN) && top->width == 1 && isConsNoZero(top->getChild(1)) && isConsZero(top->getChild(2))) {
       updateNewChild(parent, top->getChild(0), idx);
