@@ -554,7 +554,6 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
       fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), node->name.c_str());
     }
     if (node->isArray() && !node->fullyUpdated) fprintf(fp, "bool %s = false;\n", ASSIGN_INDI(node).c_str());
-    if (node->isArray()) printf("node %s fullyUpdated %d\n", node->name.c_str(), node->fullyUpdated);
     std::vector<std::string> newInsts(node->insts);
     /* save oldVal */
     if (node->needActivate() && !node->isArray()) {
@@ -945,4 +944,5 @@ void graph::cppEmitter() {
 #ifdef DIFFTEST_PER_SIG
   fclose(sigFile);
 #endif
+  printf("[cppEmitter] define %ld nodes\n", definedNode.size());
 }
