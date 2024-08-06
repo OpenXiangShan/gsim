@@ -346,7 +346,7 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
   bool childBasic = ChildInfo(1, width) <= BASIC_WIDTH && ChildInfo(2, width) <= BASIC_WIDTH;
   bool enodeBasic = width <= BASIC_WIDTH;
   valInfo* ret = computeInfo;
-  ret->opNum = ChildInfo(1, opNum) + ChildInfo(2, opNum) + 1;
+  ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + ChildInfo(2, opNum) + 1;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
   if (childBasic && enodeBasic) {
