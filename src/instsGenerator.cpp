@@ -35,6 +35,8 @@ static std::stack<std::pair<int*, int*>> tmpStack;
 
 std::set<std::pair<int, int>> allMask;
 
+static int stmtDepth = 0;
+
 static std::string addMask(int width) {
   allMask.insert(std::make_pair(width-1, 0));
   return format("MPZ_MASK$%d_%d", width-1, 0);
@@ -456,6 +458,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
 
   ret->mergeInsts(getChild(0)->computeInfo);
 
+  bool toMux = false;
   std::string condStr, trueStr, falseStr;
   if (childBasic && enodeBasic) {
     auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
@@ -466,10 +469,25 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       else if (node->sign && node->width != width) return format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), expr.c_str());
       return lvalue + " = " + expr + ";";
     };
-    condStr = ChildInfo(0, valStr);
-    trueStr = ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ?
-                  assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "");
-    falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "");
+    if (!isSubArray(lvalue, node) && node->assignTree.size() == 1 && stmtDepth == 0 && isRoot) {
+      if (!getChild(1) && getChild(2) && ChildInfo(2, opNum) >= 0 && ChildInfo(2, opNum) < 1 && ChildInfo(2, insts).size() == 0) {
+        toMux = true;
+        condStr = ChildInfo(0, valStr);
+        trueStr = lvalue;
+        falseStr = ChildInfo(2, valStr);
+      } else if (!getChild(2) && getChild(1) && ChildInfo(1, opNum) >= 0 && ChildInfo(1, opNum) < 1 && ChildInfo(1, insts).size() == 0) {
+        toMux = true;
+        condStr = ChildInfo(0, valStr);
+        trueStr = ChildInfo(1, valStr);
+        falseStr = lvalue;
+      }
+    }
+    if (!toMux) {
+      condStr = ChildInfo(0, valStr);
+      trueStr = ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ?
+                    assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "");
+      falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "");
+    }
 
   } else if (!childBasic && !enodeBasic) { // can merge into childBasic && enodeBasic
     auto assignmentMpz = [lvalue, node, ret](bool isStmt, std::string expr, int width, bool sign, valInfo* info, ENode* child) {
@@ -504,27 +522,33 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   } else {
     TODO();
   }
-  if (getChild(1)) {
-    std::string trueInst;
-    for (std::string str : getChild(1)->computeInfo->insts) trueInst += str;
-    trueStr = trueInst + trueStr;
-    getChild(1)->computeInfo->insts.clear();
+  if (toMux) {
+    ret->valStr = format(" (%s ? %s : %s)", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
+    ret->opNum = ChildInfo(0, opNum) + (getChild(1) ? ChildInfo(1, opNum) : 0) + (getChild(2) ? ChildInfo(2, opNum) : 0) + 1;
+  } else {
+    if (getChild(1)) {
+      std::string trueInst;
+      for (std::string str : getChild(1)->computeInfo->insts) trueInst += str;
+      trueStr = trueInst + trueStr;
+      getChild(1)->computeInfo->insts.clear();
+    }
+    if (getChild(2)) {
+      std::string falseInst;
+      for (std::string str : getChild(2)->computeInfo->insts) falseInst += str;
+      falseStr = falseInst + falseStr;
+      getChild(2)->computeInfo->insts.clear();
+    }
+    if (node->isArray()) {
+      if (getChild(1) && ChildInfo(1, directUpdate)) trueStr += ASSIGN_LABLE;
+      if (getChild(2) && ChildInfo(2, directUpdate)) falseStr += ASSIGN_LABLE;
+    }
+    ret->valStr = format("if(%s) { %s } else { %s }", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
+    ret->opNum = -1;
+    ret->directUpdate = false;
+    if (trueStr.length() == 0 || falseStr.length() == 0 || !ChildInfo(1, fullyUpdated) || !ChildInfo(2, fullyUpdated)) ret->fullyUpdated = false;
   }
-  if (getChild(2)) {
-    std::string falseInst;
-    for (std::string str : getChild(2)->computeInfo->insts) falseInst += str;
-    falseStr = falseInst + falseStr;
-    getChild(2)->computeInfo->insts.clear();
-  }
-  if (node->isArray()) {
-    if (getChild(1) && ChildInfo(1, directUpdate)) trueStr += ASSIGN_LABLE;
-    if (getChild(2) && ChildInfo(2, directUpdate)) falseStr += ASSIGN_LABLE;
-  }
-  ret->valStr = format("if(%s) { %s } else { %s }", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
-  ret->opNum = -1;
-  ret->directUpdate = false;
-  if (trueStr.length() == 0 || falseStr.length() == 0 || !ChildInfo(1, fullyUpdated) || !ChildInfo(2, fullyUpdated)) ret->fullyUpdated = false;
 
+  /* update sameConstant and assignCons*/
   if ((!getChild(1) || ChildInfo(1, status) == VAL_EMPTY) && getChild(2)) {
     if (ChildInfo(2, sameConstant)) {
       ret->sameConstant = true;
@@ -2108,9 +2132,11 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     computeInfo->setConstantByStr("0");
     return computeInfo;
   }
+  if (opType == OP_STMT) stmtDepth ++;
   for (ENode* childNode : child) {
     if (childNode) childNode->compute(n, lvalue, false);
   }
+  if (opType == OP_STMT) stmtDepth --;
   if (nodePtr) {
     if (nodePtr->isArray() && nodePtr->arraySplitted()) {
       if (getChildNum() < nodePtr->dimension.size()) {
