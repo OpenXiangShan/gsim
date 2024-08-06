@@ -1303,7 +1303,7 @@ void visitWhenPrintf(graph* g, PNode* print) {
     enode->addChild(val->getExpRoot());
   }
 
-  n->valTree = new ExpTree(enode);
+  n->valTree = new ExpTree(enode, new ENode(n));
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
 }
@@ -1336,7 +1336,7 @@ void visitWhenAssert(graph* g, PNode* ass) {
   enode->addChild(pred->getExpRoot());
   enode->addChild(enRoot);
   
-  n->valTree = new ExpTree(enode);
+  n->valTree = new ExpTree(enode, new ENode(n));
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
 }
@@ -1407,7 +1407,7 @@ void visitPrintf(graph* g, PNode* print) {
     enode->addChild(val->getExpRoot());
   }
 
-  n->valTree = new ExpTree(enode);
+  n->valTree = new ExpTree(enode, new ENode(n));
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
 }
@@ -1429,7 +1429,7 @@ void visitAssert(graph* g, PNode* ass) {
   enode->addChild(pred->getExpRoot());
   enode->addChild(en->getExpRoot());
 
-  n->valTree = new ExpTree(enode);
+  n->valTree = new ExpTree(enode, new ENode(n));
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
 }
