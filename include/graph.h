@@ -44,6 +44,7 @@ class graph {
   void constantMemory();
   void orderAllNodes();
   void genDiffSig(FILE* fp, Node* node);
+  void removeDeadReg();
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;
