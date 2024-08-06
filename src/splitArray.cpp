@@ -233,6 +233,45 @@ void distributeTree(Node* node, ExpTree* tree) {
   }
 }
 
+void splitAssignMent(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees) {
+  int range = 1;
+  for (int i = tree->getlval()->getChildNum(); i < (int)node->dimension.size(); i ++) range *= node->dimension[i];
+
+  for (int idx = 0; idx < range; idx ++) {
+    std::vector<int> subIdx(node->dimension.size() - tree->getlval()->getChildNum());
+    int tmp = idx;
+    for (int i = node->dimension.size() - 1; i >= tree->getlval()->getChildNum(); i --) {
+      subIdx[i - tree->getlval()->getChildNum()] = tmp % node->dimension[i];
+      tmp /= node->dimension[i];
+    }
+    ExpTree* dupTree = dupTreeWithIdx(tree, subIdx);
+    newTrees.push_back(dupTree);
+  }
+}
+
+void ExpTree::updateSplittedArray(Node* array, std::set<Node*>& allSplittedArray) {
+  std::stack<ENode*> s;
+  s.push(getRoot());
+  s.push(getlval());
+  while(!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    if (!top->nodePtr || allSplittedArray.find(top->nodePtr) == allSplittedArray.end()) {
+      for (ENode* child : top->child) {
+        if (child) s.push(child);
+      }
+      continue;
+    }
+    auto range = top->getIdx(top->nodePtr);
+    if (range.first == range.second) {
+      top->nodePtr = top->nodePtr->getArrayMember(range.first);
+      top->child.clear();
+    } else {
+      continue;
+    }
+  }
+}
+
 void graph::splitArrayNode(Node* node) {
   splittedArray.insert(node);
   if (supersrc.find(node->super) != supersrc.end()) supersrc.erase(node->super);
@@ -335,7 +374,6 @@ void graph::splitArray() {
       /* split arrays in partialVisited until s.size() != 0 */
       Node* node = getSplitArray(this);
       Assert(!node->arraySplitted(), "%s is already splitted", node->name.c_str());
-      // printf("split array %s\n", node->name.c_str());
       num ++;
       splitArrayNode(node);
       /* add into s and visitedSet */
@@ -361,6 +399,36 @@ void graph::splitArray() {
   Assert(partialVisited.size() == 0, "partial is not empty!");
   printf("[splitArray] split %d arrays\n", num);
   splitOptionalArray();
+  /* treat arrayMember with no arrayNext as normal nodes, update assignTree */
+  /* with arrayNext can also be updated */
+  std::set<Node*> checkNodes;
+  for (Node* node : splittedArray) {
+    for (Node* member : node->arrayMember) {
+      for (Node* next : member->next) {
+        checkNodes.insert(next);
+        if (next->isArray()) member->isArrayMember = true;
+      }
+      checkNodes.insert(member);
+    }
+  }
+  for (Node* node : checkNodes) {
+    if (node->isArray()) {
+      for (int i = 0; i < (int)node->assignTree.size(); i ++) {
+        node->assignTree[i]->updateSplittedArray(node, splittedArray);
+      }
+      for (size_t i = 0; i < node->arrayVal.size(); i ++) {
+        node->arrayVal[i]->updateSplittedArray(node, splittedArray);
+      }
+    } else {
+      for (size_t i = 0; i < node->assignTree.size(); i ++) {
+        std::vector<ExpTree*> newTrees;
+        node->assignTree[i]->updateSplittedArray(node, splittedArray);
+      }
+    }
+    if (node->updateTree) node->updateTree->updateSplittedArray(node, splittedArray);
+    if (node->resetVal) node->resetVal->updateSplittedArray(node, splittedArray);
+    if (node->resetTree) node->resetTree->updateSplittedArray(node, splittedArray);
+  }
 }
 
 Node* Node::arrayMemberNode(int idx) {
@@ -381,7 +449,6 @@ Node* Node::arrayMemberNode(int idx) {
   }
 
   Node* member = new Node(type);
-  member->isArrayMember = true;
   member->name = memberName;
   member->arrayIdx = idx;
   arrayMember.push_back(member);

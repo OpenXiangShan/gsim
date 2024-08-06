@@ -17,21 +17,27 @@ void ENode::passWidthToChild() {
   std::vector<int>childBits;
   if (nodePtr) {
     Node* node = nodePtr;
-    if (usedBit > node->usedBit) {
-      if (node->isArray() && node->arraySplitted()) {
-        for (Node* member : node->arrayMember) {
-          member->update_usedBit(usedBit);
-          if (member->type == NODE_REG_SRC) {
-            if (member->usedBit != member->getDst()->usedBit) {
-              checkNodes.push_back(member->getDst());
-              member->getDst()->usedBit = member->usedBit;
-            }
-          }
-          checkNodes.push_back(member);
+    if (node->isArray() && node->arraySplitted()) {
+        auto range = this->getIdx(nodePtr);
+        if (range.first < 0) {
+          range.first = 0;
+          range.second = node->arrayMember.size() - 1;
         }
-      } else {
-        checkNodes.push_back(node);
-      }
+        for (int i = range.first; i <= range.second; i ++) {
+          Node* member = node->getArrayMember(i);
+          if (usedBit > member->usedBit) {
+            member->update_usedBit(usedBit);
+            if (member->type == NODE_REG_SRC) {
+              if (member->usedBit != member->getDst()->usedBit) {
+                checkNodes.push_back(member->getDst());
+                member->getDst()->usedBit = member->usedBit;
+              }
+            }
+            checkNodes.push_back(member);
+          }
+        }
+    } else {
+      if (usedBit > node->usedBit) checkNodes.push_back(node);
     }
     node->update_usedBit(usedBit);
     if (node->type == NODE_REG_SRC) {

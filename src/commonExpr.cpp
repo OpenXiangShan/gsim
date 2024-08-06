@@ -117,7 +117,7 @@ void graph::commonExpr() {
     for (Node* node : super->member) {
       if(node->status != VALID_NODE) continue;
       nodeId[node] = node->id;
-      if (node->type != NODE_OTHERS || node->isArray() || node->isArrayMember) continue;
+      if (node->type != NODE_OTHERS || node->isArray()) continue;
       if (node->prev.size() == 0) continue;
       // if (node->next.size() == 1) continue;
       uint64_t key = node->keyHash();

@@ -305,6 +305,7 @@ public:
     void getRelyNodes(std::set<Node*>& allNodes);
     void updateWithSplittedNode();
     void clearComponent();
+    void updateSplittedArray(Node* array, std::set<Node*>& allSplittedArray);
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes

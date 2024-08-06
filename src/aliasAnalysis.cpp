@@ -24,7 +24,6 @@ ENode* Node::isAlias() {
   if (assignTree.size() != 1) return nullptr;
   if (!assignTree[0]->getRoot()->getNode()) return nullptr;
   if (prev.size() != 1) return nullptr;
-  if (isArrayMember && assignTree[0]->getRoot()->getNode()->isArray() && !assignTree[0]->getRoot()->getNode()->arraySplitted()) return nullptr;
   return assignTree[0]->getRoot();
 }
 
