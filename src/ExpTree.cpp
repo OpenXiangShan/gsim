@@ -75,14 +75,18 @@ void ExpTree::matchWidth(int width) {
         else setRoot(pad);
       }
     } else if (width < oldNode->width) {
-      ENode* bits = new ENode(OP_BITS);
-      bits->width = width;
-      bits->sign = oldNode->sign;
-      bits->addVal(width - 1);
-      bits->addVal(0);
-      bits->addChild(oldNode);
-      if (iter.first) iter.first->setChild(iter.second, bits);
-      else setRoot(bits);
+      if (oldNode->opType == OP_INVALID) {
+        oldNode->width = width;
+      } else {
+        ENode* bits = new ENode(OP_BITS);
+        bits->width = width;
+        bits->sign = oldNode->sign;
+        bits->addVal(width - 1);
+        bits->addVal(0);
+        bits->addChild(oldNode);
+        if (iter.first) iter.first->setChild(iter.second, bits);
+        else setRoot(bits);
+      }
     }
   }
 }
