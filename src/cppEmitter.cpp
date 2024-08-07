@@ -85,6 +85,18 @@ std::string updateActiveStr(int idx, uint64_t mask) {
   return format("*(uint64_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
 }
 
+std::string updateActiveStr(int idx, uint64_t mask, std::string& cond) {
+  auto activeFlags = std::string("activeFlags[") + std::to_string(idx) + std::string("]");
+
+  if (mask <= MAX_U8)
+    return format("%s |= %s ?  0x%lx : %s;", activeFlags.c_str(), cond.c_str(), mask, activeFlags.c_str());
+  if (mask <= MAX_U16)
+    return format("*(uint16_t*)&%s |= %s ? 0x%lx : %s;", activeFlags.c_str(), cond.c_str(), mask, activeFlags.c_str());
+  if (mask <= MAX_U32)
+    return format("*(uint32_t*)&%s |= %s ? 0x%lx : %s;", activeFlags.c_str(), cond.c_str(), mask, activeFlags.c_str());
+  return format("*(uint64_t*)&%s |= %s ?  0x%lx : %s;", activeFlags.c_str(), cond.c_str(), mask, activeFlags.c_str());
+}
+
 std::string strRepeat(std::string str, int times) {
   std::string ret;
   for (int i = 0; i < times; i ++) ret += str;
@@ -484,6 +496,9 @@ std::string graph::saveOldVal(FILE* fp, Node* node) {
 
 static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep) {
   std::string nodeName = node->name;
+  auto condName = std::string("cond_") + nodeName;
+  bool opt{false};
+
   if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
   if (node->isAsyncReset()) {
     if (node->width > BASIC_WIDTH) {
@@ -495,7 +510,8 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
     if (node->width > BASIC_WIDTH) {
       fprintf(fp, "if (mpz_cmp(%s, %s) != 0) {\n", nodeName.c_str(), oldName.c_str());
     } else {
-      fprintf(fp, "if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
+      opt = true;
+      fprintf(fp, "auto %s = %s != %s;", condName.c_str(), nodeName.c_str(), oldName.c_str());
     }
   }
   if (inStep) {
@@ -503,7 +519,8 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
       fprintf(fp, "mpz_set(%s, %s);\n", node->name.c_str(), newName(node).c_str());
     else {
       if (node->isReset() && node->type == NODE_REG_SRC) fprintf(fp, "%s = %s;\n", RESET_NAME(node).c_str(), newName(node).c_str());
-      fprintf(fp, "%s = %s;\n", node->name.c_str(), newName(node).c_str());
+      fprintf(fp, "%s = %s ? %s : %s;\n", node->name.c_str(), condName.c_str(), newName(node).c_str(),
+              nodeName.c_str());
     }
   }
   if (node->isAsyncReset()) {
@@ -513,9 +530,10 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   else {
     std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
     std::pair<uint64_t, std::string> curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
-    if (curMask.first != 0) fprintf(fp, "oldFlag |= 0x%lx; // %s\n", curMask.first, curMask.second.c_str());
+    if (curMask.first != 0) fprintf(fp, "oldFlag |= %s ?  0x%lx : oldFlag; // %s\n", condName.c_str() ,curMask.first, curMask.second.c_str());
     for (auto iter : bitMapInfo) {
-      fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, iter.second.first).c_str(), iter.second.second.c_str());
+      auto str = opt ? updateActiveStr(iter.first, iter.second.first, condName) : updateActiveStr(iter.first, iter.second.first);
+      fprintf(fp, "%s // %s\n", str.c_str(), iter.second.second.c_str());
     }
   #ifdef PERF
     for (int id : nextNodeId) {
@@ -525,7 +543,7 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
     if (inStep) fprintf(fp, "isActivateValid = true;\n");
   #endif
   }
-  fprintf(fp, "}\n");
+  if (!opt) fprintf(fp, "}\n");
 }
 
 static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bool inStep) {
