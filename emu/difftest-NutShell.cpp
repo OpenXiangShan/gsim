@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
       printf("%c", mod->get_io_uart_out_ch());
       fflush(stdout);
     }
-    // dut_end = (mod->cpu$writeback$valid_r == 1) && (mod->cpu$writeback$inst_r == 0x6b);
+    dut_end = mod->soc$nutcore$_dataBuffer_T_ctrl_isNutCoreTrap;
 #endif
 #if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
     bool isDiff = checkSignals(false);
@@ -190,8 +190,13 @@ int main(int argc, char** argv) {
       return 0;
     }
 #endif
+#if (defined (VERILATOR))
+  dut_end = ref->rootp->SimTop__DOT__soc__DOT__nutcore__DOT__dataBuffer_0_ctrl_isNutCoreTrap;
+#endif
     if(dut_end) {
       clock_t dur = clock() - start;
     }
   }
+  clock_t dur = clock() - start;
+  printf("end cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
 }
