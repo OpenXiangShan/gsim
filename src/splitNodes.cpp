@@ -811,9 +811,7 @@ void graph::splitNodes() {
       // for (int cut : nodeCuts) printf("%d ", cut);
       // printf("\n");
       createSplittedNode(node, nodeCuts);
-      componentMap[node]->display();
       for (Node* n : splittedNodesSet[node]) {
-        n->display();
         addReInfer(n);
       }
       node->status = SPLITTED_NODE;

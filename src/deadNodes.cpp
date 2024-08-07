@@ -69,9 +69,7 @@ void graph::removeDeadNodes() {
     for (Node* member : super->member) {
       if (!anyOuterEdge(member) && potentialDead(member)) {
         s.push(member);
-        printf("dead:\n");
       }
-      member->display();
     }
   }
   while(!s.empty()) {
