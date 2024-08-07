@@ -7,6 +7,7 @@
 #include <numeric>
 #include <algorithm>
 #include <fstream>
+#include <set>
 
 #if defined(GSIM)
 #include <SimTop.h>
@@ -146,9 +147,12 @@ int main(int argc, char** argv) {
   bool dut_end = false;
   uint64_t cycles = 0;
   clock_t start = clock();
+  clock_t prevTime = start;
 #ifdef PERF
   FILE* activeFp = fopen(ACTIVE_FILE, "w");
 #endif
+  int max_cycles = 3100000;
+  if (strcmp(DUTNAME, "xiangshan") == 0) max_cycles = 6400000;
   while(!dut_end) {
 #ifdef VERILATOR
     ref_cycle(1);
@@ -163,14 +167,16 @@ int main(int argc, char** argv) {
     ref->step();
 #endif
     cycles ++;
-    if(cycles % 100000 == 0 && cycles <= 6400000) {
-      clock_t dur = clock() - start;
-      printf("cycles %ld (%ld ms, %ld per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+    if(cycles % 100000 == 0 && cycles <= max_cycles) {
+      clock_t now = clock();
+      clock_t dur = now - start;
+      printf("cycles %ld (%ld ms, %ld per sec / current %ld ) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur, 100000 * CLOCKS_PER_SEC / (now - prevTime));
+      prevTime = now;
 #ifdef PERF
       fprintf(activeFp, "cycles: %ld\n", cycles);
       size_t totalActives = 0;
       size_t validActives = 0;
-      for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
+      for (size_t i = 0; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
         totalActives += mod->activeTimes[i];
         validActives += mod->validActive[i];
       }
@@ -186,7 +192,7 @@ int main(int argc, char** argv) {
       }
       if (cycles == 500000) return 0;
 #endif
-      if (cycles == 6400000) return 0;
+      if (cycles == max_cycles) return 0;
     }
 #if defined(GSIM)
     mod->step();
