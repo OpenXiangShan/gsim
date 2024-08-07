@@ -2168,6 +2168,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
         }
       } else {
         int idx = getArrayIndex(nodePtr);
+        MUX_DEBUG(printf("node %s %s\n", nodePtr->name.c_str(), nodePtr->getArrayMember(idx)->name.c_str()));
         computeInfo = nodePtr->getArrayMember(idx)->compute()->dup();
       }
     } else if (nodePtr->isArray()) {
@@ -2254,6 +2255,12 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     }
 
     for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
+    MUX_DEBUG(printf("  %p(node) %s width %d info->width %d status %d val %s sameConstant %d opNum %d instsNum %ld\n", this, n->name.c_str(), width, computeInfo->width, computeInfo->status, computeInfo->valStr.c_str(), computeInfo->sameConstant, computeInfo->opNum, computeInfo->insts.size()));
+    for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
+      if (computeInfo->memberInfo[i]) {
+        MUX_DEBUG(printf("idx %ld %s\n", i, computeInfo->memberInfo[i]->valStr.c_str()));
+      }
+    }
     return computeInfo;
   }
 
@@ -2311,6 +2318,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     default:
       Panic();
   }
+  MUX_DEBUG(printf("  %p %s op %d width %d val %s status %d sameConstant %d instsNum %ld opNum %d\n", this, n->name.c_str(), opType, width, computeInfo->valStr.c_str(), computeInfo->status, computeInfo->sameConstant, computeInfo->insts.size(), computeInfo->opNum));
   return computeInfo;
 
 }
@@ -2329,6 +2337,8 @@ valInfo* Node::compute() {
   tmp_push();
   localTmpNum = &super->localTmpNum;
   mpzTmpNum = &super->mpzTmpNum;
+  MUX_DEBUG(printf("compute %s lcoalTmp %d mpzTmp %d\n", name.c_str(), *localTmpNum, *mpzTmpNum));
+  MUX_DEBUG(display());
 
   if (isArray()) {
     valInfo* ret = computeArray();
@@ -2377,6 +2387,7 @@ valInfo* Node::compute() {
   Assert(ret, "empty info in %s\n", name.c_str());
   if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) ret->setConstantByStr("0");
   if (ret->status == VAL_EMPTY_SRC && assignTree.size() == 1) status = DEAD_SRC;
+  MUX_DEBUG(printf("compute [%s(%d), %d] = %s width %d info->width %d status %d sameCons %d insts(%ld, %ld) isRoot %d %p\n", name.c_str(), type, ret->status, ret->valStr.c_str(), width, ret->width, status, ret->sameConstant, ret->insts.size(), insts.size(), isRoot, this));
   bool needRecompute = false;
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
@@ -2450,6 +2461,7 @@ valInfo* Node::compute() {
     for (std::string inst : tree->getRoot()->computeInfo->insts) insts.push_back(inst);
   }
   tmp_pop();
+  MUX_DEBUG(printf("compute [%s(%d), %d] = %s status %d %p\n", name.c_str(), type, ret->status, ret->valStr.c_str(), status, this));
   if (needRecompute) recomputeAllNodes();
   return ret;
 }
@@ -2548,6 +2560,8 @@ void Node::finalConnect(std::string lvalue, valInfo* info) {
 
 valInfo* Node::computeArray() {
   if (computeInfo) return computeInfo;
+  MUX_DEBUG(printf("compute Array %s\n", name.c_str()));
+  MUX_DEBUG(display());
   if (width == 0) {
     computeInfo = new valInfo();
     computeInfo->setConstantByStr("0");
