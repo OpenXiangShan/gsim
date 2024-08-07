@@ -184,14 +184,25 @@ void graph::mergeSublings() {
 
 void graph::mergeNodes() {
   size_t totalSuper = sortedSuper.size();
+  size_t phaseSuper = sortedSuper.size();
 
   mergeAsyncReset();
   mergeUIntReset();
-  mergeOut1();
-  mergeIn1();
-  mergeSublings();
+  printf("[mergeNodes-reset] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
 
-  size_t optimizeSuper = sortedSuper.size();
-  printf("[mergeNodes] remove %ld superNodes (%ld -> %ld)\n", totalSuper - optimizeSuper, totalSuper, optimizeSuper);
+  phaseSuper = sortedSuper.size();
+  mergeOut1();
+  printf("[mergeNodes-out1] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
+
+  phaseSuper = sortedSuper.size();
+  mergeIn1();
+  printf("[mergeNodes-in1] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
+
+  phaseSuper = sortedSuper.size();
+  mergeSublings();
+  printf("[mergeNodes-subling] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
+
+  phaseSuper = sortedSuper.size();
+  printf("[mergeNodes] remove %ld superNodes (%ld -> %ld)\n", totalSuper - phaseSuper, totalSuper, phaseSuper);
 
 }
