@@ -596,8 +596,7 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
             for (int i = ret->beg; i <= ret->end; i ++) {
               Node* member = nodePtr->getArrayMember(i);
               member->computeConstant();
-              if (consMap.find(member) != consMap.end()) ret->memberInfo.push_back(consMap[member]);
-              else ret->memberInfo.push_back(nullptr);
+              ret->memberInfo.push_back(consMap[member]);
             }
           }
         }
@@ -788,13 +787,11 @@ valInfo* Node::computeConstantArray() {
     for (ExpTree* tree : assignTree) {
       int infoIdxBeg, infoIdxEnd;
       std::tie(infoIdxBeg, infoIdxEnd) = tree->getlval()->getIdx(this);
-      if (consEMap[tree->getRoot()]->status == VAL_CONSTANT) {
-        if (infoIdxBeg == infoIdxEnd) {
-          ret->memberInfo[infoIdxBeg] = consEMap[tree->getRoot()];
-        } else if (consEMap[tree->getRoot()]->memberInfo.size() != 0) {
-          for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) {
-            ret->memberInfo[infoIdxBeg + i] = consEMap[tree->getRoot()]->getMemberInfo(i);
-          }
+      if (infoIdxBeg == infoIdxEnd) {
+        ret->memberInfo[infoIdxBeg] = consEMap[tree->getRoot()];
+      } else if (consEMap[tree->getRoot()]->memberInfo.size() != 0) {
+        for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) {
+          ret->memberInfo[infoIdxBeg + i] = consEMap[tree->getRoot()]->getMemberInfo(i);
         }
       }
     }
@@ -802,16 +799,12 @@ valInfo* Node::computeConstantArray() {
     for (ExpTree* tree : arrayVal) {
       int infoIdxBeg, infoIdxEnd;
       std::tie(infoIdxBeg, infoIdxEnd) = tree->getlval()->getIdx(this);
-      if (consEMap[tree->getRoot()]->status == VAL_CONSTANT) {
-        if (infoIdxBeg == infoIdxEnd) {
-          ret->memberInfo[infoIdxBeg] = consEMap[tree->getRoot()];
-
-        } else if (consEMap[tree->getRoot()]->memberInfo.size() != 0) {
-          for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) {
-            ret->memberInfo[infoIdxBeg + i] = consEMap[tree->getRoot()]->getMemberInfo(i);
-          }
+      if (infoIdxBeg == infoIdxEnd) {
+        ret->memberInfo[infoIdxBeg] = consEMap[tree->getRoot()];
+      } else if (consEMap[tree->getRoot()]->memberInfo.size() != 0) {
+        for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) {
+          ret->memberInfo[infoIdxBeg + i] = consEMap[tree->getRoot()]->getMemberInfo(i);
         }
-
       }
     }
 
