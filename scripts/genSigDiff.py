@@ -41,12 +41,12 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
     self.reffp = open(refFile, "r")
     all_sigs = {}
     for line in self.reffp.readlines():
-      match = re.search(r'(uint[0-9]*_t)|mpz_t ', line)
+      match = re.search(r'((uint[0-9]*_t)|mpz_t)(.*)width =', line)
       if match:
-        line = line.split(";")[0]
         line = line.strip(" ;\n")
-        line = re.split(' |\[', line)
-        all_sigs[line[1]] = 0
+        line = re.split(' |\[|;', line)
+        width = line[-1]
+        all_sigs[line[1]] = int(width)
 
     self.newDstFile()
 
@@ -61,6 +61,9 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
       else:
         matchName = line[3][:index]
       if matchName in all_sigs:
+        print(matchName, mod_width, all_sigs[matchName])
+        if mod_width != all_sigs[matchName]:
+          continue
         if self.varNum == self.numPerFile:
           self.newDstFile()
         self.varNum += 1
