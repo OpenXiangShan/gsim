@@ -530,7 +530,10 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   else {
     std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
     std::pair<uint64_t, std::string> curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
-    if (curMask.first != 0) fprintf(fp, "oldFlag |= %s ?  0x%lx : oldFlag; // %s\n", condName.c_str() ,curMask.first, curMask.second.c_str());
+    if (curMask.first != 0) {
+      if (opt) fprintf(fp, "oldFlag |= %s ?  0x%lx : oldFlag; // %s\n", condName.c_str() ,curMask.first, curMask.second.c_str());
+      else fprintf(fp, "oldFlag |= 0x%lx; // %s\n", curMask.first, curMask.second.c_str());
+    }
     for (auto iter : bitMapInfo) {
       auto str = opt ? updateActiveStr(iter.first, iter.second.first, condName) : updateActiveStr(iter.first, iter.second.first);
       fprintf(fp, "%s // %s\n", str.c_str(), iter.second.second.c_str());
