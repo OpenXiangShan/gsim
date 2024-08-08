@@ -531,7 +531,7 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
     std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
     std::pair<uint64_t, std::string> curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
     if (curMask.first != 0) {
-      if (opt) fprintf(fp, "oldFlag |= -(uint8_t)%s & 0x%lx; // %s\n", condName.c_str() ,curMask.first, curMask.second.c_str());
+      if (opt) fprintf(fp, "oldFlag |= -(uint%d_t)%s & 0x%lx; // %s\n", ACTIVE_WIDTH, condName.c_str() ,curMask.first, curMask.second.c_str());
       else fprintf(fp, "oldFlag |= 0x%lx; // %s\n", curMask.first, curMask.second.c_str());
     }
     for (auto iter : bitMapInfo) {
