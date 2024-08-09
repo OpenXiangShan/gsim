@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
 
   FUNC_TIMER(g->usedBits());
 
-  // FUNC_TIMER(g->splitNodes());
+  FUNC_TIMER(g->splitNodes());
 
   // FUNC_TIMER(g->traversal());
 
@@ -127,7 +127,7 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->mergeNodes(), "MergeNodes");
 
-  // FUNC_WRAPPER(g->replicationOpt(), "Replication");
+  FUNC_WRAPPER(g->replicationOpt(), "Replication");
 
   FUNC_WRAPPER(g->mergeRegister(), "MergeRegister");
 
