@@ -500,6 +500,8 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   bool opt{false};
 
   if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
+  std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
+  std::pair<uint64_t, std::string> curMask;
   if (node->isAsyncReset()) {
     if (node->width > BASIC_WIDTH) {
       fprintf(fp, "if (mpz_sgn(%s) != 0 || mpz_cmp(%s, %s) != 0) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
@@ -507,11 +509,13 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
       fprintf(fp, "if (%s || (%s != %s)) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
     }
   } else {
+    curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
     if (node->width > BASIC_WIDTH) {
       fprintf(fp, "if (mpz_cmp(%s, %s) != 0) {\n", nodeName.c_str(), oldName.c_str());
     } else {
-      opt = true;
-      fprintf(fp, "auto %s = %s != %s;", condName.c_str(), nodeName.c_str(), oldName.c_str());
+      opt = ((curMask.first != 0) + bitMapInfo.size()) <= 3;
+      if (opt) fprintf(fp, "auto %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
+      else fprintf(fp, "if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
     }
   }
   if (inStep) {
@@ -519,17 +523,15 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
       fprintf(fp, "mpz_set(%s, %s);\n", node->name.c_str(), newName(node).c_str());
     else {
       if (node->isReset() && node->type == NODE_REG_SRC) fprintf(fp, "%s = %s;\n", RESET_NAME(node).c_str(), newName(node).c_str());
-      if (opt) fprintf(fp, "%s = %s ? %s : %s;\n", node->name.c_str(), condName.c_str(), newName(node).c_str(), nodeName.c_str());
-      else fprintf(fp, "%s = %s;\n", node->name.c_str(), newName(node).c_str());
+      fprintf(fp, "%s = %s;\n", node->name.c_str(), newName(node).c_str());
     }
   }
   if (node->isAsyncReset()) {
+    Assert(!opt, "invalid opt");
     fprintf(fp, "activateAll();\n");
     fprintf(fp, "oldFlag = -1;\n");
   }
   else {
-    std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
-    std::pair<uint64_t, std::string> curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
     if (curMask.first != 0) {
       if (opt) fprintf(fp, "oldFlag |= -(uint%d_t)%s & 0x%lx; // %s\n", ACTIVE_WIDTH, condName.c_str() ,curMask.first, curMask.second.c_str());
       else fprintf(fp, "oldFlag |= 0x%lx; // %s\n", curMask.first, curMask.second.c_str());
