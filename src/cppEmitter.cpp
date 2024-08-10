@@ -514,7 +514,10 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
       fprintf(fp, "if (mpz_cmp(%s, %s) != 0) {\n", nodeName.c_str(), oldName.c_str());
     } else {
       opt = ((curMask.first != 0) + bitMapInfo.size()) <= 3;
-      if (opt) fprintf(fp, "auto %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
+      if (opt) {
+        if (node->width == 1) fprintf(fp, "auto %s = %s ^ %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
+        else fprintf(fp, "auto %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
+      }
       else fprintf(fp, "if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
     }
   }
