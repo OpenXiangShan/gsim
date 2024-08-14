@@ -163,6 +163,7 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo) {
     if (consType == 0 || consType == 1) {
       for (int i = 0; i < num; i ++) {
         valInfo* assignInfo = rinfo->getMemberInfo(i);
+        for (std::string inst : assignInfo->insts) ret += inst;
         if (node->width > BASIC_WIDTH) {
           if (assignInfo->status == VAL_CONSTANT) {
             if (mpz_cmp_ui(assignInfo->consVal, MAX_U64) > 0) {
@@ -1899,6 +1900,7 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
     for (valInfo* info : ChildInfo(0, memberInfo)) {
       if (info) {
         valInfo* memInfo = info->dup();
+        memInfo->insts.insert(memInfo->insts.end(), info->insts.begin(), info->insts.end());
         memInfo->width = ret->width;
         memInfo->sign = ret->sign;
         infoBits(memInfo, this, info);
@@ -2458,7 +2460,10 @@ valInfo* Node::compute() {
   ret->sign = sign;
   computeInfo = ret;
   for (ExpTree* tree : assignTree) {
-    for (std::string inst : tree->getRoot()->computeInfo->insts) insts.push_back(inst);
+    for (std::string inst : tree->getRoot()->computeInfo->insts) {
+      insts.push_back(inst);
+      ret->insts.push_back(inst);
+    }
   }
   tmp_pop();
   MUX_DEBUG(printf("compute [%s(%d), %d] = %s status %d %p\n", name.c_str(), type, ret->status, ret->valStr.c_str(), status, this));
