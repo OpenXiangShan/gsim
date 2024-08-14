@@ -2255,7 +2255,9 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       }
       computeInfo->opNum = 1;
     }
-
+    if (nodePtr->status == MERGED_NODE && nodePtr->next.size() <= 1) {
+      computeInfo->insts.insert(computeInfo->insts.begin(), nodePtr->insts.begin(), nodePtr->insts.end());
+    }
     for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
     MUX_DEBUG(printf("  %p(node) %s width %d info->width %d status %d val %s sameConstant %d opNum %d instsNum %ld\n", this, n->name.c_str(), width, computeInfo->width, computeInfo->status, computeInfo->valStr.c_str(), computeInfo->sameConstant, computeInfo->opNum, computeInfo->insts.size()));
     for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
@@ -2798,6 +2800,7 @@ void graph::instsGenerator() {
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == CONSTANT_NODE) member->removeConnection();
+      if (member->status == MERGED_NODE && member->next.size() == 1) member->insts.clear();
     }
   }
   removeNodes(CONSTANT_NODE);
