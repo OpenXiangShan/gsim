@@ -14,6 +14,8 @@
 #include "graph.h"
 #include "opFuncs.h"
 
+#define MUX_OPT true
+
 #define Child(id, name) getChild(id)->name
 #define ChildInfo(id, name) getChild(id)->computeInfo->name
 
@@ -369,10 +371,18 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
       } else if (ChildInfo(2, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(2, consVal)) != 0) {
         ret->valStr = format("((!%s) | %s)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
       } else {
-        ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
+        if (MUX_OPT) {
+          ret->valStr = format("((%s & %s) | ((!%s) & %s))", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
+        } else {
+          ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
+        }
       }
     } else {
-      ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
+      if (MUX_OPT && ChildInfo(0, opNum) <= 1 && ChildInfo(1, opNum) <= 1  && ChildInfo(2, opNum) <= 1) {
+        ret->valStr = format("((-(%s)%s & %s) | ((-(%s)!%s) & %s))", widthUType(width).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), widthUType(width).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
+      } else {
+        ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
+      }
     }
   } else if (!childBasic && !enodeBasic) {
     std::string dstName = isRoot ? lvalue : newMpzTmp();
