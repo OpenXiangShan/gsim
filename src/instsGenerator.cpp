@@ -38,16 +38,7 @@ static std::stack<std::pair<int*, int*>> tmpStack;
 std::set<std::pair<int, int>> allMask;
 
 static int stmtDepth = 0;
-
-static std::string addMask(int width) {
-  allMask.insert(std::make_pair(width-1, 0));
-  return format("MPZ_MASK$%d_%d", width-1, 0);
-}
-static std::string addMask(int hi, int lo) {
-  allMask.insert(std::make_pair(hi, lo));
-  return format("MPZ_MASK$%d_%d", hi, lo);
-}
-
+int maxConcatNum = 0;
 static void tmp_push() {
   tmpStack.push(std::make_pair(localTmpNum, mpzTmpNum));
 }
@@ -79,9 +70,14 @@ static bool mpzOutOfBound(mpz_t& val, int width) {
 
 std::string legalCppCons(std::string str) {
   if (str.length() <= 16) return "0x" + str;
-  else if (str.length() <= 32) return format("UINT128(0x%s, 0x%s)", str.substr(0, str.length() - 16).c_str(), str.substr(str.length()-16, 16).c_str());
-  else if (str.length() <= 48) return format("UINT256_3(0x%s, 0x%s, 0x%s)", str.substr(0, str.length() - 32).c_str(), str.substr(str.length()-32, 16).c_str(), str.substr(str.length()-16, 16).c_str());
-  else return format("UINT256_4(0x%s, 0x%s, 0x%s, 0x%s)", str.substr(0, str.length() - 48).c_str(), str.substr(str.length()-48, 16).c_str(), str.substr(str.length()-32, 16).c_str(), str.substr(str.length()-16, 16).c_str());
+  int concatNum = (str.length() + 15) / 16;
+  std::string ret;
+  for (int i = concatNum - 1; i >= 0; i --) {
+    ret += "0x" + str.substr(MAX(0, (int)str.length() - (i + 1) * 16), MIN(16, (int)str.length() - i * 16));
+    if (i != 0) ret += ", ";
+  }
+  maxConcatNum = MAX(maxConcatNum, concatNum);
+  return format("UINT_CONCAT%d(%s)", concatNum, ret.c_str());
 }
 
 static std::string getConsStr(mpz_t& val) {
@@ -166,19 +162,7 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo) {
       for (int i = 0; i < num; i ++) {
         valInfo* assignInfo = rinfo->getMemberInfo(i);
         for (std::string inst : assignInfo->insts) ret += inst;
-        if (node->width > BASIC_WIDTH) {
-          if (assignInfo->status == VAL_CONSTANT) {
-            if (mpz_cmp_ui(assignInfo->consVal, MAX_U64) > 0) {
-              ret += format("mpz_set_str(%s%s, \"%s\", 16);\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), mpz_get_str(NULL, 16, assignInfo->consVal));
-            } else {
-              ret += format("mpz_set_ui(%s%s, %s);\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
-            }
-          } else {
-            ret += format("mpz_set(%s%s, %s);\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
-          }
-        } else {
-          ret += format("%s%s = %s;\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
-        }
+        ret += format("%s%s = %s;\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
       }
     } else if (consType == 2) {
       if(node->width <= BASIC_WIDTH && mpz_sgn(rinfo->memberInfo[0]->consVal) == 0) {
@@ -190,14 +174,7 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo) {
           idxStr += "[i" + std::to_string(i) + "]";
           bracket += "}\n";
         }
-        if (node->width > BASIC_WIDTH) {
-          if (mpz_cmp_ui(rinfo->memberInfo[0]->consVal, MAX_U64) <= 0)
-            ret += format("mpz_set_ui(%s%s, 0x%s);\n", lvalue.c_str(), idxStr.c_str(), rinfo->memberInfo[0]->valStr.c_str());
-          else
-            TODO();
-        } else { // not mpz
-          ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->memberInfo[0]->valStr.c_str());
-        }
+        ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->memberInfo[0]->valStr.c_str());
         ret += bracket;
       }
     } else Panic();
@@ -209,66 +186,8 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo) {
       idxStr += "[i" + std::to_string(i) + "]";
       bracket += "}\n";
     }
-    if (node->width > BASIC_WIDTH)
-      ret += format("mpz_set(%s%s, %s);\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
-    else
-      ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
+    ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
     ret += bracket;
-  }
-  return ret;
-}
-
-static std::string setMpz(std::string dstName, ENode* enode, valInfo* dstInfo, Node* node) {
-  std::string ret;
-  if (enode->computeInfo->status == VAL_CONSTANT) {
-    if (mpz_cmp_ui(enode->computeInfo->consVal, MAX_U64) > 0) ret = format("mpz_set_str(%s, \"%s\", 16);", dstName.c_str(), mpz_get_str(NULL, 16, enode->computeInfo->consVal));
-    else ret = format("mpz_set_ui(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
-  } else if (isSubArray(dstName, node)) {
-    ret = arrayCopy(dstName, node, enode->computeInfo);
-  } else if (enode->width > BASIC_WIDTH) {
-    ret = format("mpz_set(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
-  } else if (enode->width > 64) {
-    std::string localVal = enode->computeInfo->valStr;
-    if (enode->computeInfo->opNum > 0) {
-      localVal = newLocalTmp();
-      dstInfo->insts.push_back(format("%s %s = %s;", widthUType(enode->width).c_str(), localVal.c_str(), enode->computeInfo->valStr.c_str()));
-    }
-    ret = format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", dstName.c_str(), localVal.c_str());
-  } else {
-    ret = format("mpz_set_ui(%s, %s);", dstName.c_str(), enode->computeInfo->valStr.c_str());
-  }
-  return ret;
-}
-
-static std::string get128(std::string name) {
-  return format("((uint128_t)mpz_getlimbn(%s, 1) << 64 | mpz_get_ui(%s))",
-              name.c_str(), name.c_str(), name.c_str(), name.c_str());
-}
-static std::string get256(std::string name, int width) { // TODO: replace by getFromMpz
-  if (width <= 128) return get128(name);
-  return format("((uint256_t)mpz_getlimbn(%s, 3) << 192 | "
-                "(uint256_t)mpz_getlimbn(%s, 2) << 128 | "
-                "(uint256_t)mpz_getlimbn(%s, 1) << 64 | "
-                "(uint256_t)mpz_get_ui(%s))",
-              name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str());
-}
-static std::string set256_tmp(valInfo* info, valInfo* parent, std::string str = "") {
-  std::string localName = info->valStr;
-  std::string ret = str.length() == 0 ? newMpzTmp() : str;
-  if (info->status == VAL_CONSTANT) {
-    if (mpz_cmp_ui(info->consVal, MAX_U64) > 0) parent->insts.push_back(format("mpz_set_str(%s, \"%s\", 16);", ret.c_str(), mpz_get_str(NULL, 16, info->consVal)));
-    else parent->insts.push_back(format("mpz_set_ui(%s, %s);", ret.c_str(), info->valStr.c_str()));
-    return ret;
-  }
-  if (info->width <= 64) {
-    parent->insts.push_back(format("mpz_set_ui(%s, %s);", ret.c_str(), info->valStr.c_str()));
-  } else {
-    if (info->opNum > 0) {
-      localName = newLocalTmp();
-      parent->insts.push_back(format("%s %s = %s;", widthUType(info->width).c_str(), localName.c_str(), info->valStr.c_str()));
-    }
-    int count = info->width > 128 ? 4 : 2;
-    parent->insts.push_back(format("mpz_import(%s, %d, -1, 8, 0, 0, (mp_limb_t*)&%s);", ret.c_str(), count, localName.c_str()));
   }
   return ret;
 }
@@ -348,60 +267,38 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
   if (isSubArray(lvalue, node)) return instsWhen(node, lvalue, isRoot);
 
   /* not constant */
-  bool childBasic = ChildInfo(1, width) <= BASIC_WIDTH && ChildInfo(2, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   valInfo* ret = computeInfo;
   ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + ChildInfo(2, opNum) + 1;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  if (childBasic && enodeBasic) {
-    if (width == 1 && !sign) {
-      if (ChildInfo(1, status) == VAL_CONSTANT && ChildInfo(2, status) == VAL_CONSTANT) {
-        if (mpz_sgn(ChildInfo(1, consVal)) != 0 && mpz_sgn(ChildInfo(2, consVal)) == 0) { // cond ? 1 : 0  = cond
-          ret->valStr = ChildInfo(0, valStr);
-        } else if (mpz_sgn(ChildInfo(1, consVal)) == 0 && mpz_sgn(ChildInfo(2, consVal)) != 0) { // cond ? 0 : 1  = !cond
-          ret->valStr = format("(!%s)", ChildInfo(0, valStr).c_str());
-        } else Panic();
-      } else if (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0) {
-        ret->valStr = format("((!%s) & %s)", ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
-      } else if (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) != 0) {
-        ret->valStr = format("(%s | %s)", ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
-      } else if (ChildInfo(2, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(2, consVal)) == 0) {
-        ret->valStr = format("(%s & %s)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
-      } else if (ChildInfo(2, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(2, consVal)) != 0) {
-        ret->valStr = format("((!%s) | %s)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
-      } else {
-        if (MUX_OPT) {
-          ret->valStr = format("((%s & %s) | ((!%s) & %s))", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
-        } else {
-          ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
-        }
-      }
+  if (width == 1 && !sign) {
+    if (ChildInfo(1, status) == VAL_CONSTANT && ChildInfo(2, status) == VAL_CONSTANT) {
+      if (mpz_sgn(ChildInfo(1, consVal)) != 0 && mpz_sgn(ChildInfo(2, consVal)) == 0) { // cond ? 1 : 0  = cond
+        ret->valStr = ChildInfo(0, valStr);
+      } else if (mpz_sgn(ChildInfo(1, consVal)) == 0 && mpz_sgn(ChildInfo(2, consVal)) != 0) { // cond ? 0 : 1  = !cond
+        ret->valStr = format("(!%s)", ChildInfo(0, valStr).c_str());
+      } else Panic();
+    } else if (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0) {
+      ret->valStr = format("((!%s) & %s)", ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
+    } else if (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) != 0) {
+      ret->valStr = format("(%s | %s)", ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
+    } else if (ChildInfo(2, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(2, consVal)) == 0) {
+      ret->valStr = format("(%s & %s)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
+    } else if (ChildInfo(2, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(2, consVal)) != 0) {
+      ret->valStr = format("((!%s) | %s)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
     } else {
-      if (MUX_OPT && ChildInfo(0, opNum) <= 1 && ChildInfo(1, opNum) <= 1  && ChildInfo(2, opNum) <= 1) {
-        ret->valStr = format("((-(%s)%s & %s) | ((-(%s)!%s) & %s))", widthUType(width).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), widthUType(width).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
+      if (MUX_OPT) {
+        ret->valStr = format("((%s & %s) | ((!%s) & %s))", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
       } else {
         ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
       }
     }
-  } else if (!childBasic && !enodeBasic) {
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    std::string trueAssign = setMpz(dstName, getChild(1), ret, node);
-    std::string falseAssign = setMpz(dstName, getChild(2), ret, node);
-    ret->insts.push_back(format("if (%s) { %s } else { %s }", ChildInfo(0, valStr).c_str(), trueAssign.c_str(), falseAssign.c_str()));
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else if (enodeBasic && !childBasic) {
-    if (width <= 64) {
-      std::string lname = ChildInfo(1, width) <= 64 ? ChildInfo(1, valStr) : format("mpz_get_ui(%s)", ChildInfo(1, valStr).c_str());
-      std::string rname = ChildInfo(2, width) <= 64 ? ChildInfo(2, valStr) : format("mpz_get_ui(%s)", ChildInfo(2, valStr).c_str());
-      ret->valStr = format("(%s ? %s : %s)", ChildInfo(0, valStr).c_str(), lname.c_str(), rname.c_str());
-    } else {
-      TODO();
-    }
   } else {
-    printf("width %d = mux %s(%d) %s(%d)\n", width, ChildInfo(1, valStr).c_str(), ChildInfo(1, width), ChildInfo(2, valStr).c_str(), ChildInfo(2, width));
-    TODO();
+    if (MUX_OPT && ChildInfo(0, opNum) <= 1 && ChildInfo(1, opNum) <= 1  && ChildInfo(2, opNum) <= 1 && width <= BASIC_WIDTH) {
+      ret->valStr = format("((-(%s)%s & %s) | ((-(%s)!%s) & %s))", widthUType(width).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), widthUType(width).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
+    } else {
+      ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
+    }
   }
   return ret;
 }
@@ -418,12 +315,7 @@ std::string idx2Str(Node* node, int idx, int dim) {
 std::string setCons(std::string lvalue, int width, valInfo* info) {
   Assert(info->status == VAL_CONSTANT, "%s expect constant", lvalue.c_str());
   std::string ret;
-  if (width > BASIC_WIDTH) {
-    if (mpz_cmp_ui(info->consVal, MAX_U64) > 0) ret = format("mpz_set_str(%s, \"%s\", 16);", lvalue.c_str(), mpz_get_str(NULL, 16, info->consVal));
-    else ret = format("mpz_set_ui(%s, %s);", lvalue.c_str(), info->valStr.c_str());
-  } else {
-    ret = format("%s = %s;\n", lvalue.c_str(), info->valStr.c_str());
-  }
+  ret = format("%s = %s;\n", lvalue.c_str(), info->valStr.c_str());
   return ret;
 }
 
@@ -471,68 +363,34 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
 
   bool toMux = false;
   std::string condStr, trueStr, falseStr;
-  if (childBasic && enodeBasic) {
-    auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
-      if (isStmt) return expr;
-      if (expr.length() == 0 || expr == lvalue) return std::string("");
-      else if (isSubArray(lvalue, node)) return arrayCopy(lvalue, node, info);
-      else if (node->width < width) return format("%s = (%s & %s);", lvalue.c_str(), expr.c_str(), bitMask(node->width).c_str());
-      else if (node->sign && node->width != width) return format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), expr.c_str());
-      return lvalue + " = " + expr + ";";
-    };
-    if (!isSubArray(lvalue, node) && node->assignTree.size() == 1 && stmtDepth == 0 && isRoot) {
-      if (!getChild(1) && getChild(2) && ChildInfo(2, opNum) >= 0 && ChildInfo(2, opNum) < 1 && ChildInfo(2, insts).size() == 0) {
-        toMux = true;
-        condStr = ChildInfo(0, valStr);
-        trueStr = lvalue;
-        falseStr = ChildInfo(2, valStr);
-      } else if (!getChild(2) && getChild(1) && ChildInfo(1, opNum) >= 0 && ChildInfo(1, opNum) < 1 && ChildInfo(1, insts).size() == 0) {
-        toMux = true;
-        condStr = ChildInfo(0, valStr);
-        trueStr = ChildInfo(1, valStr);
-        falseStr = lvalue;
-      }
-    }
-    if (!toMux) {
+  auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign, valInfo* info) {
+    if (isStmt) return expr;
+    if (expr.length() == 0 || expr == lvalue) return std::string("");
+    else if (isSubArray(lvalue, node)) return arrayCopy(lvalue, node, info);
+    else if (node->width < width) return format("%s = (%s & %s);", lvalue.c_str(), expr.c_str(), bitMask(node->width).c_str());
+    else if (node->sign && node->width != width) return format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), expr.c_str());
+    return lvalue + " = " + expr + ";";
+  };
+  if (!isSubArray(lvalue, node) && node->assignTree.size() == 1 && stmtDepth == 0 && isRoot && node->width <= 128) {
+    if (!getChild(1) && getChild(2) && ChildInfo(2, opNum) >= 0 && ChildInfo(2, opNum) < 1 && ChildInfo(2, insts).size() == 0) {
+      toMux = true;
       condStr = ChildInfo(0, valStr);
-      trueStr = ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ?
-                    assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "");
-      falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "");
+      trueStr = lvalue;
+      falseStr = ChildInfo(2, valStr);
+    } else if (!getChild(2) && getChild(1) && ChildInfo(1, opNum) >= 0 && ChildInfo(1, opNum) < 1 && ChildInfo(1, insts).size() == 0) {
+      toMux = true;
+      condStr = ChildInfo(0, valStr);
+      trueStr = ChildInfo(1, valStr);
+      falseStr = lvalue;
     }
-
-  } else if (!childBasic && !enodeBasic) { // can merge into childBasic && enodeBasic
-    auto assignmentMpz = [lvalue, node, ret](bool isStmt, std::string expr, int width, bool sign, valInfo* info, ENode* child) {
-      if (isStmt) return expr;
-      if (expr.length() == 0 || expr == lvalue) return std::string("");
-      else if (isSubArray(lvalue, node)) {
-        return arrayCopy(lvalue, node, info);
-      }
-      else if (width <= 64) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
-      else if (info->status == VAL_CONSTANT && info->consLength <= 16) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
-      else if (info->status == VAL_CONSTANT) TODO();
-      else if (width <= BASIC_WIDTH) return setMpz(lvalue, child, ret, node);
-      return format("mpz_set(%s, %s);", lvalue.c_str(), expr.c_str());
-    };
-    condStr = ChildInfo(0, valStr).c_str();
-    trueStr = ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ? assignmentMpz(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo), getChild(1)) : "");
-    falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignmentMpz(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo), getChild(2)) : "");
-  } else if (!enodeBasic && childBasic) {
-    auto assignment = [lvalue, node](bool isStmt, std::string expr, int width, bool sign) {
-      if (isStmt) return expr;
-      if (expr.length() == 0 || expr == lvalue) return std::string("");
-      else if (isSubArray(lvalue, node)) TODO();
-      else if (width <= 64) return format(sign ? "mpz_set_si(%s, %s);" : "mpz_set_ui(%s, %s);", lvalue.c_str(), expr.c_str());
-      else if (width <= BASIC_WIDTH) TODO();
-      else TODO();
-      return std::string("INALID");
-    };
-    condStr = ChildInfo(0, valStr).c_str();
-    trueStr = ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ? assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign)) : "");
-    falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign)) : "");
-
-  } else {
-    TODO();
   }
+  if (!toMux) {
+    condStr = ChildInfo(0, valStr);
+    trueStr = ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ?
+                  assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "");
+    falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "");
+  }
+
   if (toMux) {
     ret->valStr = format(" (%s ? %s : %s)", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
     ret->opNum = ChildInfo(0, opNum) + (getChild(1) ? ChildInfo(1, opNum) : 0) + (getChild(2) ? ChildInfo(2, opNum) : 0) + 1;
@@ -631,8 +489,6 @@ valInfo* ENode::instsStmt(Node* node, std::string lvalue, bool isRoot) {
     if (childENode->computeInfo->status == VAL_INVALID || childENode->computeInfo->status == VAL_EMPTY) continue;
     else if (childENode->computeInfo->opNum < 0) {
       computeInfo->valStr += childENode->computeInfo->valStr;
-    } else if (width > BASIC_WIDTH){
-      computeInfo->valStr += setMpz(lvalue, childENode, computeInfo, node);
     } else {
       if (isSubArray(lvalue, node)) {
         computeInfo->valStr += arrayCopy(lvalue, node, childENode->computeInfo);
@@ -654,14 +510,12 @@ valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
     us_add(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     std::string lstr = ChildInfo(0, valStr);
     std::string rstr = ChildInfo(1, valStr);
     if (sign) { // signed extension
@@ -680,12 +534,6 @@ valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
     if (!sign && width <= MAX(ChildInfo(0, width), ChildInfo(1, width))) {
       ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
     }
-  } else if (enodeBasic) {
-    TODO();
-  } else if (!childBasic && enodeBasic) {
-    TODO();
-  } else {
-    Panic();
   }
   return ret;
 }
@@ -694,14 +542,12 @@ valInfo* ENode::instsSub(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
     us_sub(ret->consVal, ChildInfo(0, consVal), ChildInfo(1, consVal), width);
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     std::string lstr = ChildInfo(0, valStr);
     std::string rstr = ChildInfo(1, valStr);
     if (sign) {
@@ -720,8 +566,6 @@ valInfo* ENode::instsSub(Node* node, std::string lvalue, bool isRoot) {
     if (!sign) {
       ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
     }
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -730,48 +574,14 @@ valInfo* ENode::instsMul(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
     us_mul(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign)+ ChildInfo(0, valStr) + " * " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else if (childBasic && !enodeBasic) {
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    std::string lname = newMpzTmp();
-    std::string rname = newMpzTmp();
-    /* assign left & right values to mpz variables */
-    if (ChildInfo(0, width) > 64) {
-      std::string localVal = ChildInfo(0, valStr);
-      if (ChildInfo(0, opNum) > 0) {
-        localVal = newLocalTmp();
-        ret->insts.push_back(format("%s %s = %s;", widthUType(ChildInfo(0, width)).c_str(), localVal.c_str(), ChildInfo(0, valStr).c_str()));
-      }
-      ret->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", lname.c_str(), localVal.c_str()));
-    } else {
-      std::string funcName = sign ? "mpz_set_si" : "mpz_set_ui";
-      ret->insts.push_back(format("%s(%s, %s);", funcName.c_str(), lname.c_str(), ChildInfo(0, valStr).c_str()));
-    }
-    if (ChildInfo(1, width) > 64) {
-      std::string localVal = ChildInfo(0, valStr);
-      if (ChildInfo(1, opNum) > 0) {
-        localVal = newLocalTmp();
-        ret->insts.push_back(format("%s %s = %s;", widthUType(ChildInfo(1, width)).c_str(), localVal.c_str(), ChildInfo(1, valStr).c_str()));
-      }
-      ret->insts.push_back(format("mpz_import(%s, 2, -1, 8, 0, 0, (mp_limb_t*)&%s);", rname.c_str(), localVal.c_str()));
-    } else {
-      std::string funcName = sign ? "mpz_set_si" : "mpz_set_ui";
-      ret->insts.push_back(format("%s(%s, %s);", funcName.c_str(), rname.c_str(), ChildInfo(1, valStr).c_str()));
-    }
-    ret->insts.push_back(format("mpz_mul(%s, %s, %s);", dstName.c_str(), lname.c_str(), rname.c_str()));
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -780,18 +590,14 @@ valInfo* ENode::instsDIv(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
     us_div(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign)+ ChildInfo(0, valStr) + " / " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -800,18 +606,14 @@ valInfo* ENode::instsRem(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
     us_rem(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign)+ ChildInfo(0, valStr) + " % " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -820,8 +622,6 @@ valInfo* ENode::instsLt(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
@@ -829,7 +629,7 @@ valInfo* ENode::instsLt(Node* node, std::string lvalue, bool isRoot) {
     ret->setConsStr();
   } else if (ChildInfo(0, valStr) == ChildInfo(1, valStr)) {
     ret->setConstantByStr("0");
-  } else if (childBasic && enodeBasic) {
+  } else {
     if (Child(0, sign)) {
       ret->valStr = format("(%s%s < %s%s)", Cast(Child(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(),
                                             Cast(Child(1, width), Child(1, sign)).c_str(), ChildInfo(1, valStr).c_str());
@@ -837,8 +637,6 @@ valInfo* ENode::instsLt(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = "(" + ChildInfo(0, valStr) + " < " + ChildInfo(1, valStr) + ")";
     }
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -847,8 +645,6 @@ valInfo* ENode::instsLeq(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
@@ -856,7 +652,7 @@ valInfo* ENode::instsLeq(Node* node, std::string lvalue, bool isRoot) {
     ret->setConsStr();
   } else if (ChildInfo(0, valStr) == ChildInfo(1, valStr)) {
     ret->setConstantByStr("1");
-  } else if (childBasic && enodeBasic) {
+  } else {
     if (Child(0, sign)) {
       ret->valStr = format("(%s%s <= %s%s)", Cast(Child(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(),
                                             Cast(Child(1, width), Child(1, sign)).c_str(), ChildInfo(1, valStr).c_str());
@@ -864,8 +660,6 @@ valInfo* ENode::instsLeq(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = "(" + ChildInfo(0, valStr) + " <= " + ChildInfo(1, valStr) + ")";
     }
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -874,8 +668,6 @@ valInfo* ENode::instsGt(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
@@ -883,7 +675,7 @@ valInfo* ENode::instsGt(Node* node, std::string lvalue, bool isRoot) {
     ret->setConsStr();
   } else if (ChildInfo(0, valStr) == ChildInfo(1, valStr)) {
     ret->setConstantByStr("0");
-  } else if (childBasic && enodeBasic) {
+  } else {
     if (Child(0, sign)) {
       ret->valStr = format("(%s%s > %s%s)", Cast(Child(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(),
                                             Cast(Child(1, width), Child(1, sign)).c_str(), ChildInfo(1, valStr).c_str());
@@ -891,8 +683,6 @@ valInfo* ENode::instsGt(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = "(" + ChildInfo(0, valStr) + " > " + ChildInfo(1, valStr) + ")";
     }
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -901,8 +691,6 @@ valInfo* ENode::instsGeq(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
@@ -910,7 +698,7 @@ valInfo* ENode::instsGeq(Node* node, std::string lvalue, bool isRoot) {
     ret->setConsStr();
   } else if (ChildInfo(0, valStr) == ChildInfo(1, valStr)) {
     ret->setConstantByStr("1");
-  } else if (childBasic && enodeBasic) {
+  } else {
     if (Child(0, sign)) {
       ret->valStr = format("(%s%s >= %s%s)", Cast(Child(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(),
                                             Cast(Child(1, width), Child(1, sign)).c_str(), ChildInfo(1, valStr).c_str());
@@ -918,8 +706,6 @@ valInfo* ENode::instsGeq(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = "(" + ChildInfo(0, valStr) + " >= " + ChildInfo(1, valStr) + ")";
     }
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -928,8 +714,6 @@ valInfo* ENode::instsEq(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
@@ -940,7 +724,7 @@ valInfo* ENode::instsEq(Node* node, std::string lvalue, bool isRoot) {
   } else if ((ChildInfo(0, status) == VAL_CONSTANT && mpzOutOfBound(ChildInfo(0, consVal), Child(1, width)))
       ||(ChildInfo(1, status) == VAL_CONSTANT && mpzOutOfBound(ChildInfo(1, consVal), Child(0, width)))) {
     ret->setConstantByStr("0");
-  } else if (childBasic && enodeBasic) {
+  } else {
     if (Child(1, width) == 1 && ChildInfo(0, status) == VAL_CONSTANT && mpz_cmp_ui(ChildInfo(0, consVal), 1) == 0) {
       computeInfo = Child(1, computeInfo);
     } else if (Child(0, width) == 1 && ChildInfo(1, status) == VAL_CONSTANT && mpz_cmp_ui(ChildInfo(1, consVal), 1) == 0) {
@@ -952,33 +736,6 @@ valInfo* ENode::instsEq(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = "(" + ChildInfo(0, valStr) + " == " + ChildInfo(1, valStr) + ")";
       ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     }
-  } else if (!childBasic && enodeBasic) {
-    if (ChildInfo(0, width) > BASIC_WIDTH && ChildInfo(1, width) > BASIC_WIDTH) {
-      ret->valStr = format("(mpz_cmp(%s, %s) == 0)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
-      ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-    } else if (ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) > BASIC_WIDTH){
-      std::string tmp;
-      if (ChildInfo(0, width) > 64) {
-        std::string tmp = set256_tmp(Child(0, computeInfo), computeInfo);
-      } else {
-        tmp = newMpzTmp();
-        computeInfo->insts.push_back(format("mpz_set_ui(%s, %s);", tmp.c_str(), ChildInfo(0, valStr).c_str()));
-      }
-      ret->valStr = format("(mpz_cmp(%s, %s) == 0)", tmp.c_str(), ChildInfo(1, valStr).c_str());
-      ret->opNum = 1;
-    } else if (ChildInfo(0, width) > BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH){
-      std::string tmp;
-      if (ChildInfo(1, width) > 64) {
-        tmp = set256_tmp(Child(1, computeInfo), computeInfo);
-      } else {
-        tmp = newMpzTmp();
-        computeInfo->insts.push_back(format("mpz_set_ui(%s, %s);", tmp.c_str(), ChildInfo(1, valStr).c_str()));
-      }
-      ret->valStr = format("(mpz_cmp(%s, %s) == 0)", tmp.c_str(), ChildInfo(0, valStr).c_str());
-      ret->opNum = 1;
-    }
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -987,8 +744,6 @@ valInfo* ENode::instsNeq(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
@@ -996,7 +751,7 @@ valInfo* ENode::instsNeq(Node* node, std::string lvalue, bool isRoot) {
     ret->setConsStr();
   } else if (ChildInfo(0, valStr) == ChildInfo(1, valStr)) {
     ret->setConstantByStr("0");
-  } else if (childBasic && enodeBasic) {
+  } else {
     if (Child(1, width) == 1 && ChildInfo(0, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(0, consVal)) == 0) {
       computeInfo = Child(1, computeInfo);
     } else if (Child(0, width) == 1 && ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0) {
@@ -1008,22 +763,6 @@ valInfo* ENode::instsNeq(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = "(" + ChildInfo(0, valStr) + " != " + ChildInfo(1, valStr) + ")";
       ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     }
-  } else if (!childBasic && enodeBasic) {
-    if (ChildInfo(0, status) == VAL_CONSTANT && ChildInfo(0, consLength) > 64) TODO();
-    if (ChildInfo(1, status) == VAL_CONSTANT && ChildInfo(1, consLength) > 64) TODO();
-    std::string lvalue = ChildInfo(0, valStr);
-    std::string rvalue = ChildInfo(1, valStr);
-    if (ChildInfo(0, status) == VAL_CONSTANT) {
-      rvalue = ChildInfo(0, valStr);
-      lvalue = ChildInfo(1, valStr);
-    }
-    bool halfConstant = ChildInfo(0, status) == VAL_CONSTANT || ChildInfo(1, status) == VAL_CONSTANT;
-    std::string formatStr = halfConstant ? (sign ? "(mpz_cmp_si(%s, %s) != 0)" : "(mpz_cmp_ui(%s, %s) != 0)")
-                                        : "(mpz_cmp(%s, %s) != 0)";
-    ret->valStr = format(formatStr.c_str(), lvalue.c_str(), rvalue.c_str());
-    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1032,42 +771,16 @@ valInfo* ENode::instsDshl(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
     if (sign) TODO();
     u_dshl(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     int castWidth = ChildInfo(0, width) + (1 << ChildInfo(1, width)) - 1;
     ret->valStr = format("(%s(%s%s << %s) & %s)", Cast(width, sign).c_str(), upperCast(castWidth, ChildInfo(0, width), sign).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), bitMask(width).c_str());
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else if (childBasic && !enodeBasic) {
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    if (ChildInfo(0, width) < 64 && ChildInfo(1, width) < 64) {
-      std::string midName = newMpzTmp();
-      ret->insts.push_back(format("mpz_set_ui(%s, %s);", midName.c_str(), ChildInfo(0, valStr).c_str()));
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
-      ret->valStr = dstName;
-      ret->opNum = 0;
-    } else if (ChildInfo(1, width) < 64) {
-      std::string midName = set256_tmp(Child(0, computeInfo), ret);
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
-      ret->valStr = dstName;
-      ret->opNum = 0;
-    } else {
-      TODO();
-    }
-  } else if (!childBasic && !enodeBasic) {
-    if (ChildInfo(1, width) > 64) TODO();
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1076,8 +789,6 @@ valInfo* ENode::instsDshr(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
@@ -1091,29 +802,9 @@ valInfo* ENode::instsDshr(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = format("(%s & %s)", ChildInfo(0, valStr).c_str(), bitMask(width).c_str());
       ret->opNum = ChildInfo(0, opNum) + 1;
     }
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = format("((%s%s >> %s) & %s)", Cast(ChildInfo(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), bitMask(width).c_str());
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else if (!childBasic && !enodeBasic) {
-    if (ChildInfo(1, width) > 64) TODO();
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
-    ret->valStr = dstName;
-    ret->opNum = 0;
-    if (width < ChildInfo(0, width)) {
-      std::string tmpMpz = newMpzTmp();
-      ret->insts.push_back(format("mpz_and(%s, %s, %s);", dstName.c_str(), addMask(width).c_str(), dstName.c_str()));
-    }
-  } else if (enodeBasic && !childBasic) {
-    std::string tmp = newMpzTmp();
-    ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %s);", tmp.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
-    if (width <= 64) {
-      ret->valStr = format("(mpz_get_ui(%s) & %s)", tmp.c_str(), bitMask(width).c_str());
-      ret->opNum = 1;
-    } else TODO();
-  } else {
-    printf("%d = %s(%d) >> %s(%d)\n", width, ChildInfo(0, valStr).c_str(), ChildInfo(0, width), ChildInfo(1, valStr).c_str(), ChildInfo(1, width));
-    TODO();
   }
   return ret;
 }
@@ -1122,8 +813,6 @@ valInfo* ENode::instsAnd(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
@@ -1137,35 +826,9 @@ valInfo* ENode::instsAnd(Node* node, std::string lvalue, bool isRoot) {
     computeInfo = Child(1, computeInfo);
   } else if (ChildInfo(1, status) == VAL_CONSTANT && ChildInfo(0, width) == ChildInfo(1, width) && allOnes(ChildInfo(1, consVal), width)) {
     computeInfo = Child(0, computeInfo);
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + ChildInfo(0, valStr) + " & " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else if (!childBasic && enodeBasic) {
-    if (width <= 64) {
-      std::string lname = ChildInfo(0, width) <= 64 ? ChildInfo(0, valStr) : format("mpz_get_ui(%s)", ChildInfo(0, valStr).c_str());
-      std::string rname = ChildInfo(1, width) <= 64 ? ChildInfo(1, valStr) : format("mpz_get_ui(%s)", ChildInfo(1, valStr).c_str());
-      ret->valStr = format("(%s & %s)", lname.c_str(), rname.c_str());
-      ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-    } else {
-      TODO();
-    }
-  } else if (!childBasic && !enodeBasic) {
-    std::string lvalue = ChildInfo(0, valStr), rvalue = ChildInfo(1, valStr);
-    if (ChildInfo(0, status) == VAL_CONSTANT) {
-      lvalue = newMpzTmp();
-      setMpz(lvalue, getChild(0), ret, node);
-    }
-    if (ChildInfo(1, status) == VAL_CONSTANT) {
-      rvalue = newMpzTmp();
-      setMpz(rvalue, getChild(1), ret, node);
-    }
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_and(%s, %s, %s);", dstName.c_str(), lvalue.c_str(), rvalue.c_str()));
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else {
-    printf("%d = %s(%d) & %s(%d)\n", width, ChildInfo(0, valStr).c_str(), ChildInfo(0, width), ChildInfo(1, valStr).c_str(), ChildInfo(1, width));
-    TODO();
   }
   return ret;
 }
@@ -1174,8 +837,6 @@ valInfo* ENode::instsOr(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
@@ -1188,33 +849,9 @@ valInfo* ENode::instsOr(Node* node, std::string lvalue, bool isRoot) {
   } else if (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0) {
     ret->valStr = ChildInfo(0, valStr);
     ret->opNum = ChildInfo(0, opNum);
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + ChildInfo(0, valStr) + " | " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else if (!childBasic && !enodeBasic) {
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    valInfo* linfo = Child(0, computeInfo);
-    valInfo* rinfo = Child(1, computeInfo);
-    if (ChildInfo(0, status) == VAL_CONSTANT) {
-      rinfo = Child(0, computeInfo);
-      linfo = Child(1, computeInfo);
-    }
-    if(rinfo->status == VAL_CONSTANT) {
-      if (mpz_sgn(rinfo->consVal) != 0) TODO();
-      ret->valStr = linfo->valStr;
-      ret->opNum = linfo->opNum;
-    } else {
-      std::string lname = ChildInfo(0, valStr).c_str();
-      std::string rname = ChildInfo(1, valStr).c_str();
-      if (ChildInfo(0, width) <= BASIC_WIDTH) lname = set256_tmp(Child(0, computeInfo), ret);
-      if (ChildInfo(1, width) <= BASIC_WIDTH) rname = set256_tmp(Child(1, computeInfo), ret);
-      ret->insts.push_back(format("mpz_ior(%s, %s, %s);", dstName.c_str(), lname.c_str(), rname.c_str()));
-      ret->valStr = dstName;
-      ret->opNum = 0;
-    }
-  } else {
-    printf("%d = %s(%d) | %s(%d)\n", width, ChildInfo(0, valStr).c_str(), ChildInfo(0, width), ChildInfo(1, valStr).c_str(), ChildInfo(1, width));
-    TODO();
   }
   return ret;
 }
@@ -1223,28 +860,15 @@ valInfo* ENode::instsXor(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (isConstant) {
     if (sign) TODO();
     u_xor(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + ChildInfo(0, valStr) + " ^ " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-  } else if (!childBasic && !enodeBasic) {
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    if (ChildInfo(0, width) > BASIC_WIDTH && ChildInfo(1, width) > BASIC_WIDTH) {
-      ret->insts.push_back(format("mpz_xor(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str()));
-      ret->valStr = dstName;
-      ret->opNum = 0;
-    } else {
-      TODO();
-    }
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1253,8 +877,6 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH && ChildInfo(1, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = (ChildInfo(0, status) == VAL_CONSTANT) && (ChildInfo(1, status) == VAL_CONSTANT);
 
   if (ChildInfo(0, status) == VAL_CONSTANT) {
@@ -1277,7 +899,7 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
     if (sign) TODO();
     u_cat(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     std::string hi;
     if (ChildInfo(0, status) == VAL_CONSTANT) {
       mpz_t cons_hi;
@@ -1298,48 +920,6 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
       }
       ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     }
-  } else if (childBasic && !enodeBasic) { // child <= BASIC_WIDTH, cur > BASIC_WIDTH
-    Assert(ChildInfo(0, opNum) >= 0 && ChildInfo(1, opNum) >= 0, "invalid opNum (%d %s) (%d, %s)", ChildInfo(0, opNum), ChildInfo(0, valStr).c_str(), ChildInfo(1, opNum), ChildInfo(1, valStr).c_str());
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    std::string midName;
-    /* set first value */
-    midName = set256_tmp(Child(0, computeInfo), ret);
-    /* concat second value*/
-    if (ChildInfo(1, width) > 64) {
-      std::string rightName = set256_tmp(Child(1, computeInfo), ret);
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);\n", midName.c_str(), midName.c_str(), Child(1, width)));
-      ret->insts.push_back(format("mpz_add(%s, %s, %s);", dstName.c_str(), midName.c_str(), rightName.c_str()));
-    } else {
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), midName.c_str(), Child(1, width)));
-      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
-    }
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else if (!childBasic && !enodeBasic) { // child > BASIC, cur > BASIC
-    std::string midName = newMpzTmp();
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    std::string firstName = ChildInfo(0, valStr);
-    /* one of child is basic */
-    if (ChildInfo(0, width) <= BASIC_WIDTH || ChildInfo(0, status) == VAL_CONSTANT) {
-      firstName = set256_tmp(Child(0, computeInfo), ret);
-    }
-    if (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0) {
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), firstName.c_str(), Child(1, width)));
-    } else if (Child(1, width) <= 64) {
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width)));
-      ret->insts.push_back(format("mpz_add_ui(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
-    } else if (Child(1, width) <= BASIC_WIDTH) {
-      set256_tmp(Child(1, computeInfo), ret, midName);
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);\n", midName.c_str(), firstName.c_str(), Child(1, width)));
-      ret->insts.push_back(format("mpz_add(%s, %s, %s);", dstName.c_str(), midName.c_str(), midName.c_str()));
-    } else {
-      ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", midName.c_str(), firstName.c_str(), Child(1, width)));
-      ret->insts.push_back(format("mpz_add(%s, %s, %s);", dstName.c_str(), midName.c_str(), ChildInfo(1, valStr).c_str()));
-    }
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1348,37 +928,15 @@ valInfo* ENode::instsAsUInt(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
   if (isConstant) {
     if (sign) TODO();
     u_asUInt(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + Cast(width, false) + ChildInfo(0, valStr) + " & " + bitMask(Child(0, width)) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else if (!childBasic && !enodeBasic) {
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    std::string tmp = newMpzTmp();
-    ret->insts.push_back(format("if (mpz_sgn(%s) < 0) {\
-      mpz_set_ui(%s, 1); \
-      mpz_mul_2exp(%s, %s, %d); \
-      mpz_add(%s, %s, %s); \
-    } else { \
-      mpz_set(%s, %s); \
-    }", ChildInfo(0, valStr).c_str(),
-        tmp.c_str(),
-        tmp.c_str(), tmp.c_str(), width,
-        dstName.c_str(), ChildInfo(0, valStr).c_str(), tmp.c_str(),
-        dstName.c_str(), ChildInfo(0, valStr).c_str()
-    ));
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else {
-    printf("node %s width %d\n", node->name.c_str(), width);
-    TODO();
   }
   return ret;
 }
@@ -1387,15 +945,13 @@ valInfo* ENode::instsAsSInt(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
   if (isConstant) {
     if (!sign) TODO();
     s_asSInt(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     if (Child(0, sign)) ret->valStr = format("%s%s%s", Cast(width, true).c_str(), Cast(ChildInfo(0, width), true).c_str(), ChildInfo(0, valStr).c_str());
     else {
       int shiftBits = widthBits(width) - ChildInfo(0, width);
@@ -1405,25 +961,6 @@ valInfo* ENode::instsAsSInt(Node* node, std::string lvalue, bool isRoot) {
         ret->valStr = format("(%s(%s << %d) >> %d)", Cast(width, true).c_str(), ChildInfo(0, valStr).c_str(), shiftBits, shiftBits);
     }
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else if (!childBasic && !enodeBasic){
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    std::string tmp = newMpzTmp();
-    ret->insts.push_back(format("if (mpz_tstbit(%s, %d)){\
-      mpz_set_ui(%s, 1); \
-      mpz_mul_2exp(%s, %s, %d); \
-      mpz_sub(%s, %s, %s); \
-    } else {\
-      mpz_set(%s, %s); \
-    }", ChildInfo(0, valStr).c_str(), width,
-        tmp.c_str(),
-        tmp.c_str(), tmp.c_str(), width,
-        dstName.c_str(), ChildInfo(0, valStr).c_str(), tmp.c_str(),
-        dstName.c_str(), ChildInfo(0, valStr).c_str()));
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else {
-    printf("node %s width %d\n", node->name.c_str(), width);
-    TODO();
   }
   return ret;
 }
@@ -1432,19 +969,15 @@ valInfo* ENode::instsAsClock(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
   if (isConstant) {
     if (sign) TODO();
     u_asClock(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + ChildInfo(0, valStr) + " != 0)";
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1453,20 +986,16 @@ valInfo* ENode::instsAsAsyncReset(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
   if (isConstant) {
     if (sign) TODO();
     u_asAsyncReset(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     if (ChildInfo(0, width) == 1) ret->valStr = ChildInfo(0, valStr);
     else ret->valStr = "(" + ChildInfo(0, valStr) + " != 0)";
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1475,19 +1004,14 @@ valInfo* ENode::instsCvt(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
-
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
   if (isConstant) {
     (sign ? s_cvt : u_cvt)(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + Cast(width, sign) + ChildInfo(0, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1; // may keep same ?
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1496,21 +1020,17 @@ valInfo* ENode::instsNeg(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
   if (isConstant) {
     if (!sign) TODO();
     s_neg(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     /* cast explicitly only if type do not match or argument is UInt */
     std::string castStr = (typeCmp(width, ChildInfo(0, width)) > 0 || !getChild(0)->sign) ? Cast(width, sign) : "";
     ret->valStr = "(-" + castStr + ChildInfo(0, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1519,26 +1039,15 @@ valInfo* ENode::instsNot(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
   if (Child(0, width) != ChildInfo(0, width)) TODO();
   if (isConstant) {
     if (sign) TODO();
     u_not(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + ChildInfo(0, valStr) + " ^ " + bitMask(width) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else if (!childBasic && !enodeBasic) {
-    std::string tmpMpz = newMpzTmp();
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_xor(%s, %s, %s);", dstName.c_str(), addMask(width).c_str(), ChildInfo(0, valStr).c_str()));
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else {
-    printf("%d = ~ %s(%d)\n", width, ChildInfo(0, valStr).c_str(), ChildInfo(0, width));
-    TODO();
   }
   return ret;
 }
@@ -1547,19 +1056,15 @@ valInfo* ENode::instsAndr(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
   if (Child(0, width) != ChildInfo(0, width)) TODO();
   if (isConstant) {
     if (sign) TODO();
     u_andr(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + ChildInfo(0, valStr) + " == " + bitMask(ChildInfo(0, width)) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1568,22 +1073,15 @@ valInfo* ENode::instsOrr(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
   if (Child(0, width) != ChildInfo(0, width)) TODO();
   if (isConstant) {
     if (sign) TODO();
     u_orr(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else{
     ret->valStr = "(" + ChildInfo(0, valStr) + " != 0 )";
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else if (!childBasic && enodeBasic) {
-    ret->valStr = format("(mpz_sgn(%s) != 0)", ChildInfo(0, valStr).c_str());
-    ret->opNum = ChildInfo(0, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1592,15 +1090,13 @@ valInfo* ENode::instsXorr(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
   if (isConstant) {
     if (sign) TODO();
     u_xorr(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     if (Child(0, width) <= 64) {
       ret->valStr = "__builtin_parityl(" + ChildInfo(0, valStr) + ")";
       ret->opNum = ChildInfo(0, opNum) + 1;
@@ -1608,8 +1104,6 @@ valInfo* ENode::instsXorr(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = format("(__builtin_parityl(%s >> 64) ^ __builtin_parityl(%s))", ChildInfo(0, valStr).c_str(), ChildInfo(0, valStr).c_str());
       ret->opNum = ChildInfo(0, opNum) + 1;
     } else TODO();
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1618,17 +1112,12 @@ valInfo* ENode::instsPad(Node* node, std::string lvalue, bool isRoot) {
   /* no operation for UInt variable */
   if (!sign || (width <= ChildInfo(0, width))) {
     for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
-    if (width > BASIC_WIDTH && ChildInfo(0, width) <= BASIC_WIDTH) {
-      computeInfo->valStr = set256_tmp(Child(0, computeInfo), computeInfo);
-      computeInfo->opNum = 0;
+    if (ChildInfo(0, opNum) >= 0 && widthBits(ChildInfo(0, width)) < width) {
+      computeInfo->valStr = format("(%s)%s", widthUType(width).c_str(), ChildInfo(0, valStr).c_str());
+      computeInfo->opNum = ChildInfo(0, opNum) + 1;
     } else {
-      if (ChildInfo(0, opNum) >= 0 && widthBits(ChildInfo(0, width)) < width && width <= BASIC_WIDTH) {
-        computeInfo->valStr = format("(%s)%s", widthUType(width).c_str(), ChildInfo(0, valStr).c_str());
-        computeInfo->opNum = ChildInfo(0, opNum) + 1;
-      } else {
-        computeInfo->valStr = ChildInfo(0, valStr);
-        computeInfo->opNum = ChildInfo(0, opNum);
-      }
+      computeInfo->valStr = ChildInfo(0, valStr);
+      computeInfo->opNum = ChildInfo(0, opNum);
     }
     return computeInfo;
   }
@@ -1636,14 +1125,12 @@ valInfo* ENode::instsPad(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
   if (isConstant) {
     (sign ? s_pad : u_pad)(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), values[0]);  // n(values[0]) == width
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     std::string operandName;
     if (ChildInfo(0, opNum) == 0) operandName = ChildInfo(0, valStr);
     else {
@@ -1656,8 +1143,6 @@ valInfo* ENode::instsPad(Node* node, std::string lvalue, bool isRoot) {
     std::string signExtended = "(" + lshiftVal + " >>" + std::to_string(shiftBits) + ")";
     ret->valStr = "(" + signExtended + " & " + bitMask(width) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1666,8 +1151,6 @@ valInfo* ENode::instsShl(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
   int n = values[0];
 
@@ -1675,26 +1158,9 @@ valInfo* ENode::instsShl(Node* node, std::string lvalue, bool isRoot) {
     if (sign) TODO();
     u_shl(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), n);
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + ChildInfo(0, valStr) + " << " + std::to_string(n) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else if (!childBasic && !enodeBasic) {
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), ChildInfo(0, valStr).c_str(), n));
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else if (childBasic && !enodeBasic){
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    if (Child(0, width) <= 64) {
-      ret->insts.push_back(format("mpz_set_ui(%s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str()));
-    } else {
-      set256_tmp(Child(0, computeInfo), ret, dstName);
-    }
-    ret->insts.push_back(format("mpz_mul_2exp(%s, %s, %d);", dstName.c_str(), dstName.c_str(), n));
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1703,35 +1169,15 @@ valInfo* ENode::instsShr(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
   int n = values[0];
 
   if (isConstant) {
     (sign ? s_shr : u_shr)(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), values[0]);  // n(values[0]) == width
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + ChildInfo(0, valStr) + " >> " + std::to_string(n) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else if (!childBasic && !enodeBasic) {
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", dstName.c_str(), ChildInfo(0, valStr).c_str(), n));
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else if(!childBasic && enodeBasic) {
-    std::string tmp = newMpzTmp();
-    ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", tmp.c_str(), ChildInfo(0, valStr).c_str(), n));
-    if (width > 64) {
-      ret->valStr = get256(tmp, width);
-      ret->opNum = 1;
-    } else {
-      ret->valStr = format("mpz_get_ui(%s)", tmp.c_str());
-      ret->opNum = 1;
-    }
-  } else {
-    printf("%d = %s(%d) >> %d\n", width, ChildInfo(0, valStr).c_str(), ChildInfo(0, width), n);
-    TODO();
   }
   return ret;
 }
@@ -1743,8 +1189,6 @@ valInfo* ENode::instsHead(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
   int n = values[0];
   Assert(n >= 0, "child width %d is less than current width %d", Child(0, width), values[0]);
@@ -1753,21 +1197,13 @@ valInfo* ENode::instsHead(Node* node, std::string lvalue, bool isRoot) {
     if (sign) TODO();
     u_head(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), n);
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     if (Child(0, sign)) {
       ret->valStr = "(" + Cast(width, sign) + ChildInfo(0, valStr) + " >> " + std::to_string(n) + ")";
     }  else {
       ret->valStr = "(" + ChildInfo(0, valStr) + " >> " + std::to_string(n) + ")";
     }
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else if (!childBasic && enodeBasic) {
-    std::string tmp = newMpzTmp();
-    ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", tmp.c_str(), ChildInfo(0, valStr).c_str(), n));
-    if (width > 64) ret->valStr = get256(tmp, width);
-    else ret->valStr = format("mpz_get_ui(%s)", tmp.c_str());
-    ret->opNum = 1;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1780,8 +1216,6 @@ valInfo* ENode::instsTail(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
   int n = MIN(width, values[0]);
 
@@ -1789,34 +1223,18 @@ valInfo* ENode::instsTail(Node* node, std::string lvalue, bool isRoot) {
     if (sign) TODO();
     u_tail(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), n); // u_tail remains the last n bits
     ret->setConsStr();
-  } else if (childBasic && enodeBasic) {
+  } else {
     if (Child(0, sign)) {
       ret->valStr = "(" + Cast(width, sign) + ChildInfo(0, valStr) + " & " + bitMask(n) + ")";
     }  else {
       ret->valStr = "(" + ChildInfo(0, valStr) + " & " + bitMask(n) + ")";
     }
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else if (!childBasic && enodeBasic) {
-    if (width <= 64) {
-      ret->valStr = format("(mpz_get_ui(%s) & %s)", ChildInfo(0, valStr).c_str(), bitMask(n).c_str());
-    } else {
-      ret->valStr = format("(%s & %s)", get256(ChildInfo(0, valStr), width).c_str(), bitMask(n).c_str());
-    }
-    ret->opNum = ChildInfo(0, opNum) + 1;
-  } else if (!childBasic && !enodeBasic) {
-    std::string tmpMpz = newMpzTmp();
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_and(%s, %s, %s);", dstName.c_str(), addMask(width).c_str(), ChildInfo(0, valStr).c_str()));
-    ret->valStr = dstName;
-  } else {
-    TODO();
   }
   return ret;
 }
 
 void infoBits(valInfo* ret, ENode* enode, valInfo* childInfo) {
-  bool childBasic = childInfo->width <= BASIC_WIDTH;
-  bool enodeBasic = enode->width <= BASIC_WIDTH;
   bool isConstant = childInfo->status == VAL_CONSTANT;
 
   int hi = enode->values[0];
@@ -1832,7 +1250,7 @@ void infoBits(valInfo* ret, ENode* enode, valInfo* childInfo) {
   } else if (childInfo->width <= BASIC_WIDTH && lo == 0 && w == childInfo->width) {
     ret->valStr = childInfo->width;
     ret->opNum = childInfo->width;
-  } else if (childBasic && enodeBasic) {
+  } else {
     std::string shift;
     if (lo == 0) {
       if (childInfo->sign) shift = Cast(childInfo->width, childInfo->sign) + childInfo->valStr;
@@ -1843,35 +1261,6 @@ void infoBits(valInfo* ret, ENode* enode, valInfo* childInfo) {
     }
     ret->valStr = "(" + shift + " & " + bitMask(w) + ")";
     ret->opNum = childInfo->opNum + 1;
-  } else if (!childBasic && enodeBasic) {
-    std::string mpzTmp1 = newMpzTmp();
-    std::string mpzTmp2 = newMpzTmp(); // mask
-    std::string shiftVal = mpzTmp1;
-    if (lo != 0) {
-      ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", mpzTmp1.c_str(), childInfo->valStr.c_str(), lo));
-    } else {
-      shiftVal = childInfo->valStr;
-    }
-    if (w > 64) {
-      ret->insts.push_back(format("mpz_and(%s, %s, %s);", mpzTmp2.c_str(), shiftVal.c_str(), addMask(enode->width).c_str()));
-      ret->valStr = get256(mpzTmp2, w);
-    } else {
-      ret->valStr = format("(mpz_get_ui(%s) & %s)", shiftVal.c_str(), bitMask(w).c_str());
-    }
-    ret->opNum = 1;
-  } else if (!childBasic && !enodeBasic){
-    std::string mpzTmp1 = newMpzTmp();
-    std::string shiftVal = mpzTmp1;
-    if (lo != 0) {
-      ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", mpzTmp1.c_str(), childInfo->valStr.c_str(), lo));
-    } else {
-      shiftVal = childInfo->valStr;
-    }
-    ret->insts.push_back(format("mpz_and(%s, %s, %s);", mpzTmp1.c_str(), shiftVal.c_str(), addMask(enode->width).c_str()));
-    ret->valStr = mpzTmp1;
-    ret->opNum = 0;
-  } else {
-    TODO();
   }
 }
 
@@ -1879,8 +1268,6 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
   
   int hi = values[0];
@@ -1896,7 +1283,7 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
   } else if (ChildInfo(0, width) <= BASIC_WIDTH && lo == 0 && w == ChildInfo(0, width)) {
     ret->valStr = ChildInfo(0, valStr);
     ret->opNum = ChildInfo(0, opNum);
-  } else if (childBasic && enodeBasic) {
+  } else {
     std::string shift;
     if (lo == 0) {
       if (Child(0, sign)) shift = Cast(ChildInfo(0, width), Child(0, sign)) + ChildInfo(0, valStr);
@@ -1919,35 +1306,6 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
         ret->memberInfo.push_back(nullptr);
       }
     }
-  } else if (!childBasic && enodeBasic) {
-    std::string mpzTmp1 = newMpzTmp();
-    std::string shiftVal = mpzTmp1;
-    if (lo != 0) {
-      ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", mpzTmp1.c_str(), ChildInfo(0, valStr).c_str(), lo));
-    } else {
-      shiftVal = ChildInfo(0, valStr);
-    }
-    if (w > 64) {
-      std::string mpzTmp2 = newMpzTmp(); // mask
-      ret->insts.push_back(format("mpz_and(%s, %s, %s);", mpzTmp2.c_str(), shiftVal.c_str(), addMask(width).c_str()));
-      ret->valStr = get256(mpzTmp2, w);
-    } else {
-      ret->valStr = format("(mpz_get_ui(%s) & %s)", shiftVal.c_str(), bitMask(w).c_str());
-    }
-    ret->opNum = 1;
-  } else if (!childBasic && !enodeBasic){
-    std::string mpzTmp1 = newMpzTmp();
-    std::string shiftVal = mpzTmp1;
-    if (lo != 0) {
-      ret->insts.push_back(format("mpz_tdiv_q_2exp(%s, %s, %d);", mpzTmp1.c_str(), ChildInfo(0, valStr).c_str(), lo));
-    } else {
-      shiftVal = ChildInfo(0, valStr);
-    }
-    ret->insts.push_back(format("mpz_and(%s, %s, %s);", mpzTmp1.c_str(), shiftVal.c_str(), addMask(width).c_str()));
-    ret->valStr = mpzTmp1;
-    ret->opNum = 0;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -1956,8 +1314,6 @@ valInfo* ENode::instsBitsNoShift(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
-  bool childBasic = ChildInfo(0, width) <= BASIC_WIDTH;
-  bool enodeBasic = width <= BASIC_WIDTH;
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
 
   int hi = values[0];
@@ -1973,23 +1329,9 @@ valInfo* ENode::instsBitsNoShift(Node* node, std::string lvalue, bool isRoot) {
   } else if (ChildInfo(0, width) <= BASIC_WIDTH && lo == 0 && w == ChildInfo(0, width)) {
     ret->valStr = ChildInfo(0, valStr);
     ret->opNum = ChildInfo(0, opNum);
-  } else if (childBasic && enodeBasic) {
+  } else {
     ret->valStr = "(" + ChildInfo(0, valStr) + " & " + rangeMask(hi, lo) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
-  } else if (!childBasic && enodeBasic) {
-    if (w > 64) {
-      ret->valStr = format ("(%s & %s)", get256(ChildInfo(0, valStr), w).c_str(), rangeMask(hi, lo).c_str());
-    } else {
-      ret->valStr = format("(mpz_get_ui(%s) & %s)", ChildInfo(0, valStr).c_str(), rangeMask(hi, lo).c_str());
-    }
-    ret->opNum = ChildInfo(0, opNum) + 1;
-  } else if (!childBasic && !enodeBasic){
-    std::string dstName = isRoot ? lvalue : newMpzTmp();
-    ret->insts.push_back(format("mpz_and(%s, %s, %s);", dstName.c_str(), ChildInfo(0, valStr).c_str(), addMask(hi, lo).c_str()));
-    ret->valStr = dstName;
-    ret->opNum = 0;
-  } else {
-    TODO();
   }
   return ret;
 }
@@ -2037,11 +1379,7 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   }
 
   if (memory->width > width) {
-    if (memory->width > 128 && width < 64)
-      ret->valStr = format("(mpz_get_ui(%s) & %s)", ret->valStr.c_str(), bitMask(width).c_str());
-    else if (memory->width < 128)
-      ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
-    else TODO();
+    ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
   }
   ret->opNum = 0;
   return ret;
@@ -2057,8 +1395,7 @@ valInfo* ENode::instsPrintf() {
   ret->status = VAL_FINISH;
   std::string printfInst = "if(" + ChildInfo(0, valStr) +  ") printf(" + strVal;
   for (int i = 1; i < getChildNum(); i ++) {
-    if (Child(i, width) > BASIC_WIDTH) printfInst += ", mpz_get_ui(" + ChildInfo(i, valStr) + ")";
-    else printfInst += ", " + ChildInfo(i, valStr);
+    printfInst += ", " + ChildInfo(i, valStr);
   }
   printfInst += ");";
 
@@ -2077,11 +1414,7 @@ valInfo* ENode::instsAssert() {
   std::string assertInst;
   if (ChildInfo(0, status) == VAL_CONSTANT) { // pred is constant
     if (mpz_cmp_ui(ChildInfo(0, consVal), 0) == 0) {
-      if (ChildInfo(1, status) == VAL_CONSTANT) {
-        assertInst = mpz_cmp_ui(ChildInfo(1, consVal), 0) == 0? "" : ("Assert(true, " + strVal + ");");
-      } else {
-        assertInst = "Assert(!" + enStr + ", " + strVal + ");";
-      }
+      assertInst = "Assert(!" + enStr + ", " + strVal + ");";
     } else { // pred is always satisfied
       assertInst = "";
     }
@@ -2117,16 +1450,7 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
   if (node->isArray() && isSubArray(lvalue, node)) {
       ret = arrayCopy(lvalue, node, resetVal);
   } else {
-    if (node->width > BASIC_WIDTH) {
-      if (resetVal->status == VAL_CONSTANT) {
-        if (mpz_cmp_ui(resetVal->consVal, MAX_U64) > 0) TODO();
-        ret = format("mpz_set_ui(%s, %s);", lvalue.c_str(), resetVal->valStr.c_str());
-      } else {
-        ret = format("mpz_set(%s, %s);", lvalue.c_str(), resetVal->valStr.c_str());
-      }
-    } else {
-      ret = format("%s = %s;", lvalue.c_str(), resetVal->valStr.c_str());
-    }
+    ret = format("%s = %s;", lvalue.c_str(), resetVal->valStr.c_str());
   }
 
   computeInfo->valStr = format("if(%s) { %s %s }", ChildInfo(0, valStr).c_str(), ret.c_str(), ASSIGN_LABLE.c_str());
@@ -2234,26 +1558,9 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->valStr = format("((%s%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
         computeInfo->opNum = 1;
         computeInfo->width = width;
-      } else if (width > BASIC_WIDTH) {
-        std::string mpz = newMpzTmp();
-        if (computeInfo->width <= 64) {
-          computeInfo->insts.push_back(format("mpz_set_ui(%s, %s);", mpz.c_str(), computeInfo->valStr.c_str()));
-          computeInfo->width = width;
-        } else if (computeInfo->width <= BASIC_WIDTH) {
-          set256_tmp(computeInfo, computeInfo, mpz);
-          computeInfo->width = width;
-        }
-        computeInfo->valStr = mpz;
       }
     } else if (!IS_INVALID_LVALUE(lvalue)) { // info->width > BASIC_WIDTH
-      if (computeInfo->status == VAL_CONSTANT) {
-        /* do nothing */
-      } else if (width <= 64) {
-        computeInfo->valStr = format("mpz_get_ui(%s)", computeInfo->valStr.c_str());
-      } else if (width <= BASIC_WIDTH) {
-        computeInfo->valStr = get256(computeInfo->valStr, width);
-      }
-      if (computeInfo->width > width && width <= BASIC_WIDTH) {
+      if (computeInfo->width > width) {
         if (computeInfo->status == VAL_CONSTANT) {
           computeInfo->width = width;
           computeInfo->updateConsVal();
@@ -2340,6 +1647,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
   compute node
 */
 valInfo* Node::compute() {
+  Assert(width <= MAX_NODE_WIDTH, "width of node %s(width=%d) exceeds the upper limit", name.c_str(), width);
   if (computeInfo) return computeInfo;
   Assert(status != DEAD_NODE, "compute deadNode %s\n", name.c_str());
   if (width == 0) {
@@ -2559,20 +1867,10 @@ void Node::finalConnect(std::string lvalue, valInfo* info) {
       insts.push_back(arrayCopy(lvalue, this, info));;
     }
   } else {
-    if (width <= BASIC_WIDTH) {
-      if (info->width > width) info->valStr = format("(%s & %s)", info->valStr.c_str(), bitMask(width).c_str());
-      if (sign && width != info->width) insts.push_back(format("%s = %s%s;", lvalue.c_str(), Cast(info->width, info->sign).c_str(), info->valStr.c_str()));
-      else insts.push_back(format("%s = %s;", lvalue.c_str(), info->valStr.c_str()));
-
-    } else {
-      if (info->status == VAL_CONSTANT) {
-        if (mpz_cmp_ui(info->consVal, MAX_U64) > 0) TODO();
-        insts.push_back(format("mpz_set_ui(%s, %s);", lvalue.c_str(), info->valStr.c_str()));
-      } else
-        insts.push_back(format("mpz_set(%s, %s);", lvalue.c_str(), info->valStr.c_str()));
-    }
+    if (info->width > width) info->valStr = format("(%s & %s)", info->valStr.c_str(), bitMask(width).c_str());
+    if (sign && width != info->width) insts.push_back(format("%s = %s%s;", lvalue.c_str(), Cast(info->width, info->sign).c_str(), info->valStr.c_str()));
+    else insts.push_back(format("%s = %s;", lvalue.c_str(), info->valStr.c_str()));
   }
-
 }
 
 valInfo* Node::computeArray() {
@@ -2686,14 +1984,7 @@ valInfo* Node::computeArray() {
           computeInfo->memberInfo[i]->status = VAL_CONSTANT;
           mpz_set(computeInfo->memberInfo[i]->consVal, computeInfo->memberInfo[i]->assignmentCons);
           computeInfo->memberInfo[i]->setConsStr();
-          if (width > BASIC_WIDTH) {
-            if (mpz_cmp_ui(computeInfo->memberInfo[i]->consVal, MAX_U64) > 0)
-              insts.push_back(format("mpz_set_str(%s%s, \"%s\", 16);", name.c_str(), idx2Str(this, i, 0).c_str(), mpz_get_str(NULL, 16, computeInfo->memberInfo[i]->consVal)));
-            else
-              insts.push_back(format("mpz_set_ui(%s%s, %s);", name.c_str(), idx2Str(this, i, 0).c_str(), computeInfo->memberInfo[i]->valStr.c_str()));
-          } else {
-            insts.push_back(format("%s%s = %s;", name.c_str(), idx2Str(this, i, 0).c_str(), computeInfo->memberInfo[i]->valStr.c_str()));
-          }
+          insts.push_back(format("%s%s = %s;", name.c_str(), idx2Str(this, i, 0).c_str(), computeInfo->memberInfo[i]->valStr.c_str()));
         }
       }
     }
@@ -2752,10 +2043,7 @@ void graph::instsGenerator() {
         reg->resetInsts.push_back(arrayCopy(reg->name, reg, info));
       }
     } else {
-      if (reg->width <= BASIC_WIDTH)
-        reg->resetInsts.push_back(reg->name + " = " + info->valStr + ";");
-      else
-        reg->resetInsts.push_back(format("mpz_set(%s, %s);", reg->name.c_str(), info->valStr.c_str()));
+      reg->resetInsts.push_back(reg->name + " = " + info->valStr + ";");
     }
     if (reg->regSplit && reg->getDst()->status == VALID_NODE) {
       std::vector<std::string> newInsts;
@@ -2779,10 +2067,7 @@ void graph::instsGenerator() {
   for (Node* n : s) {
     if (n->status == CONSTANT_NODE) {
       if ((n->type == NODE_REG_DST && !n->getSrc()->regSplit && n->getSrc()->status != CONSTANT_NODE) || (n->type == NODE_REG_UPDATE && n->regNext->status != CONSTANT_NODE)) {
-        if (n->width <= BASIC_WIDTH)
-          n->insts.push_back(n->name + " = " + n->computeInfo->valStr + ";");
-        else
-          n->insts.push_back(format("mpz_set_str(%s, \"%s\", 16);", n->name.c_str(), mpz_get_str(NULL, 16, n->computeInfo->consVal)));
+        n->insts.push_back(n->name + " = " + n->computeInfo->valStr + ";");
         n->status = VALID_NODE;
       }
     }
@@ -2793,10 +2078,7 @@ void graph::instsGenerator() {
         if (assignInfo->opNum < 0) {
             n->insts.push_back(assignInfo->valStr);
         } else if (assignInfo->opNum > 0 || assignInfo->valStr != n->name) {
-          if (n->width <= BASIC_WIDTH)
-            n->insts.push_back(n->name + " = " + assignInfo->valStr + ";");
-          else
-            n->insts.push_back(format("mpz_set(%s, %s);", n->name.c_str(), assignInfo->valStr.c_str()));
+          n->insts.push_back(n->name + " = " + assignInfo->valStr + ";");
         }
         if (n->type == NODE_REG_SRC && n->reset == ASYRESET && n->regSplit && n->getDst()->status == VALID_NODE) {
           srcUpdateDst(n);

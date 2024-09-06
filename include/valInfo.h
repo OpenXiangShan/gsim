@@ -1,6 +1,8 @@
 #ifndef VALINFO_H
 #define VALINFO_H
 
+std::string legalCppCons(std::string str);
+
 enum valStatus {VAL_EMPTY = 0, VAL_VALID, VAL_CONSTANT, VAL_FINISH /* for printf/assert*/ , VAL_INVALID, VAL_EMPTY_SRC};
 
 class valInfo {
@@ -45,7 +47,7 @@ public:
     }
     consLength = valStr.length();
     if (valStr.length() <= 16) valStr = Cast(width, sign) + "0x" + valStr;
-    else valStr = format("UINT128(0x%s, 0x%s)", valStr.substr(0, valStr.length() - 16).c_str(), valStr.substr(valStr.length()-16, 16).c_str());
+    else valStr = legalCppCons(valStr);
     status = VAL_CONSTANT;
     mpz_set(assignmentCons, consVal);
     sameConstant = true;
