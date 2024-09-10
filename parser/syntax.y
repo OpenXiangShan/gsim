@@ -47,7 +47,7 @@ int p_stoi(const char* str);
 
 /* token */
 %token <name> ID
-%token <strVal> INT String
+%token <strVal> INT RINT String
 %token DoubleLeft "<<"
 %token DoubleRight ">>"
 %token <typeGround> Clock Reset IntType anaType FixedType AsyReset
@@ -145,6 +145,7 @@ exprs:                  { $$ = new PNode(P_EXPRS, synlineno());}
     ;
 expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S');}
     | IntType width '(' INT ')' { $$ = newNode(P_EXPR_INT_INIT, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); $$->appendExtraInfo($4);}
+    | IntType width '(' RINT ')'{ $$ = newNode(P_EXPR_INT_INIT, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); $$->appendExtraInfo($4);}
     | reference { $$ = $1; }
     | Mux '(' expr ',' expr ',' expr ')' { $$ = newNode(P_EXPR_MUX, synlineno(), NULL, 3, $3, $5, $7); }
     | Validif '(' expr ',' expr ')' { $$ = $5; }
