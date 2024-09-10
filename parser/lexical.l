@@ -33,7 +33,9 @@ digit_oct   [0-7]
 digit_dec   [0-9]
 digit_hex   [0-9A-Fa-f]
 /* Integer */
-int         \"b-?{digit_bin}+\"|\"o-?{digit_oct}+\"|\"h-?{digit_hex}+\"
+int         -?{digit_dec}+
+/* Radix-specified Integer Literals */
+rint        -?0b{digit_bin}+|-?0o{digit_oct}+|-?0d{digit_dec}+|-?0h{digit_hex}+
 int_dec     -?{digit_dec}+
 /* Identifiers define legal FIRRTL or Verilog names */
 letter      [A-Za-z]
@@ -99,7 +101,8 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>validif                 { return token::Validif; }
 <normal>old|new|undefined       { yylval->typeRUW = strdup(yytext); return token::Ruw; }
 <normal>mem                     { return token::Mem; }
-<normal>{int}                   { yylval->strVal = strndup(yytext+1, strlen(yytext)-2); return token::INT; }
+<normal>{int}                   { yylval->strVal = strdup(yytext); return token::INT; }
+<normal>{rint}                  { yylval->strVal = strdup(yytext); return token::RINT; }
 <normal>{int_dec}               { if (angle_num == 0 && square_num == 0 && parenthesis_num == 0 && bracket_num != 0) { \
                                     yylval->name = strdup(yytext); return token::ID; \
                                   } \

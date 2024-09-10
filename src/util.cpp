@@ -8,7 +8,9 @@
 #include <iostream>
 #include "common.h"
 #include <execinfo.h>
-/* convert firrtl constant to C++ constant */
+
+/* convert firrtl constant to C++ constant 
+   In the new FIRRTL spec, there are 'int' and 'rint'.*/
 std::pair<int, std::string> firStrBase(std::string s) {
   if (s.length() <= 1) { return std::make_pair(10, s); }
 
@@ -17,22 +19,27 @@ std::pair<int, std::string> firStrBase(std::string s) {
   int idx  = 1;
   int base = -1;
 
-  if (s[1] == '-') {
-    ret += "-";
+  // Check if the constant is negative.
+  if (s[0] == '-') {
+    ret += '-';
     idx = 2;
   }
 
-  if (s[0] == 'b') {
-    base = 2;
-  } else if (s[0] == 'o') {
-    base = 8;
-  } else if (s[0] == 'h') {
-    base = 16;
-  } else {
-    base = 10;
-    idx  = 0;
+  // If there is no "0b", "0o", "0d", or "0h" prefix, treat it as a base-10 integer.
+  if ((s[idx] != 'b') && (s[idx] != 'o') && (s[idx] != 'd') && (s[idx] != 'h')) {
+    ret += s.substr(idx);
+    return std::make_pair(10, ret);
   }
 
+  // Determine the base from the prefix.
+  switch (s[2]) {
+    case 'b': base = 2; break;
+    case 'o': base = 8; break;
+    case 'h': base = 16; break;
+    default: base = 10; break;
+  }
+
+  idx = 2;
   ret += s.substr(idx);
 
   return std::make_pair(base, ret);
