@@ -58,10 +58,9 @@ int p_stoi(const char* str);
 %token <strVal> Info
 %token Flip Mux Validif Invalid Mem Wire Reg RegWith RegReset Inst Of Node Is Attach
 %token When Else Stop Printf Skip Input Output Assert
-%token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit
+%token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit Connect
 %token Class Target Firrtl Version INDENT DEDENT
 %token RightArrow "=>"
-%token LeftArrow "<="
 %token Leftarrow "<-"
 %token DataType Depth ReadLatency WriteLatency ReadUnderwrite Reader Writer Readwriter
 /* internal node */
@@ -200,7 +199,7 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5
     | memory    { $$ = $1;}
     | Inst ALLID Of ALLID info    { $$ = newNode(P_INST, synlineno(), $5, $2, 0); $$->appendExtraInfo($4); }
     | Node ALLID '=' expr info { $$ = newNode(P_NODE, synlineno(), $5, $2, 1, $4); }
-    | reference "<=" expr info  { $$ = newNode(P_CONNECT, $1->lineno, $4, NULL, 2, $1, $3); }
+    | Connect reference ',' expr info { $$ = newNode(P_CONNECT, $2->lineno, $5, NULL, 2, $2, $4); }
     | reference "<-" expr info  { $$ = newNode(P_PAR_CONNECT, $1->lineno, $4, NULL, 2, $1, $3); }
     | reference Is Invalid info { $$ = newNode(P_INVALID, synlineno(), nullptr, 0); $$->setWidth(1); $$ = newNode(P_CONNECT, $1->lineno, $4, NULL, 2, $1, $$); }
     | Attach '(' references ')' info { TODO(); }
