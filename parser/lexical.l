@@ -141,10 +141,10 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>FIRRTL                  { return token::Firrtl; }
 <normal>version                 { return token::Version; }
 <normal>circuit                 { return token::Circuit; }
+<normal>connect                 { return token::Connect; }
 <normal>{id}                    { yylval->name = strdup(yytext); return token::ID; }
 <normal>{string}                { yylval->strVal = strdup(yytext); return token::String; }
 <normal>"=>"                    { return token::RightArrow; }
-<normal>"<="                    { return token::LeftArrow; }
 <normal>"<-"                    { return token::Leftarrow; }
 <normal>"<"                     { angle_num ++; return yytext[0];}
 <normal>">"                     { angle_num --; return yytext[0];}
