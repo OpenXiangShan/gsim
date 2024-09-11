@@ -11,7 +11,7 @@
       assert(cond); \
     } \
   } while (0)
-
+#if 0
 void u_tail(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n);
 unsigned long ui_tail(mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n);
 __uint128_t ui_tail128(mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n);
@@ -126,5 +126,7 @@ void u_shl(mpz_t& dst, mpz_t& src, unsigned long n);
 void u_shr(mpz_t& dst, mpz_t& src, unsigned long n);
 
 void init_functions();
+
+#endif
 
 #endif

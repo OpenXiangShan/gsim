@@ -581,9 +581,9 @@ void graph::nodeDisplay(FILE* fp, SuperNode* super) {
       if (member->width > BASIC_WIDTH) {
         fprintf(fp, "%s.displayn();\n", nameIdx.c_str());
       } else if (member->width > 64) {
-        fprintf(fp, "printf(\"%%lx|%%lx \", (uint64_t)(%s >> 64), (uint64_t(%s)));", nameIdx.c_str(), nameIdx.c_str());
+        fprintf(fp, "printf(\"%%lx|%%lx \", (uint64_t)(%s >> 64), (uint64_t)(%s));", nameIdx.c_str(), nameIdx.c_str());
       } else {
-        fprintf(fp, "printf(\"%%lx \", (uint64_t(%s)));", nameIdx.c_str());
+        fprintf(fp, "printf(\"%%lx \", (uint64_t)(%s));", nameIdx.c_str());
       }
       fprintf(fp, "\n%s", bracket.c_str());
       fprintf(fp, "printf(\"\\n\");\n");
@@ -593,15 +593,15 @@ void graph::nodeDisplay(FILE* fp, SuperNode* super) {
       fprintf(fp, "printf(\"\\n\");\n");
     } else if (member->width > 64 && member->width <= BASIC_WIDTH) {
       if (member->needActivate()) {// display old value and new value
-        fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t(%s)));", super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
+        fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t)(%s));", super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
       } else if (member->type != NODE_SPECIAL) {
-        fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t(%s)));", super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
+        fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t)(%s));", super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
       }
     } else {
       if (member->needActivate()) {// display old value and new value
-        fprintf(fp, "printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t(%s)));", super->cppId, member->name.c_str(), member->name.c_str());
+        fprintf(fp, "printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t)(%s));", super->cppId, member->name.c_str(), member->name.c_str());
       } else if (member->type != NODE_SPECIAL) {
-        fprintf(fp, "printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t(%s)));", super->cppId, member->name.c_str(), member->name.c_str());
+        fprintf(fp, "printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t)(%s));", super->cppId, member->name.c_str(), member->name.c_str());
       }
     }
     fprintf(fp, "}\n");

@@ -1,10 +1,15 @@
+#include <sys/types.h>
 #include <cstdint>
+#include <cstring>
 #define uint128_t __uint128_t
 #define int128_t __int128_t
 
 class uint512_t;
 class uint1024_t;
 class uint2048_t;
+
+#define MAX(a, b) ((a >= b) ? a : b)
+#define MIN(a, b) ((a >= b) ? b : a)
 
 #define SUPPORT_U256 true
 #if SUPPORT_U256
@@ -94,7 +99,10 @@ public:
   union {
     uint256_t u256_0;
   };
-  uint512_t() {}
+  uint512_t() {
+    u256_0 = 0;
+    u256_1 = 0;
+  }
   uint512_t(int val) {
     u256_0 = val;
     u256_1 = 0;
@@ -160,8 +168,16 @@ public:
 #endif
     return ret;
   }
+  uint512_t operator << (uint64_t shiftNum) {
+    return *this << (int)shiftNum;
+  }
   uint512_t operator >> (int shiftNum) {
     uint512_t ret;
+    if (shiftNum == 0) {
+      ret.u256_0 = u256_0;
+      ret.u256_1 = u256_1;
+      return ret;
+    }
     ret.u256_1 = shiftNum >= 256 ? 0 : (u256_1 >> shiftNum);
     ret.u256_0 = shiftNum >= 512 ? 0 :
                   (shiftNum >= 256 ?
@@ -259,6 +275,12 @@ public:
     u512_0 = val;
     u512_1 = 0;
   }
+  uint1024_t(uint64_t* val) { // construct from array
+    u512_0 = 0;
+    u512_1 = 0;
+    for (int i = 0; i < 8; i ++) u512_0 = u512_0 | (uint512_t)val[i] << (i * 64);
+    for (int i = 0; i < 8; i ++) u512_1 = u512_1 | (uint512_t)val[i + 8] << (i * 64);
+  }
   void operator = (uint64_t data) {
     u512_0 = data;
     u512_1 = 0;
@@ -292,6 +314,12 @@ public:
                     (u512_1 >> (shiftNum - 512)) :
                     (u512_0 >> shiftNum) | (u512_1 << (512 - shiftNum)));
     return ret;
+  }
+  int operator & (int a) {
+    return u512_0.u256_0 & a;
+  }
+  uint64_t operator & (uint64_t a) {
+    return u512_0.u256_0 & a;
   }
   uint512_t operator & (uint512_t a) {
     return u512_0 & a;
@@ -360,6 +388,12 @@ public:
   uint2048_t(uint256_t val) {
     u1024_0 = val;
     u1024_1 = 0;
+  }
+  uint2048_t(uint64_t* val) { // construct from array
+    u1024_0 = 0;
+    u1024_1 = 0;
+    for (int i = 0; i < 16; i ++) u1024_0 = u1024_0 | (uint1024_t)val[i] << (i * 64);
+    for (int i = 0; i < 16; i ++) u1024_1 = u1024_1 | (uint1024_t)val[i + 16] << (i * 64);
   }
   void operator = (uint64_t data) {
     u1024_0 = data;
@@ -441,6 +475,159 @@ public:
   }
   void displayn() {
     display();
+    printf("\n");
+  }
+};
+
+template<int width, int _dataNum = (width + 63) / 64> class wide_t {
+public:
+  uint64_t data[_dataNum]; // lo - hi
+  int dataNum = _dataNum;
+  wide_t() {
+    memset(data, 0, sizeof(data));
+  }
+  wide_t(int val) {
+    for (int i = 1; i < dataNum ; i++) data[i] = 0;
+    data[0] = val;
+  }
+  wide_t(long val) {
+    for (int i = 1; i < dataNum; i++) data[i] = 0;
+    data[0] = val;
+  }
+  wide_t(uint64_t val) {
+    for (int i = 1; i < dataNum; i++) data[i] = 0;
+    data[0] = val;
+  }
+  wide_t(uint256_t val) {
+    for (int i = 4; i < dataNum; i++) data[i] = 0;
+    data[0] = val;
+    data[1] = val >> 64;
+    data[2] = val >> 128;
+    data[3] = val >> 196;
+  }
+  wide_t<width> operator << (int shiftNum) {
+    wide_t<width> ret;
+    int full_shifts = shiftNum / 64;
+    int bit_shift = shiftNum % 64;
+
+    // fully shift
+    memset(ret.data, 0, full_shifts * sizeof(uint64_t));
+    memcpy(ret.data + full_shifts, data, (dataNum - full_shifts) * sizeof(uint64_t));
+
+    // partial shift
+    if (bit_shift > 0) {
+      uint64_t carry = 0;
+      for (int i = 0; i < dataNum; i ++) {
+        uint64_t new_carry = ret.data[i] >> (64 - bit_shift);
+        ret.data[i] = (ret.data[i] << bit_shift) | carry;
+        carry = new_carry;
+      }
+    }
+    return ret;
+  }
+  wide_t<width> operator >> (int shiftNum) {
+    wide_t<width> ret;
+    int full_shifts = shiftNum / 64;
+    int bit_shift = shiftNum % 64;
+
+    // fully shift
+    memcpy(ret.data, data + full_shifts, (dataNum - full_shifts) * sizeof(uint64_t));
+    memset(ret.data + (dataNum - full_shifts) * sizeof(uint64_t), 0, full_shifts);
+
+    // partial shift
+    if (bit_shift > 0) {
+      uint64_t carry = 0;
+      for (int i = dataNum - 1; i >= 0; i --) {
+        uint64_t new_carry = ret.data[i] << (64 - bit_shift);
+        ret.data[i] = ret.data[i] >> bit_shift | carry;
+        carry = new_carry;
+      }
+    }
+
+    return ret;
+  }
+  template<int w> wide_t<width> operator & (wide_t<w> a) {
+    wide_t<width> ret;
+    for (int i = 0; i < dataNum; i++) {
+      ret.data[i] = data[i] & a.data[i];
+    }
+    return ret;
+  }
+  uint64_t operator & (uint64_t a) {
+    return data[0] & a;
+  }
+  uint64_t operator & (int a) {
+    return data[0] & a;
+  }
+  template<int w> wide_t<width> operator | (wide_t<w> a) {
+    wide_t<width> ret;
+    for (int i = 0; i < dataNum; i++) {
+      ret.data[i] = data[i] | a.data[i];
+    }
+    return ret;
+  }
+  template<int w> wide_t<width> operator ^ (wide_t<w> a) {
+    wide_t<width> ret;
+    for (int i = 0; i < dataNum; i++) {
+      ret.data[i] = data[i] ^ a.data[i];
+    }
+    return ret;
+  }
+  template<int w> bool operator == (wide_t<w> a) {
+    bool ret = true;
+    for (int i = 0; i < dataNum; i++) {
+      ret &= data[i] == a.data[i];
+    }
+    return ret;
+  }
+  bool operator == (int a) {
+    bool ret = data[0] == a;
+    for (int i = 1; i < dataNum; i++) {
+      ret &= data[i] == 0;
+    }
+    return ret;
+  }
+  template<int w> bool operator != (wide_t<w> a) {
+    bool ret = false;
+    for (int i = 0; i < dataNum; i++) {
+      ret |= data[i] != a.data[i];
+    }
+    return ret;
+  }
+  bool operator != (int a) {
+    bool ret = data[0] != a;
+    for (int i = 0; i < dataNum; i++) {
+      ret |= data[i] != 0;
+    }
+    return ret;
+  }
+  operator int() {
+    return data[0];
+  }
+  operator uint64_t() {
+    return data[0];
+  }
+  operator uint256_t() {
+    uint256_t ret = (uint256_t)data[0] << 192 | (uint256_t)data[1] << 128 | (uint256_t)data[2] << 64 | (uint256_t)data[3];
+    return ret;
+  }
+  operator uint1024_t() {
+    uint1024_t ret(data);
+    return ret;
+  }
+  operator uint2048_t() {
+    uint2048_t ret(data);
+    return ret;
+  }
+  template<int w> operator wide_t<w>() {
+    wide_t<w> ret;
+    for (int i = 0; i < sizeof(ret.data) / sizeof(ret.data[0]); i++) {
+      ret.data[i] = data[i];
+    }
+    return ret;
+  }
+  void displayn() {
+    for (int i = 0; i < dataNum; i ++) printf("%lx ", data[i]);
     printf("\n");
   }
 };
