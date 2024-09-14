@@ -5,8 +5,8 @@ circuit GCD :
     input reset : UInt<1> @[src/main/GCD.scala 10:7]
     output io : { flip value1 : UInt<16>, flip value2 : UInt<16>, flip loadingValues : UInt<1>, outputGCD : UInt<16>, outputValid : UInt<1>} @[src/main/GCD.scala 11:14]
 
-    reg x : UInt, clock @[src/main/GCD.scala 19:14]
-    reg y : UInt, clock @[src/main/GCD.scala 20:14]
+    reg x : UInt<32>, clock @[src/main/GCD.scala 19:14]
+    reg y : UInt<32>, clock @[src/main/GCD.scala 20:14]
     node _T = gt(x, y) @[src/main/GCD.scala 22:10]
     when _T : @[src/main/GCD.scala 22:15]
       node _x_T = sub(x, y) @[src/main/GCD.scala 22:24]
