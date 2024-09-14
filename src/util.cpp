@@ -27,7 +27,7 @@ std::pair<int, std::string> firStrBase(std::string s) {
 
   // If there is no "0b", "0o", "0d", or "0h" prefix, treat it as a base-10 integer.
   if ((s[idx] != 'b') && (s[idx] != 'o') && (s[idx] != 'd') && (s[idx] != 'h')) {
-    ret += s.substr(idx);
+    ret += s.substr(idx - 1);
     return std::make_pair(10, ret);
   }
 
