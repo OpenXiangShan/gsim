@@ -56,7 +56,7 @@ int p_stoi(const char* str);
 %token <typeOP> E2OP E1OP E1I1OP E1I2OP  
 %token <typeRUW> Ruw
 %token <strVal> Info
-%token Flip Mux Validif Invalid Mem Wire Reg RegWith RegReset Inst Of Node Is Attach
+%token Flip Mux Validif Invalidate Mem Wire Reg RegReset Inst Of Node Attach
 %token When Else Stop Printf Skip Input Output Assert
 %token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit Connect
 %token Class Target Firrtl Version INDENT DEDENT
@@ -179,7 +179,7 @@ mem_writer: { $$ = new PList(); }
     | mem_writer Writer "=>" ALLID    { $$ = $1; $$->append(newNode(P_WRITER, synlineno(), $4, 0));}
     ;
 mem_readwriter: { $$ = new PList(); }
-    | mem_readwriter Readwriter "=>" ALLID  { $$ = $1; $$->append(newNode(P_READWRITER, synlineno(), $4, 0));}
+    | mem_readwriter Readwriter INT ALLID  { $$ = $1; $$->append(newNode(P_READWRITER, synlineno(), $4, 0));}
     ;
 mem_optional: mem_reader mem_writer mem_readwriter { $$ = $1; $$->concat($2); $$->concat($3); }
     ;
@@ -196,7 +196,8 @@ when_else:  %prec LOWER_THAN_ELSE { $$ = new PNode(P_STATEMENTS, synlineno()); }
     | Else ':' INDENT statements DEDENT { $$ = $4; }
     ;
 statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5, $2, 1, $4); }
-    | Reg ALLID ':' type ',' expr RegWith INDENT RegReset '(' expr ',' expr ')' info DEDENT { $$ = newNode(P_REG_DEF, $4->lineno, $15, $2, 4, $4, $6, $11, $13); }
+    | Reg      ALLID ':' type ',' expr info  { $$ = newNode(P_REG_DEF, $4->lineno, /* info */$7 , /* name */$2, /* num */2, /* Type */$4, /* Clock */$6); }
+    | RegReset ALLID ':' type ',' expr ',' expr ',' expr info { $$ = newNode(P_REG_RESET_DEF, $4->lineno, /* info */$11, /* name */$2, /* num */4, /* Type */ $4, /* Clock */$6, /* Reset Cond */ $8 , /* Reset Val*/$10); }
     | memory    { $$ = $1;}
     | Inst ALLID Of ALLID info    { $$ = newNode(P_INST, synlineno(), $5, $2, 0); $$->appendExtraInfo($4); }
     | Node ALLID '=' expr info { $$ = newNode(P_NODE, synlineno(), $5, $2, 1, $4); }

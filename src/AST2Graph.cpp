@@ -554,9 +554,8 @@ void visitWireDef(graph* g, PNode* wire) {
 statement: Reg ALLID ':' type ',' expr(1) RegWith INDENT RegReset '(' expr ',' expr ')' info DEDENT { $$ = newNode(P_REG_DEF, $4->lineno, $15, $2, 4, $4, $6, $11, $13); }
 expr(1) must be clock
 */
-void visitRegDef(graph* g, PNode* reg) {
-  TYPE_CHECK(reg, 4, 4, P_REG_DEF);
-  
+void visitRegDef(graph* g, PNode* reg, PNodeType t) {
+
   ASTExpTree* clkExp = visitExpr(g, reg->getChild(1));
   Assert(!clkExp->isAggr() && clkExp->getExpRoot()->getNode(), "unsupported clock in lineno %d", reg->lineno);
   Node* clockNode = clkExp->getExpRoot()->getNode();
@@ -580,12 +579,25 @@ void visitRegDef(graph* g, PNode* reg) {
     addSignal(dst->name, dst);
     src->bindReg(dst);
     src->clock = dst->clock = clockNode;
+
+    if (t == P_REG_RESET_DEF) continue;
+
+    // Fake reset
+    auto* cond = new ENode(OP_INT);
+    cond->width = 1;
+    cond->strVal = "0";
+
+    src->resetCond = new ExpTree(cond, src);
+    src->resetVal = new ExpTree(new ENode(src), src);
   }
   // only src dummy nodes are in allDummy
   for (AggrParentNode* dummy : info->aggrParent) addDummy(dummy->name, dummy);
   
   prefix_pop();
 
+  if (t == P_REG_DEF)
+    return ;
+  
   ASTExpTree* resetCond = visitExpr(g, reg->getChild(2));
   ASTExpTree* resetVal = visitExpr(g, reg->getChild(3));
   Assert(!resetCond->isAggr(), "reg %s: reset cond can never be aggregate\n", reg->name.c_str());
@@ -599,6 +611,7 @@ void visitRegDef(graph* g, PNode* reg) {
       src->resetVal = new ExpTree(resetVal->getExpRoot(), src);
   }
 }
+
 /*
 mem_datatype: DataType "=>" type { $$ = newNode(P_DATATYPE, synlineno(), NULL, 1, $3); }
 */
@@ -1355,7 +1368,8 @@ void visitWhenStmt(graph* g, PNode* stmt) {
     case P_PRINTF: visitWhenPrintf(g, stmt); break;
     case P_ASSERT: visitWhenAssert(g, stmt); break;
     case P_INST: visitInst(g, stmt); break;
-    case P_REG_DEF: visitRegDef(g, stmt); break;
+    case P_REG_DEF: visitRegDef(g, stmt, P_REG_DEF); break;
+    case P_REG_RESET_DEF: visitRegDef(g, stmt, P_REG_RESET_DEF); break;
     default: printf("Invalid type %d %d\n", stmt->type, stmt->lineno); Panic();
   }
 }
@@ -1480,7 +1494,8 @@ void visitStmt(graph* g, PNode* stmt) {
   stmtsNodes.clear();
   switch (stmt->type) {
     case P_WIRE_DEF: visitWireDef(g, stmt); break;
-    case P_REG_DEF: visitRegDef(g, stmt); break;
+    case P_REG_DEF: visitRegDef(g, stmt, P_REG_DEF); break;
+    case P_REG_RESET_DEF: visitRegDef(g, stmt, P_REG_RESET_DEF); break;
     case P_INST: visitInst(g, stmt); break;
     case P_MEMORY: visitMemory(g, stmt); break;
     case P_NODE: visitNode(g, stmt); break;
