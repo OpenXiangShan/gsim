@@ -51,6 +51,11 @@ static void tmp_pop() {
 static std::priority_queue<Node*, std::vector<Node*>, ordercmp> recomputeQueue;
 static std::set<Node*> uniqueRecompute;
 
+static inline std::string tailName(int width) {
+  if (width <= 256) return std::string("tail256");
+  else return std::string("tail") ;
+}
+
 static void addRecompute(Node* node) {
   if (uniqueRecompute.find(node) == uniqueRecompute.end()) {
     recomputeQueue.push(node);
@@ -376,7 +381,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       if (width <= BASIC_WIDTH)
         return format("%s = (%s & %s);", lvalue.c_str(), expr.c_str(), bitMask(node->width).c_str());
       else
-        return format("%s = %s.tail(%d);", lvalue.c_str(), expr.c_str(), node->width);
+        return format("%s = %s.%s(%d);", lvalue.c_str(), expr.c_str(), tailName(width).c_str(), node->width);
     }
     else if (node->sign && node->width != width) return format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), expr.c_str());
     return lvalue + " = " + expr + ";";
@@ -506,7 +511,7 @@ valInfo* ENode::instsStmt(Node* node, std::string lvalue, bool isRoot) {
         if (node->width <= BASIC_WIDTH)
           computeInfo->valStr += format("%s = (%s & %s);", lvalue.c_str(), childENode->computeInfo->valStr.c_str(), bitMask(node->width).c_str());
         else
-          computeInfo->valStr += format("%s = %s.tail(%d);", lvalue.c_str(), childENode->computeInfo->valStr.c_str(), node->width);
+          computeInfo->valStr += format("%s = %s.%s(%d);", lvalue.c_str(), childENode->computeInfo->valStr.c_str(), tailName(width).c_str(), node->width);
       } else if (node->sign && node->width != width) {
         computeInfo->valStr += format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), childENode->computeInfo->valStr.c_str());
       }
@@ -546,7 +551,7 @@ valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     if (!sign && width <= MAX(ChildInfo(0, width), ChildInfo(1, width))) {
       if (width <= BASIC_WIDTH) ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
-      else ret->valStr = format("%s.tail(%d)", ret->valStr.c_str(), width);
+      else ret->valStr = format("%s.%s(%d)", ret->valStr.c_str(), tailName(width).c_str(), width);
     }
   }
   return ret;
@@ -579,7 +584,7 @@ valInfo* ENode::instsSub(Node* node, std::string lvalue, bool isRoot) {
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     if (!sign) {
       if (width <= BASIC_WIDTH) ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
-      else ret->valStr = format("%s.tail(%d)", ret->valStr.c_str(), width);
+      else ret->valStr = format("%s.%s(%d)", ret->valStr.c_str(), tailName(width).c_str(), width);
     }
   }
   return ret;
@@ -799,7 +804,7 @@ valInfo* ENode::instsDshl(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = format("(%s(%s%s << %s) & %s)", Cast(width, sign).c_str(), upperCast(castWidth, ChildInfo(0, width), sign).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), bitMask(width).c_str());
       ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     } else {
-      ret->valStr = format("((%s%s << %s).tail(%d))", Cast(width, sign).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), width);
+      ret->valStr = format("((%s%s << %s).%s(%d))", Cast(width, sign).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), tailName(width).c_str(), width);
       ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     }
   }
@@ -827,7 +832,7 @@ valInfo* ENode::instsDshr(Node* node, std::string lvalue, bool isRoot) {
     if (width <= BASIC_WIDTH) {
       ret->valStr = format("((%s%s >> %s) & %s)", Cast(ChildInfo(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), bitMask(width).c_str());
     } else {
-      ret->valStr = format("((%s%s >> %s).tail(%d))", Cast(ChildInfo(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), width);
+      ret->valStr = format("((%s%s >> %s).%s(%d))", Cast(ChildInfo(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), tailName(width).c_str(), width);
       /// TODO: maybe upperCast
     }
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
@@ -1259,7 +1264,7 @@ valInfo* ENode::instsTail(Node* node, std::string lvalue, bool isRoot) {
     ret->setConsStr();
   } else {
     if (n > BASIC_WIDTH) {
-      ret->valStr = format("(%s.tail(%d))", ChildInfo(0, valStr).c_str(), n);
+      ret->valStr = format("(%s.%s(%d))", ChildInfo(0, valStr).c_str(), tailName(width).c_str(), n);
     } else if (Child(0, sign)) {
       ret->valStr = "(" + Cast(width, sign) + ChildInfo(0, valStr) + " & " + bitMask(n) + ")";
     }  else {
@@ -1298,8 +1303,15 @@ void infoBits(valInfo* ret, ENode* enode, valInfo* childInfo) {
       ret->valStr = "(" + shift + " & " + bitMask(w) + ")";
       ret->opNum = childInfo->opNum + 1;
   } else {
-    if (lo == 0) ret->valStr = format("%s.tail(%d)", childInfo->valStr.c_str(), hi);
-    else ret->valStr = format("%s.bits(%d, %d)", childInfo->valStr.c_str(), hi, lo);
+    if (lo == 0) ret->valStr = format("%s.%s(%d)", childInfo->valStr.c_str(), tailName(enode->width).c_str(), hi + 1);
+    else {
+      // if (enode->width <= 64) ret->valStr = format("%s.bits64(%d, %d)", childInfo->valStr.c_str(), hi, lo);
+      // else if (enode->width <= 128) ret->valStr = format("%s.bits128(%d, %d)", childInfo->valStr.c_str(), hi, lo);
+      // else 
+      if (enode->width <= 256) {
+        ret->valStr = format("%s.bits256(%d, %d)", childInfo->valStr.c_str(), hi, lo);
+      } else ret->valStr = format("%s.bits(%d, %d)", childInfo->valStr.c_str(), hi, lo);
+    }
     ret->opNum = childInfo->opNum + 1;
   }
 }
@@ -1413,7 +1425,7 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
     if (width <= BASIC_WIDTH)
       ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
     else
-      ret->valStr = format("(%s.tail(%d))", ret->valStr.c_str(), width);
+      ret->valStr = format("(%s.%s(%d))", ret->valStr.c_str(), tailName(width).c_str(), width);
   }
   ret->opNum = 0;
   return ret;
@@ -1607,7 +1619,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           if (width <= BASIC_WIDTH)
             computeInfo->valStr = format("(%s & %s)", computeInfo->valStr.c_str(), bitMask(width).c_str());
           else
-            computeInfo->valStr = format("%s.tail(%d)", computeInfo->valStr.c_str(), width);
+            computeInfo->valStr = format("%s.%s(%d)", computeInfo->valStr.c_str(), tailName(width).c_str(), width);
           computeInfo->width = width;
         }
       }
@@ -1816,7 +1828,7 @@ valInfo* Node::compute() {
       if (width <= BASIC_WIDTH)
         ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
       else
-        ret->valStr = format("%s.tail(%d)", ret->valStr.c_str(), width);
+        ret->valStr = format("%s.%s(%d)", ret->valStr.c_str(), tailName(width).c_str(), width);
     }
     ret->valStr = upperCast(width, ret->width, sign) + ret->valStr;
     status = MERGED_NODE;
@@ -1916,7 +1928,7 @@ void Node::finalConnect(std::string lvalue, valInfo* info) {
       if (width <= BASIC_WIDTH)
         info->valStr = format("(%s & %s)", info->valStr.c_str(), bitMask(width).c_str());
       else
-        info->valStr = format("%s.tail(%d)", info->valStr.c_str(), width);
+        info->valStr = format("%s.%s(%d)", info->valStr.c_str(), tailName(width).c_str(), width);
     }
     if (sign && width != info->width) insts.push_back(format("%s = %s%s;", lvalue.c_str(), Cast(info->width, info->sign).c_str(), info->valStr.c_str()));
     else insts.push_back(format("%s = %s;", lvalue.c_str(), info->valStr.c_str()));

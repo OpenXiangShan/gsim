@@ -243,6 +243,8 @@ public:
     return u256_0;
   }
   uint512_t tail(int n);
+  uint256_t tail256(int n);
+  uint256_t bits256(int hi, int lo);
   uint512_t flip();
   void display() {
     printf("%lx %lx %lx %lx %lx %lx %lx %lx",

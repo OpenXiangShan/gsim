@@ -13,11 +13,37 @@ uint512_t uint512_t::tail(int n) {
   if (n > 256) {
     ret.u256_0 = u256_0;
     int shiftNum = (512 - n);
-    ret.u256_1 = (u256_1 << shiftNum) >> shiftNum;
+    ret.u256_1 = shiftNum == 0 ? u256_1 : ((u256_1 << shiftNum) >> shiftNum);
   } else {
     ret.u256_1 = 0;
-    ret.u256_0 = (u256_0 << n) >> n;
+    int shiftNum = (256 - n);
+    ret.u256_0 = shiftNum == 0 ? u256_0 : ((u256_0 << shiftNum) >> shiftNum);
   }
+  return ret;
+}
+
+uint256_t uint512_t::tail256(int n) {
+  uint256_t ret;
+  int shiftNum = (256 - n);
+  ret = shiftNum == 0 ? u256_0 : ((u256_0 << shiftNum) >> shiftNum);
+  return ret;
+}
+
+uint256_t uint512_t::bits256(int hi, int lo) {
+  uint256_t ret = 0;
+
+  if (lo < 256) {
+    ret = u256_0 >> lo;
+  }
+  if (hi < 256) {
+    int shiftNum =  256 - (hi - lo + 1);
+    ret = (ret << shiftNum) >> shiftNum;
+  } else if (hi >= 256) {
+    int shiftNum = 512 - hi - 1 - (256 - lo); // 256 + lo - hi
+    ret |= (u256_1 << (512 - hi - 1)) >> shiftNum;
+  }
+
+  // if (lo > 256) ret = ret >> (lo - 256);
   return ret;
 }
 
