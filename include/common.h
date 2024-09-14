@@ -41,8 +41,6 @@
 #define widthType(width, sign)                     \
   (sign ? widthSType(width) : widthUType(width))
 
-#define MAX_NODE_WIDTH 2048
-
 #define widthUType(width) \
   std::string(width <= 8 ? "uint8_t" : \
             (width <= 16 ? "uint16_t" : \
@@ -52,7 +50,7 @@
             (width <= 256 ? "uint256_t" : \
             (width <= 512 ? "uint512_t" : \
             (width <= 1024 ? "uint1024_t" : \
-            (width <= 2048 ? "uint2048_t" : format("wide_t<%d>", width))))))))))
+            (width <= 2048 ? "uint2048_t" : format("wide_t<%d>", (width + 63) / 64))))))))))
 
 #define widthSType(width) \
   std::string(width <= 8 ? "int8_t" : \
@@ -74,9 +72,10 @@
         (width <= 256 ? 256 : \
         (width <= 512 ? 512 : \
         (width <= 1024 ? 1024 : \
-        (width <= 2048 ? 2048 : width)))))))))
+        (width <= 2048 ? 2048 : (width + 63) / 64 * 64)))))))))
 
 #define BASIC_WIDTH 256
+#define MAX_UINT_WIDTH 2048
 #define BASIC_TYPE __uint128_t
 #define uint128_t __uint128_t
 #define MAX_U8 0xff

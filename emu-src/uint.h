@@ -230,6 +230,9 @@ public:
     ret.u256_0 = u256_0 ^ a.u256_0;
     return ret;
   }
+  operator int () {
+    return (int)u256_0;
+  }
   operator uint64_t () {
     return (uint64_t)u256_0;
   }
@@ -239,6 +242,8 @@ public:
   operator uint256_t () {
     return u256_0;
   }
+  uint512_t tail(int n);
+  uint512_t flip();
   void display() {
     printf("%lx %lx %lx %lx %lx %lx %lx %lx",
      (uint64_t)(u256_1 >> 192), (uint64_t)(u256_1 >> 128), (uint64_t)(u256_1 >> 64), (uint64_t)u256_1, (uint64_t)(u256_0 >> 192), (uint64_t)(u256_0 >> 128), (uint64_t)(u256_0 >> 64), (uint64_t)u256_0);
@@ -357,6 +362,8 @@ public:
   operator uint512_t() {
     return u512_0;
   }
+  uint1024_t tail(int n);
+  uint1024_t flip();
   void display() {
     u512_1.display();
     printf(" ");
@@ -468,6 +475,11 @@ public:
   operator uint512_t () {
     return u1024_0.u512_0;
   }
+  operator uint1024_t () {
+    return u1024_0;
+  }
+  uint2048_t tail(int n);
+  uint2048_t flip();
   void display() {
     u1024_1.display();
     printf(" ");
@@ -479,7 +491,7 @@ public:
   }
 };
 
-template<int width, int _dataNum = (width + 63) / 64> class wide_t {
+template<int _dataNum> class wide_t {
 public:
   uint64_t data[_dataNum]; // lo - hi
   int dataNum = _dataNum;
@@ -505,8 +517,8 @@ public:
     data[2] = val >> 128;
     data[3] = val >> 196;
   }
-  wide_t<width> operator << (int shiftNum) {
-    wide_t<width> ret;
+  wide_t<_dataNum> operator << (int shiftNum) {
+    wide_t<_dataNum> ret;
     int full_shifts = shiftNum / 64;
     int bit_shift = shiftNum % 64;
 
@@ -525,8 +537,11 @@ public:
     }
     return ret;
   }
-  wide_t<width> operator >> (int shiftNum) {
-    wide_t<width> ret;
+  wide_t<_dataNum> operator << (uint64_t shiftNum) {
+    return *this << (int)shiftNum;
+  }
+  wide_t<_dataNum> operator >> (int shiftNum) {
+    wide_t<_dataNum> ret;
     int full_shifts = shiftNum / 64;
     int bit_shift = shiftNum % 64;
 
@@ -546,8 +561,8 @@ public:
 
     return ret;
   }
-  template<int w> wide_t<width> operator & (wide_t<w> a) {
-    wide_t<width> ret;
+  template<int num1> wide_t<_dataNum> operator & (wide_t<num1> a) {
+    wide_t<_dataNum> ret;
     for (int i = 0; i < dataNum; i++) {
       ret.data[i] = data[i] & a.data[i];
     }
@@ -559,21 +574,21 @@ public:
   uint64_t operator & (int a) {
     return data[0] & a;
   }
-  template<int w> wide_t<width> operator | (wide_t<w> a) {
-    wide_t<width> ret;
+  template<int num1> wide_t<_dataNum> operator | (wide_t<num1> a) {
+    wide_t<_dataNum> ret;
     for (int i = 0; i < dataNum; i++) {
       ret.data[i] = data[i] | a.data[i];
     }
     return ret;
   }
-  template<int w> wide_t<width> operator ^ (wide_t<w> a) {
-    wide_t<width> ret;
+  template<int num1> wide_t<_dataNum> operator ^ (wide_t<num1> a) {
+    wide_t<_dataNum> ret;
     for (int i = 0; i < dataNum; i++) {
       ret.data[i] = data[i] ^ a.data[i];
     }
     return ret;
   }
-  template<int w> bool operator == (wide_t<w> a) {
+  template<int num> bool operator == (wide_t<num> a) {
     bool ret = true;
     for (int i = 0; i < dataNum; i++) {
       ret &= data[i] == a.data[i];
@@ -587,7 +602,7 @@ public:
     }
     return ret;
   }
-  template<int w> bool operator != (wide_t<w> a) {
+  template<int num> bool operator != (wide_t<num> a) {
     bool ret = false;
     for (int i = 0; i < dataNum; i++) {
       ret |= data[i] != a.data[i];
@@ -619,10 +634,29 @@ public:
     uint2048_t ret(data);
     return ret;
   }
-  template<int w> operator wide_t<w>() {
-    wide_t<w> ret;
-    for (int i = 0; i < sizeof(ret.data) / sizeof(ret.data[0]); i++) {
+  template<int num> operator wide_t<num>() {
+    wide_t<num> ret;
+    for (int i = 0; i < num; i++) {
       ret.data[i] = data[i];
+    }
+    return ret;
+  }
+  wide_t<_dataNum> tail(int n) {
+    wide_t<_dataNum> ret;
+    int fullNum = n / 64;
+    int shiftNum = 64 - n % 64;
+    for (int i = 0; i < fullNum; i++) {
+      ret.data[i] = data[i];
+    }
+    if (shiftNum != 64) {
+      ret.data[fullNum] = (data[fullNum] << shiftNum) >> shiftNum;
+    }
+    return ret;
+  }
+  wide_t<_dataNum> flip() {
+    wide_t<_dataNum> ret;
+    for (int i = 0; i < _dataNum; i++) {
+      ret.data[i] = ~data[i];
     }
     return ret;
   }

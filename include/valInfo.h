@@ -46,7 +46,7 @@ public:
       valStr = mpz_get_str(NULL, 16, sintVal);
     }
     consLength = valStr.length();
-    if (valStr.length() <= 16) valStr = Cast(width, sign) + "0x" + valStr;
+    if (valStr.length() <= 16) valStr = (sign ? Cast(width, sign) : "") + "0x" + valStr;
     else valStr = legalCppCons(valStr);
     status = VAL_CONSTANT;
     mpz_set(assignmentCons, consVal);

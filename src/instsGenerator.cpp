@@ -84,7 +84,7 @@ static std::string getConsStr(mpz_t& val) {
   std::string str = mpz_get_str(NULL, 16, val);
   return legalCppCons(str);
 }
-static bool allOnes(mpz_t& val, int width) {
+bool allOnes(mpz_t& val, int width) {
   mpz_t tmp;
   mpz_init(tmp);
   mpz_set_ui(tmp, 1);
@@ -108,11 +108,16 @@ static std::string upperCast(int width1, int width2, bool sign) {
 
 static std::string bitMask(int width) {
   Assert(width > 0, "invalid width %d", width);
-  std::string ret = std::string(width/4, 'f');
-  const char* headTable[] = {"", "1", "3", "7"};
-  ret = headTable[width % 4] + ret;
-  ret = legalCppCons(ret);
-  return ret;
+  if (width <= BASIC_WIDTH) {
+    std::string ret = std::string(width/4, 'f');
+    const char* headTable[] = {"", "1", "3", "7"};
+    ret = headTable[width % 4] + ret;
+    ret = legalCppCons(ret);
+    return ret;
+  } else {
+    allMask.insert(std::make_pair(width-1, 0));
+    return format("UINT_MASK_%d_%d", width - 1, 0);
+  }
 }
 
 static std::string rangeMask(int hi, int lo) {
@@ -264,7 +269,7 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
       return computeInfo;
     }
   }
-  if (isSubArray(lvalue, node)) return instsWhen(node, lvalue, isRoot);
+  if (isSubArray(lvalue, node) || node->width > BASIC_WIDTH) return instsWhen(node, lvalue, isRoot);
 
   /* not constant */
   valInfo* ret = computeInfo;
@@ -367,7 +372,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     if (isStmt) return expr;
     if (expr.length() == 0 || expr == lvalue) return std::string("");
     else if (isSubArray(lvalue, node)) return arrayCopy(lvalue, node, info);
-    else if (node->width < width) return format("%s = (%s & %s);", lvalue.c_str(), expr.c_str(), bitMask(node->width).c_str());
+    else if (node->width < width) {
+      if (width <= BASIC_WIDTH)
+        return format("%s = (%s & %s);", lvalue.c_str(), expr.c_str(), bitMask(node->width).c_str());
+      else
+        return format("%s = %s.tail(%d);", lvalue.c_str(), expr.c_str(), node->width);
+    }
     else if (node->sign && node->width != width) return format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), expr.c_str());
     return lvalue + " = " + expr + ";";
   };
@@ -493,7 +503,10 @@ valInfo* ENode::instsStmt(Node* node, std::string lvalue, bool isRoot) {
       if (isSubArray(lvalue, node)) {
         computeInfo->valStr += arrayCopy(lvalue, node, childENode->computeInfo);
       } else if (node->width < width) {
-        computeInfo->valStr += format("%s = (%s & %s);", lvalue.c_str(), childENode->computeInfo->valStr.c_str(), bitMask(node->width).c_str());
+        if (node->width <= BASIC_WIDTH)
+          computeInfo->valStr += format("%s = (%s & %s);", lvalue.c_str(), childENode->computeInfo->valStr.c_str(), bitMask(node->width).c_str());
+        else
+          computeInfo->valStr += format("%s = %s.tail(%d);", lvalue.c_str(), childENode->computeInfo->valStr.c_str(), node->width);
       } else if (node->sign && node->width != width) {
         computeInfo->valStr += format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), childENode->computeInfo->valStr.c_str());
       }
@@ -532,7 +545,8 @@ valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " + " + rstr + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     if (!sign && width <= MAX(ChildInfo(0, width), ChildInfo(1, width))) {
-      ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+      if (width <= BASIC_WIDTH) ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+      else ret->valStr = format("%s.tail(%d)", ret->valStr.c_str(), width);
     }
   }
   return ret;
@@ -564,7 +578,8 @@ valInfo* ENode::instsSub(Node* node, std::string lvalue, bool isRoot) {
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " - " + rstr + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     if (!sign) {
-      ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+      if (width <= BASIC_WIDTH) ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+      else ret->valStr = format("%s.tail(%d)", ret->valStr.c_str(), width);
     }
   }
   return ret;
@@ -778,9 +793,15 @@ valInfo* ENode::instsDshl(Node* node, std::string lvalue, bool isRoot) {
     u_dshl(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
   } else {
-    int castWidth = ChildInfo(0, width) + (1 << ChildInfo(1, width)) - 1;
-    ret->valStr = format("(%s(%s%s << %s) & %s)", Cast(width, sign).c_str(), upperCast(castWidth, ChildInfo(0, width), sign).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), bitMask(width).c_str());
-    ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    int castWidth = MAX(width, 1 << ChildInfo(1, width));
+    // int castWidth = ChildInfo(0, width) + (1 << ChildInfo(1, width)) - 1;
+    if (ChildInfo(0, width) <= BASIC_WIDTH && width <= BASIC_WIDTH) {
+      ret->valStr = format("(%s(%s%s << %s) & %s)", Cast(width, sign).c_str(), upperCast(castWidth, ChildInfo(0, width), sign).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), bitMask(width).c_str());
+      ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    } else {
+      ret->valStr = format("((%s%s << %s).tail(%d))", Cast(width, sign).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), width);
+      ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    }
   }
   return ret;
 }
@@ -803,7 +824,12 @@ valInfo* ENode::instsDshr(Node* node, std::string lvalue, bool isRoot) {
       ret->opNum = ChildInfo(0, opNum) + 1;
     }
   } else {
-    ret->valStr = format("((%s%s >> %s) & %s)", Cast(ChildInfo(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), bitMask(width).c_str());
+    if (width <= BASIC_WIDTH) {
+      ret->valStr = format("((%s%s >> %s) & %s)", Cast(ChildInfo(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), bitMask(width).c_str());
+    } else {
+      ret->valStr = format("((%s%s >> %s).tail(%d))", Cast(ChildInfo(0, width), Child(0, sign)).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), width);
+      /// TODO: maybe upperCast
+    }
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   }
   return ret;
@@ -935,7 +961,8 @@ valInfo* ENode::instsAsUInt(Node* node, std::string lvalue, bool isRoot) {
     u_asUInt(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
   } else {
-    ret->valStr = "(" + Cast(width, false) + ChildInfo(0, valStr) + " & " + bitMask(Child(0, width)) + ")";
+    if (Child(0, width) <= BASIC_WIDTH) ret->valStr = "(" + Cast(width, false) + ChildInfo(0, valStr) + " & " + bitMask(Child(0, width)) + ")";
+    else TODO();
     ret->opNum = ChildInfo(0, opNum) + 1;
   }
   return ret;
@@ -1046,7 +1073,10 @@ valInfo* ENode::instsNot(Node* node, std::string lvalue, bool isRoot) {
     u_not(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
   } else {
-    ret->valStr = "(" + ChildInfo(0, valStr) + " ^ " + bitMask(width) + ")";
+    if (ChildInfo(0, width) <= BASIC_WIDTH)
+      ret->valStr = "(" + ChildInfo(0, valStr) + " ^ " + bitMask(width) + ")";
+    else
+      ret->valStr = format("%s.flip()", ChildInfo(0, valStr).c_str());
     ret->opNum = ChildInfo(0, opNum) + 1;
   }
   return ret;
@@ -1063,7 +1093,10 @@ valInfo* ENode::instsAndr(Node* node, std::string lvalue, bool isRoot) {
     u_andr(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width));
     ret->setConsStr();
   } else {
-    ret->valStr = "(" + ChildInfo(0, valStr) + " == " + bitMask(ChildInfo(0, width)) + ")";
+    if (ChildInfo(0, width) <= BASIC_WIDTH)
+      ret->valStr = "(" + ChildInfo(0, valStr) + " == " + bitMask(ChildInfo(0, width)) + ")";
+    else
+      ret->valStr = format("%s.allOnes()", ChildInfo(0, valStr).c_str());
     ret->opNum = ChildInfo(0, opNum) + 1;
   }
   return ret;
@@ -1131,6 +1164,7 @@ valInfo* ENode::instsPad(Node* node, std::string lvalue, bool isRoot) {
     (sign ? s_pad : u_pad)(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), values[0]);  // n(values[0]) == width
     ret->setConsStr();
   } else {
+    if (width > BASIC_WIDTH) TODO();
     std::string operandName;
     if (ChildInfo(0, opNum) == 0) operandName = ChildInfo(0, valStr);
     else {
@@ -1224,7 +1258,9 @@ valInfo* ENode::instsTail(Node* node, std::string lvalue, bool isRoot) {
     u_tail(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), n); // u_tail remains the last n bits
     ret->setConsStr();
   } else {
-    if (Child(0, sign)) {
+    if (n > BASIC_WIDTH) {
+      ret->valStr = format("(%s.tail(%d))", ChildInfo(0, valStr).c_str(), n);
+    } else if (Child(0, sign)) {
       ret->valStr = "(" + Cast(width, sign) + ChildInfo(0, valStr) + " & " + bitMask(n) + ")";
     }  else {
       ret->valStr = "(" + ChildInfo(0, valStr) + " & " + bitMask(n) + ")";
@@ -1250,16 +1286,20 @@ void infoBits(valInfo* ret, ENode* enode, valInfo* childInfo) {
   } else if (childInfo->width <= BASIC_WIDTH && lo == 0 && w == childInfo->width) {
     ret->valStr = childInfo->width;
     ret->opNum = childInfo->width;
+  } else if (childInfo->width <= BASIC_WIDTH) {
+      std::string shift;
+      if (lo == 0) {
+        if (childInfo->sign) shift = Cast(childInfo->width, childInfo->sign) + childInfo->valStr;
+        else shift = childInfo->valStr;
+      } else {
+        if (childInfo->sign) shift = "(" + Cast(childInfo->width, childInfo->sign) + childInfo->valStr + " >> " + std::to_string(lo) + ")";
+        else shift = "(" + childInfo->valStr + " >> " + std::to_string(lo) + ")";
+      }
+      ret->valStr = "(" + shift + " & " + bitMask(w) + ")";
+      ret->opNum = childInfo->opNum + 1;
   } else {
-    std::string shift;
-    if (lo == 0) {
-      if (childInfo->sign) shift = Cast(childInfo->width, childInfo->sign) + childInfo->valStr;
-      else shift = childInfo->valStr;
-    } else {
-      if (childInfo->sign) shift = "(" + Cast(childInfo->width, childInfo->sign) + childInfo->valStr + " >> " + std::to_string(lo) + ")";
-      else shift = "(" + childInfo->valStr + " >> " + std::to_string(lo) + ")";
-    }
-    ret->valStr = "(" + shift + " & " + bitMask(w) + ")";
+    if (lo == 0) ret->valStr = format("%s.tail(%d)", childInfo->valStr.c_str(), hi);
+    else ret->valStr = format("%s.bits(%d, %d)", childInfo->valStr.c_str(), hi, lo);
     ret->opNum = childInfo->opNum + 1;
   }
 }
@@ -1284,16 +1324,7 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
     ret->valStr = ChildInfo(0, valStr);
     ret->opNum = ChildInfo(0, opNum);
   } else {
-    std::string shift;
-    if (lo == 0) {
-      if (Child(0, sign)) shift = Cast(ChildInfo(0, width), Child(0, sign)) + ChildInfo(0, valStr);
-      else shift = ChildInfo(0, valStr);
-    } else {
-      if (Child(0, sign)) shift = "(" + Cast(ChildInfo(0, width), Child(0, sign)) + ChildInfo(0, valStr) + " >> " + std::to_string(lo) + ")";
-      else shift = "(" + ChildInfo(0, valStr) + " >> " + std::to_string(lo) + ")";
-    }
-    ret->valStr = "(" + shift + " & " + bitMask(w) + ")";
-    ret->opNum = ChildInfo(0, opNum) + 1;
+    infoBits(ret, this, Child(0, computeInfo));
     for (valInfo* info : ChildInfo(0, memberInfo)) {
       if (info) {
         valInfo* memInfo = info->dup();
@@ -1379,7 +1410,10 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   }
 
   if (memory->width > width) {
-    ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+    if (width <= BASIC_WIDTH)
+      ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+    else
+      ret->valStr = format("(%s.tail(%d))", ret->valStr.c_str(), width);
   }
   ret->opNum = 0;
   return ret;
@@ -1543,13 +1577,17 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->width = width;
           computeInfo->updateConsVal();
         }
-        else {
+        else if (width <= BASIC_WIDTH){
           computeInfo->valStr = format("(%s & %s)", computeInfo->valStr.c_str(), bitMask(width).c_str());
+          computeInfo->width = width;
+        } else {
+          computeInfo->valStr = format("%s.bits(%d)", computeInfo->valStr.c_str(), width);
           computeInfo->width = width;
         }
       }
       if (computeInfo->status == VAL_CONSTANT) ;
       else if (sign && computeInfo->width < width && computeInfo->status == VAL_VALID) { // sign extend
+        if (width > BASIC_WIDTH) TODO();
         int extendedWidth = widthBits(width);
         int shiftBits = extendedWidth - computeInfo->width;
         if (extendedWidth != width)
@@ -1566,7 +1604,10 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->updateConsVal();
         }
         else {
-          computeInfo->valStr = format("(%s & %s)", computeInfo->valStr.c_str(), bitMask(width).c_str());
+          if (width <= BASIC_WIDTH)
+            computeInfo->valStr = format("(%s & %s)", computeInfo->valStr.c_str(), bitMask(width).c_str());
+          else
+            computeInfo->valStr = format("%s.tail(%d)", computeInfo->valStr.c_str(), width);
           computeInfo->width = width;
         }
       }
@@ -1576,10 +1617,10 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       computeInfo->insts.insert(computeInfo->insts.begin(), nodePtr->insts.begin(), nodePtr->insts.end());
     }
     for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
-    MUX_DEBUG(printf("  %p(node) %s width %d info->width %d status %d val %s sameConstant %d opNum %d instsNum %ld\n", this, n->name.c_str(), width, computeInfo->width, computeInfo->status, computeInfo->valStr.c_str(), computeInfo->sameConstant, computeInfo->opNum, computeInfo->insts.size()));
+    MUX_DEBUG(printf("  %p(node) %s width %d info->width %d status %d val %s sameConstant %d opNum %d instsNum %ld %p\n", this, n->name.c_str(), width, computeInfo->width, computeInfo->status, computeInfo->valStr.c_str(), computeInfo->sameConstant, computeInfo->opNum, computeInfo->insts.size(), computeInfo));
     for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
       if (computeInfo->memberInfo[i]) {
-        MUX_DEBUG(printf("idx %ld %s\n", i, computeInfo->memberInfo[i]->valStr.c_str()));
+        MUX_DEBUG(printf("idx %ld %s instNum %ld %p\n", i, computeInfo->memberInfo[i]->valStr.c_str(), computeInfo->memberInfo[i]->insts.size(), computeInfo->memberInfo[i]));
       }
     }
     return computeInfo;
@@ -1639,7 +1680,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     default:
       Panic();
   }
-  MUX_DEBUG(printf("  %p %s op %d width %d val %s status %d sameConstant %d instsNum %ld opNum %d\n", this, n->name.c_str(), opType, width, computeInfo->valStr.c_str(), computeInfo->status, computeInfo->sameConstant, computeInfo->insts.size(), computeInfo->opNum));
+  MUX_DEBUG(printf("  %p %s op %d width %d val %s status %d sameConstant %d instsNum %ld opNum %d %p\n", this, n->name.c_str(), opType, width, computeInfo->valStr.c_str(), computeInfo->status, computeInfo->sameConstant, computeInfo->insts.size(), computeInfo->opNum, computeInfo));
   return computeInfo;
 
 }
@@ -1647,7 +1688,6 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
   compute node
 */
 valInfo* Node::compute() {
-  Assert(width <= MAX_NODE_WIDTH, "width of node %s(width=%d) exceeds the upper limit", name.c_str(), width);
   if (computeInfo) return computeInfo;
   Assert(status != DEAD_NODE, "compute deadNode %s\n", name.c_str());
   if (width == 0) {
@@ -1772,7 +1812,12 @@ valInfo* Node::compute() {
     ret->opNum = 0;
     ret->status = VAL_VALID;
   } else {
-    if (ret->width > width) ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+    if (ret->width > width) {
+      if (width <= BASIC_WIDTH)
+        ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+      else
+        ret->valStr = format("%s.tail(%d)", ret->valStr.c_str(), width);
+    }
     ret->valStr = upperCast(width, ret->width, sign) + ret->valStr;
     status = MERGED_NODE;
   }
@@ -1786,7 +1831,7 @@ valInfo* Node::compute() {
     }
   }
   tmp_pop();
-  MUX_DEBUG(printf("compute [%s(%d), %d] = %s status %d %p\n", name.c_str(), type, ret->status, ret->valStr.c_str(), status, this));
+  MUX_DEBUG(printf("compute [%s(%d), %d] = %s status %d %p ret=%p retInst=%ld\n", name.c_str(), type, ret->status, ret->valStr.c_str(), status, this, ret, ret->insts.size()));
   if (needRecompute) recomputeAllNodes();
   return ret;
 }
@@ -1867,7 +1912,12 @@ void Node::finalConnect(std::string lvalue, valInfo* info) {
       insts.push_back(arrayCopy(lvalue, this, info));;
     }
   } else {
-    if (info->width > width) info->valStr = format("(%s & %s)", info->valStr.c_str(), bitMask(width).c_str());
+    if (info->width > width) {
+      if (width <= BASIC_WIDTH)
+        info->valStr = format("(%s & %s)", info->valStr.c_str(), bitMask(width).c_str());
+      else
+        info->valStr = format("%s.tail(%d)", info->valStr.c_str(), width);
+    }
     if (sign && width != info->width) insts.push_back(format("%s = %s%s;", lvalue.c_str(), Cast(info->width, info->sign).c_str(), info->valStr.c_str()));
     else insts.push_back(format("%s = %s;", lvalue.c_str(), info->valStr.c_str()));
   }
@@ -2010,6 +2060,7 @@ valInfo* Node::computeArray() {
 }
 
 void graph::instsGenerator() {
+  maxConcatNum = 0;
   std::set<Node*> s;
   std::set<Node*> s_array;
   for (SuperNode* super : sortedSuper) {

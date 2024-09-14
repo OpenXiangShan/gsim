@@ -20,6 +20,7 @@
 
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 static void recomputeAllNodes();
+bool allOnes(mpz_t& val, int width);
 
 static std::map<Node*, valInfo*> consMap;
 static std::map<ENode*, valInfo*> consEMap;
@@ -1099,6 +1100,14 @@ void ExpTree::removeConstant() {
         updateNewChild(parent, newChild, idx);
       }
       remove = true;
+    } else if (top->opType == OP_AND) {
+      if (enodeConstant(top->getChild(0)) && top->getChild(0)->width == top->getChild(1)->width && allOnes(consEMap[top->getChild(0)]->consVal, top->getChild(0)->width)) {
+        updateNewChild(parent, top->getChild(1), idx);
+        remove = true;
+      } else if (enodeConstant(top->getChild(1)) && top->getChild(0)->width == top->getChild(1)->width && allOnes(consEMap[top->getChild(1)]->consVal, top->getChild(1)->width)) {
+        updateNewChild(parent, top->getChild(0), idx);
+        remove = true;
+      }
     }
 
     if (!remove) {
