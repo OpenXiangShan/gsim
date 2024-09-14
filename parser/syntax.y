@@ -91,7 +91,7 @@ ALLID: ID {$$ = $1; }
     | Reg { $$ = strdup("reg"); }
     | Output { $$ = strdup("output"); }
     | Target { $$ = strdup("target"); }
-    | Invalid { $$ = strdup("invalid"); }
+    | Invalidate { $$ = strdup("invalidate"); }
     | Mux { $$ = strdup("mux"); }
     | Stop { $$ = strdup("stop"); }
     | Depth {$$ = strdup("depth"); }
@@ -202,7 +202,7 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5
     | Node ALLID '=' expr info { $$ = newNode(P_NODE, synlineno(), $5, $2, 1, $4); }
     | Connect reference ',' expr info { $$ = newNode(P_CONNECT, $2->lineno, $5, NULL, 2, $2, $4); }
     | reference "<-" expr info  { $$ = newNode(P_PAR_CONNECT, $1->lineno, $4, NULL, 2, $1, $3); }
-    | reference Is Invalid info { $$ = newNode(P_INVALID, synlineno(), nullptr, 0); $$->setWidth(1); $$ = newNode(P_CONNECT, $1->lineno, $4, NULL, 2, $1, $$); }
+    | Invalidate reference info { $$ = newNode(P_INVALID, synlineno(), nullptr, 0); $$->setWidth(1); $$ = newNode(P_CONNECT, $2->lineno, $3, NULL, 2, $2, $$); }
     | Attach '(' references ')' info { TODO(); }
     | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $2->lineno, $4, NULL, 3, $2, $6, $8); } /* expected newline before statement */
     | Stop '(' expr ',' expr ',' INT ')' info   { TODO(); }

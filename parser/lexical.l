@@ -122,8 +122,7 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>inst                    { return token::Inst; }
 <normal>of                      { return token::Of; }
 <normal>node                    { return token::Node; }
-<normal>is                      { return token::Is; }
-<normal>invalid                 { return token::Invalid; }
+<normal>invalidate              { return token::Invalidate; }
 <normal>attach                  { return token::Attach; }
 <normal>when                    { return token::When; }
 <normal>else                    { return token::Else; }
