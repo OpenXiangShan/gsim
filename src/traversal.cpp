@@ -9,7 +9,7 @@
 
 const char* pname[] = {
   "P_EMPTY", "P_CIRCUIT", "P_MOD", "P_EXTMOD", "P_INTMOD", "P_PORTS", "P_INPUT",
-  "P_OUTPUT", "P_WIRE_DEF", "P_REG_DEF", "P_INST", "P_NODE", "P_CONNECT", 
+  "P_OUTPUT", "P_WIRE_DEF", "P_REG_DEF", "P_REG_RESET_DEF", "P_INST", "P_NODE", "P_CONNECT", 
   "P_PAR_CONNECT", "P_WHEN", "P_MEMORY", "P_READER", "P_WRITER", 
   "P_READWRITER", "P_RUW", "P_RLATENCT", "P_WLATENCT", "P_DATATYPE", "P_DEPTH", 
   "P_REF", "P_REF_DOT", "P_REF_IDX_INT", "P_REF_IDX_EXPR", "P_2EXPR", "P_1EXPR", 
@@ -52,6 +52,18 @@ static std::map<OPType, const char*> OP2Name = {
   {OP_READ_MEM, "readMem"}, {OP_RESET, "reset"}, {OP_STMT, "stmts"}, {OP_SEXT, "sext"}, {OP_BITS_NOSHIFT, "bits_noshift"}
 };
 
+static const char* StatusName[] = {
+    "NODE_INVALID",    "NODE_REG_SRC", "NODE_REG_DST",    "NODE_SPECIALt", "NODE_INP",
+    "NODE_OUT",        "NODE_MEMORY",  "NODE_READER",     "NODE_WRITER",   "NODE_READWRITER",
+    "NODE_MEM_MEMBER", "NODE_OTHERS",  "NODE_REG_UPDATE",
+};
+
+static const char* TypeName[] = {
+    "NODE_INVALID",    "NODE_REG_SRC", "NODE_REG_DST",    "NODE_SPECIAL", "NODE_INP",
+    "NODE_OUT",        "NODE_MEMORY",  "NODE_READER",     "NODE_WRITER",  "NODE_READWRITER",
+    "NODE_MEM_MEMBER", "NODE_OTHERS",  "NODE_REG_UPDATE",
+};
+
 void ExpTree::display() {
   if (!getRoot()) return;
   std::stack<std::pair<ENode*, int>> enodes;
@@ -66,7 +78,9 @@ void ExpTree::display() {
       printf("%s(EMPTY)\n",std::string(depth * 2, ' ').c_str());
       continue;
     }
-    printf("%s(%d %s %p) %s %s [width=%d, sign=%d, type=%d]", std::string(depth * 2, ' ').c_str(), top->opType, OP2Name[top->opType], top, (top->nodePtr) ? top->nodePtr->name.c_str(): "", top->strVal.c_str(), top->width, top->sign, (top->nodePtr) ? top->nodePtr->type: 0);
+    printf("%s(%d %s %p) %s %s [width=%d, sign=%d, type=%s]", std::string(depth * 2, ' ').c_str(), top->opType,
+           OP2Name[top->opType], top, (top->nodePtr) ? top->nodePtr->name.c_str() : "", top->strVal.c_str(), top->width,
+           top->sign, (top->nodePtr) ? TypeName[top->nodePtr->type] : TypeName[0]);
     for (int val : top->values) printf(" %d", val);
     printf("\n");
     for (int i = top->child.size() - 1; i >= 0; i --) {
@@ -90,8 +104,9 @@ void SuperNode::display() {
     }
 }
 
+
 void Node::display() {
-  printf("node %s[width %d sign %d status %d type %d]:\n", name.c_str(), width, sign, status, type);
+  printf("node %s[width %d sign %d status %s type %s]:\n", name.c_str(), width, sign, StatusName[status], TypeName[type]);
   for (size_t i = 0; i < assignTree.size(); i ++) {
     printf("[assign] %ld\n", i);
     assignTree[i]->display();
