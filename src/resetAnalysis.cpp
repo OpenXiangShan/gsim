@@ -33,8 +33,12 @@ ResetType ENode::inferReset() {
       break;
     case OP_INT:
       std::tie(base, str) = firStrBase(strVal);
-      if (str == "0") reset = ZERO_RESET;
-      else TODO();
+      if (str == "h0" || str == "0")
+        reset = ZERO_RESET;
+      else {
+        std::cout << "Unknown :" << str << std::endl;
+        TODO();
+      }
       break;
     case OP_ASASYNCRESET:
       reset = ASYRESET;
