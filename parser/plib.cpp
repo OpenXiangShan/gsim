@@ -19,21 +19,19 @@ static inline int bit(char c, int base) {
 int p_stoi(const char* str) {  // oct/dec/hex string to int
   int len = strlen(str);
   if (len == 0) return 0;
+
   int val  = 0;
-  int idx  = 1;
+  int idx  = 0;
   int neg  = 0;
-  int base = 0;
-  switch (str[0]) {
-    case 'b': base = 2; break;
-    case 'o': base = 8; break;
-    case 'h': base = 16; break;
-    default: base = 10; idx = 0;
-  }
+  int base = 10;
+
   if (str[idx] == '-') {
     idx++;
     neg = 1;
   }
+
   for (int i = idx; i < len; i++) { val = val * base + bit(str[i], base); }
   if (neg) return -val;
+
   return val;
 }
