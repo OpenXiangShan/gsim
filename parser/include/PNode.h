@@ -26,6 +26,7 @@ enum PNodeType{
   P_OUTPUT,
   P_WIRE_DEF,
   P_REG_DEF,
+  P_REG_RESET_DEF,
   P_INST,
   P_NODE,
   P_CONNECT,

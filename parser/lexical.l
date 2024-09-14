@@ -117,8 +117,7 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>readwriter              { return token::Readwriter; }
 <normal>wire                    { return token::Wire; }
 <normal>reg                     { return token::Reg; }
-<normal>"with :"                { return token::RegWith; }
-<normal>"reset =>"              { return token::RegReset; }
+<normal>regreset                { return token::RegReset; }
 <normal>inst                    { return token::Inst; }
 <normal>of                      { return token::Of; }
 <normal>node                    { return token::Node; }
