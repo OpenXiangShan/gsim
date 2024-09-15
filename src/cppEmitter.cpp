@@ -22,6 +22,11 @@ static int displayNum = 0;
 
 #define RESET_NAME(node) (node->name + "$RESET")
 
+#define ActiveType std::tuple<uint64_t, std::string, int>
+#define ACTIVE_MASK(active) std::get<0>(active)
+#define ACTIVE_COMMENT(active) std::get<1>(active)
+#define ACTIVE_UNIQUE(active) std::get<2>(active)
+
 static int superId = 0;
 static int activeFlagNum = 0;
 static std::set<Node*> definedNode;
@@ -52,9 +57,10 @@ std::pair<int, uint64_t>clearIdxMask(int cppId) {
   return std::make_pair(id, mask);
 }
 
-std::pair<uint64_t, std::string> activeSet2bitMap(std::set<int>& activeId, std::map<uint64_t, std::pair<uint64_t, std::string>>& bitMapInfo, int curId) {
+ActiveType activeSet2bitMap(std::set<int>& activeId, std::map<uint64_t, ActiveType>& bitMapInfo, int curId) {
   uint64_t ret = 0;
   std::string comment = "";
+  int uniqueIdx = 0;
   for (int id : activeId) {
     int bitMapId;
     uint64_t bitMapMask;
@@ -62,21 +68,24 @@ std::pair<uint64_t, std::string> activeSet2bitMap(std::set<int>& activeId, std::
     int num = 64 / ACTIVE_WIDTH;
     bool find = false;
     if (curId >= 0 && id > curId && bitMapId == curId / ACTIVE_WIDTH) {
+      if (ret == 0) uniqueIdx = id % ACTIVE_WIDTH;
+      else uniqueIdx = -1;
       ret |= bitMapMask;
       comment += " " + std::to_string(id);
     } else {
       for (int i = 0; i < num; i ++) {
         int newId = bitMapId - i;
         if (bitMapInfo.find(newId) != bitMapInfo.end()) {
-          bitMapInfo[newId].first |= bitMapMask << (i * ACTIVE_WIDTH);
-          bitMapInfo[newId].second += " " + std::to_string(id);
+          ACTIVE_MASK(bitMapInfo[newId]) |= bitMapMask << (i * ACTIVE_WIDTH);
+          ACTIVE_COMMENT(bitMapInfo[newId]) += " " + std::to_string(id);
+          ACTIVE_UNIQUE(bitMapInfo[newId]) = -1;
           find = true;
         }
       }
-      if (!find) bitMapInfo[bitMapId] = std::make_pair(bitMapMask, std::to_string(id));
+      if (!find) bitMapInfo[bitMapId] = std::make_tuple(bitMapMask, std::to_string(id), id % ACTIVE_WIDTH);
     }
   }
-  return std::make_pair(ret, comment);
+  return std::make_tuple(ret, comment, uniqueIdx);
 }
 
 std::string updateActiveStr(int idx, uint64_t mask) {
@@ -86,11 +95,13 @@ std::string updateActiveStr(int idx, uint64_t mask) {
   return format("*(uint64_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
 }
 
-std::string updateActiveStr(int idx, uint64_t mask, std::string& cond) {
+std::string updateActiveStr(int idx, uint64_t mask, std::string& cond, int uniqueId) {
   auto activeFlags = std::string("activeFlags[") + std::to_string(idx) + std::string("]");
 
-  if (mask <= MAX_U8)
-    return format("%s |= -(uint8_t)%s & 0x%lx;", activeFlags.c_str(), cond.c_str(), mask, activeFlags.c_str());
+  if (mask <= MAX_U8) {
+    if (uniqueId >= 0) return format("%s |= %s << %d;", activeFlags.c_str(), cond.c_str(), uniqueId);
+    else return format("%s |= -(uint8_t)%s & 0x%lx;", activeFlags.c_str(), cond.c_str(), mask, activeFlags.c_str());
+  }
   if (mask <= MAX_U16)
     return format("*(uint16_t*)&%s |= -(uint16_t)%s & 0x%lx;", activeFlags.c_str(), cond.c_str(), mask, activeFlags.c_str());
   if (mask <= MAX_U32)
@@ -452,13 +463,13 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   bool opt{false};
 
   if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
-  std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
-  std::pair<uint64_t, std::string> curMask;
+  std::map<uint64_t, ActiveType> bitMapInfo;
+  ActiveType curMask;
   if (node->isAsyncReset()) {
     fprintf(fp, "if (%s || (%s != %s)) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
   } else {
     curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
-    opt = ((curMask.first != 0) + bitMapInfo.size()) <= 3;
+    opt = ((ACTIVE_MASK(curMask) != 0) + bitMapInfo.size()) <= 3;
     if (opt) {
       if (node->width == 1) fprintf(fp, "auto %s = %s ^ %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
       else fprintf(fp, "auto %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
@@ -473,15 +484,14 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
     Assert(!opt, "invalid opt");
     fprintf(fp, "activateAll();\n");
     fprintf(fp, "oldFlag = -1;\n");
-  }
-  else {
-    if (curMask.first != 0) {
-      if (opt) fprintf(fp, "oldFlag |= -(uint%d_t)%s & 0x%lx; // %s\n", ACTIVE_WIDTH, condName.c_str() ,curMask.first, curMask.second.c_str());
-      else fprintf(fp, "oldFlag |= 0x%lx; // %s\n", curMask.first, curMask.second.c_str());
+  } else {
+    if (ACTIVE_MASK(curMask) != 0) {
+      if (opt) fprintf(fp, "oldFlag |= -(uint%d_t)%s & 0x%lx; // %s\n", ACTIVE_WIDTH, condName.c_str() ,ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
+      else fprintf(fp, "oldFlag |= 0x%lx; // %s\n", ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
     }
     for (auto iter : bitMapInfo) {
-      auto str = opt ? updateActiveStr(iter.first, iter.second.first, condName) : updateActiveStr(iter.first, iter.second.first);
-      fprintf(fp, "%s // %s\n", str.c_str(), iter.second.second.c_str());
+      auto str = opt ? updateActiveStr(iter.first, ACTIVE_MASK(iter.second), condName, ACTIVE_UNIQUE(iter.second)) : updateActiveStr(iter.first, ACTIVE_MASK(iter.second));
+      fprintf(fp, "%s // %s\n", str.c_str(), ACTIVE_COMMENT(iter.second).c_str());
     }
   #ifdef PERF
     for (int id : nextNodeId) {
@@ -496,11 +506,11 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
 
 static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bool inStep) {
   if (!node->fullyUpdated) fprintf(fp, "if (%s) {\n", ASSIGN_INDI(node).c_str());
-  std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
+  std::map<uint64_t, ActiveType> bitMapInfo;
   auto curMask = activeSet2bitMap(activateId, bitMapInfo, node->super->cppId);
-  if (curMask.first != 0) fprintf(fp, "oldFlag |= 0x%lx; // %s\n", curMask.first, curMask.second.c_str());
+  if (ACTIVE_MASK(curMask) != 0) fprintf(fp, "oldFlag |= 0x%lx; // %s\n", ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
   for (auto iter : bitMapInfo) {
-    fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, iter.second.first).c_str(), iter.second.second.c_str());
+    fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
   }
 #ifdef PERF
   for (int id : activateId) {
@@ -666,10 +676,10 @@ void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
 
   if (allNext.size() > 100) fprintf(fp, "activateAll();\n");
   else {
-    std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
+    std::map<uint64_t, ActiveType> bitMapInfo;
     activeSet2bitMap(allNext, bitMapInfo, -1);
     for (auto iter : bitMapInfo) {
-      fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, iter.second.first).c_str(), iter.second.second.c_str());
+      fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
     }
   }
   for (size_t i = 0; i < super->member.size(); i ++) {
@@ -740,10 +750,10 @@ void graph::genMemWrite(FILE* fp) {
           fprintf(fp, "if(unlikely(%s)) {\n", cond.c_str());
           fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
         }
-        std::map<uint64_t, std::pair<uint64_t, std::string>> bitMapInfo;
+        std::map<uint64_t, ActiveType> bitMapInfo;
         activeSet2bitMap(readerNextId, bitMapInfo, -1);
         for (auto iter : bitMapInfo) {
-          fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, iter.second.first).c_str(), iter.second.second.c_str());
+          fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
         }
         fprintf(fp, "}\n");
 
