@@ -505,13 +505,17 @@ ExpTree* dupTreeWithBits(ExpTree* tree, int _hi, int _lo) {
     std::tie(top, parent, idx, hi, lo) = s.top();
     s.pop();
     if (top->nodePtr || top->opType == OP_INT) {
-      ENode* bits = new ENode(OP_BITS);
-      bits->addChild(top);
-      bits->addVal(hi);
-      bits->addVal(lo);
-      bits->width = hi - lo + 1;
-      if (parent) parent->child[idx] = bits;
-      else rvalue = bits;
+      if (top->nodePtr && top->nodePtr->width == hi + 1 && lo == 0) {
+
+      } else {
+        ENode* bits = new ENode(OP_BITS);
+        bits->addChild(top);
+        bits->addVal(hi);
+        bits->addVal(lo);
+        bits->width = hi - lo + 1;
+        if (parent) parent->child[idx] = bits;
+        else rvalue = bits;
+      }
     } else {
       switch(top->opType) {
         case OP_WHEN: case OP_MUX:
