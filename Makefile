@@ -39,7 +39,7 @@ else ifeq ($(dutName),boom)
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
-	mainargs = ready-to-run/bin/bbl-test1.bin
+	mainargs = ready-to-run/bin/linux-rocket.bin
 	TEST_FILE = ready-to-run/$(NAME).SmallBoomConfig
 else ifeq ($(dutName),xiangshan)
 	NAME ?= SimTop
