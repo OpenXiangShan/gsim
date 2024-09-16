@@ -187,7 +187,6 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   /* include all libs */
   includeLib(header, "iostream", true);
   includeLib(header, "vector", true);
-  includeLib(header, "gmp.h", true);
   includeLib(header, "assert.h", true);
   includeLib(header, "cstdint", true);
   includeLib(header, "ctime", true);
