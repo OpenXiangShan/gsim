@@ -539,7 +539,7 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
     if (node->status == VALID_NODE && node->type == NODE_OTHERS && !node->needActivate() && !node->isArray()) {
       fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), node->name.c_str());
     }
-    if (node->isArray() && !node->fullyUpdated) fprintf(fp, "bool %s = false;\n", ASSIGN_INDI(node).c_str());
+    if (node->isArray() && !node->fullyUpdated && node->needActivate()) fprintf(fp, "bool %s = false;\n", ASSIGN_INDI(node).c_str());
     std::vector<std::string> newInsts(node->insts);
     /* save oldVal */
     if (node->needActivate() && !node->isArray()) {
@@ -557,7 +557,7 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
       }
     }
     /* display all insts */
-    std::string indiStr = node->fullyUpdated || !node->isArray() ? "" : format("\n%s = true;\n", ASSIGN_INDI(node).c_str());
+    std::string indiStr = node->fullyUpdated || !node->isArray() || !node->needActivate() ? "" : format("\n%s = true;\n", ASSIGN_INDI(node).c_str());
     for (std::string inst : newInsts) {
       fprintf(fp, "%s\n", strReplace(inst, ASSIGN_LABLE, indiStr).c_str());
     }
