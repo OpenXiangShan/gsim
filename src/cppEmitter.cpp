@@ -66,23 +66,34 @@ ActiveType activeSet2bitMap(std::set<int>& activeId, std::map<uint64_t, ActiveTy
     uint64_t bitMapMask;
     std::tie(bitMapId, bitMapMask) = setIdxMask(id);
     int num = 64 / ACTIVE_WIDTH;
-    bool find = false;
     if (curId >= 0 && id > curId && bitMapId == curId / ACTIVE_WIDTH) {
       if (ret == 0) uniqueIdx = id % ACTIVE_WIDTH;
       else uniqueIdx = -1;
       ret |= bitMapMask;
-      comment += " " + std::to_string(id);
+      comment += std::to_string(id) + " ";
     } else {
-      for (int i = 0; i < num; i ++) {
-        int newId = bitMapId - i;
-        if (bitMapInfo.find(newId) != bitMapInfo.end()) {
-          ACTIVE_MASK(bitMapInfo[newId]) |= bitMapMask << (i * ACTIVE_WIDTH);
-          ACTIVE_COMMENT(bitMapInfo[newId]) += " " + std::to_string(id);
-          ACTIVE_UNIQUE(bitMapInfo[newId]) = -1;
-          find = true;
+      int beg = bitMapId - bitMapId % num;
+      int end = beg + num;
+      int findType = 0;
+      uint64_t newMask = bitMapMask << ((bitMapId - beg) * ACTIVE_WIDTH);
+      std::string newComment = std::to_string(id);
+      if (bitMapInfo.find(bitMapId) != bitMapInfo.end()) {
+        ACTIVE_MASK(bitMapInfo[bitMapId]) |= bitMapMask;
+        ACTIVE_COMMENT(bitMapInfo[bitMapId]) += " " + std::to_string(id);
+        ACTIVE_UNIQUE(bitMapInfo[bitMapId]) = -1;
+        findType = 1; // no nothing
+      } else {
+        for (int newId = beg; newId < end; newId ++) {
+          if (bitMapInfo.find(newId) != bitMapInfo.end()) {
+            newMask |= ACTIVE_MASK(bitMapInfo[newId]) << ((newId - beg) * ACTIVE_WIDTH);
+            newComment += " " + ACTIVE_COMMENT(bitMapInfo[newId]);
+            findType = 2;  // find to merge
+            bitMapInfo.erase(newId);
+          }
         }
       }
-      if (!find) bitMapInfo[bitMapId] = std::make_tuple(bitMapMask, std::to_string(id), id % ACTIVE_WIDTH);
+      if (findType == 0) bitMapInfo[bitMapId] = std::make_tuple(bitMapMask, std::to_string(id), id % ACTIVE_WIDTH);
+      else if (findType == 2) bitMapInfo[beg] = std::make_tuple(newMask, newComment, -1);
     }
   }
   return std::make_tuple(ret, comment, uniqueIdx);
