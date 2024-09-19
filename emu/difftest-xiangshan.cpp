@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <fstream>
 #include <set>
+#include <csignal>
 
 #if defined(GSIM)
 #include <SimTop.h>
@@ -28,6 +29,7 @@ REF_NAME* ref;
 #define MAX_PROGRAM_SIZE 0x8000000
 uint8_t program[MAX_PROGRAM_SIZE];
 int program_sz = 0;
+bool dut_end = false;
 
 template <typename T>
 std::vector<size_t> sort_indexes(const std::vector<T> &v) {
@@ -144,7 +146,12 @@ int main(int argc, char** argv) {
   std::cout << "start testing.....\n";
   // printf("size = %lx %lx\n", sizeof(*ref->rootp),
   // (uintptr_t)&(ref->rootp->SimTop__DOT__l_soc__DOT__misc__DOT__buffers__DOT__nodeOut_a_q__DOT__ram_opcode) - (uintptr_t)(ref->rootp));
-  bool dut_end = false;
+  std::signal(SIGINT, [](int){
+    dut_end = true;
+  });
+  std::signal(SIGTERM, [](int){
+    dut_end = true;
+  });
   uint64_t cycles = 0;
   clock_t start = clock();
   clock_t prevTime = start;
