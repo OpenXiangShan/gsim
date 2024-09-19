@@ -6,6 +6,7 @@
 #include <numeric>
 #include <algorithm>
 #include <fstream>
+#include <csignal>
 
 #if defined(GSIM)
 #include <TestHarness.h>
@@ -26,6 +27,7 @@ REF_NAME* ref;
 #define MAX_PROGRAM_SIZE 0x8000000
 uint8_t program[MAX_PROGRAM_SIZE];
 int program_sz = 0;
+bool dut_end = false;
 
 template <typename T>
 std::vector<size_t> sort_indexes(const std::vector<T> &v) {
@@ -135,7 +137,12 @@ int main(int argc, char** argv) {
   std::cout << "start testing.....\n";
   // printf("size = %lx %lx\n", sizeof(*ref->rootp),
   // (uintptr_t)&(ref->rootp->TestHarness__DOT__ldut__DOT__subsystem_sbus__DOT__coupler_to_port_named_mmio_port_axi4__DOT__axi4buf__DOT__nodeOut_aw_deq_q__DOT__ram_id) - (uintptr_t)(ref->rootp));
-  bool dut_end = false;
+  std::signal(SIGINT, [](int){
+    dut_end = true;
+  });
+  std::signal(SIGTERM, [](int){
+    dut_end = true;
+  });
   uint64_t cycles = 0;
 #ifdef PERF
   FILE* activeFp = fopen(ACTIVE_FILE, "w");
@@ -152,7 +159,7 @@ int main(int argc, char** argv) {
 #if (!defined(GSIM) && defined(VERILATOR)) || (defined(GSIM) && !defined(VERILATOR))
     if(cycles % 10000000 == 0 && cycles <= 70000000) {
       clock_t dur = clock() - start;
-      printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+      fprintf(stderr, "cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
 #ifdef PERF
       size_t totalActives = 0;
       size_t validActives = 0;

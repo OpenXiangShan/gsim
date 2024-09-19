@@ -2,6 +2,7 @@
 #include <top.h>
 #include <time.h>
 #include "verilated.h"
+#include <csignal>
 #include HEADER
 
 MOD_NAME* mod;
@@ -10,6 +11,7 @@ REF_NAME* ref;
 #define MAX_PROGRAM_SIZE 0x8000000
 uint8_t program[MAX_PROGRAM_SIZE];
 int program_sz = 0;
+bool dut_end = false;
 
 void load_program(char* filename){
 
@@ -87,7 +89,12 @@ int main(int argc, char** argv) {
   }
 #endif
   std::cout << "start testing.....\n";
-  bool dut_end = false;
+  std::signal(SIGINT, [](int){
+    dut_end = true;
+  });
+  std::signal(SIGTERM, [](int){
+    dut_end = true;
+  });
   int cycles = 0;
   clock_t start = clock();
   while(!dut_end) {
@@ -103,7 +110,7 @@ int main(int argc, char** argv) {
     if(cycles % 10000 == 0 && cnt < 3) {
       cnt ++;
       clock_t dur = clock() - start;
-      printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+      fprintf(stderr, "cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
     }
 #endif
 #if defined(VERILATOR) && defined(GSIM)
