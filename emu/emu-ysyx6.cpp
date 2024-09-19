@@ -48,13 +48,15 @@ class VerilatorModel : public Model {
     // Initialize verilated c model
     ref = std::make_unique<REF_NAME>(Context.get());
 
+#ifdef TRACE
     // Initialize verilated vcd
-    //FIXME: Add `--trace` to `VERI_VFLAGS`
+    // FIXME: Add `--trace` to `VERI_VFLAGS`
     Verilated::traceEverOn(true);
     Wave = std::make_unique<VerilatedVcdC>();
 
     ref->trace(Wave.get(), 99, 99);
     Wave->open("./model.vcd");
+#endif
 
     // Initialize memory
     memcpy(&ref->rootp->ysyx6__DOT__Mem__DOT__mem_ext__DOT__Memory, ram, size);
@@ -67,13 +69,16 @@ class VerilatorModel : public Model {
     set_clock(false);
     eval();
     Context->timeInc(1);
+#ifdef TRACE
     Wave->dump(Context->time());
+#endif
 
     set_clock(true);
     eval();
     Context->timeInc(1);
+#ifdef TRACE
     Wave->dump(Context->time());
-
+#endif
     ++Cycles;
   }
 
