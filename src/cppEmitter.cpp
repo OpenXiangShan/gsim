@@ -225,8 +225,9 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
   fprintf(header, "uint64_t cycles = 0;\n");
   /* constrcutor */
-  fprintf(header, "S%s() {\n", name.c_str());
-  /* some initialization */
+  fprintf(header, "S%s() {\ninit();\n}", name.c_str());
+  /*initialization */
+  fprintf(header, "void init() {\n");
   fprintf(header, "activateAll();\n");
 #ifdef PERF
   fprintf(header, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
