@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
     if(cycles % 10000 == 0 && cnt < 3) {
       cnt ++;
       clock_t dur = clock() - start;
-      printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+      fprintf(stderr, "cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
     }
 #endif
 #if defined(VERILATOR) && defined(GSIM)

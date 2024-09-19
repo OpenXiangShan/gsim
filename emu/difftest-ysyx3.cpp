@@ -162,7 +162,7 @@ int main(int argc, char** argv) {
 #if (!defined(GSIM) && defined(VERILATOR)) || (defined(GSIM) && !defined(VERILATOR))
     if(cycles % 10000000 == 0 && cycles <= 600000000) {
       clock_t dur = clock() - start;
-      printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+      fprintf(stderr, "cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
 #ifdef PERF
       size_t totalActives = 0;
       size_t validActives = 0;

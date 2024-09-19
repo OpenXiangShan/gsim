@@ -177,7 +177,7 @@ int main(int argc, char** argv) {
     if(cycles % 100000 == 0 && cycles <= max_cycles) {
       clock_t now = clock();
       clock_t dur = now - start;
-      printf("cycles %ld (%ld ms, %ld per sec / current %ld ) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur, 100000 * CLOCKS_PER_SEC / (now - prevTime));
+      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec / current %ld ) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur, 100000 * CLOCKS_PER_SEC / (now - prevTime));
       prevTime = now;
 #ifdef PERF
       fprintf(activeFp, "cycles: %ld\n", cycles);
