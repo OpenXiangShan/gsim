@@ -4,20 +4,22 @@ import os
 
 # Define the specific order of passes
 passes = [
-    "00Init",
-    "01TopoSort",
-    "02ClockOptimize",
-    "03RemoveDeadNodes",
-    "04ExprOpt",
-    "05ConstantAnalysis",
-    "06RemoveDeadNodes",
-    "07AliasAnalysis",
-    "08CommonExpr",
-    "09RemoveDeadNodes",
-    "10MergeNodes",
-    "11MergeRegister",
-    "12ConstructRegs",
-    "13Final"
+    "0Init",
+    "1TopoSort",
+    "2ClockOptimize",
+    "3RemoveDeadNodes",
+    "4ExprOpt",
+    "5ConstantAnalysis",
+    "6RemoveDeadNodes",
+    "7AliasAnalysis",
+    "8PatternDetect",
+    "9CommonExpr",
+    "10RemoveDeadNodes",
+    "11MergeNodes",
+    "12Replication",
+    "13MergeRegister",
+    "14ConstructRegs",
+    "15Final"
 ]
 
 
