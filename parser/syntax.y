@@ -59,7 +59,7 @@ int p_stoi(const char* str);
 %token Flip Mux Validif Invalidate Mem Wire Reg RegReset Inst Of Node Attach
 %token When Else Stop Printf Skip Input Output Assert
 %token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit Connect Public
-%token Class Target Firrtl Version INDENT DEDENT
+%token Firrtl Version INDENT DEDENT
 %token RightArrow "=>"
 %token Leftarrow "<-"
 %token DataType Depth ReadLatency WriteLatency ReadUnderwrite Reader Writer Readwriter
@@ -90,7 +90,6 @@ ALLID: ID {$$ = $1; }
     | Of { $$ = strdup("of"); }
     | Reg { $$ = strdup("reg"); }
     | Output { $$ = strdup("output"); }
-    | Target { $$ = strdup("target"); }
     | Invalidate { $$ = strdup("invalidate"); }
     | Mux { $$ = strdup("mux"); }
     | Stop { $$ = strdup("stop"); }
@@ -239,15 +238,24 @@ extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$
 intmodule: Intmodule ALLID ':' info INDENT ports Intrinsic '=' ALLID params DEDENT	{ TODO(); }
 		;
 /* in-line anotations */
-jsons:
-		| jsons json    { TODO(); }
-		;
-json: '"' Class '"' ':' String '"' Target '"' ':' String    { TODO(); }
-		;
-json_array: '[' jsons ']'   { TODO(); }
+member:
+    | String ':' String {}
+
+members:  
+    | member             {}
+    | member ',' members {}
+
+json:  
+    | '{' INDENT members DEDENT '}' {}
+    
+jsons: 
+    | json            {}
+    | json ',' jsons  {}
+
+json_array: '[' INDENT jsons DEDENT ']' { }
 		;
 annotations: 
-		| '%' '[' json_array ']' { TODO(); }
+		| '%' '[' json_array ']' { }
 		;
 /* version definition */
 version: Firrtl Version INT '.' INT '.' INT { }
