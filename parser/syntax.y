@@ -58,7 +58,7 @@ int p_stoi(const char* str);
 %token <strVal> Info
 %token Flip Mux Validif Invalidate Mem Wire Reg RegReset Inst Of Node Attach
 %token When Else Stop Printf Skip Input Output Assert
-%token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit Connect
+%token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit Connect Public
 %token Class Target Firrtl Version INDENT DEDENT
 %token RightArrow "=>"
 %token Leftarrow "<-"
@@ -220,7 +220,10 @@ port: Input ALLID ':' type info    { $$ = newNode(P_INPUT, synlineno(), $5, $2, 
 ports:  { $$ = new PNode(P_PORTS); }
     | ports port    { $$ = $1; $$->appendChild($2); }
     ;
-module: Module ALLID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, synlineno(), $4, $2, 2, $6, $7); }
+opt_public:   {}
+    | Public  {}
+    ;
+module: opt_public Module ALLID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, synlineno(), $5, $3, 2, $7, $8); }
     ;
 ext_defname:                       {  }
     | Defname '=' ALLID            {  }
