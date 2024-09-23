@@ -199,6 +199,7 @@ $(EMU_BUILD_DIR)/S$(NAME)_diff: $(VERI_OBJS) $(REF_GSIM_OBJS)
 build-emu: $(target)
 
 build-emu-pgo:
+	rm -rf $(PGO_BUILD_DIR)
 	mkdir -p $(PGO_BUILD_DIR)
 	make clean-pgo
 	make build-emu PGO_CFLAGS="-fprofile-generate=`realpath $(PGO_BUILD_DIR)`"
