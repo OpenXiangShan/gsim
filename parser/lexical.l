@@ -137,8 +137,6 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>parameter               { return token::Parameter; }
 <normal>intmodule               { return token::Intmodule; }
 <normal>intrinsic               { return token::Intrinsic; }
-<normal>class                   { return token::Class; }
-<normal>target                  { return token::Target; }
 <normal>FIRRTL                  { return token::Firrtl; }
 <normal>version                 { return token::Version; }
 <normal>circuit                 { return token::Circuit; }
