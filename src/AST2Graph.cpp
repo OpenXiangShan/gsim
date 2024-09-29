@@ -1044,7 +1044,11 @@ void visitConnect(graph* g, PNode* connect) {
         if (beg < 0) TODO();
         for (int i = beg; i <= end; i ++) node->invalidIdx.insert(i);
       }
-    } else node->valTree = valTree;
+    } else {
+      // Override all prefix nodes in the prev assignTree.
+      node->assignTree.clear();
+      node->valTree = valTree;
+    }
   }
 }
 
