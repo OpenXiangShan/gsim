@@ -52,7 +52,8 @@ static std::priority_queue<Node*, std::vector<Node*>, ordercmp> recomputeQueue;
 static std::set<Node*> uniqueRecompute;
 
 static inline std::string tailName(int width) {
-  if (width <= 256) return std::string("tail256");
+  if (width <= 128) return std::string("tail128");
+  else if (width <= 256) return std::string("tail256");
   else return std::string("tail") ;
 }
 
@@ -967,7 +968,7 @@ valInfo* ENode::instsAsUInt(Node* node, std::string lvalue, bool isRoot) {
     ret->setConsStr();
   } else {
     if (Child(0, width) <= BASIC_WIDTH) ret->valStr = "(" + Cast(width, false) + ChildInfo(0, valStr) + " & " + bitMask(Child(0, width)) + ")";
-    else TODO();
+    else ret->valStr = format("%s.%s(%d)", ChildInfo(0, valStr).c_str(), tailName(width).c_str(), width);
     ret->opNum = ChildInfo(0, opNum) + 1;
   }
   return ret;
@@ -1306,9 +1307,9 @@ void infoBits(valInfo* ret, ENode* enode, valInfo* childInfo) {
     if (lo == 0) ret->valStr = format("%s.%s(%d)", childInfo->valStr.c_str(), tailName(enode->width).c_str(), hi + 1);
     else {
       // if (enode->width <= 64) ret->valStr = format("%s.bits64(%d, %d)", childInfo->valStr.c_str(), hi, lo);
-      // else if (enode->width <= 128) ret->valStr = format("%s.bits128(%d, %d)", childInfo->valStr.c_str(), hi, lo);
       // else 
-      if (enode->width <= 256) {
+      if (enode->width <= 128) ret->valStr = format("%s.bits128(%d, %d)", childInfo->valStr.c_str(), hi, lo);
+      else if (enode->width <= 256) {
         ret->valStr = format("%s.bits256(%d, %d)", childInfo->valStr.c_str(), hi, lo);
       } else ret->valStr = format("%s.bits(%d, %d)", childInfo->valStr.c_str(), hi, lo);
     }
