@@ -408,7 +408,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   }
 
   if (toMux) {
-    ret->valStr = format(" (%s ? %s : %s)", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
+    if (MUX_OPT && !sign) {
+      if (width == 1) ret->valStr = format("((%s & %s) | ((!%s) & %s))", condStr.c_str(), trueStr.c_str(), condStr.c_str(), falseStr.c_str());
+      else ret->valStr = format("((-(%s)%s & %s) | ((-(%s)!%s) & %s))", widthUType(width).c_str(), condStr.c_str(), trueStr.c_str(), widthUType(width).c_str(), condStr.c_str(), falseStr.c_str());
+    } else {
+      ret->valStr = format(" (%s ? %s : %s)", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
+    }
     ret->opNum = ChildInfo(0, opNum) + (getChild(1) ? ChildInfo(1, opNum) : 0) + (getChild(2) ? ChildInfo(2, opNum) : 0) + 1;
   } else {
     if (getChild(1)) {
