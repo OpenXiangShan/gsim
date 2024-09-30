@@ -1449,7 +1449,7 @@ valInfo* ENode::instsPrintf() {
   for (int i = 1; i < getChildNum(); i ++) {
     printfInst += ", " + ChildInfo(i, valStr);
   }
-  printfInst += ");";
+  printfInst += "); fflush(stdout);";
 
   if (ChildInfo(0, status) != VAL_CONSTANT || mpz_cmp_ui(ChildInfo(0, consVal), 0) != 0) {
     ret->insts.push_back(printfInst);

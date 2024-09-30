@@ -1,6 +1,7 @@
 BUILD_DIR = build
 GSIM_BUILD_DIR = $(BUILD_DIR)/gsim
 EMU_BUILD_DIR = $(BUILD_DIR)/emu
+PGO_BUILD_DIR = $(BUILD_DIR)/pgo
 
 PARSER_DIR = parser
 LEXICAL_NAME = lexical
@@ -8,48 +9,56 @@ SYNTAX_NAME = syntax
 PARSER_BUILD = $(PARSER_DIR)/build
 FIRRTL_VERSION = 
 $(shell mkdir -p $(PARSER_BUILD))
+LLVM_PROFDATA := llvm-profdata
 
 INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 
 OBJ_DIR = obj
 $(shell mkdir -p $(OBJ_DIR))
 
-dutName = xiangshan
+dutName ?= xiangshan
 
 ifeq ($(dutName),ysyx3)
 	NAME ?= newtop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
 	mainargs = ready-to-run/bin/bbl-hello.bin
+	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = ready-to-run/$(NAME)
 else ifeq ($(dutName),NutShell)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
 	mainargs = ready-to-run/bin/linux-NutShell.bin
+	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = ready-to-run/$(NAME)
 else ifeq ($(dutName),rocket)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-rocketchip.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
+	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = ready-to-run/$(NAME)
 else ifeq ($(dutName),boom)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
+	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = ready-to-run/$(NAME).LargeBoomConfig
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
-	mainargs = ready-to-run/bin/linux-rocket.bin
+	mainargs = ready-to-run/bin/bbl-test1.bin
+	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = ready-to-run/$(NAME).SmallBoomConfig
 else ifeq ($(dutName),xiangshan)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
 	mainargs = ready-to-run/bin/linux-xiangshan.bin
+	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = ready-to-run/$(NAME)-xiangshan
 else ifeq ($(dutName),xiangshan-default)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
 	mainargs = ready-to-run/bin/linux-xiangshan.bin
+	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = ready-to-run/$(NAME)-xiangshan-default
 endif
 
@@ -62,6 +71,7 @@ EVENT_DRIVEN ?= 0
 CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror \
 	-DDST_NAME=\"$(NAME)\" -DEVENT_DRIVEN=$(EVENT_DRIVEN)
 CXX = clang++
+CCACHE := ccache
 TARGET = GraphEmu
 
 FIRRTL_FILE = $(TEST_FILE).hi.fir
@@ -111,7 +121,7 @@ ifeq ($(PERF),1)
 else ifeq ($(MODE),0)
 	MODE_FLAGS += -DGSIM
 	target = $(EMU_BUILD_DIR)/S$(NAME)
-	GSIM_CFLAGS += -O3 -Wno-format
+	GSIM_CFLAGS += -O3 -Wno-format $(PGO_CFLAGS)
 else ifeq ($(MODE), 1)
 	MODE_FLAGS += -DVERILATOR
 	target = ./obj_dir/V$(NAME)
@@ -134,11 +144,11 @@ endif
 
 $(GSIM_BUILD_DIR)/%.o: %.cpp $(PARSER_SRCS) $(HEADERS) Makefile
 	@mkdir -p $(dir $@) && echo + CXX $<
-	@$(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
+	@$(CCACHE) $(CXX) $(CXXFLAGS) -c -o $@ $(realpath $<)
 
 $(EMU_BUILD_DIR)/%.o: %.cpp $(VERI_HEADER) Makefile
 	@mkdir -p $(dir $@) && echo + CXX $<
-	$(CXX) $< $(GSIM_CFLAGS) -c -o $@
+	$(CCACHE) $(CXX) $< $(GSIM_CFLAGS) -c -o $@
 
 $(TARGET): makedir $(PARSER_OBJS) $(OBJS)
 	$(CXX) $(CXXFLAGS) -rdynamic $(OBJS) $(PARSER_OBJS) -o $(GSIM_BUILD_DIR)/$(TARGET) -lgmp
@@ -188,6 +198,20 @@ $(EMU_BUILD_DIR)/S$(NAME)_diff: $(VERI_OBJS) $(REF_GSIM_OBJS)
 
 build-emu: $(target)
 
+build-emu-pgo:
+	mkdir -p $(PGO_BUILD_DIR)
+	make clean-pgo
+	make build-emu PGO_CFLAGS="-fprofile-generate=`realpath $(PGO_BUILD_DIR)`"
+	./scripts/run_until_exit.sh $(target) $(PGO_WORKLOAD)
+ifneq ($(LLVM_PROFDATA),)
+	$(LLVM_PROFDATA) merge -o $(PGO_BUILD_DIR)/default.profdata $(PGO_BUILD_DIR)/*.profraw
+endif
+	make clean-pgo
+	make build-emu PGO_CFLAGS="-fprofile-use=$(PGO_BUILD_DIR)/default.profdata"
+
+clean-pgo:
+	rm -rf $(EMU_BUILD_DIR)
+
 difftest: $(target)
 	$(target) $(mainargs)
 
@@ -213,4 +237,4 @@ gendoc:
 format-obj:
 	@clang-format -i --style=file obj/$(NAME).cpp
 
-.PHONY: compile clean emu difftest count makedir gendoc format-obj build-emu
+.PHONY: compile clean emu difftest count makedir gendoc format-obj build-emu build-emu-pgo
