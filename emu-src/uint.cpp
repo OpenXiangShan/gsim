@@ -1,6 +1,77 @@
 #include <stdio.h>
 #include "uint.h"
 
+#if SUPPORT_U256
+
+#else
+uint256_t operator | (uint128_t a, uint256_t b) {
+  uint256_t ret;
+  ret.u128_1 = b.u128_1;
+  ret.u128_0 = a | b.u128_0;
+  return ret;
+}
+uint256_t operator | (uint64_t a, uint256_t b) {
+  uint256_t ret;
+  ret.u128_1 = b.u128_1;
+  ret.u128_0 = a | b.u128_0;
+  return ret;
+}
+uint128_t uint256_t::tail128(int n) {
+  uint128_t ret;
+  int shiftNum = (128 - n);
+  ret = (u128_0 << shiftNum) >> shiftNum;
+  return ret;
+}
+uint256_t uint256_t::tail256(int n) {
+  uint256_t ret;
+  int shiftNum = (256 - n);
+  ret = shiftNum == 0 ? *this : ((*this << shiftNum) >> shiftNum);
+  return ret;
+}
+uint128_t uint256_t::bits128(int hi, int lo) {
+  uint128_t ret = bits256(hi, lo).u128_0;
+  return ret;
+}
+uint256_t uint256_t::bits256(int hi, int lo) {
+  uint256_t ret = 0;
+
+  ret = *this >> lo;
+  int shiftNum = 256 - (hi - lo + 1);
+  ret = (ret << shiftNum) >> shiftNum;
+  return ret;
+}
+
+uint128_t int256_t::tail128(int n) {
+  uint128_t ret;
+  int shiftNum = (128 - n);
+  ret = (u128_0 << shiftNum) >> shiftNum;
+  return ret;
+}
+
+uint256_t int256_t::tail256(int n) {
+    uint256_t ret;
+    ret.u128_0 = u128_0;
+    ret.u128_1 = s128_1;
+    int shiftNum = (256 - n);
+    ret = (ret << shiftNum) >> shiftNum;
+    return ret;
+}
+
+uint256_t uint256_t::flip() {
+  uint256_t ret;
+  ret.u128_0 = ~u128_0;
+  ret.u128_1 = ~u128_1;
+  return ret;
+}
+
+uint256_t::operator int256_t() {
+  int256_t ret;
+  ret.u128_0 = u128_0;
+  ret.s128_1 = u128_1;
+  return ret;
+}
+#endif
+
 void uint512_t::operator = (uint1024_t data) {
   // uint512_t ret;
   u256_1 = data.u512_0.u256_1;
@@ -22,11 +93,22 @@ uint512_t uint512_t::tail(int n) {
   return ret;
 }
 
+uint128_t uint512_t::tail128(int n) {
+  uint128_t ret;
+  int shiftNum = (128 - n);
+  ret = ((uint128_t)u256_0 << shiftNum) >> shiftNum;
+  return ret;
+}
+
 uint256_t uint512_t::tail256(int n) {
   uint256_t ret;
   int shiftNum = (256 - n);
   ret = shiftNum == 0 ? u256_0 : ((u256_0 << shiftNum) >> shiftNum);
   return ret;
+}
+
+uint128_t uint512_t::bits128(int hi, int lo) {
+  return (uint128_t)bits256(hi, lo);
 }
 
 uint256_t uint512_t::bits256(int hi, int lo) {
@@ -43,7 +125,6 @@ uint256_t uint512_t::bits256(int hi, int lo) {
     ret |= (u256_1 << (512 - hi - 1)) >> shiftNum;
   }
 
-  // if (lo > 256) ret = ret >> (lo - 256);
   return ret;
 }
 

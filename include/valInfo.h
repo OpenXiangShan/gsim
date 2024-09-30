@@ -85,6 +85,12 @@ public:
     }
     return ret;
   }
+  void setFullyUpdated() {
+    fullyUpdated = true;
+    for (valInfo* info : memberInfo) {
+      if (info) info->setFullyUpdated();
+    }
+  }
   valInfo* dupWithCons() {
     valInfo* ret = dup();
     mpz_set(ret->assignmentCons, assignmentCons);

@@ -568,6 +568,27 @@ valInfo* ENode::consReset(bool isLvalue) {
   return ret;
 }
 
+valInfo* ENode::consAssert() {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT && mpz_sgn(ChildCons(0, consVal)) != 0) {
+    mpz_set_ui(ret->consVal, 0);
+    ret->setConsStr();
+  } else if (ChildCons(1, status) == VAL_CONSTANT && mpz_sgn(ChildCons(1, consVal)) == 0) {
+    mpz_set_ui(ret->consVal, 0);
+    ret->setConsStr();
+  }
+  return ret;
+}
+
+valInfo* ENode::consPrint() {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT && mpz_sgn(ChildCons(0, consVal)) == 0) {
+    mpz_set_ui(ret->consVal, 0);
+    ret->setConsStr();
+  }
+  return ret;
+}
+
 /* compute enode */
 valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
   if (consEMap.find(this) != consEMap.end()) return consEMap[this];
@@ -672,10 +693,8 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
     case OP_READ_MEM: ret = consReadMem(isLvalue); break;
     case OP_INVALID: ret = consInvalid(isLvalue); break;
     case OP_RESET: ret = consReset(isLvalue); break;
-    case OP_PRINTF:
-    case OP_ASSERT:
-      ret = new valInfo();
-      break;
+    case OP_PRINTF: ret = consPrint(); break;
+    case OP_ASSERT: ret = consAssert(); break;
     default:
       Panic();
   }
@@ -1161,6 +1180,9 @@ void graph::constantAnalysis() {
         enode->strVal = mpz_get_str(NULL, 10, member->computeInfo->consVal);
         if (member->isArray()) member->arrayVal.push_back(new ExpTree(enode, member));
         else member->assignTree.push_back(new ExpTree(enode, member));
+        if (member->type == NODE_SPECIAL) { // set to NODE_OTHERS to enable removeDeadNode
+          member->type = NODE_OTHERS;
+        }
         continue;
       }
       for (ExpTree* tree : member->arrayVal) {

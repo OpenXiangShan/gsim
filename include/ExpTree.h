@@ -161,6 +161,8 @@ private:
   valInfo* consReadMem(bool isLvalue);
   valInfo* consInvalid(bool isLvalue);
   valInfo* consReset(bool isLvalue);
+  valInfo* consAssert();
+  valInfo* consPrint();
   /* used in usedBits */
 
 public:
