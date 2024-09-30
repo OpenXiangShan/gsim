@@ -15,42 +15,65 @@ class uint2048_t;
 #if SUPPORT_U256
 #define uint256_t unsigned _BitInt(256)
 #define int256_t _BitInt(256)
-#else 
+#else
+class int256_t;
 class uint256_t {
 public:
-  union {
-    uint128_t u128_1;
-    struct {
-      uint64_t u64_2;
-      uint64_t u64_3;
-    };
-  };
-  union {
-    uint128_t u128_0;
-    struct {
-      uint64_t u64_0;
-      uint64_t u64_1;
-    };
-  };
+  uint128_t u128_1;
+  uint128_t u128_0;
   uint256_t() {}
+  uint256_t(int val) {
+    u128_0 = val;
+    u128_1 = 0;
+  }
+  uint256_t(uint32_t val) {
+    u128_0 = val;
+    u128_1 = 0;
+  }
   uint256_t(uint64_t val) {
     u128_0 = val;
     u128_1 = 0;
   }
-  void operator = (uint64_t data) {
-    // uint256_t ret;
+  uint256_t(uint128_t val) {
+    u128_0 = val;
+    u128_1 = 0;
+  }
+  void operator = (int data) {
     u128_0 = data;
     u128_1 = 0;
-    // return ret;
+  }
+  void operator = (uint32_t data) {
+    u128_0 = data;
+    u128_1 = 0;
+  }
+  void operator = (long data) {
+    u128_0 = data;
+    u128_1 = 0;
+  }
+  void operator = (uint64_t data) {
+    u128_0 = data;
+    u128_1 = 0;
+  }
+  void operator = (uint128_t data) {
+    u128_0 = data;
+    u128_1 = 0;
   }
   bool operator == (uint256_t b) {
     return u128_1 == b.u128_1 && u128_0 == b.u128_0;
+  }
+  bool operator != (int b) {
+    return u128_1 != 0 || u128_0 != b;
   }
   bool operator != (uint256_t b) {
     return u128_1 != b.u128_1 || u128_0 != b.u128_0;
   }
   uint256_t operator << (int shiftNum) {
     uint256_t ret;
+    if (shiftNum == 0) {
+      ret.u128_0 = u128_0;
+      ret.u128_1 = u128_1;
+      return ret;
+    }
     ret.u128_0 = shiftNum >= 128 ? 0 : (u128_0 << shiftNum);
     ret.u128_1 = shiftNum >= 256 ? 0 :
                   (shiftNum >= 128 ?
@@ -58,8 +81,16 @@ public:
                     (u128_1 << shiftNum) | (u128_0 >> (128 - shiftNum)));
     return ret;
   }
+  uint256_t operator >> (uint32_t shiftNum) {
+    return *this >> (int)shiftNum;
+  }
   uint256_t operator >> (int shiftNum) {
     uint256_t ret;
+    if (shiftNum == 0) {
+      ret.u128_0 = u128_0;
+      ret.u128_1 = u128_1;
+      return ret;
+    }
     ret.u128_1 = shiftNum >= 128 ? 0 : (u128_1 >> shiftNum);
     ret.u128_0 = shiftNum >= 256 ? 0 :
                   (shiftNum >= 128 ?
@@ -67,14 +98,60 @@ public:
                     (u128_0 >> shiftNum) | (u128_1 << (128 - shiftNum)));
     return ret;
   }
+  int operator & (int a) {
+    return u128_0 & a;
+  }
+  uint32_t operator & (uint32_t a) {
+    return u128_0 & a;
+  }
+  uint64_t operator & (uint64_t a) {
+    return u128_0 & a;
+  }
+  uint64_t operator & (long a) {
+    return u128_0 & a;
+  }
+  uint128_t operator & (uint128_t a) {
+    return u128_0 & a;
+  }
   uint256_t operator & (uint256_t a) {
     uint256_t ret;
     ret.u128_1 = u128_1 & a.u128_1;
     ret.u128_0 = u128_0 & a.u128_0;
     return ret;
   }
-  uint64_t operator & (uint64_t a) {
-    return u128_0 & a;
+  void operator |= (uint256_t a) {
+    u128_1 |= a.u128_1;
+    u128_0 |= a.u128_0;
+  }
+  uint256_t operator | (uint8_t a) {
+    uint256_t ret;
+    ret.u128_1 = 0;
+    ret.u128_0 = u128_0 | a;
+    return ret;
+  }
+  uint256_t operator | (int a) {
+    uint256_t ret;
+    ret.u128_1 = u128_1;
+    ret.u128_0 = u128_0 | a;
+    return ret;
+  }
+  uint256_t operator | (uint32_t a) {
+    uint256_t ret;
+    ret.u128_1 = u128_1;
+    ret.u128_0 = u128_0 | a;
+    return ret;
+  }
+  uint256_t operator | (uint64_t a) {
+    uint256_t ret;
+    ret.u128_1 = u128_1;
+    ret.u128_0 = u128_0 | a;
+    return ret;
+  }
+  uint256_t operator | (uint128_t a) {
+    uint256_t ret;
+    ret.u128_1 = u128_1;
+    ret.u128_0 = u128_0 | a;
+    return ret;
   }
   uint256_t operator | (uint256_t a) {
     uint256_t ret;
@@ -82,23 +159,215 @@ public:
     ret.u128_0 = u128_0 | a.u128_0;
     return ret;
   }
+  friend uint256_t operator | (uint128_t a, uint256_t b);
+  friend uint256_t operator | (uint64_t a, uint256_t b);
   uint256_t operator ^ (uint256_t a) {
     uint256_t ret;
     ret.u128_1 = u128_1 ^ a.u128_1;
     ret.u128_0 = u128_0 ^ a.u128_0;
     return ret;
   }
+  uint256_t operator ~() {
+    uint256_t ret;
+    ret.u128_1 = ~u128_1;
+    ret.u128_0 = ~u128_0;
+    return ret;
+  }
+  uint256_t operator +(uint256_t val) {
+    uint256_t ret;
+    ret.u128_0 = u128_0 + val.u128_0;
+    ret.u128_1 = u128_1 + val.u128_1 + (ret.u128_0 < u128_0);
+    return ret;
+    
+  }
+  operator bool()      { return u128_0 || u128_1; }
+  operator uint8_t()   { return (uint8_t)u128_0; }
+  operator int()       { return (int)u128_0; }
+  operator uint32_t()  { return (uint32_t)u128_0; }
+  operator uint64_t()  { return (uint64_t)u128_0; }
+  operator uint128_t() { return u128_0; }
+  operator int256_t();
+  uint128_t tail128(int n);
+  uint256_t tail256(int n);
+  uint128_t bits128(int hi, int lo);
+  uint256_t bits256(int hi, int lo);
+  uint256_t flip();
+  void display() {
+    printf("%lx %lx %lx %lx", (uint64_t)(u128_1 >> 64), (uint64_t)u128_1, (uint64_t)(u128_0 >> 64), (uint64_t)u128_0);
+  }
+  void displayn() {
+    display();
+    printf("\n");
+  }
+};
+
+class int256_t {
+public:
+  int128_t s128_1;
+  uint128_t u128_0;
+  int256_t() {}
+  int256_t(uint64_t val) {
+    u128_0 = val;
+    s128_1 = 0;
+  }
+  int256_t(int128_t val) {
+    u128_0 = val;
+    s128_1 = val < 0 ? -1 : 0;
+  }
+  void operator = (uint128_t data) {
+    u128_0 = data;
+    s128_1 = 0;
+  }
+  void operator = (uint64_t data) {
+    u128_0 = data;
+    s128_1 = 0;
+  }
+  bool operator == (uint256_t b) {
+    return s128_1 == b.u128_1 && u128_0 == b.u128_0;
+  }
+  bool operator != (uint256_t b) {
+    return s128_1 != b.u128_1 || u128_0 != b.u128_0;
+  }
+  int256_t operator << (int shiftNum) {
+    int256_t ret;
+    if (shiftNum == 0) {
+      ret.u128_0 = u128_0;
+      ret.s128_1 = s128_1;
+      return ret;
+    }
+    ret.u128_0 = shiftNum >= 128 ? (uint128_t)0 : (u128_0 << shiftNum);
+    ret.s128_1 = shiftNum >= 256 ? (uint128_t)0 :
+                  (shiftNum >= 128 ?
+                    (u128_0 << (shiftNum - 128)) :
+                    (s128_1 << shiftNum) | (u128_0 >> (128 - shiftNum)));
+    return ret;
+  }
+  int256_t operator >> (uint32_t shiftNum) {
+    return *this >> (int)shiftNum;
+  }
+  int256_t operator >> (int shiftNum) {
+    int256_t ret;
+    if (shiftNum == 0) {
+      ret.u128_0 = u128_0;
+      ret.s128_1 = s128_1;
+      return ret;
+    }
+    ret.s128_1 = shiftNum >= 128 ? 0 : (s128_1 >> shiftNum);
+    ret.u128_0 = shiftNum >= 256 ? 0 :
+                  (shiftNum >= 128 ?
+                    (s128_1 >> (shiftNum - 128)) :
+                    (u128_0 >> shiftNum) | (s128_1 << (128 - shiftNum)));
+    return ret;
+  }
+  uint64_t operator & (uint64_t a) {
+    return u128_0 & a;
+  }
+  uint128_t operator & (uint128_t a) {
+    return u128_0 & a;
+  }
+  uint256_t operator & (uint256_t a) {
+    uint256_t ret;
+    ret.u128_1 = s128_1 & a.u128_1;
+    ret.u128_0 = u128_0 & a.u128_0;
+    return ret;
+  }
+  uint256_t operator | (uint128_t a) {
+    uint256_t ret;
+    ret.u128_1 = s128_1;
+    ret.u128_0 = u128_0 | a;
+    return ret;
+  }
+  uint256_t operator | (uint256_t a) {
+    uint256_t ret;
+    ret.u128_1 = s128_1 | a.u128_1;
+    ret.u128_0 = u128_0 | a.u128_0;
+    return ret;
+  }
+  uint256_t operator | (uint8_t a) {
+    uint256_t ret;
+    ret.u128_1 = 0;
+    ret.u128_0 = u128_0 | a;
+    return ret;
+  }
+  uint256_t operator ^ (uint256_t a) {
+    uint256_t ret;
+    ret.u128_1 = s128_1 ^ a.u128_1;
+    ret.u128_0 = u128_0 ^ a.u128_0;
+    return ret;
+  }
+  int256_t operator * (int128_t a) {
+    uint64_t result[6];
+    uint64_t val1[4];
+    uint64_t val2[2];
+    uint128_t u0, u1;
+    bool neg = false;
+    if (s128_1 < 0) {
+      u0 = ~u128_0 + 1;
+      u1 = ~s128_1 + (u0 == 0);
+      neg = !neg;
+    } else {
+      u0 = u128_0;
+      u1 = s128_1;
+    }
+    if (a < 0) {
+      a = -a;
+      neg = !neg;
+    }
+    val1[0] = (uint64_t)u0;
+    val1[1] = (uint64_t)(u0 >> 64);
+    val1[2] = (uint64_t)u1;
+    val1[3] = (uint64_t)(u1 >> 64);
+    val2[0] = (uint64_t)a;
+    val2[1] = (uint64_t)(a >> 64);
+
+    for (int i = 0; i < 6; i++) {
+      result[i] = 0;
+    }
+
+    for (int i = 0; i < 4; i ++) {
+      for (int j = 0; j < 2; j ++) {
+        uint128_t mulVal = (uint128_t)val1[i] * (uint128_t)val2[j];
+        result[i + j] += (uint64_t)mulVal;
+        result[i + j + 1] += (uint64_t)(mulVal >> 64);
+      }
+    }
+    if (neg) {
+      for (int i = 0; i < 6; i ++) result[i] = ~result[i];
+      for (int i = 0; i < 6; i ++) {
+        result[i] += 1;
+        if (result[i] != 0) break;
+      }
+    }
+    int256_t ret;
+    ret.u128_0 = result[0] | ((uint128_t)result[1] << 64);
+    ret.s128_1 = result[2] | ((uint128_t)result[3] << 64);
+    return ret;
+  }
+  uint128_t tail128(int n);
+  uint256_t tail256(int n);
+  operator int() {
+    return (int)u128_0;
+  }
+  operator uint64_t() {
+    return (uint64_t)u128_0;
+  }
+  operator uint128_t() {
+    return u128_0;
+  }
+  void display() {
+    printf("%lx %lx %lx %lx", (uint64_t)(s128_1 >> 64), (uint64_t)s128_1, (uint64_t)(u128_0 >> 64), (uint64_t)u128_0);
+  }
+  void displayn() {
+    display();
+    printf("\n");
+  }
 };
 #endif
 
 class uint512_t {
 public:
-  union{
-    uint256_t u256_1;
-  };
-  union {
-    uint256_t u256_0;
-  };
+  uint256_t u256_1;
+  uint256_t u256_0;
   uint512_t() {
     u256_0 = 0;
     u256_1 = 0;
@@ -128,16 +397,12 @@ public:
     u256_1 = 0;
   }
   void operator = (uint64_t data) {
-    // uint512_t ret;
     u256_0 = data;
     u256_1 = 0;
-    // return ret;
   }
   void operator = (uint512_t data) {
-    // uint512_t ret;
     u256_1 = data.u256_1;
     u256_0 = data.u256_0;
-    // return ret;
   }
   void operator = (uint1024_t data);
   bool operator == (uint512_t b) {
@@ -151,12 +416,12 @@ public:
   }
   uint512_t operator << (int shiftNum) {
     uint512_t ret;
+#if SUPPORT_U256
     if (shiftNum == 0) {
       ret.u256_0 = u256_0;
       ret.u256_1 = u256_1;
       return ret;
     }
-#if SUPPORT_U256
     ret.u256_0 = shiftNum >= 256 ? (uint256_t)0 : (u256_0 << shiftNum);
     ret.u256_1 = shiftNum >= 512 ? 0 :
                   (shiftNum >= 256 ?
@@ -178,8 +443,8 @@ public:
       ret.u256_1 = u256_1;
       return ret;
     }
-    ret.u256_1 = shiftNum >= 256 ? 0 : (u256_1 >> shiftNum);
-    ret.u256_0 = shiftNum >= 512 ? 0 :
+    ret.u256_1 = shiftNum >= 256 ? (uint256_t)0 : (u256_1 >> shiftNum);
+    ret.u256_0 = shiftNum >= 512 ? (uint256_t)0 :
                   (shiftNum >= 256 ?
                     (u256_1 >> (shiftNum - 256)) :
                     (u256_0 >> shiftNum) | (u256_1 << (256 - shiftNum)));
@@ -242,8 +507,10 @@ public:
   operator uint256_t () {
     return u256_0;
   }
-  uint512_t tail(int n);
+  uint128_t tail128(int n);
   uint256_t tail256(int n);
+  uint512_t tail(int n);
+  uint128_t bits128(int hi, int lo);
   uint256_t bits256(int hi, int lo);
   uint512_t flip();
   void display() {
