@@ -1046,7 +1046,7 @@ void visitConnect(graph* g, PNode* connect) {
       }
     } else {
       // Override all prefix nodes in the prev assignTree.
-      node->assignTree.clear();
+      if (!exp->isInvalid()) node->assignTree.clear();
       node->valTree = valTree;
     }
   }
