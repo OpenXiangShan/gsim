@@ -105,7 +105,7 @@ info:               { $$ = NULL;}
     | Info          { $$ = $1;}
     ;
 /* type definition */
-width:                { $$ = 0; } /* infered width */
+width:                { $$ = -1; } /* infered width */
     | '<' INT '>'     { $$ = p_stoi($2); }
     ;
 binary_point:
