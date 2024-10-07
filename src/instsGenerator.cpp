@@ -1509,6 +1509,7 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
   computeInfo->fullyUpdated = false;
   computeInfo->opNum = -1;
   computeInfo->sameConstant = resetVal->sameConstant;
+  mpz_set(computeInfo->assignmentCons, resetVal->consVal);
   return computeInfo;
 }
 

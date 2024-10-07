@@ -565,6 +565,7 @@ valInfo* ENode::consReset(bool isLvalue) {
     }
   }
   ret->sameConstant = consEMap[getChild(1)]->sameConstant;
+  mpz_set(ret->assignmentCons, consEMap[getChild(1)]->consVal);
   return ret;
 }
 
