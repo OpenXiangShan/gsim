@@ -53,6 +53,25 @@ void Node::inferWidth() {
   if (updateTree) updateTree->getRoot()->inferWidth();
   if (resetTree) resetTree->getRoot()->inferWidth();
   if (resetVal) resetVal->getRoot()->inferWidth();
+  
+  // Unknown width wire def
+  if (width == 0 && !isArray()) {
+    auto findWidth = [&](auto& Tree) {
+      int width = 0;
+      for (auto* t : Tree) { width = MAX(width, t->getRoot()->width); }
+
+      return width;
+    };
+
+    switch (type) {
+      case NODE_REG_DST:
+      case NODE_OTHERS: width = findWidth(assignTree); break;
+
+      case NODE_REG_SRC:
+      default: break;
+    }
+  }
+
   if (width == -1) {
     int width = 0;
     bool sign = false;
