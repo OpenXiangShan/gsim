@@ -65,50 +65,6 @@ void ENode::inferWidth() {
         break;
       case OP_AND: // the width is actually max, while the upper bits are zeros
         Assert(getChildNum() == 2 && s0 == s1, "invalid child");
-        if (w0 != w1) {
-          if (s1) {
-            int w = MAX(w0, w1);
-            ENode* enode;
-            enode = new ENode(OP_SEXT);
-            enode->addVal(w);
-            enode->width = w;
-            enode->sign = s1;
-            if (w0 > w1) {
-              enode->addChild(getChild(1));
-              setChild(1, enode);
-            } else {
-              enode->addChild(getChild(0));
-              setChild(0, enode);
-            }
-          } else {
-            if (getChild(0)->nodePtr && getChild(1)->nodePtr) {
-              int w = MIN(w0, w1);
-              ENode* enode = new ENode(OP_BITS);
-              enode->addVal(w-1);
-              enode->addVal(0);
-              enode->width = w;
-              if (w0 < w1) {
-                enode->addChild(getChild(1));
-                setChild(1, enode);
-              } else {
-                enode->addChild(getChild(0));
-                setChild(0, enode);
-              }
-            } else {
-              int w = MAX(w0, w1);
-              ENode* enode = new ENode(OP_PAD);
-              enode->addVal(w);
-              enode->width = w;
-              if (w0 > w1) {
-                enode->addChild(getChild(1));
-                setChild(1, enode);
-              } else {
-                enode->addChild(getChild(0));
-                setChild(0, enode);
-              }
-            }
-          }
-        }
         setWidth(MAX(w0, w1), false);
         break;
       case OP_OR: case OP_XOR:
