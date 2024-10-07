@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <fstream>
 #include <csignal>
+#include <format>
 
 #if defined(GSIM)
 #include <SimTop.h>
@@ -28,20 +29,6 @@ REF_NAME* ref;
 uint8_t program[MAX_PROGRAM_SIZE];
 int program_sz = 0;
 bool dut_end = false;
-
-template <typename T>
-std::vector<size_t> sort_indexes(const std::vector<T> &v) {
-
-  // initialize original index locations
-  std::vector<size_t> idx(v.size());
-  iota(idx.begin(), idx.end(), 0);
-
-  // when v contains elements of equal values
-  stable_sort(idx.begin(), idx.end(),
-       [&v](size_t i1, size_t i2) {return v[i1] < v[i2];});
-
-  return idx;
-}
 
 void load_program(char* filename){
 
@@ -74,34 +61,21 @@ void ref_cycle(int n) {
     ref->eval();
   }
 }
-void ref_reset(){
-    ref->reset = 1;
-    for(int i = 0; i < 10; i++){
-        ref_cycle(1);
-    }
-    ref->reset = 0;
+void ref_reset() {
+  ref->reset = 1;
+  ref_cycle(1);
+
+  ref->reset = 0;
+  ref_cycle(1);
 }
 #endif
 #ifdef GSIM
 void mod_reset() {
   mod->set_reset(1);
   mod->step();
+
   mod->set_reset(0);
-}
-#endif
-#ifdef GSIM_DIFF
-void ref_reset() {
-  ref->set_reset(1);
-  ref->step();
-  ref->set_reset(0);
-}
-#endif
-
-#if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
-
-bool checkSig(bool display, REF_NAME* ref, MOD_NAME* mod);
-bool checkSignals(bool display) {
-  return checkSig(display, ref, mod);
+  mod->step();
 }
 #endif
 
@@ -109,53 +83,34 @@ int main(int argc, char** argv) {
   load_program(argv[1]);
 #ifdef GSIM
   mod = new MOD_NAME();
-  memcpy(&mod->mem$rdata_mem$mem, program, program_sz);
-  mod->set_io_logCtrl_log_begin(0);
-  mod->set_io_logCtrl_log_end(0);
-  mod->set_io_uart_in_ch(-1);
+  memcpy(&mod->mem$rdata_mem, program, program_sz);
+  mod->set_difftest$$logCtrl$$begin(0);
+  mod->set_difftest$$logCtrl$$end(0);
+  mod->set_difftest$$uart$$in$$ch(-1);
   mod_reset();
-  mod->step();
 #endif
 #ifdef VERILATOR
-  ref = new REF_NAME();
-  memcpy(&ref->rootp->SimTop__DOT__mem__DOT__rdata_mem__DOT__mem, program, program_sz);
-  ref->io_logCtrl_log_begin = ref->io_logCtrl_log_begin = 0;
-  ref->io_uart_in_ch = -1;
+  auto Context = std::make_unique<VerilatedContext>();
+  ref = new REF_NAME(Context.get());
+  memcpy(&ref->rootp->SimTop__DOT__mem__DOT__rdata_mem_ext__DOT__Memory, program, program_sz);
+  ref->rootp->difftest_logCtrl_begin = ref->rootp->difftest_logCtrl_begin = 0;
+  ref->rootp->difftest_uart_in_valid = -1;
   ref_reset();
-#endif
-#ifdef GSIM_DIFF
-  ref = new REF_NAME();
-  memcpy(&ref->mem$rdata_mem$mem, program, program_sz);
-  ref->set_io_uart_in_ch(-1);
-  ref_reset();
-  ref->step();
 #endif
   std::cout << "start testing.....\n";
-  // printf("size = %lx %lx\n", sizeof(*ref->rootp),
-  // (uintptr_t)&(ref->rootp->SimTop__DOT__soc__DOT__nutcore__DOT__frontend__DOT__ifu__DOT__bp1__DOT__pht) - (uintptr_t)(ref->rootp));
-#ifdef PERF
-  FILE* activeFp = fopen(ACTIVE_FILE, "w");
-#endif
-  std::signal(SIGINT, [](int){
-    dut_end = true;
-  });
-  std::signal(SIGTERM, [](int){
-    dut_end = true;
-  });
+
   uint64_t cycles = 0;
   clock_t start = clock();
   while(!dut_end) {
 #ifdef VERILATOR
     ref_cycle(1);
-  #ifndef GSIM
-    if (ref->io_uart_out_valid) {
-      printf("%c", ref->io_uart_out_ch);
+
+#ifndef GSIM
+    if (ref->rootp->difftest_uart_out_valid) {
+      printf("%c", ref->rootp->difftest_uart_out_ch);
       fflush(stdout);
     }
-  #endif
 #endif
-#ifdef GSIM_DIFF
-    ref->step();
 #endif
     cycles ++;
     if(cycles % 10000000 == 0 && cycles <= 250000000) {
@@ -181,21 +136,49 @@ int main(int argc, char** argv) {
     }
 #if defined(GSIM)
     mod->step();
-    if (mod->get_io_uart_out_valid()) {
-      printf("%c", mod->get_io_uart_out_ch());
+    if (mod->get_difftest$$uart$$out$$valid()) {
+      printf("%c", mod->get_difftest$$uart$$out$$ch());
       fflush(stdout);
     }
-    dut_end = mod->soc$nutcore$_dataBuffer_T_ctrl_isNutCoreTrap;
+    // dut_end = mod->soc$nutcore$_dataBuffer_T_ctrl_isNutCoreTrap;
 #endif
-#if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
-    bool isDiff = checkSignals(false);
-    if(isDiff) {
-      std::cout << "all Sigs:\n -----------------\n";
-      checkSignals(true);
-      printf("Failed after %ld cucles\nALL diffs: mode -- ref\n", cycles);
-      checkSignals(false);
-      return 0;
-    }
+#if defined(GSIM) && defined(VERILATOR)
+    bool error = false;
+    auto report = [&](auto name, auto miss, auto right) {
+      std::cerr << std::format("mismatching : {}\n\texpected: {:#x} unexpected: {:#x}\n", name, miss, right);
+      error = true;
+    };
+
+    auto diff = [&](auto name, auto left, auto right) {
+      if (left != right) report(name, left, right);
+    };
+#define VTOR_GET(X) ref->rootp->X
+#define GSIM_GET(X) mod->X
+#define DIFF(X, Y) diff(#X, VTOR_GET(Y), GSIM_GET(X))
+    DIFF(soc$nutcore$frontend$ifu$pc, SimTop__DOT__soc__DOT__nutcore__DOT__frontend__DOT__ifu__DOT__pc);
+    DIFF(soc$nutcore$frontend$ibf$state, SimTop__DOT__soc__DOT__nutcore__DOT__frontend__DOT__ibf__DOT__state);
+
+    // io_i
+    DIFF(soc$nutcore$io_imem_cache$s3$state, SimTop__DOT__soc__DOT__nutcore__DOT__io_imem_cache__DOT__s3__DOT__state);
+    DIFF(soc$nutcore$io_imem_cache$s3$state2, SimTop__DOT__soc__DOT__nutcore__DOT__io_imem_cache__DOT__s3__DOT__state2);
+    DIFF(soc$nutcore$io_imem_cache$valid, SimTop__DOT__soc__DOT__nutcore__DOT__io_imem_cache__DOT__valid);
+    DIFF(soc$nutcore$io_imem_cache$valid_1, SimTop__DOT__soc__DOT__nutcore__DOT__io_imem_cache__DOT__valid_1);
+
+    // mmioXbar
+    DIFF(soc$nutcore$mmioXbar$state, SimTop__DOT__soc__DOT__nutcore__DOT__mmioXbar__DOT__state);
+    DIFF(soc$nutcore$mmioXbar$inflightSrc, SimTop__DOT__soc__DOT__nutcore__DOT__mmioXbar__DOT__inflightSrc);
+
+    // dmemXbar
+    DIFF(soc$nutcore$dmemXbar$state, SimTop__DOT__soc__DOT__nutcore__DOT__dmemXbar__DOT__state);
+    DIFF(soc$nutcore$dmemXbar$inflightSrc, SimTop__DOT__soc__DOT__nutcore__DOT__dmemXbar__DOT__inflightSrc);
+
+    // Xbar
+    DIFF(soc$xbar$state, SimTop__DOT__soc__DOT__xbar__DOT__state);
+
+    // mem l2cache
+    DIFF(soc$mem_l2cacheOut_cache$s3$state, SimTop__DOT__soc__DOT__mem_l2cacheOut_cache__DOT__s3__DOT__state);
+
+    if (error) exit(EXIT_FAILURE);
 #endif
 #if (defined (VERILATOR))
   dut_end = ref->rootp->SimTop__DOT__soc__DOT__nutcore__DOT__dataBuffer_0_ctrl_isNutCoreTrap;
