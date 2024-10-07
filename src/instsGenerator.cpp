@@ -52,7 +52,8 @@ static std::priority_queue<Node*, std::vector<Node*>, ordercmp> recomputeQueue;
 static std::set<Node*> uniqueRecompute;
 
 static inline std::string tailName(int width) {
-  if (width <= 256) return std::string("tail256");
+  if (width <= 128) return std::string("tail128");
+  else if (width <= 256) return std::string("tail256");
   else return std::string("tail") ;
 }
 
@@ -407,7 +408,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   }
 
   if (toMux) {
-    ret->valStr = format(" (%s ? %s : %s)", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
+    if (MUX_OPT && !sign) {
+      if (width == 1) ret->valStr = format("((%s & %s) | ((!%s) & %s))", condStr.c_str(), trueStr.c_str(), condStr.c_str(), falseStr.c_str());
+      else ret->valStr = format("((-(%s)%s & %s) | ((-(%s)!%s) & %s))", widthUType(width).c_str(), condStr.c_str(), trueStr.c_str(), widthUType(width).c_str(), condStr.c_str(), falseStr.c_str());
+    } else {
+      ret->valStr = format(" (%s ? %s : %s)", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
+    }
     ret->opNum = ChildInfo(0, opNum) + (getChild(1) ? ChildInfo(1, opNum) : 0) + (getChild(2) ? ChildInfo(2, opNum) : 0) + 1;
   } else {
     if (getChild(1)) {
@@ -967,7 +973,7 @@ valInfo* ENode::instsAsUInt(Node* node, std::string lvalue, bool isRoot) {
     ret->setConsStr();
   } else {
     if (Child(0, width) <= BASIC_WIDTH) ret->valStr = "(" + Cast(width, false) + ChildInfo(0, valStr) + " & " + bitMask(Child(0, width)) + ")";
-    else TODO();
+    else ret->valStr = format("%s.%s(%d)", ChildInfo(0, valStr).c_str(), tailName(width).c_str(), width);
     ret->opNum = ChildInfo(0, opNum) + 1;
   }
   return ret;
@@ -1306,9 +1312,9 @@ void infoBits(valInfo* ret, ENode* enode, valInfo* childInfo) {
     if (lo == 0) ret->valStr = format("%s.%s(%d)", childInfo->valStr.c_str(), tailName(enode->width).c_str(), hi + 1);
     else {
       // if (enode->width <= 64) ret->valStr = format("%s.bits64(%d, %d)", childInfo->valStr.c_str(), hi, lo);
-      // else if (enode->width <= 128) ret->valStr = format("%s.bits128(%d, %d)", childInfo->valStr.c_str(), hi, lo);
       // else 
-      if (enode->width <= 256) {
+      if (enode->width <= 128) ret->valStr = format("%s.bits128(%d, %d)", childInfo->valStr.c_str(), hi, lo);
+      else if (enode->width <= 256) {
         ret->valStr = format("%s.bits256(%d, %d)", childInfo->valStr.c_str(), hi, lo);
       } else ret->valStr = format("%s.bits(%d, %d)", childInfo->valStr.c_str(), hi, lo);
     }
@@ -1629,6 +1635,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       computeInfo->insts.insert(computeInfo->insts.begin(), nodePtr->insts.begin(), nodePtr->insts.end());
     }
     for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
+    computeInfo->setFullyUpdated();
     MUX_DEBUG(printf("  %p(node) %s width %d info->width %d status %d val %s sameConstant %d opNum %d instsNum %ld %p\n", this, n->name.c_str(), width, computeInfo->width, computeInfo->status, computeInfo->valStr.c_str(), computeInfo->sameConstant, computeInfo->opNum, computeInfo->insts.size(), computeInfo));
     for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
       if (computeInfo->memberInfo[i]) {

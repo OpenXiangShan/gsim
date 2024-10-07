@@ -10,6 +10,7 @@ do
     echo "${o}"
     if [[ "$o" =~ "Exit with code" ]]; then
         kill $pid
+        wait $pid
         if [[ "$o" =~ "0" ]]; then
             exit 0
         else
@@ -18,6 +19,7 @@ do
     fi
     if [[ "$o" =~ "MicroBench PASS" ]]; then
         kill $pid
+        wait $pid
         exit 0
     fi
 done
