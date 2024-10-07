@@ -110,7 +110,7 @@ REF_GSIM_SRCS = $(shell find $(REF_GSIM_DIR)/splitted -name "*.cpp")
 REF_GSIM_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(REF_GSIM_SRCS:.cpp=.o))
 
 GSIM_CFLAGS = $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME) -DMOD_HEADER=\"$(NAME).h\" -fbracket-depth=2048 \
-			-Wno-parentheses-equality -DDUTNAME=\"$(dutName)\" --std=c++20 # -pg #-ggdb
+			-Wno-parentheses-equality -DDUTNAME=\"$(dutName)\" --std=c++20 -g # -pg #-ggdb
 
 OPT_FAST = 
 
