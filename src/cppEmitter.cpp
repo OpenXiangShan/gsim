@@ -233,7 +233,13 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   fprintf(header, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
   fprintf(header, "for (int i = 0; i < %d; i ++) activator[i] = std::map<int, int>();\n", superId);
 for (SuperNode* super : sortedSuper) {
-  if (super->cppId >= 0) fprintf(header, "nodeNum[%d] = %ld;\n", super->cppId, super->member.size());
+  if (super->cppId >= 0) {
+    size_t num = 0;
+    for (Node* member : super->member) {
+      if (member->needActivate()) num ++;
+    }
+    fprintf(header, "nodeNum[%d] = %ld;\n", super->cppId, num);
+  }
 }
   fprintf(header, "for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
 #endif
@@ -906,5 +912,5 @@ void graph::cppEmitter() {
 #ifdef DIFFTEST_PER_SIG
   fclose(sigFile);
 #endif
-  printf("[cppEmitter] define %ld nodes\n", definedNode.size());
+  printf("[cppEmitter] define %ld nodes %d superNodes\n", definedNode.size(), superId);
 }

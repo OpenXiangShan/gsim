@@ -38,6 +38,7 @@ class graph {
   void mergeOut1();
   void mergeIn1();
   void mergeSublings();
+  void mergeNear();
   void splitArrayNode(Node* node);
   void checkNodeSplit(Node* node);
   void splitOptionalArray();

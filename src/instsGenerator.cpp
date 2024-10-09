@@ -1509,6 +1509,7 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
   computeInfo->fullyUpdated = false;
   computeInfo->opNum = -1;
   computeInfo->sameConstant = resetVal->sameConstant;
+  mpz_set(computeInfo->assignmentCons, resetVal->consVal);
   return computeInfo;
 }
 
@@ -1893,14 +1894,18 @@ void Node::recompute() {
   if (prevVal->valStr != computeInfo->valStr) {
     recomputeNext = true;
   }
-  for (size_t i = 0; i < prevArrayVal.size(); i ++) {
-    if ((!prevArrayVal[i] && computeInfo->memberInfo[i]) || (prevArrayVal[i] && !computeInfo->memberInfo[i])) {
-      recomputeNext = true;
-      break;
-    }
-    if (prevArrayVal[i] && computeInfo->memberInfo[i] && prevArrayVal[i]->valStr != computeInfo->memberInfo[i]->valStr) {
-      recomputeNext = true;
-      break;
+  if (prevArrayVal.size() != computeInfo->memberInfo.size()) {
+    recomputeNext = true;
+  } else {
+    for (size_t i = 0; i < prevArrayVal.size(); i ++) {
+      if ((!prevArrayVal[i] && computeInfo->memberInfo[i]) || (prevArrayVal[i] && !computeInfo->memberInfo[i])) {
+        recomputeNext = true;
+        break;
+      }
+      if (prevArrayVal[i] && computeInfo->memberInfo[i] && prevArrayVal[i]->valStr != computeInfo->memberInfo[i]->valStr) {
+        recomputeNext = true;
+        break;
+      }
     }
   }
   if (recomputeNext) {

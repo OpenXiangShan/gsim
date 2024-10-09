@@ -1,3 +1,5 @@
+#ifndef UINT_H
+#define UINT_H
 #include <sys/types.h>
 #include <cstdint>
 #include <cstring>
@@ -934,3 +936,5 @@ public:
     printf("\n");
   }
 };
+
+#endif

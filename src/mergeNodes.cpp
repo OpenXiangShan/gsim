@@ -4,6 +4,7 @@
 #include "common.h"
 #define MAX_NODES_PER_SUPER 7000
 #define MAX_SUBLINGS 30
+#define MAX_NEAR_NUM 50
 
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
 
@@ -182,6 +183,23 @@ void graph::mergeSublings() {
   reconnectSuper();
 }
 
+void graph::mergeNear() {
+  for (size_t i = 1; i < sortedSuper.size(); i ++) {
+    SuperNode* prevSuper = sortedSuper[i - 1];
+    SuperNode* curSuper = sortedSuper[i];
+    if (prevSuper->superType != SUPER_VALID || curSuper->superType != SUPER_VALID) continue;
+    if (prevSuper->member.size() + curSuper->member.size() <= MAX_NEAR_NUM) {
+      for (Node* node : prevSuper->member) {
+        node->super = curSuper;
+      }
+      curSuper->member.insert(curSuper->member.begin(), prevSuper->member.begin(), prevSuper->member.end());
+      prevSuper->member.clear();
+    }
+  }
+  removeEmptySuper();
+  reconnectSuper();
+}
+
 void graph::mergeNodes() {
   size_t totalSuper = sortedSuper.size();
   size_t phaseSuper = sortedSuper.size();
@@ -201,6 +219,10 @@ void graph::mergeNodes() {
   phaseSuper = sortedSuper.size();
   mergeSublings();
   printf("[mergeNodes-subling] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
+
+  phaseSuper = sortedSuper.size();
+  mergeNear();
+  printf("[mergeNodes-near-%d] remove %ld superNodes (%ld -> %ld)\n", MAX_NEAR_NUM, phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
 
   phaseSuper = sortedSuper.size();
   printf("[mergeNodes] remove %ld superNodes (%ld -> %ld)\n", totalSuper - phaseSuper, totalSuper, phaseSuper);
