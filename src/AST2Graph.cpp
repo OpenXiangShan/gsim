@@ -1696,15 +1696,6 @@ graph* AST2Graph(PNode* root) {
   return g;
 }
 
-void inferAllWidth() {
-  for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
-    it->second->inferWidth();
-  }
-  for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
-    it->second->updateTreeWithNewWIdth();
-  }
-}
-
 bool ExpTree::isConstant() {
   std::stack<ENode*> s;
   s.push(getRoot());
