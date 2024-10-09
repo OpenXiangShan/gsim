@@ -27078,7 +27078,7 @@ circuit SimTop :
     node wen = and(_wen_T, _wen_T_1) @[build/NutShell.fir.opt.mlir 54927:14]
     mem rdata_mem : @[build/NutShell.fir.opt.mlir 54928:58]
       data-type => UInt<8>[8]
-      depth => 60000
+      depth => 268435456
       read-latency => 0
       write-latency => 1
       reader => rdata_MPORT_1
