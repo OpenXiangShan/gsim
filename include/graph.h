@@ -93,6 +93,7 @@ class graph {
   void perfAnalysis();
   void exprOpt();
   void patternDetect();
+  void inferAllWidth();
   void dump(std::string FileName);
 };
 
