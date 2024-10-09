@@ -37,60 +37,6 @@ void Node::updateConnect() {
     }
   }
 }
-static std::set<Node*>inferredNodes;
-/*
-infer width of node and all ENodes in valTree
-inverse topological order or [infer all encountered nodes]
-*/
-void Node::inferWidth() {
-  if (inferredNodes.find(this) != inferredNodes.end()) return;
-  inferredNodes.insert(this);
-  if (type == NODE_INVALID) return;
-  if (isArray() && arraySplitted()) {
-    for (Node* member : arrayMember) member->inferWidth();
-  }
-  for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();
-  if (updateTree) updateTree->getRoot()->inferWidth();
-  if (resetTree) resetTree->getRoot()->inferWidth();
-  if (resetVal) resetVal->getRoot()->inferWidth();
-  
-  // Unknown width wire def
-  if (width == 0 && !isArray()) {
-    auto findWidth = [&](auto& Tree) {
-      int width = 0;
-      for (auto* t : Tree) { width = MAX(width, t->getRoot()->width); }
-
-      return width;
-    };
-
-    switch (type) {
-      case NODE_REG_DST:
-      case NODE_OTHERS: width = findWidth(assignTree); break;
-
-      case NODE_REG_SRC:
-      default: break;
-    }
-  }
-
-  if (width == -1) {
-    int width = 0;
-    bool sign = false;
-    bool clock = false;
-    for (ExpTree* tree : assignTree) {
-      width = MAX(width, tree->getRoot()->width);
-      sign = tree->getRoot()->sign;
-      clock |= tree->getRoot()->isClock;
-    }
-    setType(width, sign);
-    isClock = clock;
-  }
-
-  for (ExpTree* arrayTree : arrayVal) {
-    if (!arrayTree) continue;
-    arrayTree->getRoot()->inferWidth();
-    arrayTree->getlval()->inferWidth();
-  }
-}
 
 /* construct superNodes for all memory_member in the port the (member) belongs to */
 static void memSuper(Node* member) {
