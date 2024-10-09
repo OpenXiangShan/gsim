@@ -103,6 +103,7 @@ class graph {
   void MFFCPartition();
   void mergeEssentSmallSubling(int maxSize, double sim);
   void essentPartition();
+  void inferAllWidth();
   void dump(std::string FileName);
 };
 
