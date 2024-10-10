@@ -57,7 +57,7 @@ int p_stoi(const char* str);
 %token <typeRUW> Ruw
 %token <strVal> Info
 %token Flip Mux Validif Invalidate Mem Wire Reg RegReset Inst Of Node Attach
-%token When Else Stop Printf Skip Input Output Assert
+%token When Else Stop Printf Skip Input Output Assert Assume
 %token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit Connect Public
 %token Firrtl Version INDENT DEDENT
 %token RightArrow "=>"
@@ -86,6 +86,7 @@ ALLID: ID {$$ = $1; }
     | Inst { $$ = strdup("inst"); }
     | Printf { $$ = strdup("printf"); }
     | Assert { $$ = strdup("assert"); }
+    | Assume { $$ = strdup("assume"); }
     | Mem { $$ = strdup("mem"); }
     | Of { $$ = strdup("of"); }
     | Reg { $$ = strdup("reg"); }
@@ -210,6 +211,8 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5
     | Printf '(' expr ',' expr ',' String exprs ')' info    { $$ = newNode(P_PRINTF, synlineno(), $10, NULL, 3, $3, $5, $8); $$->appendExtraInfo($7); }
     | Assert '(' expr ',' expr ',' expr ',' String ')' ':' ALLID info { $$ = newNode(P_ASSERT, synlineno(), $13, $12, 3, $3, $5, $7); $$->appendExtraInfo($9); }
     | Assert '(' expr ',' expr ',' expr ',' String ')' info { $$ = newNode(P_ASSERT, synlineno(), $11, NULL, 3, $3, $5, $7); $$->appendExtraInfo($9); }
+    | Assume '(' expr ',' expr ',' expr ',' String ')' ':' ALLID info { $$ = NULL; }
+    | Assume '(' expr ',' expr ',' expr ',' String ')' info { $$ = NULL; }
     | Skip info { $$ = NULL; }
     ;
 /* module definitions */
