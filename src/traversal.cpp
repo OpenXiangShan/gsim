@@ -53,9 +53,7 @@ static std::map<OPType, const char*> OP2Name = {
 };
 
 static const char* StatusName[] = {
-    "NODE_INVALID",    "NODE_REG_SRC", "NODE_REG_DST",    "NODE_SPECIALt", "NODE_INP",
-    "NODE_OUT",        "NODE_MEMORY",  "NODE_READER",     "NODE_WRITER",   "NODE_READWRITER",
-    "NODE_MEM_MEMBER", "NODE_OTHERS",  "NODE_REG_UPDATE", "NODE_EXT_IN", "NODE_EXT_OUT", "NODE_EXT",
+  "VALID_NODE", "DEAD_NODE", "CONSTANT_NODE", "MERGED_NODE", "DEAD_SRC", "REPLICATION_NODE", "SPLITTED_NODE"
 };
 
 static const char* TypeName[] = {
