@@ -859,7 +859,7 @@ bool SuperNode::instsEmpty() {
 
 void graph::cppEmitter() {
   for (SuperNode* super : sortedSuper) {
-    if (super->superType == SUPER_SAVE_REG || !super->instsEmpty()) {
+    if (super->superType == SUPER_SAVE_REG || !super->instsEmpty() || super->superType == SUPER_EXTMOD) {
       super->cppId = superId ++;
       cppId2Super[super->cppId] = super;
     }
@@ -886,6 +886,9 @@ void graph::cppEmitter() {
     // std::string insts;
     if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
       for (Node* n : super->member) genNodeDef(header, n);
+    }
+    if (super->superType == SUPER_EXTMOD) {
+      for (size_t i = 1; i < super->member.size(); i ++) genNodeDef(header, super->member[i]);
     }
   }
   /* memory definition */

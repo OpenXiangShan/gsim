@@ -1754,7 +1754,7 @@ valInfo* Node::compute() {
     return computeInfo;
   }
 
-  bool isRoot = anyExtEdge() || next.size() != 1 || isReset();
+  bool isRoot = anyExtEdge() || next.size() != 1 || isReset() || type == NODE_EXT;
   if (isArrayMember) {
     for (Node* nextNode : next) {
       if (nextNode->isArray()) isRoot = true;
@@ -2101,8 +2101,15 @@ std::string computeExtMod(SuperNode* super) {
 
   super->member[0]->compute();
   std::string inst = super->member[0]->assignTree[0]->getRoot()->computeInfo->valStr;
+
   for (int i = 1; i < (int)super->member.size(); i ++) {
-    inst += (inst.back() == '(' ? "" : ", ") + super->member[i]->name;
+    inst += (inst.back() == '(' ? "" : ", ");
+    inst += "&" + super->member[i]->name;
+    valInfo* memberInfo = new valInfo();
+    memberInfo->valStr = super->member[i]->name;
+    memberInfo->width = super->member[i]->width;
+    memberInfo->sign = super->member[i]->sign;
+    super->member[i]->computeInfo = memberInfo;
   }
   inst += ");";
   super->member[0]->insts.push_back(inst);
