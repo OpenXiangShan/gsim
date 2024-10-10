@@ -2100,7 +2100,6 @@ std::string computeExtMod(SuperNode* super) {
   Assert(super->member[0]->type == NODE_EXT && super->member[0]->assignTree.size() == 1, "invalid extmod\n");
 
   super->member[0]->compute();
-  printf("valStr = %s\n", super->member[0]->computeInfo->valStr.c_str());
   std::string inst = super->member[0]->assignTree[0]->getRoot()->computeInfo->valStr;
   for (int i = 1; i < (int)super->member.size(); i ++) {
     inst += (inst.back() == '(' ? "" : ", ") + super->member[i]->name;
