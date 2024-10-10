@@ -67,6 +67,8 @@ enum OPType {
   OP_RESET,
 /* width processing */
   OP_SEXT,
+/* extmodule / dipc */
+  OP_EXT_FUNC,
 };
 
 class ENode {
@@ -117,6 +119,7 @@ private:
   valInfo* instsReset(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsPrintf();
   valInfo* instsAssert();
+  valInfo* instsExtFunc(Node* node);
   /* used in constantNode */
   valInfo* consMux(bool isLvalue);
   valInfo* consAdd(bool isLvalue);

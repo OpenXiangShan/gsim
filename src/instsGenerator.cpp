@@ -1484,6 +1484,18 @@ valInfo* ENode::instsAssert() {
   return ret;
 }
 
+valInfo* ENode::instsExtFunc(Node* n) {
+  valInfo* ret = computeInfo;
+  ret->status = VAL_FINISH;
+  std::string extInst = n->name + "(";
+  for (int i = 0; i < getChildNum(); i ++) {
+    if (i != 0) extInst += ", ";
+    extInst += ChildInfo(i, valStr);
+  }
+  ret->valStr = extInst;
+  return ret;
+}
+
 valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
   Assert(node->type == NODE_REG_SRC, "node %s is not reg_src\n", node->name.c_str());
 
@@ -1697,6 +1709,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     case OP_RESET: instsReset(n, lvalue, isRoot); break;
     case OP_PRINTF: instsPrintf(); break;
     case OP_ASSERT: instsAssert(); break;
+    case OP_EXT_FUNC: instsExtFunc(n); break;
     default:
       Panic();
   }
@@ -1750,7 +1763,7 @@ valInfo* Node::compute() {
   valInfo* ret = nullptr;
   for (size_t i = 0; i < assignTree.size(); i ++) {
     ExpTree* tree = assignTree[i];
-    valInfo* info = tree->getRoot()->compute(this, name, isRoot);
+    valInfo* info = tree->getRoot()->compute(this, type == NODE_EXT ? INVALID_LVALUE : name, isRoot);
     if (info->status == VAL_EMPTY || info->status == VAL_INVALID) continue;
     ret = info->dupWithCons();
     if ((ret->status == VAL_INVALID || ret->status == VAL_CONSTANT) && (i < assignTree.size() - 1) ) {
@@ -2083,18 +2096,36 @@ valInfo* Node::computeArray() {
   return computeInfo;
 }
 
+std::string computeExtMod(SuperNode* super) {
+  Assert(super->member[0]->type == NODE_EXT && super->member[0]->assignTree.size() == 1, "invalid extmod\n");
+
+  super->member[0]->compute();
+  printf("valStr = %s\n", super->member[0]->computeInfo->valStr.c_str());
+  std::string inst = super->member[0]->assignTree[0]->getRoot()->computeInfo->valStr;
+  for (int i = 1; i < (int)super->member.size(); i ++) {
+    inst += (inst.back() == '(' ? "" : ", ") + super->member[i]->name;
+  }
+  inst += ");";
+  super->member[0]->insts.push_back(inst);
+  return inst;
+}
+
 void graph::instsGenerator() {
   maxConcatNum = 0;
   std::set<Node*> s;
   std::set<Node*> s_array;
   for (SuperNode* super : sortedSuper) {
-    for (Node* n : super->member) {
-      if (n->dimension.size() != 0) {
-        n->compute();
-        s_array.insert(n);
-      } else {
-        n->compute();
-        s.insert(n);
+    if (super->superType == SUPER_EXTMOD) {
+      computeExtMod(super);
+    } else {
+      for (Node* n : super->member) {
+        if (n->dimension.size() != 0) {
+          n->compute();
+          s_array.insert(n);
+        } else {
+          n->compute();
+          s.insert(n);
+        }
       }
     }
   }

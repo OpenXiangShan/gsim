@@ -472,7 +472,7 @@ std::string graph::saveOldVal(FILE* fp, Node* node) {
   return ret;
 }
 
-static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep) {
+static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName) {
   std::string nodeName = node->name;
   auto condName = std::string("cond_") + nodeName;
   bool opt{false};
@@ -498,11 +498,11 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   if (node->isAsyncReset()) {
     Assert(!opt, "invalid opt");
     fprintf(fp, "activateAll();\n");
-    fprintf(fp, "oldFlag = -1;\n");
+    fprintf(fp, "%s = -1;\n", flagName.c_str());
   } else {
     if (ACTIVE_MASK(curMask) != 0) {
-      if (opt) fprintf(fp, "oldFlag |= -(uint%d_t)%s & 0x%lx; // %s\n", ACTIVE_WIDTH, condName.c_str() ,ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
-      else fprintf(fp, "oldFlag |= 0x%lx; // %s\n", ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
+      if (opt) fprintf(fp, "%s |= -(uint%d_t)%s & 0x%lx; // %s\n", flagName.c_str(), ACTIVE_WIDTH, condName.c_str() ,ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
+      else fprintf(fp, "%s |= 0x%lx; // %s\n", flagName.c_str(), ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
     }
     for (auto iter : bitMapInfo) {
       auto str = opt ? updateActiveStr(iter.first, ACTIVE_MASK(iter.second), condName, ACTIVE_UNIQUE(iter.second)) : updateActiveStr(iter.first, ACTIVE_MASK(iter.second));
@@ -519,11 +519,11 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   if (!opt) fprintf(fp, "}\n");
 }
 
-static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bool inStep) {
+static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bool inStep, std::string flagName) {
   if (!node->fullyUpdated) fprintf(fp, "if (%s) {\n", ASSIGN_INDI(node).c_str());
   std::map<uint64_t, ActiveType> bitMapInfo;
   auto curMask = activeSet2bitMap(activateId, bitMapInfo, node->super->cppId);
-  if (ACTIVE_MASK(curMask) != 0) fprintf(fp, "oldFlag |= 0x%lx; // %s\n", ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
+  if (ACTIVE_MASK(curMask) != 0) fprintf(fp, "%s |= 0x%lx; // %s\n", flagName.c_str(), ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
   for (auto iter : bitMapInfo) {
     fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
   }
@@ -537,7 +537,7 @@ static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bo
   if (!node->fullyUpdated) fprintf(fp, "}\n");
 }
 
-void graph::genNodeInsts(FILE* fp, Node* node) {
+void graph::genNodeInsts(FILE* fp, Node* node, std::string flagName) {
   std::string oldnode;
   if (node->insts.size()) {
     /* local variables */
@@ -568,18 +568,20 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
     }
   }
   if (!node->needActivate()) ;
-  else if(!node->isArray()) activateNext(fp, node, node->nextActiveId, newName(node), true);
-  else activateUncondNext(fp, node, node->nextActiveId, true);
+  else if(!node->isArray()) activateNext(fp, node, node->nextActiveId, newName(node), true, flagName);
+  else activateUncondNext(fp, node, node->nextActiveId, true, flagName);
 }
 
-void graph::genNodeStepStart(FILE* fp, SuperNode* node, uint64_t mask, int idx) {
+void graph::genNodeStepStart(FILE* fp, SuperNode* node, uint64_t mask, int idx, std::string flagName) {
   nodeNum ++;
   if(node->superType == SUPER_SAVE_REG) {
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
     fprintf(fp, "saveDiffRegs();\n");
 #endif
+  } else if (node->superType == SUPER_EXTMOD) {
+
   } else {
-    fprintf(fp, "if(unlikely(oldFlag & 0x%lx)) { // id=%d\n", mask, idx);
+    fprintf(fp, "if(unlikely(%s & 0x%lx)) { // id=%d\n", flagName.c_str(), mask, idx);
     int id;
     uint64_t mask;
     std::tie(id, mask) = clearIdxMask(node->cppId);
@@ -641,31 +643,43 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
 #endif
 
   nodeDisplay(fp, node);
-  if(node->superType != SUPER_SAVE_REG) fprintf(fp, "}\n");
+  if(node->superType != SUPER_SAVE_REG && node->superType != SUPER_EXTMOD) fprintf(fp, "}\n");
 }
 
 void graph::genActivate(FILE* fp) {
   int idx = 0;
   for (int i = 0; i < subStepNum; i ++) {
     fprintf(fp, "void S%s::subStep%d(){\n", name.c_str(), i);
+    bool prevAnyExt = false;
     for (int i = 0; i < NODE_PER_SUBFUNC && idx < superId; i ++, idx ++) {
       int id;
       uint64_t mask;
       std::tie(id, mask) = setIdxMask(idx);
       if (idx % ACTIVE_WIDTH == 0) {
-        if (i != 0) {
+        if (i != 0 && !prevAnyExt) {
           fprintf(fp, "}\n");
         }
-        fprintf(fp, "if(unlikely(activeFlags[%d] != 0)) {\n", id);
-        fprintf(fp, "uint%d_t oldFlag = activeFlags[%d];\n", ACTIVE_WIDTH, id);
-        fprintf(fp, "activeFlags[%d] = 0;\n", id);
+        bool curAnyExt = false;
+        for (int j = 0; j < ACTIVE_WIDTH && idx + j < superId; j ++) {
+          if (cppId2Super[idx + j]->superType == SUPER_EXTMOD) {
+            curAnyExt = true;
+            break;
+          }
+        }
+        if (!curAnyExt) {
+          fprintf(fp, "if(unlikely(activeFlags[%d] != 0)) {\n", id);
+          fprintf(fp, "uint%d_t oldFlag = activeFlags[%d];\n", ACTIVE_WIDTH, id);
+          fprintf(fp, "activeFlags[%d] = 0;\n", id);
+        }
+        prevAnyExt = curAnyExt;
       }
 
       SuperNode* super = cppId2Super[idx];
-      genNodeStepStart(fp, super, mask, idx);
+      std::string flagName = prevAnyExt ? format("activeFlags[%d]", id) : "oldFlag";
+      genNodeStepStart(fp, super, mask, idx, flagName);
       for (Node* n : super->member) {
         if (n->insts.size() == 0) continue;
-        genNodeInsts(fp, n);
+        genNodeInsts(fp, n, flagName);
       }
       genNodeStepEnd(fp, super);
     }

@@ -55,13 +55,13 @@ static std::map<OPType, const char*> OP2Name = {
 static const char* StatusName[] = {
     "NODE_INVALID",    "NODE_REG_SRC", "NODE_REG_DST",    "NODE_SPECIALt", "NODE_INP",
     "NODE_OUT",        "NODE_MEMORY",  "NODE_READER",     "NODE_WRITER",   "NODE_READWRITER",
-    "NODE_MEM_MEMBER", "NODE_OTHERS",  "NODE_REG_UPDATE",
+    "NODE_MEM_MEMBER", "NODE_OTHERS",  "NODE_REG_UPDATE", "NODE_EXT_IN", "NODE_EXT_OUT", "NODE_EXT",
 };
 
 static const char* TypeName[] = {
     "NODE_INVALID",    "NODE_REG_SRC", "NODE_REG_DST",    "NODE_SPECIAL", "NODE_INP",
     "NODE_OUT",        "NODE_MEMORY",  "NODE_READER",     "NODE_WRITER",  "NODE_READWRITER",
-    "NODE_MEM_MEMBER", "NODE_OTHERS",  "NODE_REG_UPDATE",
+    "NODE_MEM_MEMBER", "NODE_OTHERS",  "NODE_REG_UPDATE", "NODE_EXT_IN", "NODE_EXT_OUT", "NODE_EXT",
 };
 
 void ExpTree::display() {

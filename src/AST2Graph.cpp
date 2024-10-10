@@ -13,6 +13,9 @@
 #define SEP_MODULE "$" // seperator for module
 #define SEP_AGGR "$$"
 
+#define MOD_IN(module) ((module == P_EXTMOD) ? NODE_EXT_IN : (module == P_MOD ? NODE_OTHERS : NODE_INP))
+#define MOD_OUT(module) ((module == P_EXTMOD) ? NODE_EXT_OUT : (module == P_MOD ? NODE_OTHERS : NODE_OUT))
+
 int p_stoi(const char* str);
 TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType);
 ASTExpTree* visitExpr(graph* g, PNode* expr);
@@ -233,10 +236,10 @@ port: Input ALLID ':' type info    { $$ = newNode(P_INPUT, synlineno(), $5, $2, 
     | Output ALLID ':' type info   { $$ = newNode(P_OUTPUT, synlineno(), $5, $2, 1, $4); }
 all nodes are stored in aggrMember
 */
-TypeInfo* visitPort(graph* g, PNode* port, bool isTop) {
+TypeInfo* visitPort(graph* g, PNode* port, PNodeType modType) {
   TYPE_CHECK(port, 1, 1, P_INPUT, P_OUTPUT);
 
-  NodeType type = isTop ? (port->type == P_INPUT ? NODE_INP : NODE_OUT) : NODE_OTHERS;
+  NodeType type = port->type == P_INPUT ? MOD_IN(modType) : MOD_OUT(modType);
   prefix_append(SEP_MODULE, port->name);
   TypeInfo* info = visitType(g, port->getChild(0), type);
 
@@ -258,7 +261,7 @@ void visitTopPorts(graph* g, PNode* ports) {
   // visit all ports
   for (int i = 0; i < ports->getChildNum(); i ++) {
     PNode* port = ports->getChild(i);
-    TypeInfo* info = visitPort(g, port, true);
+    TypeInfo* info = visitPort(g, port, P_CIRCUIT);
     for (auto entry : info->aggrMember) {
       Node* node = entry.first;
       addSignal(node->name, node);
@@ -494,7 +497,7 @@ void visitModule(graph* g, PNode* module) {
 
   PNode* ports = module->getChild(0);
   for (int i = 0; i < ports->getChildNum(); i ++) {
-    TypeInfo* portInfo = visitPort(g, ports->getChild(i), false);
+    TypeInfo* portInfo = visitPort(g, ports->getChild(i), P_MOD);
 
     for (auto entry : portInfo->aggrMember) {
       Node* node = entry.first;
@@ -513,17 +516,39 @@ extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$
 */
 void visitExtModule(graph* g, PNode* module) {
   TYPE_CHECK(module, 1, 1, P_EXTMOD);
-  /* the same process of visitModule */
+  Node* extNode = allocNode(NODE_EXT, module->name + "$EXT");
+  addSignal(extNode->name, extNode);
+
   PNode* ports = module->getChild(0);
   for (int i = 0; i < ports->getChildNum(); i ++) {
-    TypeInfo* portInfo = visitPort(g, ports->getChild(i), false);
+    TypeInfo* portInfo = visitPort(g, ports->getChild(i), P_EXTMOD);
 
     for (auto entry : portInfo->aggrMember) {
       addSignal(entry.first->name, entry.first);
+      extNode->add_member(entry.first);
     }
     for (AggrParentNode* dummy : portInfo->aggrParent) {
       addDummy(dummy->name, dummy);
     }
+  }
+/* construct valTree for every output and NODE_EXT */
+  /* in -> ext */
+  ENode* funcENode = new ENode(OP_EXT_FUNC);
+  for (Node* node : extNode->member) {
+    if (node->type == NODE_EXT_OUT) continue;
+    if (node->isClock) extNode->clock = node;
+    else {
+      ENode* inENode = new ENode(node);
+      funcENode->addChild(inENode);
+    }
+  }
+  extNode->valTree = new ExpTree(funcENode, extNode);
+  /* ext -> out */
+  for (Node* node : extNode->member) {
+    if (node->type == NODE_EXT_IN) continue;
+    ENode* outFuncENode = new ENode(OP_EXT_FUNC);
+    outFuncENode->addChild(new ENode(extNode));
+    node->valTree = new ExpTree(outFuncENode, node);
   }
 }
 
@@ -1545,6 +1570,9 @@ void updatePrevNext(Node* n) {
     case NODE_OUT:
     case NODE_MEM_MEMBER:
     case NODE_OTHERS:
+    case NODE_EXT_IN:
+    case NODE_EXT_OUT:
+    case NODE_EXT:
       n->updateConnect();
       break;
 /* should not exists in allSignals */
@@ -1683,7 +1711,7 @@ graph* AST2Graph(PNode* root) {
     input->assignTree.clear();
   }
   for (auto it : allSignals) {
-    if ((it.second->type == NODE_OTHERS || it.second->type == NODE_MEM_MEMBER) && it.second->super->prev.size() == 0) {
+    if ((it.second->type == NODE_OTHERS || it.second->type == NODE_MEM_MEMBER || it.second->type == NODE_EXT) && it.second->super->prev.size() == 0) {
       g->supersrc.insert(it.second->super);
     }
     if (it.second->isArray()) {

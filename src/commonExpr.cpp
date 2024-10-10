@@ -113,7 +113,7 @@ void ExpTree::replace(std::map<Node*, Node*>& aliasMap) {
 /* TODO: check common regs */
 void graph::commonExpr() {
   for (SuperNode* super : sortedSuper) {
-    if (super->superType != SUPER_VALID) continue;
+    if (super->superType != SUPER_VALID && super->superType != SUPER_EXTMOD) continue;
     for (Node* node : super->member) {
       if(node->status != VALID_NODE) continue;
       nodeId[node] = node->id;

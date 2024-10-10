@@ -119,6 +119,7 @@ void ENode::passWidthToChild() {
       break;
     case OP_PRINTF:
     case OP_ASSERT:
+    case OP_EXT_FUNC:
       for (int i = 0; i < getChildNum(); i ++) {
         childBits.push_back(getChild(i)->width);
       }
