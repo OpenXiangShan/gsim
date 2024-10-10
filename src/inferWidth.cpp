@@ -184,9 +184,6 @@ void Node::inferWidth() {
     for (Node* member : arrayMember) member->inferWidth();
   }
   for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();
-  if (updateTree) updateTree->getRoot()->inferWidth();
-  if (resetTree) resetTree->getRoot()->inferWidth();
-  if (resetVal) resetVal->getRoot()->inferWidth();
 
   if (width == -1) {
     int newWidth = 0;
@@ -246,6 +243,13 @@ void graph::inferAllWidth() {
           }
         }
       }
+    }
+  }
+  for (SuperNode* super : sortedSuper) {
+    for (Node* node : super->member) {
+      if (node->updateTree) node->updateTree->getRoot()->inferWidth();
+      if (node->resetTree) node->resetTree->getRoot()->inferWidth();
+      if (node->resetVal) node->resetVal->getRoot()->inferWidth();
     }
   }
 }
