@@ -516,7 +516,7 @@ extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$
 */
 void visitExtModule(graph* g, PNode* module) {
   TYPE_CHECK(module, 1, 1, P_EXTMOD);
-  Node* extNode = allocNode(NODE_EXT, module->name + "$EXT");
+  Node* extNode = allocNode(NODE_EXT, module->name);
   addSignal(extNode->name, extNode);
 
   PNode* ports = module->getChild(0);
