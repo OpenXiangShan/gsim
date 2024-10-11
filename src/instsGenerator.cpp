@@ -1754,7 +1754,7 @@ valInfo* Node::compute() {
     return computeInfo;
   }
 
-  bool isRoot = anyExtEdge() || next.size() != 1 || isReset() || type == NODE_EXT;
+  bool isRoot = anyExtEdge() || next.size() != 1 || isReset() || isExt();
   if (isArrayMember) {
     for (Node* nextNode : next) {
       if (nextNode->isArray()) isRoot = true;
@@ -2099,21 +2099,31 @@ valInfo* Node::computeArray() {
 std::string computeExtMod(SuperNode* super) {
   Assert(super->member[0]->type == NODE_EXT && super->member[0]->assignTree.size() == 1, "invalid extmod\n");
 
-  super->member[0]->compute();
-  std::string inst = super->member[0]->assignTree[0]->getRoot()->computeInfo->valStr;
-
-  for (int i = 1; i < (int)super->member.size(); i ++) {
-    inst += (inst.back() == '(' ? "" : ", ");
-    inst += "&" + super->member[i]->name;
-    valInfo* memberInfo = new valInfo();
-    memberInfo->valStr = super->member[i]->name;
-    memberInfo->width = super->member[i]->width;
-    memberInfo->sign = super->member[i]->sign;
-    super->member[i]->computeInfo = memberInfo;
+  std::string funcDecl = "void " + super->member[0]->name + "(";
+  std::string inst = super->member[0]->name + "(";
+  for (size_t i = 0; i < super->member[0]->member.size(); i ++) {
+    Node* arg = super->member[0]->member[i];
+    if (i != 0) {
+      funcDecl += ", ";
+      inst += ", ";
+    }
+    if (arg->isArray()) {
+      funcDecl += widthUType(arg->width) + "* " + arg->name;
+    } else {
+      if (arg->type == NODE_EXT_IN) {
+        funcDecl += widthUType(arg->width) + " " + arg->name;
+      } else {
+        funcDecl += widthUType(arg->width) + "& " + arg->name;
+      }
+    }
+    if (arg->type == NODE_EXT_IN) inst += arg->compute()->valStr;
+    else if (arg->isArray()) inst += arg->name;
+    else inst += "&" + arg->name;
   }
+  funcDecl += ");";
   inst += ");";
   super->member[0]->insts.push_back(inst);
-  return inst;
+  return funcDecl;
 }
 
 void graph::instsGenerator() {
@@ -2122,7 +2132,7 @@ void graph::instsGenerator() {
   std::set<Node*> s_array;
   for (SuperNode* super : sortedSuper) {
     if (super->superType == SUPER_EXTMOD) {
-      computeExtMod(super);
+      extDecl.push_back(computeExtMod(super));
     } else {
       for (Node* n : super->member) {
         if (n->dimension.size() != 0) {
