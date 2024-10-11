@@ -684,7 +684,7 @@ void graph::genActivate(FILE* fp) {
       }
       genNodeStepEnd(fp, super);
     }
-    fprintf(fp, "}\n");
+    if(!prevAnyExt) fprintf(fp, "}\n");
     fprintf(fp, "}\n");
   }
 }
