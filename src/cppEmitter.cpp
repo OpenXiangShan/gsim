@@ -220,6 +220,7 @@ FILE* graph::genHeaderStart(std::string headerFile) {
     }
     fprintf(header, "#define UINT_CONCAT%d(%s) (%s)\n", num, param.c_str(), value.c_str());
   }
+  for (std::string str : extDecl) fprintf(header, "%s\n", str.c_str());
   newLine(header);
   /* class start*/
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
