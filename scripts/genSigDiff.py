@@ -47,7 +47,6 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
         line = re.split(' |\[|;', line)
         width = line[-1]
         all_sigs[line[1]] = int(width)
-
     self.newDstFile()
 
     for line in self.srcfp.readlines():
@@ -91,7 +90,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
             outMod = "(uint64_t)(" + modName + " >> 192) <<" + "(uint64_t)(" + modName + " >> 128) <<" + "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName
             mask = "((uint256_t)" + hex((1 << max(0, mod_width - 192))-1) + "<< 192 | " + "(uint256_t)" + hex((1 << min(64, mod_width - 128))-1) + "<< 128 | " + "(uint256_t)" + hex((1 << 64)-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
           if mod_width <= 64:
-            outRef = modName
+            outRef = refName
           elif mod_width <= 128:
             outRef = "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName
           else:
@@ -102,7 +101,12 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
           "  std::cout << std::hex <<\"" + line[2] + ": \" << +" +  outMod + " << \"  \" << +" + outRef + "<< std::endl;\n" + \
           "} \n")
         elif mod_width > 256:
-          pass
+          self.dstfp.writelines( \
+          "if(display || (" + modName + ") != (" + refName + ")){\n" + \
+          "  ret = true;\n" + \
+          modName + ".display();\n" + \
+          refName + ".display();\n" + \
+          "} \n")
 
     self.srcfp.close()
     self.reffp.close()

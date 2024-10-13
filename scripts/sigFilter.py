@@ -24,9 +24,6 @@ class SigFilter():
     self.dstfp.writelines("#include <iostream>\n#include <gmp.h>\n#include <" + self.name + ".h>\n#include \"V" + self.name + "__Syms.h\"\n")
     self.dstfp.writelines("bool checkSig" + str(self.fileIdx) + "(bool display, V" + self.name + "* ref, S" + self.name + "* mod) {\n")
     self.dstfp.writelines("bool ret = false;\n")
-    self.dstfp.writelines("mpz_t tmp1;\nmpz_init(tmp1);\n \
-mpz_t tmp2;\nmpz_init(tmp2);\n \
-mpz_t tmp3;\nmpz_init(tmp3);\n")
     self.fileIdx += 1
     self.varNum = 0
 
@@ -65,52 +62,38 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
         ref_width = all_sigs[line[3]]
         refName = "ref->rootp->" + line[3]
         modName = "mod->" + line[2]
-        if mod_width > 128:
+        refUName = line[3] + "_u"
+        if mod_width > 256:
+          continue
+        if mod_width > 128 and mod_width <= 256:
           num = int((ref_width + 31) / 32)
-          self.dstfp.writelines("mpz_set_ui(tmp1, ref->rootp->" + line[3] + "[" + str(num-1) +"U]);\n")
+          self.dstfp.writelines("uint256_t " + refUName + " = " + refName + "[" + str(num-1) +"U]);\n")
           for i in range(num - 1, 0, -1):
-            self.dstfp.writelines("mpz_mul_2exp(tmp1, tmp1, 32);\n")
-            self.dstfp.writelines("mpz_add_ui(tmp1, tmp1, ref->rootp->" + line[3] + "[" + str(i-1) + "U]);\n")
-          refName = "tmp1"
+            self.dstfp.writelines(refUName + " = " + refUName + " << 32 + " + refName + "[" + str(i-1) + "U]);\n")
 
-          if mod_width > 128 and sign :
-            self.dstfp.writelines("u_asUInt(tmp2, " + "mod->" + line[2] + ", " + line[1] +");\n")
-            modName = "tmp2"
-          elif mod_width <= 128 and mod_width > 64:
-            self.dstfp.writelines("mpz_import(tmp2, 2, -1, 8, 0, 0, (mp_limb_t*)" + "mod->" + line[2] +");\n")
-            modName = "tmp2"
-
-        if refName == "tmp1" :
-          self.dstfp.writelines( \
-          "if(display || mpz_cmp(" + modName + ", " + refName + ") != 0){\n" + \
-          "  ret = true;\n" + \
-          "  std::cout << \"" + line[2] + ": \";\n" + \
-          "  mpz_out_str(stdout, 16, " + modName + ");\n" + \
-          "  std::cout << \" \"; mpz_out_str(stdout, 16, " + refName + "); std::cout << std::endl;\n}\n"
-          )
-        else :
-          refName128 = ""
-          if ref_width > 64:
-            num = int((ref_width + 31) / 32)
-            for i in range(min(4, num)):
-              refName128 = refName128 + (" | " if i != 0 else "") + "((__uint128_t)" + refName + "[" + str(i) + "] << " + str(i * 32) + ")"
-            refName = refName.lstrip("ref->rootp->") + "_128"
-            self.dstfp.writelines("__uint128_t " + refName + " = " + refName128 + ";\n")
-          mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((__uint128_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
-          self.dstfp.writelines( \
-          "if(display || (" + modName + " & " + mask + ") != (" + refName + "&" + mask + ")){\n" + \
-          "  ret = true;\n" + \
-          "  std::cout << std::hex <<\"" + line[2] + ": \" << +" +  \
-          (modName if mod_width <= 64 else "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName) + " << \"  \" << +" + \
-            (refName if ref_width <= 64 else "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName) + "<< std::endl;\n" + \
-          "} \n")
+        refName128 = ""
+        if ref_width > 64:
+          num = int((ref_width + 31) / 32)
+          for i in range(min(4, num)):
+            refName128 = refName128 + (" | " if i != 0 else "") + "((__uint128_t)" + refName + "[" + str(i) + "] << " + str(i * 32) + ")"
+          refName = refName.lstrip("ref->rootp->") + "_128"
+          self.dstfp.writelines("__uint128_t " + refName + " = " + refName128 + ";\n")
+        # mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((__uint128_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
+        mask = "(((uint256_t)1 << " + str(mod_width) + ") - 1)"
+        self.dstfp.writelines( \
+        "if(display || (" + modName + " & " + mask + ") != (" + refName + "&" + mask + ")){\n" + \
+        "  ret = true;\n" + \
+        "  std::cout << std::hex <<\"" + line[2] + ": \" << +" +  \
+        (modName if mod_width <= 64 else "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName) + " << \"  \" << +" + \
+          (refName if ref_width <= 64 else "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName) + "<< std::endl;\n" + \
+        "} \n")
     # self.dstfp.writelines("return ret;\n")
     self.srcfp.close()
     self.reffp.close()
     # self.dstfp.close()
     self.closeDstFile()
     self.dstfp = open(self.dstFileName + ".cpp", "w")
-    self.dstfp.writelines("#include <iostream>\n#include <gmp.h>\n#include <" + self.name + ".h>\n#include \"V" + self.name + "__Syms.h\"\n")
+    self.dstfp.writelines("#include <iostream>\n#include <" + self.name + ".h>\n#include \"V" + self.name + "__Syms.h\"\n")
     for i in range (self.fileIdx):
       self.dstfp.writelines("bool checkSig" + str(i) + "(bool display, V" + self.name + "* ref, S" + self.name + "* mod);\n")
     self.dstfp.writelines("bool checkSig" + "(bool display, V" + self.name + "* ref, S" + self.name + "* mod){\nbool ret = false;\n")
