@@ -510,11 +510,15 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
       fprintf(fp, "%s // %s\n", str.c_str(), ACTIVE_COMMENT(iter.second).c_str());
     }
   #ifdef PERF
-    for (int id : nextNodeId) {
-      fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\nactivator[%d][%d] ++;\n",
-                  id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
+    if (node->super->superType == SUPER_EXTMOD) {
+
+    } else {
+      for (int id : nextNodeId) {
+        fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\nactivator[%d][%d] ++;\n",
+                    id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
+      }
+      if (inStep) fprintf(fp, "isActivateValid = true;\n");
     }
-    if (inStep) fprintf(fp, "isActivateValid = true;\n");
   #endif
   }
   if (!opt) fprintf(fp, "}\n");
@@ -640,7 +644,7 @@ void graph::nodeDisplay(FILE* fp, SuperNode* super) {
 
 void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
 #ifdef PERF
-  fprintf(fp, "validActive[%d] += isActivateValid;\n", node->cppId);
+  if (node->superType != SUPER_EXTMOD) fprintf(fp, "validActive[%d] += isActivateValid;\n", node->cppId);
 #endif
 
   nodeDisplay(fp, node);
