@@ -688,7 +688,7 @@ void graph::genActivate(FILE* fp) {
         /* save old EXT_OUT*/
         for (size_t i = 1; i < super->member.size(); i ++) {
           Node* extOut = super->member[i];
-          fprintf(fp, "%s %s = %s\n", widthUType(extOut->width).c_str(), oldName(extOut).c_str(), extOut->name.c_str());
+          fprintf(fp, "%s %s = %s;\n", widthUType(extOut->width).c_str(), oldName(extOut).c_str(), extOut->name.c_str());
         }
         genNodeInsts(fp, super->member[0], flagName);
         for (size_t i = 1; i < super->member.size(); i ++) {
