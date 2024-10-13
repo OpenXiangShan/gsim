@@ -485,7 +485,9 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
     fprintf(fp, "if (%s || (%s != %s)) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
   } else {
     curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
+#ifndef PERF
     opt = ((ACTIVE_MASK(curMask) != 0) + bitMapInfo.size()) <= 3;
+#endif
     if (opt) {
       if (node->width == 1) fprintf(fp, "auto %s = %s ^ %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
       else fprintf(fp, "auto %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
