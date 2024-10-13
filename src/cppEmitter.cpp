@@ -426,7 +426,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
   if (node->type == NODE_OTHERS && !node->needActivate() && !node->isArray()) return;
-#ifdef GSIM_DIFF
+#if defined(GSIM_DIFF) || defined(VERILATOR_DIFF)
   genDiffSig(fp, node);
 #endif
   if (definedNode.find(node) != definedNode.end()) return;
@@ -434,9 +434,6 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   fprintf(fp, "%s %s", widthUType(node->width).c_str(), node->name.c_str());
   if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", upperPower2(node->depth));
   for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
-#ifdef VERILATOR_DIFF
-  genDiffSig(fp, node);
-#endif
   fprintf(fp, "; // width = %d\n", node->width);
   /* save reset registers */
   if (node->isReset() && node->type == NODE_REG_SRC) {
