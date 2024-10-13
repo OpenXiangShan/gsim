@@ -15,7 +15,7 @@ class graph {
   void genStep(FILE* fp);
   void genHeaderEnd(FILE* fp);
   void genSrcEnd(FILE* fp);
-  void genNodeStepStart(FILE* fp, SuperNode* node);
+  void genNodeStepStart(FILE* fp, SuperNode* node, uint64_t mask, int idx);
   void genNodeStepEnd(FILE* fp, SuperNode* node);
   void genNodeInit(FILE* fp, Node* node);
   void genMemInit(FILE* fp, Node* node);

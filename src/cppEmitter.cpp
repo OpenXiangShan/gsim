@@ -574,13 +574,14 @@ void graph::genNodeInsts(FILE* fp, Node* node) {
   else activateUncondNext(fp, node, node->nextActiveId, true);
 }
 
-void graph::genNodeStepStart(FILE* fp, SuperNode* node) {
+void graph::genNodeStepStart(FILE* fp, SuperNode* node, uint64_t mask, int idx) {
   nodeNum ++;
   if(node->superType == SUPER_SAVE_REG) {
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
     fprintf(fp, "saveDiffRegs();\n");
 #endif
   } else {
+    fprintf(fp, "if(unlikely(oldFlag & 0x%lx)) { // id=%d\n", mask, idx);
     int id;
     uint64_t mask;
     std::tie(id, mask) = clearIdxMask(node->cppId);
@@ -642,6 +643,7 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
 #endif
 
   nodeDisplay(fp, node);
+  if(node->superType != SUPER_SAVE_REG) fprintf(fp, "}\n");
 }
 
 void graph::genActivate(FILE* fp) {
@@ -660,15 +662,13 @@ void graph::genActivate(FILE* fp) {
         fprintf(fp, "uint%d_t oldFlag = activeFlags[%d];\n", ACTIVE_WIDTH, id);
         fprintf(fp, "activeFlags[%d] = 0;\n", id);
       }
-      fprintf(fp, "if(unlikely(oldFlag & 0x%lx)) { // id=%d\n", mask, idx);
       SuperNode* super = cppId2Super[idx];
-      genNodeStepStart(fp, super);
+      genNodeStepStart(fp, super, mask, idx);
       for (Node* n : super->member) {
         if (n->insts.size() == 0) continue;
         genNodeInsts(fp, n);
       }
       genNodeStepEnd(fp, super);
-      fprintf(fp, "}\n");
     }
     fprintf(fp, "}\n");
     fprintf(fp, "}\n");
