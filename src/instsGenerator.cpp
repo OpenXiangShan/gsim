@@ -2117,8 +2117,7 @@ std::string computeExtMod(SuperNode* super) {
       }
     }
     if (arg->type == NODE_EXT_IN) inst += arg->compute()->valStr;
-    else if (arg->isArray()) inst += arg->name;
-    else inst += "&" + arg->name;
+    else inst += arg->name;
   }
   funcDecl += ");";
   inst += ");";
