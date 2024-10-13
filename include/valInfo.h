@@ -58,6 +58,9 @@ public:
     mpz_mul_2exp(mask, mask, width);
     mpz_sub_ui(mask, mask, 1);
     mpz_and(consVal, consVal, mask);
+    if (sign) {
+      s_asSInt(consVal, consVal, width);
+    }
     setConsStr();
   }
   void setConstantByStr(std::string str, int base = 16) {
