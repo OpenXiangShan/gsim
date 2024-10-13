@@ -66,47 +66,24 @@ void ENode::inferWidth() {
       case OP_AND: // the width is actually max, while the upper bits are zeros
         Assert(getChildNum() == 2 && s0 == s1, "invalid child");
         if (w0 != w1) {
+          int w = MAX(w0, w1);
+          ENode* enode;
           if (s1) {
-            int w = MAX(w0, w1);
-            ENode* enode;
             enode = new ENode(OP_SEXT);
             enode->addVal(w);
             enode->width = w;
             enode->sign = s1;
-            if (w0 > w1) {
-              enode->addChild(getChild(1));
-              setChild(1, enode);
-            } else {
-              enode->addChild(getChild(0));
-              setChild(0, enode);
-            }
           } else {
-            if (getChild(0)->nodePtr && getChild(1)->nodePtr) {
-              int w = MIN(w0, w1);
-              ENode* enode = new ENode(OP_BITS);
-              enode->addVal(w-1);
-              enode->addVal(0);
-              enode->width = w;
-              if (w0 < w1) {
-                enode->addChild(getChild(1));
-                setChild(1, enode);
-              } else {
-                enode->addChild(getChild(0));
-                setChild(0, enode);
-              }
-            } else {
-              int w = MAX(w0, w1);
-              ENode* enode = new ENode(OP_PAD);
-              enode->addVal(w);
-              enode->width = w;
-              if (w0 > w1) {
-                enode->addChild(getChild(1));
-                setChild(1, enode);
-              } else {
-                enode->addChild(getChild(0));
-                setChild(0, enode);
-              }
-            }
+            enode = new ENode(OP_PAD);
+            enode->addVal(w);
+            enode->width = w;
+          }
+          if (w0 > w1) {
+            enode->addChild(getChild(1));
+            setChild(1, enode);
+          } else {
+            enode->addChild(getChild(0));
+            setChild(0, enode);
           }
         }
         setWidth(MAX(w0, w1), false);
@@ -338,13 +315,19 @@ void ExpTree::updateWithNewWidth() {
         } else {
           ENode* bits = new ENode(OP_BITS);
           bits->width = top->width;
-          bits->sign = top->sign;
           bits->addVal(top->width - 1);
           bits->addVal(0);
           bits->addChild(top);
-          remove = true;
-          newChild = bits;
           top->width = top->nodePtr->width;
+          newChild = bits;
+          if (top->sign) {
+            ENode* asSint = new ENode(OP_ASSINT);
+            asSint->width = bits->width;
+            asSint->sign = true;
+            asSint->addChild(bits);
+            newChild = asSint;
+          }
+          remove = true;
         }
       } else if (top->width > top->nodePtr->width) {
         if (top->sign) {
@@ -369,7 +352,7 @@ void ExpTree::updateWithNewWidth() {
     } else {
       switch(top->opType) {
         case OP_BITS:
-          if (top->width == top->getChild(0)->width) {
+          if (top->width == top->getChild(0)->width && top->sign == top->getChild(0)->sign) {
             remove = true;
             newChild = top->getChild(0);
             break;
@@ -427,6 +410,40 @@ void ExpTree::updateWithNewWidth() {
             newChild = bits;
           }
           break;
+        case OP_EQ: case OP_NEQ: case OP_LT: case OP_LEQ: case OP_GT: case OP_GEQ: case OP_ADD: case OP_SUB: {
+          int maxWidth = MAX(top->getChild(0)->width, top->getChild(1)->width);
+          if (maxWidth != top->getChild(0)->width) {
+            ENode* newENode = nullptr;
+            if (top->getChild(0)->sign) {
+              newENode = new ENode(OP_SEXT);
+              newENode->width = maxWidth;
+              newENode->sign = true;
+              newENode->addVal(maxWidth);
+            } else {
+              newENode = new ENode(OP_PAD);
+              newENode->width = maxWidth;
+              newENode->addVal(maxWidth);
+            }
+            newENode->addChild(top->getChild(0));
+            top->setChild(0, newENode);
+          }
+          if (maxWidth != top->getChild(1)->width) {
+            ENode* newENode = nullptr;
+            if (top->getChild(1)->sign) {
+              newENode = new ENode(OP_SEXT);
+              newENode->width = maxWidth;
+              newENode->sign = true;
+              newENode->addVal(maxWidth);
+            } else {
+              newENode = new ENode(OP_PAD);
+              newENode->width = maxWidth;
+              newENode->addVal(maxWidth);
+            }
+            newENode->addChild(top->getChild(1));
+            top->setChild(1, newENode);
+          }
+          break;
+        }
         case OP_OR: case OP_XOR:
           if (top->getChild(0)->width < top->width) {
             ENode* pad = new ENode(OP_PAD);
