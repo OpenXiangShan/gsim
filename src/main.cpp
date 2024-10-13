@@ -109,8 +109,6 @@ int main(int argc, char** argv) {
 
   FUNC_TIMER(g->splitNodes());
 
-  // FUNC_TIMER(g->traversal());
-
   FUNC_TIMER(g->removeDeadNodes());
 
   FUNC_WRAPPER(g->constantAnalysis(), "ConstantAnalysis");
