@@ -355,17 +355,14 @@ void graph::genDiffSig(FILE* fp, Node* node) {
 
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
 void graph::genDiffSig(FILE* fp, Node* node) {
-    if (node->type == NODE_REG_SRC){
-      if (node->width <= BASIC_WIDTH) {
-        fprintf(fp, "%s %s%s", widthUType(node->width).c_str(), node->name.c_str(), "$prev");
-      } else {
-        fprintf(fp, "mpz_t %s%s", node->name.c_str(), "$prev");
-      }
-      if (node->isArray() && node->arrayEntryNum() != 1) {
-        for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
-      }
-      fprintf(fp, ";\n");
+  if (node->type == NODE_REG_SRC){
+    fprintf(fp, "%s %s%s", widthUType(node->width).c_str(), node->name.c_str(), "$prev");
+
+    if (node->isArray() && node->arrayEntryNum() != 1) {
+      for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
     }
+    fprintf(fp, ";\n");
+  }
   std::string verilatorName = name + "__DOT__" + (node->type == NODE_REG_DST? node->getSrc()->name : node->name);
   size_t pos;
   while ((pos = verilatorName.find("$$")) != std::string::npos) {
@@ -792,10 +789,7 @@ void graph::saveDiffRegs(FILE* fp) {
         if (member->isArray() && member->arrayEntryNum() == 1) {
           for (size_t i = 0; i < member->dimension.size(); i ++) memberName += "[0]";
         }
-        if (member->width > BASIC_WIDTH)
-          fprintf(fp, "mpz_set(%s, %s);\n", arrayPrevName(member->getSrc()->name).c_str(), memberName.c_str());
-        else
-          fprintf(fp, "%s = %s;\n", arrayPrevName(member->getSrc()->name).c_str(), memberName.c_str());
+        fprintf(fp, "%s = %s;\n", arrayPrevName(member->getSrc()->name).c_str(), memberName.c_str());
       } else if (member->type == NODE_REG_SRC && member->isArray() && member->status == VALID_NODE) {
         std::string idxStr, bracket;
         for (size_t i = 0; i < member->dimension.size(); i ++) {
@@ -803,11 +797,7 @@ void graph::saveDiffRegs(FILE* fp) {
           idxStr += "[i" + std::to_string(i) + "]";
           bracket += "}\n";
         }
-        if (member->width > BASIC_WIDTH) {
-          fprintf(fp, "mpz_set(%s$prev%s, %s%s);\n", member->name.c_str(), idxStr.c_str(), member->name.c_str(), idxStr.c_str());
-        } else {
-          fprintf(fp, "%s$prev%s = %s%s;\n", member->name.c_str(), idxStr.c_str(), member->name.c_str(), idxStr.c_str());
-        }
+        fprintf(fp, "%s$prev%s = %s%s;\n", member->name.c_str(), idxStr.c_str(), member->name.c_str(), idxStr.c_str());
         fprintf(fp, "%s", bracket.c_str());
       }
     }
