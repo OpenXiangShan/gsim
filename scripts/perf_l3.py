@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 # Assume we have setup the resctrl group0 using scripts/init_resctrl.sh .
+# And also have the amd_uncore kernel module loaded.
 
 from pathlib import Path
 import os
@@ -23,16 +24,18 @@ async def stat_l3(pid, res):
         await asyncio.sleep(0.5)
 
 async def run_emu(emu_bin: str, emu_args: [str], l3_log_path: Path, stdout_path: Path, stderr_path: Path):
-    proc = await asyncio.create_subprocess_exec(
-        "perf", "stat", "-e", "instructions,cycles,branch-instructions,branch-misses",
+    cmd = [
+        "perf", "stat", "-a", "-e",
+        "instructions,cycles,branch-instructions,branch-misses,l2_cache_req_stat.ic_fill_miss,l2_cache_req_stat.ls_rd_blk_c",
         "numactl", "--physcpubind=0-7,16-23", # configured for 7950X3D
-        emu_bin, *emu_args,
+        emu_bin, *emu_args
+    ]
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
-    print("Executing", " ".join(["perf", "stat", "-e", "instructions,cycles,branch-instructions,branch-misses",
-        "numactl", "--physcpubind=0-7,16-23", # configured for 7950X3D
-        emu_bin, *emu_args]))
+    print("Executing", " ".join(cmd))
     pid = proc.pid
     res = []
     stat = asyncio.create_task(stat_l3(pid, res))
@@ -94,23 +97,37 @@ def run_matrix():
             run_test(f"{dutName}-pgo", emu_bin, [perf_workload], l3_0_cache_unit)
 
 async def run_multiple_xs_inst():
-    # build_emu("xiangshan-default",True)
+    build_emu("xiangshan-default",True)
     for xs_copy in range(2, 9):
         for l3_0_cache_unit in range(1, 17):
             result_path = Path("result-multicopy").resolve() / f"xs-{xs_copy}-{l3_0_cache_unit}"
             result_path.mkdir(parents=True, exist_ok=True)
             set_cache_size(0, l3_0_cache_unit)
             tasks = []
+            stat_cmd = [
+                "perf", "stat", "-a", "-M", "l3_misses,umc_mem_bandwidth"
+            ]
+            print("Executing", " ".join(stat_cmd))
+            stat_proc = await asyncio.create_subprocess_exec(
+                *stat_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stat_pid = stat_proc.pid
             for i in range(xs_copy):
                 tasks.append(
                     asyncio.create_task(
                         run_emu("./build/emu/SSimTop",
                                 ["ready-to-run/bin/coremark-NutShell.bin"],
-                                Path(f"result-multicopy/xs-{xs_copy}-{l3_0_cache_unit}/l3-{i}.log"),
-                                Path(f"result-multicopy/xs-{xs_copy}-{l3_0_cache_unit}/out-{i}.log"),
-                                Path(f"result-multicopy/xs-{xs_copy}-{l3_0_cache_unit}/err-{i}.log"))))
+                                result_path / Path(f'l3-{i}.log'),
+                                result_path / Path(f'out-{i}.log'),
+                                result_path / Path(f'err-{i}.log'))))
             for task in tasks:
                 await task
+            psutil.Process(stat_pid).send_signal(signal.SIGINT)
+            stdout, stderr = await stat_proc.communicate()
+            with open(result_path / 'global_stat.out', "wb") as f:
+                f.write(stderr)
 
-# run_matrix()
+run_matrix()
 asyncio.run(run_multiple_xs_inst())
