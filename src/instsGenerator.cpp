@@ -1445,11 +1445,11 @@ valInfo* ENode::instsInvalid(Node* node, std::string lvalue, bool isRoot) {
 valInfo* ENode::instsPrintf() {
   valInfo* ret = computeInfo;
   ret->status = VAL_FINISH;
-  std::string printfInst = "if(" + ChildInfo(0, valStr) +  ") printf(" + strVal;
+  std::string printfInst = "if(" + ChildInfo(0, valStr) +  ") { printf(" + strVal;
   for (int i = 1; i < getChildNum(); i ++) {
     printfInst += ", " + ChildInfo(i, valStr);
   }
-  printfInst += "); fflush(stdout);";
+  printfInst += "); fflush(stdout); }";
 
   if (ChildInfo(0, status) != VAL_CONSTANT || mpz_cmp_ui(ChildInfo(0, consVal), 0) != 0) {
     ret->insts.push_back(printfInst);
