@@ -150,6 +150,7 @@ class Node {
 
 /* used in instsGenerator */
   bool fullyUpdated = true;
+  bool nodeIsRoot = false;
 
 /* used in cppEmitter */
   std::set<int> nextActiveId;
@@ -277,6 +278,7 @@ class Node {
   NodeComponent* reInferComponent();
   void updateTreeWithNewWIdth();
   int repOpCount();
+  void updateIsRoot();
 };
 
 enum SuperType {

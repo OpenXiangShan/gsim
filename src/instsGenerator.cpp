@@ -1741,12 +1741,7 @@ valInfo* Node::compute() {
     return computeInfo;
   }
 
-  bool isRoot = anyExtEdge() || next.size() != 1 || isReset();
-  if (isArrayMember) {
-    for (Node* nextNode : next) {
-      if (nextNode->isArray()) isRoot = true;
-    }
-  }
+  bool isRoot = nodeIsRoot;
   valInfo* ret = nullptr;
   for (size_t i = 0; i < assignTree.size(); i ++) {
     ExpTree* tree = assignTree[i];
@@ -2083,10 +2078,27 @@ valInfo* Node::computeArray() {
   return computeInfo;
 }
 
+void Node::updateIsRoot() {
+  if (anyExtEdge() || next.size() != 1 || isReset()) nodeIsRoot = true;
+  if (isArrayMember) {
+    for (Node* nextNode : next) {
+      if (nextNode->isArray()) nodeIsRoot = true;
+    }
+  }
+  for (Node* prevNode : prev) {
+    if (prevNode->type == NODE_REG_SRC && !prevNode->regSplit && prevNode->getDst()->super == super) {
+      nodeIsRoot = true;
+    }
+  }
+}
+
 void graph::instsGenerator() {
   maxConcatNum = 0;
   std::set<Node*> s;
   std::set<Node*> s_array;
+  for (SuperNode* super : sortedSuper) {
+    for (Node* n : super->member) n->updateIsRoot();
+  }
   for (SuperNode* super : sortedSuper) {
     for (Node* n : super->member) {
       if (n->dimension.size() != 0) {
