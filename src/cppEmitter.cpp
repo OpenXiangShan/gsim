@@ -739,7 +739,9 @@ void graph::genMemWrite(FILE* fp) {
     for (Node* port : mem->member) {
       if (port->type == NODE_WRITER) {
         valInfo* info_en = port->member[WRITER_EN]->computeInfo;
+        valInfo* info_mask = port->member[WRITER_MASK]->computeInfo;
         if (info_en->status == VAL_CONSTANT && mpz_sgn(info_en->consVal) == 0) continue;
+        if (info_mask->status == VAL_CONSTANT && mpz_sgn(info_mask->consVal) == 0) continue;
         if (port->member[WRITER_DATA]->isArray() != 0) {
           Node* writerData = port->member[WRITER_DATA];
           fprintf(fp, "if(unlikely(%s)) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str());
@@ -749,14 +751,20 @@ void graph::genMemWrite(FILE* fp) {
             indexStr += format("[i%ld]", i);
             bracket += "}\n";
           }
-          fprintf(fp, "if (%s%s) %s[%s]%s = %s%s;\n", port->member[WRITER_MASK]->computeInfo->valStr.c_str(), indexStr.c_str(),
+          if (info_mask->status == VAL_CONSTANT && mpz_sgn(info_mask->consVal) != 0) {
+            fprintf(fp, "%s[%s]%s = %s%s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str(),
+                                                  port->member[WRITER_DATA]->computeInfo->valStr.c_str(), indexStr.c_str());
+
+          } else {
+            fprintf(fp, "if (%s%s) %s[%s]%s = %s%s;\n", port->member[WRITER_MASK]->computeInfo->valStr.c_str(), indexStr.c_str(),
                                                   mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str(),
                                                   port->member[WRITER_DATA]->computeInfo->valStr.c_str(), indexStr.c_str());
+
+          }
           fprintf(fp, "%s", bracket.c_str());
         } else {
           std::string cond;
           if (info_en->status != VAL_CONSTANT) cond += port->member[WRITER_EN]->computeInfo->valStr.c_str();
-          valInfo* info_mask = port->member[WRITER_MASK]->computeInfo;
           if (info_mask->status != VAL_CONSTANT) cond += (cond.length() == 0 ? "" : " & ") + port->member[WRITER_MASK]->computeInfo->valStr;
           fprintf(fp, "if(unlikely(%s)) {\n", cond.c_str());
           fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
