@@ -101,6 +101,11 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>validif                 { return token::Validif; }
 <normal>old|new|undefined       { yylval->typeRUW = strdup(yytext); return token::Ruw; }
 <normal>mem                     { return token::Mem; }
+<normal>smem                    { return token::SMem; }
+<normal>cmem                    { return token::CMem; }
+<normal>write                   { return token::Write; }
+<normal>read                    { return token::Read; }
+<normal>mport                   { return token::Mport; }
 <normal>{int}                   { yylval->strVal = strdup(yytext); return token::INT; }
 <normal>{rint}                  { yylval->strVal = strdup(yytext); return token::RINT; }
 <normal>{int_dec}               { if (angle_num == 0 && square_num == 0 && parenthesis_num == 0 && bracket_num != 0) { \
