@@ -1,6 +1,6 @@
 FIRRTL version 4.0.0
-circuit SRAMTemplate :
-  module SRAMTemplate : @[build/NutShell.fir.opt.mlir 3:5]
+circuit ChirrtlSRAMTemplate :
+  module ChirrtlSRAMTemplate : @[build/NutShell.fir.opt.mlir 3:5]
     input clock : Clock @[build/NutShell.fir.opt.mlir 3:44]
     input reset : Reset @[build/NutShell.fir.opt.mlir 3:70]
     output io : { flip r : { req : { flip ready : UInt<1>, valid : UInt<1>, bits : { setIdx : UInt<9> } }, flip resp : { data : { tag : UInt<28>, _type : UInt<2>, target : UInt<39>, brIdx : UInt<3>, valid : UInt<1> }[1] } }, flip w : { req : { flip ready : UInt<1>, valid : UInt<1>, bits : { setIdx : UInt<9>, data : { tag : UInt<28>, _type : UInt<2>, target : UInt<39>, brIdx : UInt<3>, valid : UInt<1> } } } } } @[build/NutShell.fir.opt.mlir 3:97]
