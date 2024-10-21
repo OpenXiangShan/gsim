@@ -333,7 +333,7 @@ static Node* findChirrtlRef(std::string& Name) {
 
   for (const auto& [key, value] : allSignals) {
     auto isMem = value->type == NODE_MEM_MEMBER;
-    if (key.find(Name) != std::string::npos && isMem)
+    if (key.starts_with(Name + "$") && isMem)
 
       if (key.find("$$data") != std::string::npos) {
         ret = value;
@@ -966,7 +966,6 @@ struct ChirrtlVistor {
 
     std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree * valTree, int depth);
     auto [valTree, whenNode] = growWhenTrace(ref->valTree, ref->whenDepth);
-    assert(whenNode != nullptr);
 
     // Create ASTExpr for ref node
     auto* from = createRef(ref);
@@ -1040,8 +1039,7 @@ struct ChirrtlVistor {
 
     for (const auto& [key, value] : allSignals) {
       auto isMem = value->type == NODE_MEM_MEMBER;
-      if (key.find(Name) != std::string::npos && isMem)
-
+      if (key.starts_with(Name) && isMem)
         if (key.find(Member) != std::string::npos) {
           ret = value;
           break;
@@ -1052,10 +1050,10 @@ struct ChirrtlVistor {
   }
 
   static void createAccess(std::string& Name, ASTExpTree* Addr, bool write, int depth) {
-    auto* addr = findRef(Name, "addr");
-    auto* en = findRef(Name, "en");
-    auto* clk = findRef(Name, "clk");
-    auto* mask = findRef(Name, "mask");
+    auto* addr = findRef(Name, "$$addr");
+    auto* en = findRef(Name, "$$en");
+    auto* clk = findRef(Name, "$$clk");
+    auto* mask = findRef(Name, "$$mask");
 
     // Create Addr connect
     // e.g.
@@ -1109,14 +1107,18 @@ static Node* visitChirrtlPort(PNode* port, int width, int depth, bool sign, std:
 }
 
 static void visitChirrtlMemPort(graph* g, PNode* port) {
-  auto memName = port->getExtra(0);
-  auto *addr = visitReference(g, port->getChild(0));
+  // If we are in the top module, 
+  //    the memory name does not need to have the prefix added.
+  auto fixName = [&](std::string Name) {
+    return prefixTrace.empty() ? Name : topPrefix() + SEP_MODULE + Name;
+  };
 
-  prefix_append(SEP_MODULE, memName);
+  auto memName = fixName(port->getExtra(0));
+  auto *addr = visitReference(g, port->getChild(0));
 
   // Find existing memory by name
   auto* Mem = ChirrtlVistor::findMemory(g, memName);
-  if (Mem == nullptr) Panic();
+  if (Mem == nullptr) Assert(0, "Could not find memory: %s", memName.c_str());
 
   auto depth = Mem->depth;
   auto sign = Mem->sign;
@@ -1131,9 +1133,8 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
     allSignals[Member->name] = Member;
   }
 
-  prefix_pop();
-
-  ChirrtlVistor::createAccess(port->name, addr, port->type == P_WRITE, Mem->dimension.size());
+  auto portName = fixName(port->name);
+  ChirrtlVistor::createAccess(portName, addr, port->type == P_WRITE, Mem->dimension.size());
 }
 
 // TODO: Comb memory support
@@ -1778,6 +1779,7 @@ void visitStmt(graph* g, PNode* stmt) {
     case P_MEMORY: visitMemory(g, stmt); break;
     case P_SEQ_MEMORY : visitChirrtlMemory(g, stmt); break;
     case P_COMB_MEMORY: visitChirrtlMemory(g, stmt); break;
+    case P_READ: visitChirrtlMemPort(g, stmt); break;
     case P_NODE: visitNode(g, stmt); break;
     case P_CONNECT: visitConnect(g, stmt); break;
     case P_PAR_CONNECT: visitPartialConnect(g, stmt); break;
