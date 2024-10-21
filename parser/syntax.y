@@ -197,9 +197,9 @@ chirrtl_memory : SMem ALLID ':' chirrtl_memory_datatype ',' chirrtl_memory_ruw i
                | CMem ALLID ':' chirrtl_memory_datatype info                        { $$ = newNode(P_COMB_MEMORY, synlineno(), /*info*/$5, /*name*/$2, 1, /* DataType */ $4              ); }
                ;
 
-chirrtl_memory_port: Write Mport ALLID '=' ALLID '[' ALLID ']' ',' ALLID info { $$ = newNode(P_WRITE, synlineno(), /* Info */ $11, /* Name */ $3, 0); $$->appendExtraInfo(/* MemName */$5); $$->appendExtraInfo(/* Addr */ $7); }
-                   | Read  Mport ALLID '=' ALLID '[' ALLID ']' ',' ALLID info { $$ = newNode(P_READ , synlineno(), /* Info */ $11, /* Name */ $3, 0); $$->appendExtraInfo(/* MemName */$5); $$->appendExtraInfo(/* Addr */ $7); }
-                   | Infer Mport ALLID '=' ALLID '[' ALLID ']' ',' ALLID info { $$ = newNode(P_INFER, synlineno(), /* Info */ $11, /* Name */ $3, 0); $$->appendExtraInfo(/* MemName */$5); $$->appendExtraInfo(/* Addr */ $7); }
+chirrtl_memory_port: Write Mport ALLID '=' ALLID '[' reference ']' ',' ALLID info { $$ = newNode(P_WRITE, synlineno(), /* Info */ $11, /* Name */ $3, 1, /* Addr */ $7); $$->appendExtraInfo(/* MemName */$5); }
+                   | Read  Mport ALLID '=' ALLID '[' reference ']' ',' ALLID info { $$ = newNode(P_READ , synlineno(), /* Info */ $11, /* Name */ $3, 1, /* Addr */ $7); $$->appendExtraInfo(/* MemName */$5); }
+                   | Infer Mport ALLID '=' ALLID '[' reference ']' ',' ALLID info { $$ = newNode(P_INFER, synlineno(), /* Info */ $11, /* Name */ $3, 1, /* Addr */ $7); $$->appendExtraInfo(/* MemName */$5); }
                    ;
 
 /* statements */
