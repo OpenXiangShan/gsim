@@ -1140,7 +1140,7 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
 
 // TODO: Comb memory support
 static void visitChirrtlMemory(graph* g, PNode* mem) {
-  TYPE_CHECK(mem, 2, 2, P_SEQ_MEMORY);
+  assert(mem->type == P_SEQ_MEMORY || mem->type == P_COMB_MEMORY);
   prefix_append(SEP_MODULE, mem->name);
 
   bool isSeq = mem->type == P_SEQ_MEMORY;
@@ -1158,7 +1158,7 @@ static void visitChirrtlMemory(graph* g, PNode* mem) {
   // Convert to firrtl memory
   int rlatency = isSeq;
   int wlatency = 1;
-  visitRUW(mem->getChild(1));
+  if (isSeq) visitRUW(mem->getChild(1));
 
   moduleInstances.insert(topPrefix());
 
