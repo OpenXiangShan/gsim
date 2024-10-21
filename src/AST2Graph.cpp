@@ -1153,7 +1153,7 @@ static void visitChirrtlMemory(graph* g, PNode* mem) {
   //        depth: 2
   auto* type = visitMemType(g, mem->getChild(0));
   int depth = type->dimension.front();
-  type->dimension.pop_back();
+  type->dimension.erase(type->dimension.begin());
 
   // Convert to firrtl memory
   int rlatency = isSeq;
