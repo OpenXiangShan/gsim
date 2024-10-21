@@ -97,7 +97,6 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->topoSort(), "TopoSort");
 
-  g->traversal();
 
   FUNC_TIMER(g->inferAllWidth());
 
