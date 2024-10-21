@@ -1051,7 +1051,7 @@ struct ChirrtlVistor {
     return ret;
   }
 
-  static void createAccess(std::string& Name, Node* Index, bool write, int depth) {
+  static void createAccess(std::string& Name, ASTExpTree* Addr, bool write, int depth) {
     auto* addr = findRef(Name, "addr");
     auto* en = findRef(Name, "en");
     auto* clk = findRef(Name, "clk");
@@ -1060,8 +1060,7 @@ struct ChirrtlVistor {
     // Create Addr connect
     // e.g.
     //    connect array.MPORT.addr, _T_2
-    auto* addrRef = createRef(Index);
-    createConnect(addr, addrRef);
+    createConnect(addr, Addr);
 
     // Create Access Enable
     // e.g.
@@ -1111,9 +1110,9 @@ static Node* visitChirrtlPort(PNode* port, int width, int depth, bool sign, std:
 
 static void visitChirrtlMemPort(graph* g, PNode* port) {
   auto memName = port->getExtra(0);
-  prefix_append(SEP_MODULE, memName);
+  auto *addr = visitReference(g, port->getChild(0));
 
-  auto index = port->getExtra(1);
+  prefix_append(SEP_MODULE, memName);
 
   // Find existing memory by name
   auto* Mem = ChirrtlVistor::findMemory(g, memName);
@@ -1134,8 +1133,7 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
 
   prefix_pop();
 
-  auto* sig = getSignal(index);
-  ChirrtlVistor::createAccess(port->name, sig, port->type == P_WRITE, Mem->dimension.size());
+  ChirrtlVistor::createAccess(port->name, addr, port->type == P_WRITE, Mem->dimension.size());
 }
 
 // TODO: Comb memory support
