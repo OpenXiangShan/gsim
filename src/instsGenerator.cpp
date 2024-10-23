@@ -106,7 +106,7 @@ static int typeCmp(int width1, int width2) {
 }
 
 static std::string upperCast(int width1, int width2, bool sign) {
-  if (typeCmp(width1, width2) > 0) { 
+  if (typeCmp(width1, width2) > 0) {
     return Cast(width1, sign);
   }
   return "";
@@ -1312,7 +1312,7 @@ void infoBits(valInfo* ret, ENode* enode, valInfo* childInfo) {
     if (lo == 0) ret->valStr = format("%s.%s(%d)", childInfo->valStr.c_str(), tailName(enode->width).c_str(), hi + 1);
     else {
       // if (enode->width <= 64) ret->valStr = format("%s.bits64(%d, %d)", childInfo->valStr.c_str(), hi, lo);
-      // else 
+      // else
       if (enode->width <= 128) ret->valStr = format("%s.bits128(%d, %d)", childInfo->valStr.c_str(), hi, lo);
       else if (enode->width <= 256) {
         ret->valStr = format("%s.bits256(%d, %d)", childInfo->valStr.c_str(), hi, lo);
@@ -1327,7 +1327,7 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
 
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
-  
+
   int hi = values[0];
   int lo = values[1];
   int w = hi - lo + 1;
@@ -1397,7 +1397,7 @@ valInfo* ENode::instsIndexInt(Node* node, std::string lvalue, bool isRoot) {
 valInfo* ENode::instsIndex(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   for (ENode* childNode : child) ret->mergeInsts(childNode->computeInfo);
-  
+
   Assert(width <= BASIC_WIDTH, "index width %d > BASIC_WIDTH", width);
   ret->opNum = ChildInfo(0, opNum);
   ret->valStr = "[" + ChildInfo(0, valStr) + "]";
@@ -1478,7 +1478,7 @@ valInfo* ENode::instsAssert() {
   } else {
     assertInst = "Assert(!" + enStr + " || " + predStr + ", " + strVal + ");";
   }
-  
+
   if (assertInst.length() != 0) ret->insts.push_back(assertInst);
 
   return ret;
@@ -2108,16 +2108,23 @@ std::string computeExtMod(SuperNode* super) {
       inst += ", ";
     }
     if (arg->isArray()) {
-      funcDecl += widthUType(arg->width) + "* " + arg->name;
+      for (size_t j = 0; j < arg->arrayEntryNum(); j ++) {
+        if (j != 0) {
+          funcDecl += ", ";
+          inst += ", ";
+        }
+        funcDecl += widthUType(arg->width) + " " + arg->name + "_" + std::to_string(j);
+        inst += arg->name + "[" + std::to_string(j) + "]";
+      }
     } else {
       if (arg->type == NODE_EXT_IN) {
         funcDecl += widthUType(arg->width) + " " + arg->name;
+        inst += arg->compute()->valStr;
       } else {
         funcDecl += widthUType(arg->width) + "& " + arg->name;
+        inst += arg->name;
       }
     }
-    if (arg->type == NODE_EXT_IN) inst += arg->compute()->valStr;
-    else inst += arg->name;
   }
   funcDecl += ");";
   inst += ");";
