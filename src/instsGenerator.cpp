@@ -2103,6 +2103,7 @@ std::string computeExtMod(SuperNode* super) {
 
   std::string funcDecl = "void " + funcName + "(";
   std::string inst = funcName + "(";
+  int argIdx = 0;
   for (size_t i = 0; i < super->member[0]->member.size(); i ++) {
     Node* arg = super->member[0]->member[i];
     if (i != 0) {
@@ -2117,18 +2118,18 @@ std::string computeExtMod(SuperNode* super) {
             funcDecl += ", ";
             inst += ", ";
           }
-          funcDecl += widthUType(arg->width) + " " + arg->name + "_" + std::to_string(j);
+          funcDecl += widthUType(arg->width) + " _" + std::to_string(argIdx ++);
           inst += arg->name + "[" + std::to_string(j) + "]";
         }
       } else {
-        funcDecl += widthUType(arg->width) + " " + arg->name;
+        funcDecl += widthUType(arg->width) + " _" + std::to_string(argIdx ++);
         inst += arg->compute()->valStr;
       }
     } else {
       if (arg->isArray()) {
         TODO();
       } else {
-        funcDecl += widthUType(arg->width) + "& " + arg->name;
+        funcDecl += widthUType(arg->width) + "& _" + std::to_string(argIdx ++);
         inst += arg->name;
       }
     }
@@ -2145,7 +2146,15 @@ void graph::instsGenerator() {
   std::set<Node*> s_array;
   for (SuperNode* super : sortedSuper) {
     if (super->superType == SUPER_EXTMOD) {
-      extDecl.push_back(computeExtMod(super));
+      bool hasDecl = false;
+      std::string newDecl = computeExtMod(super);
+      for (std::string decl : extDecl) {
+        if (decl == newDecl) {
+          hasDecl = true;
+          break;
+        }
+      }
+      if (!hasDecl) extDecl.push_back(newDecl);
     } else {
       for (Node* n : super->member) {
         if (n->dimension.size() != 0) {
