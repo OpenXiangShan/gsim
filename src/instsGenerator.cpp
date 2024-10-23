@@ -2107,19 +2107,24 @@ std::string computeExtMod(SuperNode* super) {
       funcDecl += ", ";
       inst += ", ";
     }
-    if (arg->isArray()) {
-      for (size_t j = 0; j < arg->arrayEntryNum(); j ++) {
-        if (j != 0) {
-          funcDecl += ", ";
-          inst += ", ";
+
+    if (arg->type == NODE_EXT_IN) {
+      if (arg->isArray()) {
+        for (size_t j = 0; j < arg->arrayEntryNum(); j ++) {
+          if (j != 0) {
+            funcDecl += ", ";
+            inst += ", ";
+          }
+          funcDecl += widthUType(arg->width) + " " + arg->name + "_" + std::to_string(j);
+          inst += arg->name + "[" + std::to_string(j) + "]";
         }
-        funcDecl += widthUType(arg->width) + " " + arg->name + "_" + std::to_string(j);
-        inst += arg->name + "[" + std::to_string(j) + "]";
-      }
-    } else {
-      if (arg->type == NODE_EXT_IN) {
+      } else {
         funcDecl += widthUType(arg->width) + " " + arg->name;
         inst += arg->compute()->valStr;
+      }
+    } else {
+      if (arg->isArray()) {
+        TODO();
       } else {
         funcDecl += widthUType(arg->width) + "& " + arg->name;
         inst += arg->name;
