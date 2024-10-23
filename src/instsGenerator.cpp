@@ -2099,8 +2099,10 @@ valInfo* Node::computeArray() {
 std::string computeExtMod(SuperNode* super) {
   Assert(super->member[0]->type == NODE_EXT && super->member[0]->assignTree.size() == 1, "invalid extmod\n");
 
-  std::string funcDecl = "void " + super->member[0]->name + "(";
-  std::string inst = super->member[0]->name + "(";
+  std::string funcName = (super->member[0]->extraInfo.length() ? super->member[0]->extraInfo : super->member[0]->name);
+
+  std::string funcDecl = "void " + funcName + "(";
+  std::string inst = funcName + "(";
   for (size_t i = 0; i < super->member[0]->member.size(); i ++) {
     Node* arg = super->member[0]->member[i];
     if (i != 0) {

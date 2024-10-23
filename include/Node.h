@@ -103,6 +103,7 @@ class Node {
   }
 
   std::string name;  // concat the module name in order (member in structure / temp variable)
+  std::string extraInfo;
   int id = -1;
   NodeType type;
   int width = -1;
