@@ -13,6 +13,8 @@
 #define ACTIVE_WIDTH 8
 #define NODE_PER_SUBFUNC 400
 
+#define ENABLE_ACTIVATOR false
+
 #ifdef DIFFTEST_PER_SIG
 FILE* sigFile = nullptr;
 #endif
@@ -237,7 +239,9 @@ FILE* graph::genHeaderStart(std::string headerFile) {
   fprintf(header, "activateAll();\n");
 #ifdef PERF
   fprintf(header, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
+  #if ENABLE_ACTIVATOR
   fprintf(header, "for (int i = 0; i < %d; i ++) activator[i] = std::map<int, int>();\n", superId);
+  #endif
 for (SuperNode* super : sortedSuper) {
   if (super->cppId >= 0) {
     size_t num = 0;
@@ -283,7 +287,9 @@ for (SuperNode* super : sortedSuper) {
   fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
+  #if ENABLE_ACTIVATOR
   fprintf(header, "std::map<int, int>activator[%d];\n", superId);
+  #endif
   fprintf(header, "size_t validActive[%d];\n", superId);
   fprintf(header, "size_t nodeNum[%d];\n", superId);
 #endif
@@ -511,10 +517,12 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
       fprintf(fp, "%s // %s\n", str.c_str(), ACTIVE_COMMENT(iter.second).c_str());
     }
   #ifdef PERF
+    #if ENABLE_ACTIVATOR
     for (int id : nextNodeId) {
       fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\nactivator[%d][%d] ++;\n",
                   id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
     }
+    #endif
     if (inStep) fprintf(fp, "isActivateValid = true;\n");
   #endif
   }
@@ -530,10 +538,12 @@ static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bo
     fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
   }
 #ifdef PERF
+  #if ENABLE_ACTIVATOR
   for (int id : activateId) {
     fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\n activator[%d][%d] ++;\n",
                 id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
   }
+  #endif
   if (inStep) fprintf(fp, "isActivateValid = true;\n");
 #endif
   if (!node->fullyUpdated) fprintf(fp, "}\n");
