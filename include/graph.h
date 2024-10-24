@@ -46,6 +46,11 @@ class graph {
   void orderAllNodes();
   void genDiffSig(FILE* fp, Node* node);
   void removeDeadReg();
+  void graphCoarsen();
+  void graphInitPartition();
+  void graphRefine();
+  void resort();
+  void detectSortedSuperLoop();
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;
@@ -94,6 +99,7 @@ class graph {
   void perfAnalysis();
   void exprOpt();
   void patternDetect();
+  void graphPartition();
   void dump(std::string FileName);
 };
 
