@@ -109,7 +109,7 @@ class Node {
   std::vector<int> dimension;
   int order = -1;
   int orderInSuper = -1;
-
+  int ops = 0;
   std::set<Node*> next;
   std::set<Node*> prev;
   std::vector <ExpTree*> assignTree;
@@ -154,6 +154,7 @@ class Node {
 
 /* used in cppEmitter */
   std::set<int> nextActiveId;
+  std::set<int> nextNeedActivate;
 
   std::vector<std::string> insts;
   std::vector<std::string> resetInsts;
@@ -260,7 +261,9 @@ class Node {
   ENode* isAlias();
   bool anyExtEdge();
   bool needActivate();
+  bool anyNextActive();
   void updateActivate();
+  void updateNeedActivate(std::set<int>& alwaysActive);
   void removeConnection();
   void allocArrayVal();
   Node* clockAlias();
