@@ -972,7 +972,15 @@ struct ChirrtlVistor {
     return ret;
   }
 
-  static void createConnectCommon(Node* ref, ASTExpTree* exp, bool addIndexChild, const std::string& indexValue = "0") {
+  static ASTExpTree * createInvalid() {
+    auto *ret = new ASTExpTree(false);
+    ret->setOp(OP_INVALID);
+    return ret;
+  }
+
+  enum class ConnectType { Invalid = 0, Empty, Zero };
+
+  static void createConnectCommon(Node* ref, ASTExpTree* exp, bool addIndexChild, const std::string& indexValue = "0", ConnectType Type = ConnectType::Invalid) {
     stmtsNodes.insert(ref);
 
     std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree * valTree, int depth);
@@ -986,7 +994,25 @@ struct ChirrtlVistor {
     if (addIndexChild) from->addChild(allocIntIndex(indexValue));
 
     if (whenNode) {
-      whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getExpRoot());
+      auto idx = whenTrace.back().first ? 1 : 2;
+      whenNode->setChild(idx, exp->getExpRoot());
+
+      switch (Type) {
+        case ConnectType::Invalid: {
+          auto invalid = createInvalid();
+          whenNode->setChild(++idx, invalid->getExpRoot());
+          break;
+        }
+
+        case ConnectType::Empty: break;
+
+        case ConnectType::Zero: {
+          auto zero = Builder::createZero();
+
+          whenNode->setChild(++idx, zero->getExpRoot());
+          break;
+        }
+      }
     } else {
       valTree->setRoot(exp->getExpRoot());
     }
@@ -994,16 +1020,27 @@ struct ChirrtlVistor {
     ref->valTree = valTree;
   }
 
-  static void createConnect(Node* ref, ASTExpTree* exp) { createConnectCommon(ref, exp, false); }
+  static void createConnect(Node* ref, ASTExpTree* exp, ConnectType Type = ConnectType::Invalid) {
+    createConnectCommon(ref, exp, false, "0", Type);
+  }
 
-  static void createIdxConnect(Node* ref, ASTExpTree* exp, const std::string& indexValue) {
-    createConnectCommon(ref, exp, true, indexValue);
+  static void createIdxConnect(Node* ref, ASTExpTree* exp, const std::string& indexValue,
+                               ConnectType Type = ConnectType::Invalid) {
+    createConnectCommon(ref, exp, true, indexValue, Type);
   }
 
   struct Builder {
     static ASTExpTree* createEnable() {
       ASTExpTree* ret = new ASTExpTree(false);
       ret->getExpRoot()->strVal = "1";
+      ret->setType(1, false);
+      ret->setOp(OP_INT);
+      return ret;
+    }
+
+    static ASTExpTree* createZero() {
+      ASTExpTree* ret = new ASTExpTree(false);
+      ret->getExpRoot()->strVal = "0";
       ret->setType(1, false);
       ret->setOp(OP_INT);
       return ret;
@@ -1069,13 +1106,13 @@ struct ChirrtlVistor {
     // Create Addr connect
     // e.g.
     //    connect array.MPORT.addr, _T_2
-    createConnect(addr, Addr);
+    createConnect(addr, Addr, ConnectType::Invalid);
 
     // Create Access Enable
     // e.g.
     //    Connect array.MPORT.en, UInt<1>(1)
     auto* enableRef = Builder::createEnable();
-    createConnect(en, enableRef);
+    createConnect(en, enableRef, ConnectType::Zero);
 
     // Create Access Clock
     // e.g.
@@ -1094,9 +1131,9 @@ struct ChirrtlVistor {
     //    Connect array.MPORT.mask[0], UInt<1>(1)
     if (write) {
       auto* maskRef = Builder::createMask();
-      for (int i = 0; i < depth; ++i) createIdxConnect(mask, maskRef, std::to_string(i));
+      for (int i = 0; i < depth; ++i) createIdxConnect(mask, maskRef, std::to_string(i), ConnectType::Zero);
 
-      createConnect(mask, maskRef);
+      createConnect(mask, maskRef, ConnectType::Zero);
     }
   }
 };
