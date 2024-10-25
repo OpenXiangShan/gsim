@@ -326,14 +326,25 @@ ASTExpTree* allocIndex(graph* g, PNode* expr) {
   return exprTree;
 }
 
+static std::string removePrefix(const std::string& str) {
+  auto pos = str.find('$');
+  return (pos != std::string::npos) ? str.substr(pos + 1) : str;
+}
+
 static Node* findChirrtlRef(std::string& Name) {
   Node* ret = nullptr;
 
   if (!haveChirrtl) return ret;
 
+  // In CHIRRTL, the port ownership is not explicitly known, for example:
+  //     connect MPORT[0], wdata[0]
+  // In this function, the name appears as `btb$MPORT`, but its origin is actually `btb$array$MPORT`.
+  // Therefore, we remove the module prefix and proceed with the search.
+  auto RawPortname = removePrefix(Name);
+
   for (const auto& [key, value] : allSignals) {
     auto isMem = value->type == NODE_MEM_MEMBER;
-    if (key.starts_with(Name + "$") && isMem)
+    if (key.find("$" + RawPortname + "$") != key.npos && isMem)
 
       if (key.find("$$data") != std::string::npos) {
         ret = value;
@@ -1109,12 +1120,11 @@ static Node* visitChirrtlPort(PNode* port, int width, int depth, bool sign, std:
 static void visitChirrtlMemPort(graph* g, PNode* port) {
   // If we are in the top module, 
   //    the memory name does not need to have the prefix added.
-  auto fixName = [&](std::string Name) {
-    return prefixTrace.empty() ? Name : topPrefix() + SEP_MODULE + Name;
-  };
+  auto fixName = [&](std::string Name) { return prefixTrace.empty() ? Name : topPrefix() + SEP_MODULE + Name; };
+  auto* addr = visitReference(g, port->getChild(0));
 
-  auto memName = fixName(port->getExtra(0));
-  auto *addr = visitReference(g, port->getChild(0));
+  prefix_append(SEP_MODULE, port->getExtra(0));
+  auto memName = topPrefix();
 
   // Find existing memory by name
   auto* Mem = ChirrtlVistor::findMemory(g, memName);
@@ -1127,7 +1137,7 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
   auto* portNode = visitChirrtlPort(port, width, depth, sign, "", Mem);
   Mem->add_member(portNode);
   for (auto* Member : portNode->member) {
-    std::cout << "Add signal: " << Member->name << " Depth: " << Member->whenDepth << std::endl;
+    // std::cout << "Add signal: " << Member->name << " Depth: " << Member->whenDepth << std::endl;
     // There is no need to call addSignal
     //    we dont want assignment whenDepth.
     allSignals[Member->name] = Member;
@@ -1135,6 +1145,7 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
 
   auto portName = fixName(port->name);
   ChirrtlVistor::createAccess(portName, addr, port->type == P_WRITE, Mem->dimension.size());
+  prefix_pop();
 }
 
 // TODO: Comb memory support
