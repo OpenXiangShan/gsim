@@ -9,13 +9,13 @@ class graph {
   FILE* genHeaderStart(std::string headerFile);
   FILE* genSrcStart(std::string name);
   void genNodeDef(FILE* fp, Node* node);
-  void genNodeInsts(FILE* fp, Node* node);
+  void genNodeInsts(FILE* fp, Node* node, std::string flagName);
   void genInterfaceInput(FILE* fp, Node* input);
   void genInterfaceOutput(FILE* fp, Node* output);
   void genStep(FILE* fp);
   void genHeaderEnd(FILE* fp);
   void genSrcEnd(FILE* fp);
-  void genNodeStepStart(FILE* fp, SuperNode* node, uint64_t mask, int idx);
+  void genNodeStepStart(FILE* fp, SuperNode* node, uint64_t mask, int idx, std::string flagName);
   void genNodeStepEnd(FILE* fp, SuperNode* node);
   void genNodeInit(FILE* fp, Node* node);
   void genMemInit(FILE* fp, Node* node);
@@ -46,6 +46,11 @@ class graph {
   void orderAllNodes();
   void genDiffSig(FILE* fp, Node* node);
   void removeDeadReg();
+  void graphCoarsen();
+  void graphInitPartition();
+  void graphRefine();
+  void resort();
+  void detectSortedSuperLoop();
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;
@@ -94,6 +99,7 @@ class graph {
   void perfAnalysis();
   void exprOpt();
   void patternDetect();
+  void graphPartition();
   void dump(std::string FileName);
 };
 

@@ -1759,6 +1759,7 @@ valInfo* Node::compute() {
       break;
     }
   }
+  for (size_t i = 0; i < assignTree.size(); i ++) ops += assignTree[i]->getRoot()->computeInfo->opNum >= 0 ? assignTree[i]->getRoot()->computeInfo->opNum : 1000;
   fullyUpdated = updated;
   if (!ret) ret = assignTree.back()->getRoot()->compute(this, name, isRoot)->dup();
   Assert(ret, "empty info in %s\n", name.c_str());
@@ -2004,6 +2005,8 @@ valInfo* Node::computeArray() {
         TODO();
       }
   }
+  for (size_t i = 0; i < assignTree.size(); i ++) ops += assignTree[i]->getRoot()->computeInfo->opNum >= 0 ? assignTree[i]->getRoot()->computeInfo->opNum : 1000;
+  for (size_t i = 0; i < arrayVal.size(); i ++) ops += arrayVal[i]->getRoot()->computeInfo->opNum >= 0 ? arrayVal[i]->getRoot()->computeInfo->opNum : 1000;
   bool updated = false;
   for (size_t i = 0; i < assignTree.size(); i ++) {
     if (assignTree[i]->getRoot()->computeInfo->fullyUpdated) {

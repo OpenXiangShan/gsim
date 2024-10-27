@@ -209,8 +209,11 @@ bool Node::anyExtEdge() {
   return false;
 }
 
-bool Node::needActivate() {
+bool Node::anyNextActive() {
   return nextActiveId.size() != 0;
+}
+bool Node::needActivate() {
+  return nextNeedActivate.size() != 0;
 }
 
 void Node::updateActivate() {
@@ -228,6 +231,14 @@ void Node::updateActivate() {
     for (Node* nextNode : getSrc()->next) {
       if (nextNode->super->cppId != -1)
         nextActiveId.insert(nextNode->super->cppId);
+    }
+  }
+}
+
+void Node::updateNeedActivate(std::set<int>& alwaysActive) {
+  for (int id : nextActiveId) {
+    if (alwaysActive.find(id) == alwaysActive.end()) {
+      nextNeedActivate.insert(id);
     }
   }
 }
