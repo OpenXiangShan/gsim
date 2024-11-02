@@ -1,4 +1,4 @@
-BUILD_DIR = build
+BUILD_DIR ?= build
 GSIM_BUILD_DIR = $(BUILD_DIR)/gsim
 EMU_BUILD_DIR = $(BUILD_DIR)/emu
 PGO_BUILD_DIR = $(BUILD_DIR)/pgo
@@ -7,13 +7,13 @@ PARSER_DIR = parser
 LEXICAL_NAME = lexical
 SYNTAX_NAME = syntax
 PARSER_BUILD = $(PARSER_DIR)/build
-FIRRTL_VERSION = 
+FIRRTL_VERSION =
 $(shell mkdir -p $(PARSER_BUILD))
 LLVM_PROFDATA := llvm-profdata
 
 INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 
-OBJ_DIR = obj
+OBJ_DIR = $(BUILD_DIR)/obj
 $(shell mkdir -p $(OBJ_DIR))
 
 dutName ?= boom
@@ -96,6 +96,14 @@ PARSER_SRCS := $(addprefix $(PARSER_BUILD)/, $(addsuffix $(FIRRTL_VERSION).cc, $
 PARSER_OBJS := $(PARSER_SRCS:.cc=.o)
 HEADERS := $(foreach x, $(INCLUDE_DIR), $(wildcard $(addprefix $(x)/*,.h)))
 
+# Pass from outside Design or internal Default
+ifdef GSIM_TARGET
+target = $(GSIM_TARGET)
+endif
+GSIM_CXXFILES ?= $(EMU_DIFFTEST)
+GSIM_CXXFLAGS ?= $(MODE_FLAGS) -DDUTNAME=\"$(dutName)\"
+GSIM_LDFLAGS  ?=
+
 VERI_INC_DIR = $(OBJ_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME) --max-num-width 1048576 --compiler clang # --trace-fst
 VERI_CFLAGS = $(addprefix -I../, $(VERI_INC_DIR)) $(MODE_FLAGS) -fbracket-depth=2048 -Wno-parentheses-equality
@@ -103,7 +111,7 @@ VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Sy
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = $(TEST_FILE).sv
 VERI_VSRCS += $(addprefix ready-to-run/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v DifftestMemInitializer.v)
-VERI_CSRCS = $(shell find $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIFFTEST) $(shell find $(OBJ_DIR)/$(NAME) -name "*.cpp")
+VERI_CSRCS = $(GSIM_CXXFILES) $(shell find $(EMU_SRC_DIR) -name "*.cpp") $(shell find $(OBJ_DIR)/$(NAME) -name "*.cpp")
 VERI_HEADER = $(OBJ_DIR)/$(NAME).h
 VERI_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(VERI_CSRCS:.cpp=.o))
 
@@ -114,7 +122,7 @@ REF_GSIM_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(REF_GSIM_SRCS:.cpp=.o))
 GSIM_CFLAGS = $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME) -DMOD_HEADER=\"$(NAME).h\" -fbracket-depth=2048 \
 			-Wno-parentheses-equality -DDUTNAME=\"$(dutName)\"# -pg #-ggdb
 
-OPT_FAST = 
+OPT_FAST =
 
 ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
@@ -124,25 +132,25 @@ ifeq ($(PERF),1)
 	CXXFLAGS += -DPERF
 	GSIM_CFLAGS += -DPERF -DACTIVE_FILE=\"logs/active-$(dutName).txt\" -O0 -Wno-format
 	MODE_FLAGS += -DGSIM
-	target = $(EMU_BUILD_DIR)/S$(NAME)
+	target ?= $(EMU_BUILD_DIR)/S$(NAME)
 else ifeq ($(MODE),0)
 	MODE_FLAGS += -DGSIM
-	target = $(EMU_BUILD_DIR)/S$(NAME)
+	target ?= $(EMU_BUILD_DIR)/S$(NAME)
 	GSIM_CFLAGS += -O3 -Wno-format $(PGO_CFLAGS)
 else ifeq ($(MODE), 1)
 	MODE_FLAGS += -DVERILATOR
-	target = ./obj_dir/V$(NAME)
+	target ?= ./obj_dir/V$(NAME)
 	VERI_CSRCS = $(EMU_DIFFTEST)
 	VERI_CFLAGS += -O3
 	OPT_FAST += -O3
 else ifeq ($(MODE), 2)
 	MODE_FLAGS += -DGSIM -DVERILATOR
 	CXXFLAGS += -DDIFFTEST_PER_SIG -DVERILATOR_DIFF
-	target = ./obj_dir/V$(NAME)
+	target ?= ./obj_dir/V$(NAME)
 	SIG_COMMAND = python3 scripts/sigFilter.py $(NAME)
 else
 	MODE_FLAGS += -DGSIM -DGSIM_DIFF
-	target = $(EMU_BUILD_DIR)/S$(NAME)_diff
+	target ?= $(EMU_BUILD_DIR)/S$(NAME)_diff
 	CXXFLAGS += -DDIFFTEST_PER_SIG -DGSIM_DIFF
 	GSIM_CFLAGS += -O0
 	GSIM_CFLAGS += -I$(REF_GSIM_DIR) -DREF_NAME=Diff$(NAME)
@@ -166,10 +174,10 @@ makedir:
 
 compile: $(TARGET)
 	$(GSIM_BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
-	-rm -rf obj/$(NAME)
-	mkdir -p obj/$(NAME)
+	-rm -rf $(OBJ_DIR)/$(NAME)
+	mkdir -p $(OBJ_DIR)/$(NAME)
 	$(SIG_COMMAND)
-	python ./scripts/partition.py obj/$(NAME).cpp obj/$(NAME)
+	python ./scripts/partition.py $(OBJ_DIR)/$(NAME).cpp $(OBJ_DIR)/$(NAME)
 
 clean:
 	rm -rf obj parser/build obj_dir build
@@ -198,6 +206,9 @@ $(EMU_BUILD_DIR)/S$(NAME): $(VERI_OBJS)
 $(EMU_BUILD_DIR)/S$(NAME)_diff: $(VERI_OBJS) $(REF_GSIM_OBJS)
 	echo $(REF_GSIM_OBJS)
 	$(CXX) $^ $(GSIM_CFLAGS) -lgmp -o $@
+
+$(GSIM_TARGET): $(VERI_OBJS)
+	$(CXX) $^ $(GSIM_CFLAGS) $(GSIM_LDFLAGS) -lgmp -o $@
 
 ./obj_dir/V$(NAME): $(VERI_CSRCS) $(VERI_VSRCS) Makefile
 	verilator $(VERI_VFLAGS) +define+RANDOMIZE_GARBAGE_ASSIGN -O3 -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
