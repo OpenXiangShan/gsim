@@ -630,6 +630,9 @@ public:
   operator uint128_t () {
     return (uint128_t)u512_0.u256_0;
   }
+  operator uint256_t() {
+    return (uint256_t)u512_0.u256_0;
+  }
   operator uint512_t() {
     return u512_0;
   }
