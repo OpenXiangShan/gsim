@@ -382,15 +382,13 @@ public:
   void addChildSameTree(ASTExpTree* child) {
     Assert(!child->isAggr(), "require normal");
     if (isAggr()) {
-        for (size_t i = 0; i < aggrForest.size(); i++) {
-          aggrForest[i].first->addChild(child->getExpRoot());
-        }
-      }
-      else expRoot->addChild(child->getExpRoot());
+      for (size_t i = 0; i < aggrForest.size(); i++) aggrForest[i].first->addChild(child->getExpRoot()->dup());
+    }
+    else expRoot->addChild(child->getExpRoot());
   }
   void addChild(ENode* child) {
     if (isAggr()) {
-      for (auto entry : aggrForest) entry.first->addChild(child);
+      for (auto entry : aggrForest) entry.first->addChild(child->dup());
     } else {
       expRoot->addChild(child);
     }
