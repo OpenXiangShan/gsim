@@ -584,6 +584,9 @@ valInfo* ENode::instsSub(Node* node, std::string lvalue, bool isRoot) {
         int extendedWidth = widthBits(ChildInfo(0, width));
         int shiftBits = extendedWidth - ChildInfo(1, width);
         rstr = format("((%s%s%s << %d) >> %d)", Cast(ChildInfo(0, width), true).c_str(), Cast(ChildInfo(1, width), true).c_str(), rstr.c_str(), shiftBits, shiftBits);
+      } else {
+        lstr = format("%s%s", Cast(ChildInfo(0, width), sign).c_str(), lstr.c_str());
+        rstr = format("%s%s", Cast(ChildInfo(1, width), sign).c_str(), rstr.c_str());
       }
     }
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " - " + rstr + ")";
