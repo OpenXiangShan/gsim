@@ -9,9 +9,20 @@
 class uint512_t;
 class uint1024_t;
 class uint2048_t;
+template<int _dataNum> class wide_t;
 
 #define MAX(a, b) ((a >= b) ? a : b)
 #define MIN(a, b) ((a >= b) ? b : a)
+
+template<int A, int B>
+struct max_of {
+    static constexpr auto value = A > B ? A : B;
+};
+
+template<int A, int B>
+struct min_of {
+    static constexpr auto value  = A < B ? A : B;
+};
 
 #define SUPPORT_U256 true
 #if SUPPORT_U256
@@ -208,6 +219,10 @@ public:
   int128_t s128_1;
   uint128_t u128_0;
   int256_t() {}
+  int256_t(long val) {
+    u128_0 = val;
+    s128_1 = 0;
+  }
   int256_t(uint64_t val) {
     u128_0 = val;
     s128_1 = 0;
@@ -407,6 +422,10 @@ public:
     u256_0 = data.u256_0;
   }
   void operator = (uint1024_t data);
+  template<int num> void operator = (wide_t<num> a) {
+    u256_0 = (uint256_t)a.data[3] << 192 | (uint256_t)a.data[2] << 128 | (uint256_t)a.data[1] << 64 | (uint256_t)a.data[0];
+    u256_1 = (uint256_t)a.data[7] << 192 | (uint256_t)a.data[6] << 128 | (uint256_t)a.data[5] << 64 | (uint256_t)a.data[4];
+  }
   bool operator == (uint512_t b) {
     return u256_1 == b.u256_1 && u256_0 == b.u256_0;
   }
@@ -452,6 +471,9 @@ public:
                     (u256_0 >> shiftNum) | (u256_1 << (256 - shiftNum)));
     return ret;
   }
+  uint512_t operator >> (uint32_t shiftNum) {
+    return *this >> (int)shiftNum;
+  }
   uint512_t operator & (uint512_t a) {
     uint512_t ret;
     ret.u256_1 = u256_1 & a.u256_1;
@@ -473,6 +495,18 @@ public:
   uint256_t operator & (uint256_t a) {
     return u256_0 & a;
   }
+  uint512_t operator | (uint32_t a) {
+    uint512_t ret;
+    ret.u256_1 = u256_1;
+    ret.u256_0 = u256_0 | a;
+    return ret;
+  }
+  uint512_t operator | (uint64_t a) {
+    uint512_t ret;
+    ret.u256_1 = u256_1;
+    ret.u256_0 = u256_0 | a;
+    return ret;
+  }
   uint512_t operator | (uint128_t a) {
     uint512_t ret;
     ret.u256_1 = u256_1;
@@ -490,6 +524,10 @@ public:
     ret.u256_1 = u256_1 | a.u256_1;
     ret.u256_0 = u256_0 | a.u256_0;
     return ret;
+  }
+  void operator |= (uint512_t a) {
+    u256_1 |= a.u256_1;
+    u256_0 |= a.u256_0;
   }
   uint512_t operator ^ (uint512_t a) {
     uint512_t ret;
@@ -511,6 +549,7 @@ public:
   }
   uint128_t tail128(int n);
   uint256_t tail256(int n);
+  uint512_t tail512(int n) {return tail(n);}
   uint512_t tail(int n);
   uint128_t bits128(int hi, int lo);
   uint256_t bits256(int hi, int lo);
@@ -667,6 +706,10 @@ public:
     u1024_0 = val;
     u1024_1 = 0;
   }
+  uint2048_t(uint1024_t val) {
+    u1024_0 = val;
+    u1024_1 = 0;
+  }
   uint2048_t(uint64_t* val) { // construct from array
     u1024_0 = 0;
     u1024_1 = 0;
@@ -781,12 +824,35 @@ public:
     for (int i = 1; i < dataNum; i++) data[i] = 0;
     data[0] = val;
   }
+  wide_t(uint128_t val) {
+    for (int i = 2; i < dataNum; i++) data[i] = 0;
+    data[0] = val;
+    data[1] = val >> 64;
+  }
   wide_t(uint256_t val) {
     for (int i = 4; i < dataNum; i++) data[i] = 0;
     data[0] = val;
     data[1] = val >> 64;
     data[2] = val >> 128;
-    data[3] = val >> 196;
+    data[3] = val >> 192;
+  }
+  wide_t(uint512_t val) {
+    for (int i = 8; i < dataNum; i++) data[i] = 0; // TODO: optimize using pointer
+    data[0] = val.u256_0;
+    data[1] = val.u256_0 >> 64;
+    data[2] = val.u256_0 >> 128;
+    data[3] = val.u256_0 >> 192;
+    data[4] = val.u256_1;
+    data[5] = val.u256_1 >> 64;
+    data[6] = val.u256_1 >> 128;
+    data[7] = val.u256_1 >> 192;
+  }
+
+  wide_t(uint2048_t val) {
+    for (int i = 32; i < dataNum; i++) data[i] = 0;
+    for (int i = 0; i < 32; i ++) {
+      data[i] = (uint64_t)(val >> (i * 64));
+    }
   }
   wide_t<_dataNum> operator << (int shiftNum) {
     wide_t<_dataNum> ret;
@@ -818,7 +884,7 @@ public:
 
     // fully shift
     memcpy(ret.data, data + full_shifts, (dataNum - full_shifts) * sizeof(uint64_t));
-    memset(ret.data + (dataNum - full_shifts) * sizeof(uint64_t), 0, full_shifts);
+    memset(ret.data + dataNum - full_shifts, 0, full_shifts * sizeof(uint64_t));
 
     // partial shift
     if (bit_shift > 0) {
@@ -833,8 +899,8 @@ public:
     return ret;
   }
   template<int num1> wide_t<_dataNum> operator & (wide_t<num1> a) {
-    wide_t<_dataNum> ret;
-    for (int i = 0; i < dataNum; i++) {
+    wide_t<_dataNum> ret = 0;
+    for (int i = 0; i < MIN(dataNum, num1); i++) {
       ret.data[i] = data[i] & a.data[i];
     }
     return ret;
@@ -845,16 +911,42 @@ public:
   uint64_t operator & (int a) {
     return data[0] & a;
   }
+  uint512_t operator & (uint512_t a) {
+    uint512_t ret;
+    ret.u256_0 = (uint256_t)data[3] << 192 | (uint256_t)data[2] << 128 | (uint256_t)data[1] << 64 | (uint256_t)data[0];
+    ret.u256_1 = (uint256_t)data[7] << 192 | (uint256_t)data[6] << 128 | (uint256_t)data[5] << 64 | (uint256_t)data[4];
+    ret.u256_0 &= a.u256_0;
+    ret.u256_1 &= a.u256_1;
+    return ret;
+  }
   template<int num1> wide_t<_dataNum> operator | (wide_t<num1> a) {
-    wide_t<_dataNum> ret;
-    for (int i = 0; i < dataNum; i++) {
+    wide_t<_dataNum> ret = *this;
+    for (int i = 0; i < MIN(dataNum, num1); i++) {
       ret.data[i] = data[i] | a.data[i];
     }
     return ret;
   }
+  wide_t<_dataNum> operator | (uint64_t a) {
+    wide_t<_dataNum> ret = *this;
+    ret.data[0] |= a;
+    return ret;
+  }
+  wide_t<_dataNum> operator | (uint512_t a) {
+    static_assert(_dataNum > 8, "width is not enough");
+    wide_t<_dataNum> ret = *this;
+    ret.data[0] = data[0] | (uint64_t)(a.u256_0); // TODO: optimize using pointer
+    ret.data[1] = data[1] | (uint64_t)(a.u256_0 >> 64);
+    ret.data[2] = data[2] | (uint64_t)(a.u256_0 >> 128);
+    ret.data[3] = data[3] | (uint64_t)(a.u256_0 >> 192);
+    ret.data[4] = data[4] | (uint64_t)(a.u256_1);
+    ret.data[5] = data[5] | (uint64_t)(a.u256_1 >> 64);
+    ret.data[6] = data[6] | (uint64_t)(a.u256_1 >> 128);
+    ret.data[7] = data[7] | (uint64_t)(a.u256_1 >> 192);
+    return ret;
+  }
   template<int num1> wide_t<_dataNum> operator ^ (wide_t<num1> a) {
-    wide_t<_dataNum> ret;
-    for (int i = 0; i < dataNum; i++) {
+    wide_t<_dataNum> ret = *this;
+    for (int i = 0; i < MIN(dataNum, num1); i++) {
       ret.data[i] = data[i] ^ a.data[i];
     }
     return ret;
@@ -893,8 +985,12 @@ public:
   operator uint64_t() {
     return data[0];
   }
+  operator uint128_t() {
+    uint256_t ret = (uint128_t)data[1] << 64 | data[0];
+    return ret;
+  }
   operator uint256_t() {
-    uint256_t ret = (uint256_t)data[0] << 192 | (uint256_t)data[1] << 128 | (uint256_t)data[2] << 64 | (uint256_t)data[3];
+    uint256_t ret = (uint256_t)data[3] << 192 | (uint256_t)data[2] << 128 | (uint256_t)data[1] << 64 | (uint256_t)data[0];
     return ret;
   }
   operator uint1024_t() {
@@ -915,7 +1011,7 @@ public:
   wide_t<_dataNum> tail(int n) {
     wide_t<_dataNum> ret;
     int fullNum = n / 64;
-    int shiftNum = 64 - n % 64;
+    int shiftNum = (64 - n % 64) % 64;
     for (int i = 0; i < fullNum; i++) {
       ret.data[i] = data[i];
     }
@@ -931,8 +1027,79 @@ public:
     }
     return ret;
   }
-  void displayn() {
+  uint128_t tail128(int n) {
+    uint128_t ret = (uint128_t)data[1] << 64 | data[0];
+    int shiftNum = 128 - n;
+    return ret << shiftNum >> shiftNum;
+  }
+  uint512_t tail512(int n) {
+    uint512_t ret;
+    ret.u256_0 = (uint256_t)data[3] << 192 | (uint256_t)data[2] << 128 | (uint256_t)data[1] << 64 | (uint256_t)data[0];
+    ret.u256_1 = (uint256_t)data[7] << 192 | (uint256_t)data[6] << 128 | (uint256_t)data[5] << 64 | (uint256_t)data[4];
+    // ret.u256_0 = *(uint256_t*)data[0];
+    // ret.u256_1 = *(uint256_t*)data[4];
+    int shiftNum = 512 - n;
+    return ret << shiftNum >> shiftNum;
+  }
+  uint128_t bits128(int hi, int lo) {
+    uint128_t ret = 0;
+    int offset = 0;
+    int width = hi - lo + 1;
+    int idx = lo / 64;
+    while (offset != width) {
+      int range_lo = (lo + offset) % 64;
+      int range_hi = MIN(63, width - offset + range_lo - 1);
+      uint64_t mask = range_hi == 63 ? (uint64_t)0xffffffffffffffff : (((uint64_t)1 << (range_hi + 1)) - 1);
+      /* clear high */
+      uint64_t seg = (data[idx] & mask) >> range_lo;
+      ret |= (uint128_t)seg << offset;
+      int segWidth = range_hi - range_lo + 1;;
+      offset += segWidth;
+      idx ++;
+    }
+    return ret;
+  }
+  uint256_t bits256(int hi, int lo) {
+    uint256_t ret = 0;
+    int offset = 0;
+    int width = hi - lo + 1;
+    int idx = lo / 64;
+    while (offset != width) {
+      int range_lo = (lo + offset) % 64;
+      int range_hi = MIN(63, width - offset + range_lo - 1);
+      uint64_t mask = range_hi == 63 ? 0xffffffffffffffff : ((1 << (range_hi + 1)) - 1);
+      /* clear high */
+      uint64_t seg = (data[idx] & mask) >> range_lo;
+      ret |= (uint256_t)seg << offset;
+      int segWidth = range_hi - range_lo + 1;;
+      offset += segWidth;
+      idx ++;
+    }
+    return ret;
+  }
+  uint512_t __attribute__ ((noinline)) bits512(int hi, int lo) {
+    uint512_t ret = 0;
+    int offset = 0;
+    int width = hi - lo + 1;
+    int idx = lo / 64;
+    while (offset != width) {
+      int range_lo = (lo + offset) % 64;
+      int range_hi = MIN(63, width - offset + range_lo - 1);
+      uint64_t mask = range_hi == 63 ? 0xffffffffffffffff : ((1 << (range_hi + 1)) - 1);
+      /* clear high */
+      uint64_t seg = (data[idx] & mask) >> range_lo;
+      ret |= (uint512_t)seg << offset;
+      int segWidth = range_hi - range_lo + 1;;
+      offset += segWidth;
+      idx ++;
+    }
+    return ret;
+  }
+  void display() {
     for (int i = 0; i < dataNum; i ++) printf("%lx ", data[i]);
+  }
+  void displayn() {
+    display();
     printf("\n");
   }
 };
