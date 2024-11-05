@@ -1008,7 +1008,7 @@ valInfo* ENode::instsAsSInt(Node* node, std::string lvalue, bool isRoot) {
       if (shiftBits == 0)
         ret->valStr = format("(%s%s)", Cast(width, true).c_str(), ChildInfo(0, valStr).c_str(), shiftBits, shiftBits);
       else
-        ret->valStr = format("(%s(%s << %d) >> %d)", Cast(width, true).c_str(), ChildInfo(0, valStr).c_str(), shiftBits, shiftBits);
+        ret->valStr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(width, true).c_str(), ChildInfo(0, valStr).c_str(), shiftBits, shiftBits);
     }
     ret->opNum = ChildInfo(0, opNum) + 1;
   }
