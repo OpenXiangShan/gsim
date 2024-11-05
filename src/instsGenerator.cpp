@@ -807,7 +807,7 @@ valInfo* ENode::instsDshl(Node* node, std::string lvalue, bool isRoot) {
     u_dshl(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
   } else {
-    int castWidth = MAX(width, 1 << ChildInfo(1, width));
+    int castWidth = MAX(width, (1 << ChildInfo(1, width)) + 1);
     // int castWidth = ChildInfo(0, width) + (1 << ChildInfo(1, width)) - 1;
     if (ChildInfo(0, width) <= BASIC_WIDTH && width <= BASIC_WIDTH) {
       ret->valStr = format("(%s(%s%s << %s) & %s)", Cast(width, sign).c_str(), upperCast(castWidth, ChildInfo(0, width), sign).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), bitMask(width).c_str());
