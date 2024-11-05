@@ -867,7 +867,10 @@ valInfo* ENode::instsAnd(Node* node, std::string lvalue, bool isRoot) {
   } else if (ChildInfo(1, status) == VAL_CONSTANT && ChildInfo(0, width) == ChildInfo(1, width) && allOnes(ChildInfo(1, consVal), width)) {
     computeInfo = Child(0, computeInfo);
   } else {
-    ret->valStr = "(" + ChildInfo(0, valStr) + " & " + ChildInfo(1, valStr) + ")";
+    if (ChildInfo(0, width) >= ChildInfo(1, width))
+      ret->valStr = "(" + ChildInfo(0, valStr) + " & " + ChildInfo(1, valStr) + ")";
+    else
+      ret->valStr = "(" + ChildInfo(1, valStr) + " & " + ChildInfo(0, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   }
   return ret;
@@ -890,7 +893,10 @@ valInfo* ENode::instsOr(Node* node, std::string lvalue, bool isRoot) {
     ret->valStr = ChildInfo(0, valStr);
     ret->opNum = ChildInfo(0, opNum);
   } else {
-    ret->valStr = "(" + ChildInfo(0, valStr) + " | " + ChildInfo(1, valStr) + ")";
+    if (ChildInfo(0, width) >= ChildInfo(1, width))
+      ret->valStr = "(" + ChildInfo(0, valStr) + " | " + ChildInfo(1, valStr) + ")";
+    else
+      ret->valStr = "(" + ChildInfo(1, valStr) + " | " + ChildInfo(0, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   }
   return ret;
@@ -907,7 +913,10 @@ valInfo* ENode::instsXor(Node* node, std::string lvalue, bool isRoot) {
     u_xor(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
   } else {
-    ret->valStr = "(" + ChildInfo(0, valStr) + " ^ " + ChildInfo(1, valStr) + ")";
+    if (ChildInfo(0, width) >= ChildInfo(1, width))
+      ret->valStr = "(" + ChildInfo(0, valStr) + " ^ " + ChildInfo(1, valStr) + ")";
+    else
+      ret->valStr = "(" + ChildInfo(1, valStr) + " ^ " + ChildInfo(0, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   }
   return ret;
