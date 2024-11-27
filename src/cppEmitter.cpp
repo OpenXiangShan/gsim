@@ -602,48 +602,46 @@ void graph::genNodeStepStart(FILE* fp, SuperNode* node, uint64_t mask, int idx, 
   }
 }
 
-void graph::nodeDisplay(FILE* fp, SuperNode* super) {
+void graph::nodeDisplay(FILE* fp, Node* member) {
 #ifdef EMU_LOG
-  for (Node* member : super->member) {
-    if (member->status != VALID_NODE) continue;
-    fprintf(fp, "if (cycles >= %d && cycles <= %d) {\n", LOG_START, LOG_END);
-    if (member->dimension.size() != 0) {
-      fprintf(fp, "printf(\"%%ld %d %s: \", cycles);\n", super->cppId, member->name.c_str());
-      std::string idxStr, bracket;
-      for (size_t i = 0; i < member->dimension.size(); i ++) {
-        fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, member->dimension[i], i);
-        idxStr += "[i" + std::to_string(i) + "]";
-        bracket += "}\n";
-      }
-      std::string nameIdx = member->name + idxStr;
-      if (member->width > BASIC_WIDTH) {
-        fprintf(fp, "%s.displayn();\n", nameIdx.c_str());
-      } else if (member->width > 64) {
-        fprintf(fp, "printf(\"%%lx|%%lx \", (uint64_t)(%s >> 64), (uint64_t)(%s));", nameIdx.c_str(), nameIdx.c_str());
-      } else {
-        fprintf(fp, "printf(\"%%lx \", (uint64_t)(%s));", nameIdx.c_str());
-      }
-      fprintf(fp, "\n%s", bracket.c_str());
-      fprintf(fp, "printf(\"\\n\");\n");
-    } else if (member->width > BASIC_WIDTH) {
-      fprintf(fp, "printf(\"%%ld %d %s: \", cycles);\n", super->cppId, member->name.c_str());
-      fprintf(fp, "%s.displayn();\n", member->name.c_str());
-      fprintf(fp, "printf(\"\\n\");\n");
-    } else if (member->width > 64 && member->width <= BASIC_WIDTH) {
-      if (member->anyNextActive()) {// display old value and new value
-        fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t)(%s));", super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
-      } else if (member->type != NODE_SPECIAL) {
-        fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t)(%s));", super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
-      }
-    } else {
-      if (member->anyNextActive()) {// display old value and new value
-        fprintf(fp, "printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t)(%s));", super->cppId, member->name.c_str(), member->name.c_str());
-      } else if (member->type != NODE_SPECIAL) {
-        fprintf(fp, "printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t)(%s));", super->cppId, member->name.c_str(), member->name.c_str());
-      }
+    if (member->status != VALID_NODE) return;
+  fprintf(fp, "if (cycles >= %d && cycles <= %d) {\n", LOG_START, LOG_END);
+  if (member->dimension.size() != 0) {
+    fprintf(fp, "printf(\"%%ld %d %s: \", cycles);\n", member->super->cppId, member->name.c_str());
+    std::string idxStr, bracket;
+    for (size_t i = 0; i < member->dimension.size(); i ++) {
+      fprintf(fp, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, member->dimension[i], i);
+      idxStr += "[i" + std::to_string(i) + "]";
+      bracket += "}\n";
     }
-    fprintf(fp, "}\n");
+    std::string nameIdx = member->name + idxStr;
+    if (member->width > BASIC_WIDTH) {
+      fprintf(fp, "%s.displayn();\n", nameIdx.c_str());
+    } else if (member->width > 64) {
+      fprintf(fp, "printf(\"%%lx|%%lx \", (uint64_t)(%s >> 64), (uint64_t)(%s));", nameIdx.c_str(), nameIdx.c_str());
+    } else {
+      fprintf(fp, "printf(\"%%lx \", (uint64_t)(%s));", nameIdx.c_str());
+    }
+    fprintf(fp, "\n%s", bracket.c_str());
+    fprintf(fp, "printf(\"\\n\");\n");
+  } else if (member->width > BASIC_WIDTH) {
+    fprintf(fp, "printf(\"%%ld %d %s: \", cycles);\n", member->super->cppId, member->name.c_str());
+    fprintf(fp, "%s.displayn();\n", member->name.c_str());
+    fprintf(fp, "printf(\"\\n\");\n");
+  } else if (member->width > 64 && member->width <= BASIC_WIDTH) {
+    if (member->anyNextActive()) {// display old value and new value
+      fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
+    } else if (member->type != NODE_SPECIAL) {
+      fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
+    }
+  } else {
+    if (member->anyNextActive()) {// display old value and new value
+      fprintf(fp, "printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str());
+    } else if (member->type != NODE_SPECIAL) {
+      fprintf(fp, "printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str());
+    }
   }
+  fprintf(fp, "}\n");
 #endif
 }
 
@@ -652,7 +650,6 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
   fprintf(fp, "validActive[%d] += isActivateValid;\n", node->cppId);
 #endif
 
-  nodeDisplay(fp, node);
   if(node->superType != SUPER_SAVE_REG && !isAlwaysActive(node->cppId)) fprintf(fp, "}\n");
 }
 
@@ -687,6 +684,7 @@ void graph::genActivate(FILE* fp) {
       for (Node* n : super->member) {
         if (n->insts.size() == 0) continue;
         genNodeInsts(fp, n, flagName);
+        nodeDisplay(fp, n);
       }
       genNodeStepEnd(fp, super);
     }
