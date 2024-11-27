@@ -245,9 +245,11 @@ void srcUpdateDst(Node* node) {
     std::vector<std::string> newInsts;
     size_t start_pos = 0;
     for (std::string inst : node->insts) {
-      while((start_pos = inst.find(node->name, start_pos)) != std::string::npos) {
-        inst.replace(start_pos, node->name.length(), node->getDst()->name);
-        start_pos += node->name.length();
+      std::string replaceStr = node->name + " = ";
+      std::string newStr = node->getDst()->name + " = ";
+      while((start_pos = inst.find(replaceStr, start_pos)) != std::string::npos) {
+        inst.replace(start_pos, replaceStr.length(), newStr);
+        start_pos += replaceStr.length();
       }
       newInsts.push_back(inst);
     }
