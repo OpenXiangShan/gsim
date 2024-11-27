@@ -1185,7 +1185,7 @@ valInfo* ENode::instsPad(Node* node, std::string lvalue, bool isRoot) {
   if (!sign || (width <= ChildInfo(0, width))) {
     for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
     if (ChildInfo(0, opNum) >= 0 && widthBits(ChildInfo(0, width)) < width) {
-      computeInfo->valStr = format("(%s)%s", widthUType(width).c_str(), ChildInfo(0, valStr).c_str());
+      computeInfo->valStr = format("((%s)%s)", widthUType(width).c_str(), ChildInfo(0, valStr).c_str());
       computeInfo->opNum = ChildInfo(0, opNum) + 1;
     } else {
       computeInfo->valStr = ChildInfo(0, valStr);
