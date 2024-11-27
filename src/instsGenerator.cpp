@@ -1645,6 +1645,8 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->valStr = format("((%s%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
         computeInfo->opNum = 1;
         computeInfo->width = width;
+      } else if (sign) {
+        computeInfo->valStr = format("%s%s", Cast(width, true).c_str(), computeInfo->valStr.c_str());
       }
     } else if (!IS_INVALID_LVALUE(lvalue)) { // info->width > BASIC_WIDTH
       if (computeInfo->width > width) {
