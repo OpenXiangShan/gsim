@@ -9,6 +9,7 @@
 #include <fstream>
 #include <set>
 #include <csignal>
+#include <chrono>
 
 #if defined(GSIM)
 #include <SimTop.h>
@@ -153,8 +154,8 @@ int main(int argc, char** argv) {
     dut_end = true;
   });
   uint64_t cycles = 0;
-  clock_t start = clock();
-  clock_t prevTime = start;
+  auto start = std::chrono::system_clock::now();
+  auto prevTime = start;
 #ifdef PERF
   FILE* activeFp = fopen(ACTIVE_FILE, "w");
 #endif
@@ -174,10 +175,12 @@ int main(int argc, char** argv) {
     ref->step();
 #endif
     cycles ++;
-    if(cycles % 100000 == 0 && cycles <= max_cycles) {
-      clock_t now = clock();
-      clock_t dur = now - start;
-      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec / current %ld ) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur, 100000 * CLOCKS_PER_SEC / (now - prevTime));
+    if(cycles % 10000 == 0 && cycles <= max_cycles) {
+      auto now = std::chrono::system_clock::now();
+      auto dur = now - start;
+      auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
+      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec / current %ld ) \n", cycles,
+            msec.count(), cycles * 1000 / msec.count(), 100000 * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(now - prevTime).count());
       prevTime = now;
 #ifdef PERF
       fprintf(activeFp, "cycles: %ld\n", cycles);
@@ -219,8 +222,5 @@ int main(int argc, char** argv) {
       return 0;
     }
 #endif
-    if(dut_end) {
-      clock_t dur = clock() - start;
-    }
   }
 }

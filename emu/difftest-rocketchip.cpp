@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <fstream>
 #include <csignal>
+#include <chrono>
 
 #if defined(GSIM)
 #include <TestHarness.h>
@@ -147,7 +148,7 @@ int main(int argc, char** argv) {
 #ifdef PERF
   FILE* activeFp = fopen(ACTIVE_FILE, "w");
 #endif
-  clock_t start = clock();
+  auto start = std::chrono::system_clock::now();
   while(!dut_end) {
 #ifdef VERILATOR
     ref_cycle(1);
@@ -158,17 +159,20 @@ int main(int argc, char** argv) {
     cycles ++;
 #if (!defined(GSIM) && defined(VERILATOR)) || (defined(GSIM) && !defined(VERILATOR))
     if(cycles % 10000000 == 0 && cycles <= 70000000) {
-      clock_t dur = clock() - start;
-      fprintf(stderr, "cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+      auto dur = std::chrono::system_clock::now() - start;
+      auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
+      fprintf(stderr, "cycles %d (%d ms, %d per sec) \n", cycles, msec.count(), cycles * 1000 / msec.count());
 #ifdef PERF
       size_t totalActives = 0;
       size_t validActives = 0;
-      for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
+      size_t nodeActives = 0;
+      for (size_t i = 0; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
         totalActives += mod->activeTimes[i];
         validActives += mod->validActive[i];
+        nodeActives += mod->nodeNum[i] * mod->activeTimes[i];
       }
-      printf("totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
-          totalActives, totalActives / cycles, validActives, validActives / cycles);
+      printf("nodeNum %ld totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld nodeActive %ld\n",
+          nodeNum, totalActives, totalActives / cycles, validActives, validActives / cycles, nodeActives);
       fprintf(activeFp, "totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
           totalActives, totalActives / cycles, validActives, validActives / cycles);
       for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {

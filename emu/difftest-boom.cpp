@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <fstream>
 #include <csignal>
+#include <chrono>
 
 #if defined(GSIM)
 #include <TestHarness.h>
@@ -151,7 +152,7 @@ int main(int argc, char** argv) {
 #ifdef PERF
   FILE* activeFp = fopen(ACTIVE_FILE, "w");
 #endif
-  clock_t start = clock();
+  auto start = std::chrono::system_clock::now();
   while(!dut_end) {
 #ifdef VERILATOR
     ref_cycle(1);
@@ -161,9 +162,10 @@ int main(int argc, char** argv) {
 #endif
     cycles ++;
 #if (!defined(GSIM) && defined(VERILATOR)) || (defined(GSIM) && !defined(VERILATOR))
-    if(cycles % 10000000 == 0 && cycles <= 600000000) {
-      clock_t dur = clock() - start;
-      fprintf(stderr, "cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+    if(cycles % 10000000 == 0 && cycles <= 100000000) {
+      auto dur = std::chrono::system_clock::now() - start;
+      auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
+      fprintf(stderr, "cycles %d (%d ms, %d per sec) \n", cycles, msec.count(), cycles * 1000 / msec.count());
 #ifdef PERF
       size_t totalActives = 0;
       size_t validActives = 0;
@@ -180,7 +182,7 @@ int main(int argc, char** argv) {
       }
       if (cycles == 50000000) return 0;
 #endif
-      if (cycles == 600000000) return 0;
+      if (cycles == 100000000) return 0;
     }
 #endif
 #if defined(GSIM)
