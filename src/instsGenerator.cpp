@@ -1344,6 +1344,8 @@ void infoBits(valInfo* ret, ENode* enode, valInfo* childInfo) {
       if (enode->width <= 128) ret->valStr = format("%s.bits128(%d, %d)", childInfo->valStr.c_str(), hi, lo);
       else if (enode->width <= 256) {
         ret->valStr = format("%s.bits256(%d, %d)", childInfo->valStr.c_str(), hi, lo);
+      } else if (enode->width <= 512) {
+        ret->valStr = format("%s.bits512(%d, %d)", childInfo->valStr.c_str(), hi, lo);
       } else ret->valStr = format("%s.bits(%d, %d)", childInfo->valStr.c_str(), hi, lo);
     }
     ret->opNum = childInfo->opNum + 1;
