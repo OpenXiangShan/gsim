@@ -775,14 +775,15 @@ void graph::genMemWrite(FILE* fp) {
             indexStr += format("[i%ld]", i);
             bracket += "}\n";
           }
+          std::string wdataStr = port->member[WRITER_DATA]->computeInfo->status == VAL_CONSTANT ? port->member[WRITER_DATA]->computeInfo->valStr : port->member[WRITER_DATA]->computeInfo->valStr + indexStr;
           if (info_mask->status == VAL_CONSTANT && mpz_sgn(info_mask->consVal) != 0) {
-            fprintf(fp, "%s[%s]%s = %s%s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str(),
-                                                  port->member[WRITER_DATA]->computeInfo->valStr.c_str(), indexStr.c_str());
+            fprintf(fp, "%s[%s]%s = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str(),
+                                                  wdataStr.c_str());
 
           } else {
-            fprintf(fp, "if (%s%s) %s[%s]%s = %s%s;\n", port->member[WRITER_MASK]->computeInfo->valStr.c_str(), indexStr.c_str(),
+            fprintf(fp, "if (%s%s) %s[%s]%s = %s;\n", port->member[WRITER_MASK]->computeInfo->valStr.c_str(), indexStr.c_str(),
                                                   mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str(),
-                                                  port->member[WRITER_DATA]->computeInfo->valStr.c_str(), indexStr.c_str());
+                                                  wdataStr.c_str());
 
           }
           fprintf(fp, "%s", bracket.c_str());
