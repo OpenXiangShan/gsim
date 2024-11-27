@@ -100,6 +100,9 @@ class graph {
   void exprOpt();
   void patternDetect();
   void graphPartition();
+  void MFFCPartition();
+  void mergeEssentSmallSubling(int maxSize, double sim);
+  void essentPartition();
   void dump(std::string FileName);
 };
 
