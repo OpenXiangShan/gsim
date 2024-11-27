@@ -73,7 +73,7 @@ void ENode::passWidthToChild() {
       childBits.push_back(MIN(Child(1, width), usedBit));      
       break;
     case OP_CVT:
-      childBits.push_back(Child(0, sign) ? usedBit : usedBit - 1);
+      childBits.push_back(usedBit);
       break;
     case OP_ASCLOCK: case OP_ASASYNCRESET: case OP_ANDR:
     case OP_ORR: case OP_XORR: case OP_INDEX_INT: case OP_INDEX:
