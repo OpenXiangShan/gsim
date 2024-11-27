@@ -1121,7 +1121,7 @@ valInfo* ENode::instsAndr(Node* node, std::string lvalue, bool isRoot) {
     if (ChildInfo(0, width) <= BASIC_WIDTH)
       ret->valStr = "(" + ChildInfo(0, valStr) + " == " + bitMask(ChildInfo(0, width)) + ")";
     else
-      ret->valStr = format("%s.allOnes()", ChildInfo(0, valStr).c_str());
+      ret->valStr = format("%s.allOnes(%d)", ChildInfo(0, valStr).c_str(), width);
     ret->opNum = ChildInfo(0, opNum) + 1;
   }
   return ret;
