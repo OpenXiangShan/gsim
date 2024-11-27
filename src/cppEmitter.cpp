@@ -444,8 +444,8 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   if (definedNode.find(node) != definedNode.end()) return;
   definedNode.insert(node);
   fprintf(fp, "%s %s", widthUType(node->width).c_str(), node->name.c_str());
-  if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", upperPower2(node->depth));
-  for (int dim : node->dimension) fprintf(fp, "[%d]", upperPower2(dim));
+  if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", node->depth);
+  for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
   fprintf(fp, "; // width = %d\n", node->width);
   /* save reset registers */
   if (node->isReset() && node->type == NODE_REG_SRC) {
