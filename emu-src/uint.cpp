@@ -128,6 +128,18 @@ uint256_t uint512_t::bits256(int hi, int lo) {
   return ret;
 }
 
+uint512_t __attribute__ ((noinline)) uint512_t::bits512(int hi, int lo) {
+  uint512_t ret = *this;
+  /* clear high */
+  int lshiftBits = 512 - hi - 1;
+  int rshiftBits = lshiftBits + lo;
+  if(lshiftBits == 0) ret = *this;
+  else ret = *this << lshiftBits;
+  if (rshiftBits != 0) ret = ret >> rshiftBits;
+  return ret;
+}
+
+
 uint1024_t uint1024_t::tail(int n) {
   uint1024_t ret;
   if (n > 512) {
