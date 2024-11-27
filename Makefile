@@ -24,6 +24,7 @@ ifeq ($(dutName),ysyx3)
 	mainargs = ready-to-run/bin/bbl-hello.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = ready-to-run/$(NAME)
+	SUPER_BOUND ?= 20
 else ifeq ($(dutName),NutShell)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
@@ -36,12 +37,14 @@ else ifeq ($(dutName),rocket)
 	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = ready-to-run/$(NAME)
+	SUPER_BOUND ?= 20
 else ifeq ($(dutName),boom)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = ready-to-run/$(NAME).LargeBoomConfig
+	SUPER_BOUND ?= 35
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
@@ -54,12 +57,14 @@ else ifeq ($(dutName),xiangshan)
 	mainargs = ready-to-run/bin/linux-xiangshan.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = ready-to-run/$(NAME)-xiangshan
+	SUPER_BOUND ?= 35
 else ifeq ($(dutName),xiangshan-default)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
 	mainargs = ready-to-run/bin/linux-xiangshan.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = ready-to-run/$(NAME)-xiangshan-default
+	SUPER_BOUND ?= 35
 endif
 
 MODE ?= 0
@@ -69,7 +74,7 @@ EVENT_DRIVEN ?= 0
 
 
 CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror \
-	-DDST_NAME=\"$(NAME)\" -DEVENT_DRIVEN=$(EVENT_DRIVEN)
+	-DDST_NAME=\"$(NAME)\" -DEVENT_DRIVEN=$(EVENT_DRIVEN) -DSUPER_BOUND=$(SUPER_BOUND)
 CXX = clang++
 CCACHE := ccache
 TARGET = GraphEmu

@@ -8,7 +8,7 @@
 #include <map>
 #include <tuple>
 
-#define SUPER_BOUND 35
+// #define SUPER_BOUND 35
 
 void graph::resort() {
   std::map<SuperNode*, int>times;
