@@ -51,6 +51,10 @@ static void tmp_pop() {
 static std::priority_queue<Node*, std::vector<Node*>, ordercmp> recomputeQueue;
 static std::set<Node*> uniqueRecompute;
 
+static inline bool charInName(char c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '$';
+}
+
 static inline std::string tailName(int width) {
   if (width <= 128) return std::string("tail128");
   else if (width <= 256) return std::string("tail256");
@@ -246,11 +250,16 @@ void srcUpdateDst(Node* node) {
     std::vector<std::string> newInsts;
     size_t start_pos = 0;
     for (std::string inst : node->insts) {
-      std::string replaceStr = node->name + " = ";
-      std::string newStr = node->getDst()->name + " = ";
+      std::string replaceStr = node->name;
+      std::string newStr = node->getDst()->name;
       while((start_pos = inst.find(replaceStr, start_pos)) != std::string::npos) {
-        inst.replace(start_pos, replaceStr.length(), newStr);
-        start_pos += replaceStr.length();
+        size_t next_pos = start_pos + replaceStr.length();
+        if (next_pos < inst.length() && charInName(inst[next_pos])) { // prefix
+          start_pos += replaceStr.length();
+        } else {
+          inst.replace(start_pos, replaceStr.length(), newStr);
+          start_pos += newStr.length();
+        }
       }
       newInsts.push_back(inst);
     }
