@@ -304,16 +304,25 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
       if (MUX_OPT) {
         ret->valStr = format("((%s & %s) | ((!%s) & %s))", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
       } else {
-        ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
+        std::string trueStr = ChildInfo(1, valStr);
+        std::string falseStr = ChildInfo(2, valStr);
+        if (ChildInfo(1, status) == VAL_CONSTANT) trueStr = format("%s%s", Cast(width, sign).c_str(), trueStr.c_str());
+        if (ChildInfo(2, status) == VAL_CONSTANT) falseStr = format("%s%s", Cast(width, sign).c_str(), falseStr.c_str());
+        ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + trueStr + " : " + falseStr + ")";
       }
     }
   } else {
     if (MUX_OPT && ChildInfo(0, opNum) <= 1 && ChildInfo(1, opNum) <= 1  && ChildInfo(2, opNum) <= 1 && width <= BASIC_WIDTH) {
       ret->valStr = format("((-(%s)%s & %s) | ((-(%s)!%s) & %s))", widthUType(width).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), widthUType(width).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
     } else {
-      ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + ChildInfo(1, valStr) + " : " + ChildInfo(2, valStr) + ")";
+      std::string trueStr = ChildInfo(1, valStr);
+      std::string falseStr = ChildInfo(2, valStr);
+      if (ChildInfo(1, status) == VAL_CONSTANT) trueStr = format("%s%s", Cast(width, sign).c_str(), trueStr.c_str());
+      if (ChildInfo(2, status) == VAL_CONSTANT) falseStr = format("%s%s", Cast(width, sign).c_str(), falseStr.c_str());
+      ret->valStr = "(" + ChildInfo(0, valStr) + " ? " + trueStr + " : " + falseStr + ")";
     }
   }
+
   return ret;
 }
 
@@ -546,15 +555,17 @@ valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
     std::string lstr = ChildInfo(0, valStr);
     std::string rstr = ChildInfo(1, valStr);
     if (sign) { // signed extension
-      if(ChildInfo(0, width) < ChildInfo(1, width) && ChildInfo(0, status) != VAL_CONSTANT) {
-        int extendedWidth = widthBits(ChildInfo(1, width));
-        int shiftBits = extendedWidth - ChildInfo(0, width);
-        lstr = format("((%s%s%s << %d) >> %d)", Cast(ChildInfo(1, width), true).c_str(), Cast(ChildInfo(0, width), true).c_str(), lstr.c_str(), shiftBits, shiftBits);
-      } else if (ChildInfo(0, width) > ChildInfo(1, width) && ChildInfo(1, status) != VAL_CONSTANT) {
-        int extendedWidth = widthBits(ChildInfo(0, width));
-        int shiftBits = extendedWidth - ChildInfo(1, width);
-        rstr = format("((%s%s%s << %d) >> %d)", Cast(ChildInfo(0, width), true).c_str(), Cast(ChildInfo(1, width), true).c_str(), rstr.c_str(), shiftBits, shiftBits);
-      }
+      int width = MAX(ChildInfo(0, width), ChildInfo(1, width));
+      int lshiftBits = widthBits(width) - ChildInfo(0, width);
+      if (lshiftBits == 0 || ChildInfo(0, status) == VAL_CONSTANT)
+        lstr = format("%s%s", Cast(ChildInfo(0, width), sign).c_str(), lstr.c_str());
+      else
+        lstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(0, width), true).c_str(), lstr.c_str(), lshiftBits, lshiftBits);
+      int rshiftBits = widthBits(width) - ChildInfo(1, width);
+      if(rshiftBits == 0 || ChildInfo(1, status) == VAL_CONSTANT)
+        rstr = format("%s%s", Cast(ChildInfo(1, width), sign).c_str(), rstr.c_str());
+      else
+        rstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(1, width), true).c_str(), rstr.c_str(), rshiftBits, rshiftBits);
     }
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " + " + rstr + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
@@ -579,18 +590,17 @@ valInfo* ENode::instsSub(Node* node, std::string lvalue, bool isRoot) {
     std::string lstr = ChildInfo(0, valStr);
     std::string rstr = ChildInfo(1, valStr);
     if (sign) {
-      if(ChildInfo(0, width) < ChildInfo(1, width) && ChildInfo(0, status) != VAL_CONSTANT) {
-        int extendedWidth = widthBits(ChildInfo(1, width));
-        int shiftBits = extendedWidth - ChildInfo(0, width);
-        lstr = format("((%s%s%s << %d) >> %d)", Cast(ChildInfo(1, width), true).c_str(), Cast(ChildInfo(0, width), true).c_str(), lstr.c_str(), shiftBits, shiftBits);
-      } else if (ChildInfo(0, width) > ChildInfo(1, width) && ChildInfo(1, status) != VAL_CONSTANT) {
-        int extendedWidth = widthBits(ChildInfo(0, width));
-        int shiftBits = extendedWidth - ChildInfo(1, width);
-        rstr = format("((%s%s%s << %d) >> %d)", Cast(ChildInfo(0, width), true).c_str(), Cast(ChildInfo(1, width), true).c_str(), rstr.c_str(), shiftBits, shiftBits);
-      } else {
+      int width = MAX(ChildInfo(0, width), ChildInfo(1, width));
+      int lshiftBits = widthBits(width) - ChildInfo(0, width);
+      if (lshiftBits == 0 || ChildInfo(0, status) == VAL_CONSTANT)
         lstr = format("%s%s", Cast(ChildInfo(0, width), sign).c_str(), lstr.c_str());
+      else
+        lstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(0, width), true).c_str(), lstr.c_str(), lshiftBits, lshiftBits);
+      int rshiftBits = widthBits(width) - ChildInfo(1, width);
+      if (rshiftBits == 0 || ChildInfo(1, status) == VAL_CONSTANT)
         rstr = format("%s%s", Cast(ChildInfo(1, width), sign).c_str(), rstr.c_str());
-      }
+      else
+        rstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(1, width), true).c_str(), rstr.c_str(), rshiftBits, rshiftBits);
     }
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " - " + rstr + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
