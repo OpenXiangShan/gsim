@@ -54,6 +54,7 @@ static std::set<Node*> uniqueRecompute;
 static inline std::string tailName(int width) {
   if (width <= 128) return std::string("tail128");
   else if (width <= 256) return std::string("tail256");
+  else if (width <= 512) return std::string("tail512");
   else return std::string("tail") ;
 }
 
