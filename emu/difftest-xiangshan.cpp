@@ -175,7 +175,7 @@ int main(int argc, char** argv) {
     ref->step();
 #endif
     cycles ++;
-    if(cycles % 10000 == 0 && cycles <= max_cycles) {
+    if(cycles % 100000 == 0 && cycles <= max_cycles) {
       auto now = std::chrono::system_clock::now();
       auto dur = now - start;
       auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
