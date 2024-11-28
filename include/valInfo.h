@@ -4,7 +4,7 @@
 std::string legalCppCons(std::string str);
 
 enum valStatus {VAL_EMPTY = 0, VAL_VALID, VAL_CONSTANT, VAL_FINISH /* for printf/assert*/ , VAL_INVALID, VAL_EMPTY_SRC};
-
+enum valType {TYPE_NORMAL = 0, TYPE_ARRAY, TYPE_STMT};
 class valInfo {
 private:
   mpz_t mask;
@@ -12,6 +12,7 @@ public:
   std::string valStr;
   int opNum = 0;
   valStatus status = VAL_VALID;
+  valType type = TYPE_NORMAL;
   std::vector<std::string> insts;
   mpz_t consVal;
   int width = 0;
@@ -70,6 +71,7 @@ public:
   valInfo* dup(int beg = -1, int end = -1) {
     valInfo* ret = new valInfo();
     ret->opNum = opNum;
+    ret->type = type;
     ret->valStr = valStr;
     ret->status = status;
     mpz_set(ret->consVal, consVal);

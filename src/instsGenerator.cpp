@@ -424,8 +424,8 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
   if (!toMux) {
     condStr = ChildInfo(0, valStr);
     trueStr = ((getChild(1) && ChildInfo(1, status) != VAL_INVALID) ?
-                  assignment(ChildInfo(1, opNum) < 0, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "");
-    falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, opNum) < 0, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "");
+                  assignment(ChildInfo(1, type) == TYPE_STMT, ChildInfo(1, valStr), ChildInfo(1, width), Child(1, sign), Child(1, computeInfo)) : "");
+    falseStr = ((getChild(2) && ChildInfo(2, status) != VAL_INVALID) ? assignment(ChildInfo(2, type) == TYPE_STMT, ChildInfo(2, valStr), ChildInfo(2, width), Child(2, sign), Child(2, computeInfo)) : "");
   }
 
   if (toMux) {
@@ -455,6 +455,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     }
     ret->valStr = format("if(%s) { %s } else { %s }", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
     ret->opNum = -1;
+    ret->type = TYPE_STMT;
     ret->directUpdate = false;
     if (trueStr.length() == 0 || falseStr.length() == 0 || !ChildInfo(1, fullyUpdated) || !ChildInfo(2, fullyUpdated)) ret->fullyUpdated = false;
   }
@@ -529,8 +530,10 @@ valInfo* ENode::instsStmt(Node* node, std::string lvalue, bool isRoot) {
     updated |= childENode->computeInfo->fullyUpdated;
     direct |= childENode->computeInfo->directUpdate;
     if (childENode->computeInfo->status == VAL_INVALID || childENode->computeInfo->status == VAL_EMPTY) continue;
-    else if (childENode->computeInfo->opNum < 0) {
+    else if (childENode->computeInfo->type == TYPE_STMT) {
       computeInfo->valStr += childENode->computeInfo->valStr;
+    } else if (childENode->computeInfo->type == TYPE_ARRAY) {
+      computeInfo->valStr += arrayCopy(lvalue, node, childENode->computeInfo);
     } else {
       if (isSubArray(lvalue, node)) {
         computeInfo->valStr += arrayCopy(lvalue, node, childENode->computeInfo);
@@ -546,6 +549,7 @@ valInfo* ENode::instsStmt(Node* node, std::string lvalue, bool isRoot) {
     }
   }
   computeInfo->opNum = -1;
+  computeInfo->type = TYPE_STMT;
   computeInfo->fullyUpdated = updated;
   computeInfo->directUpdate = direct;
   return computeInfo;
@@ -1457,6 +1461,23 @@ valInfo* ENode::instsInt(Node* node, std::string lvalue, bool isRoot) {
   return ret;
 }
 
+valInfo* ENode::instsGroup(Node* node, std::string lvalue, bool isRoot) {
+  valInfo* ret = computeInfo;
+  ret->opNum = 0;
+  std::string str = format("(%s[]){", widthUType(node->width).c_str());
+  for (int i = 0; i < getChildNum(); i ++) {
+    ret->mergeInsts(Child(i, computeInfo));
+    if (i != 0) str += ", ";
+    str += ChildInfo(i, valStr);
+    ret->opNum = MAX(ret->opNum, ChildInfo(i, opNum));
+    ret->memberInfo.push_back(Child(i, computeInfo));
+  }
+  str += "}";
+  ret->valStr = str;
+  ret->type = TYPE_ARRAY;
+  return ret;
+}
+
 valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   Assert(node->type == NODE_MEM_MEMBER, "invalid type %d", node->type);
@@ -1547,6 +1568,7 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
   computeInfo->valStr = format("if(%s) { %s %s }", ChildInfo(0, valStr).c_str(), ret.c_str(), ASSIGN_LABLE.c_str());
   computeInfo->fullyUpdated = false;
   computeInfo->opNum = -1;
+  computeInfo->type = TYPE_STMT;
   computeInfo->sameConstant = resetVal->sameConstant;
   mpz_set(computeInfo->assignmentCons, resetVal->consVal);
   return computeInfo;
@@ -1736,6 +1758,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     case OP_READ_MEM: instsReadMem(n, lvalue, isRoot); break;
     case OP_INVALID: instsInvalid(n, lvalue, isRoot); break;
     case OP_RESET: instsReset(n, lvalue, isRoot); break;
+    case OP_GROUP: instsGroup(n, lvalue, isRoot); break;
     case OP_PRINTF: instsPrintf(); break;
     case OP_ASSERT: instsAssert(); break;
     default:
@@ -1806,7 +1829,7 @@ valInfo* Node::compute() {
   Assert(ret, "empty info in %s\n", name.c_str());
   if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) ret->setConstantByStr("0");
   if (ret->status == VAL_EMPTY_SRC && assignTree.size() == 1) status = DEAD_SRC;
-  MUX_DEBUG(printf("compute [%s(%d), %d] = %s width %d info->width %d status %d sameCons %d insts(%ld, %ld) isRoot %d %p\n", name.c_str(), type, ret->status, ret->valStr.c_str(), width, ret->width, status, ret->sameConstant, ret->insts.size(), insts.size(), isRoot, this));
+  MUX_DEBUG(printf("compute [%s(%d), %d] = %s width %d info->width %d status %d sameCons %d insts(%ld, %ld) isRoot %d infoType %d %p\n", name.c_str(), type, ret->status, ret->valStr.c_str(), width, ret->width, status, ret->sameConstant, ret->insts.size(), insts.size(), isRoot, ret->type, this));
   bool needRecompute = false;
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
@@ -1864,9 +1887,10 @@ valInfo* Node::compute() {
       }
     }
     needRecompute = true;
-  } else if (isRoot || assignTree.size() > 1 || ret->opNum < 0){  // TODO: count validInfoNum, replace assignTree by validInfuNum
+  } else if (isRoot || assignTree.size() > 1 || ret->type == TYPE_STMT){  // TODO: count validInfoNum, replace assignTree by validInfuNum
     ret->valStr = name;
     ret->opNum = 0;
+    ret->type = TYPE_NORMAL;
     ret->status = VAL_VALID;
   } else {
     if (ret->width > width) {
@@ -1958,8 +1982,10 @@ void Node::recompute() {
 void Node::finalConnect(std::string lvalue, valInfo* info) {
   if (info->valStr.length() == 0) return; // empty, used for when statment with constant condition
   if (info->valStr == name) return; // no need to connect
-  if (info->opNum < 0) {
+  if (info->type == TYPE_STMT) {
     insts.push_back(info->valStr);
+  } else if (info->type == TYPE_ARRAY) {
+    insts.push_back(arrayCopy(lvalue, this, info));
   } else if (isSubArray(lvalue, this)) {
     if (width <= BASIC_WIDTH && info->width <= width) {
       if (info->status == VAL_CONSTANT)
@@ -2165,8 +2191,10 @@ void graph::instsGenerator() {
       reg->resetInsts.push_back(inst);
     }
     if (info->status == VAL_EMPTY) info->setConstantByStr("0");
-    if (info->opNum < 0) {
+    if (info->type == TYPE_STMT) {
       reg->resetInsts.push_back(info->valStr);
+    } else if (info->type == TYPE_ARRAY) {
+      reg->resetInsts.push_back(arrayCopy(reg->name, reg, info));
     } else if (reg->isArray()) {
       if (info->status == VAL_CONSTANT && reg->width <= BASIC_WIDTH)
         reg->resetInsts.push_back(format("memset(%s, %s, sizeof(%s));", reg->name.c_str(), info->valStr.c_str(), reg->name.c_str()));
@@ -2206,8 +2234,10 @@ void graph::instsGenerator() {
     for (ExpTree* tree : n->assignTree) {
       valInfo* assignInfo = tree->getRoot()->computeInfo;
       if (assignInfo->status == VAL_VALID) {
-        if (assignInfo->opNum < 0) {
+        if (assignInfo->type == TYPE_STMT) {
             n->insts.push_back(assignInfo->valStr);
+        } else if(assignInfo->type == TYPE_ARRAY) {
+          n->insts.push_back(arrayCopy(n->name, n, assignInfo));
         } else if (assignInfo->opNum > 0 || assignInfo->valStr != n->name) {
           n->insts.push_back(n->name + " = " + assignInfo->valStr + ";");
         }

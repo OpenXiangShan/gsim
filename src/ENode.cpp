@@ -167,6 +167,11 @@ void ENode::inferWidth() {
         else if (getChild(1)) setWidth(w1, s1);
         else setWidth(w2, s2);
         break;
+      case OP_GROUP:
+        for (ENode* enode : child) {
+          setWidth(MAX(width, enode->width), enode->sign);
+        }
+        break;
       case OP_STMT:
         for (ENode* enode : child) {
           setWidth(MAX(width, enode->width), enode->sign);

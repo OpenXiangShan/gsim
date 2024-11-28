@@ -159,6 +159,35 @@ valInfo* ENode::consStmt(Node* node, bool isLvalue) {
   return new valInfo(width, sign);
 }
 
+valInfo* ENode::consGroup(Node* node, bool isLvalue) {
+  bool isSameConstant = true;
+  bool isStart = true;
+  mpz_t sameConsVal;
+  mpz_init(sameConsVal);
+  for (int i = 0; i < getChildNum(); i++) {
+    if (ChildCons(i, status) != VAL_CONSTANT) {
+      isSameConstant = false;
+      break;
+    }
+    if (isStart) {
+      mpz_set(sameConsVal, ChildCons(i, consVal));
+      isStart = false;
+    }
+    if (mpz_cmp(sameConsVal, ChildCons(i, consVal)) != 0) {
+      isSameConstant = false;
+      break;
+    }
+  }
+  valInfo* ret = new valInfo(width, sign);
+  if (isSameConstant) {
+    ret->status = VAL_CONSTANT;
+    mpz_set(ret->consVal, sameConsVal);
+    ret->updateConsVal();
+  }
+  for (int i = 0; i < getChildNum(); i ++) ret->memberInfo.push_back(consEMap[getChild(i)]);
+  return ret;
+}
+
 valInfo* ENode::consAdd(bool isLvalue) {
   valInfo* ret = new valInfo(width, sign);
   if ((ChildCons(0, status) == VAL_CONSTANT) && (ChildCons(1, status) == VAL_CONSTANT)) {
@@ -690,6 +719,7 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
     case OP_MUX: ret = consMux(isLvalue); break;
     case OP_WHEN: ret = consWhen(node, isLvalue); break;
     case OP_STMT: ret = consStmt(node, isLvalue); break;
+    case OP_GROUP: ret = consGroup(node, isLvalue); break;
     case OP_INT: ret = consInt(isLvalue); break;
     case OP_READ_MEM: ret = consReadMem(isLvalue); break;
     case OP_INVALID: ret = consInvalid(isLvalue); break;

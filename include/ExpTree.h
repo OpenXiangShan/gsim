@@ -60,6 +60,8 @@ enum OPType {
   OP_ASSERT,
 /* leaf non-node enode */
   OP_INT,
+/* for arrays */
+  OP_GROUP,
 /* special nodes for memory */
   OP_READ_MEM,
 /* special nodes for invalid node */
@@ -115,6 +117,7 @@ private:
   valInfo* instsReadMem(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsInvalid(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsReset(Node* node, std::string lvalue, bool isRoot);
+  valInfo* instsGroup(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsPrintf();
   valInfo* instsAssert();
   /* used in constantNode */
@@ -155,6 +158,7 @@ private:
   valInfo* consBitsNoShift(bool isLvalue);
   valInfo* consWhen(Node* node, bool isLvalue);
   valInfo* consStmt(Node* node, bool isLvalue);
+  valInfo* consGroup(Node* node, bool isLvalue);
   valInfo* consIndexInt(bool isLvalue);
   valInfo* consIndex(bool isLvalue);
   valInfo* consInt(bool isLvalue);

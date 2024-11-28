@@ -250,24 +250,38 @@ void splitAssignMent(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees)
 }
 
 void ExpTree::updateSplittedArray(Node* array, std::set<Node*>& allSplittedArray) {
-  std::stack<ENode*> s;
-  s.push(getRoot());
-  s.push(getlval());
+  std::stack<std::tuple<ENode*, ENode*, int>> s;
+  s.push(std::make_tuple(getRoot(), nullptr, 0));
+  s.push(std::make_tuple(getlval(), nullptr, -2));
   while(!s.empty()) {
-    ENode* top = s.top();
+    auto top_tuple = s.top();
     s.pop();
-    if (!top->nodePtr || allSplittedArray.find(top->nodePtr) == allSplittedArray.end()) {
-      for (ENode* child : top->child) {
-        if (child) s.push(child);
+    ENode* top_enode = std::get<0>(top_tuple);
+    ENode* top_parent = std::get<1>(top_tuple);
+    int top_idx = std::get<2>(top_tuple);
+    if (!top_enode->nodePtr || allSplittedArray.find(top_enode->nodePtr) == allSplittedArray.end()) {
+      for (int i = 0; i < top_enode->getChildNum(); i ++) {
+        if (top_enode->getChild(i)) s.push(std::make_tuple(top_enode->getChild(i), top_enode, top_idx < 0 ? top_idx : i));
       }
       continue;
     }
-    auto range = top->getIdx(top->nodePtr);
+    auto range = top_enode->getIdx(top_enode->nodePtr);
     if (range.first == range.second) {
-      top->nodePtr = top->nodePtr->getArrayMember(range.first);
-      top->child.clear();
+      top_enode->nodePtr = top_enode->nodePtr->getArrayMember(range.first);
+      top_enode->child.clear();
     } else {
-      continue;
+      if (top_idx < 0) continue;
+      ENode* group = new ENode(OP_GROUP);
+      group->width = top_enode->width;
+      for (int i = range.first; i <= range.second; i ++) {
+        Node* member = top_enode->nodePtr->getArrayMember(i);
+        ENode* enode = new ENode(member);
+        enode->width = member->width;
+        enode->sign = member->sign;
+        group->addChild(enode);
+      }
+      if (top_parent) top_parent->setChild(top_idx, group);
+      else setRoot(group);
     }
   }
 }
