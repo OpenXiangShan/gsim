@@ -1003,7 +1003,10 @@ valInfo* Node::computeConstant() {
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
     if (type == NODE_REG_DST) {
-      if ((getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, consMap[getSrc()]->consVal) == 0)) && cons_resetConsEq(ret, getSrc())) {
+      if ((getSrc()->assignTree.size() == 0 ||
+          (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, consMap[getSrc()]->consVal) == 0) ||
+          (consMap[getSrc()]->sameConstant && mpz_cmp(ret->consVal, consMap[getSrc()]->assignmentCons) == 0))
+           && cons_resetConsEq(ret, getSrc())) {
         getSrc()->status = CONSTANT_NODE;
         consMap[getSrc()] = ret;
         /* re-compute nodes depend on src */
@@ -1082,6 +1085,7 @@ ENode* whenChildInvalid(ENode* enode) {
 
 void ExpTree::updateNewChild(ENode* parent, ENode* child, int idx) {
   if (parent) parent->child[idx] = child;
+  else if (idx < 0) setlval(child);
   else setRoot(child);
 }
 
@@ -1091,11 +1095,9 @@ static bool enodeConstant(ENode* enode) {
 }
 
 void ExpTree::removeConstant() {
-  if (consEMap[getRoot()]->status == VAL_CONSTANT) return;  // used for array
-  if (!getRoot() || consEMap[getRoot()]->status == VAL_CONSTANT) return;
   std::stack<std::tuple<ENode*, ENode*, int>> s;
   Assert(getRoot(), "emptyRoot");
-  s.push(std::make_tuple(getRoot(), nullptr, -1));
+  s.push(std::make_tuple(getRoot(), nullptr, 0));
   if (getlval()) s.push(std::make_tuple(getlval(), nullptr, -1));
   while (!s.empty()) {
     ENode* top, *parent;
@@ -1104,7 +1106,7 @@ void ExpTree::removeConstant() {
     s.pop();
     bool remove = false;
     ENode* enodePtr = nullptr;
-    Assert(parent || consEMap.find(top) == consEMap.end() || consEMap[top]->status != VAL_CONSTANT, "constant not removed");
+
     if (enodeConstant(top)) {
       if (parent && parent->opType == OP_INDEX) {
           Assert(parent->child.size() == 1, "opIndex with child %ld\n", top->child.size());
@@ -1184,20 +1186,23 @@ void graph::constantAnalysis() {
       n->computeConstant();
     }
   }
+  for (SuperNode* super : sortedSuper) {
+    for (Node* n : super->member) {
+      if (n->resetTree) n->resetTree->getRoot()->computeConstant(n, false);
+    }
+  }
   constantMemory();
-
   /* remove constant nodes */
   int consNum = 0;
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == CONSTANT_NODE) {
-          consNum ++;
-          member->computeInfo = consMap[member];
-          member->computeInfo->updateConsVal();
+        consNum ++;
+        member->computeInfo = consMap[member];
+        member->computeInfo->updateConsVal();
       }
     }
   }
-  // removeNodes(CONSTANT_NODE);
 
   /* update valTree */
   for (SuperNode* super : sortedSuper) {
@@ -1231,13 +1236,29 @@ void graph::constantAnalysis() {
         [](ExpTree* tree){ return !tree->getRoot() || (consEMap.find(tree->getRoot()) != consEMap.end() && consEMap[tree->getRoot()]->status == VAL_CONSTANT); }),
         member->assignTree.end()
       );
+      if (member->resetTree) member->resetTree->removeConstant();
     }
   }
+  std::set<Node*> constantButValid; // avoid nodes being removed
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
+      if (member->status == CONSTANT_NODE) {
+        if (member->type == NODE_REG_DST && (member->getSrc()->status != CONSTANT_NODE || mpz_cmp(consMap[member->getSrc()]->consVal, consMap[member]->consVal) != 0)){
+          member->status = VALID_NODE;
+          constantButValid.insert(member);
+        }
+      }
       member->prev.clear();
       member->next.clear();
     }
+  }
+  removeNodes(CONSTANT_NODE);
+  regsrc.erase(
+    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == CONSTANT_NODE; }),
+        regsrc.end()
+  );
+  for (Node* n : constantButValid) {
+    n->status = CONSTANT_NODE;
   }
 
   for (SuperNode* super : sortedSuper) {
