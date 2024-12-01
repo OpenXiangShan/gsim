@@ -105,6 +105,7 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>cmem                    { return token::CMem; }
 <normal>write                   { return token::Write; }
 <normal>read                    { return token::Read; }
+<normal>infer                   { return token::Infer; }
 <normal>mport                   { return token::Mport; }
 <normal>{int}                   { yylval->strVal = strdup(yytext); return token::INT; }
 <normal>{rint}                  { yylval->strVal = strdup(yytext); return token::RINT; }
