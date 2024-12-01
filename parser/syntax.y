@@ -28,8 +28,8 @@ int p_stoi(const char* str);
 
 %code
 {
-    #define yylex(x) scanner->lex(x)
     #define synlineno() scanner->lineno()
+    #define yylex(x) scanner->lex(x)
     /* #define yylex(x) scanner->lex_debug(x) */
 }
 
@@ -97,6 +97,7 @@ ALLID: ID {$$ = $1; }
     | Depth {$$ = strdup("depth"); }
     | Skip {$$ = strdup("skip"); }
     | Write {$$ = strdup("write"); }
+    | Read {$$ = strdup("read"); }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
@@ -194,6 +195,7 @@ chirrtl_memory_ruw: Ruw { $$ = newNode(P_RUW, synlineno(), $1, 0); }
                   ;
 
 chirrtl_memory : SMem ALLID ':' chirrtl_memory_datatype ',' chirrtl_memory_ruw info { $$ = newNode(P_SEQ_MEMORY , synlineno(), /*info*/$7, /*name*/$2, 2, /* DataType */ $4, /* Ruw */ $6); }
+               | SMem ALLID ':' chirrtl_memory_datatype info                        { $$ = newNode(P_SEQ_MEMORY , synlineno(), /*info*/$5, /*name*/$2, 2, /* DataType */ $4); }
                | CMem ALLID ':' chirrtl_memory_datatype info                        { $$ = newNode(P_COMB_MEMORY, synlineno(), /*info*/$5, /*name*/$2, 1, /* DataType */ $4              ); }
                ;
 
