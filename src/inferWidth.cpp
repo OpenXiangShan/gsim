@@ -151,6 +151,11 @@ void ENode::inferWidth() {
           if (enode->width != width) enode->setWidth(width, sign);
         }
         break;
+      case OP_GROUP:
+        for (ENode* enode : child) {
+          setWidth(MAX(width, enode->width), enode->sign);
+        }
+        break;
       case OP_READ_MEM:
         setWidth(getChild(0)->nodePtr->parent->parent->width, getChild(0)->nodePtr->parent->parent->sign);
         break;
