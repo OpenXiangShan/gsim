@@ -195,13 +195,13 @@ chirrtl_memory_ruw: Ruw { $$ = newNode(P_RUW, synlineno(), $1, 0); }
                   ;
 
 chirrtl_memory : SMem ALLID ':' chirrtl_memory_datatype ',' chirrtl_memory_ruw info { $$ = newNode(P_SEQ_MEMORY , synlineno(), /*info*/$7, /*name*/$2, 2, /* DataType */ $4, /* Ruw */ $6); }
-               | SMem ALLID ':' chirrtl_memory_datatype info                        { $$ = newNode(P_SEQ_MEMORY , synlineno(), /*info*/$5, /*name*/$2, 2, /* DataType */ $4); }
+               | SMem ALLID ':' chirrtl_memory_datatype info                        { $$ = newNode(P_SEQ_MEMORY , synlineno(), /*info*/$5, /*name*/$2, 1, /* DataType */ $4); }
                | CMem ALLID ':' chirrtl_memory_datatype info                        { $$ = newNode(P_COMB_MEMORY, synlineno(), /*info*/$5, /*name*/$2, 1, /* DataType */ $4              ); }
                ;
 
-chirrtl_memory_port: Write Mport ALLID '=' ALLID '[' reference ']' ',' ALLID info { $$ = newNode(P_WRITE, synlineno(), /* Info */ $11, /* Name */ $3, 1, /* Addr */ $7); $$->appendExtraInfo(/* MemName */$5); }
-                   | Read  Mport ALLID '=' ALLID '[' reference ']' ',' ALLID info { $$ = newNode(P_READ , synlineno(), /* Info */ $11, /* Name */ $3, 1, /* Addr */ $7); $$->appendExtraInfo(/* MemName */$5); }
-                   | Infer Mport ALLID '=' ALLID '[' reference ']' ',' ALLID info { $$ = newNode(P_INFER, synlineno(), /* Info */ $11, /* Name */ $3, 1, /* Addr */ $7); $$->appendExtraInfo(/* MemName */$5); }
+chirrtl_memory_port: Write Mport ALLID '=' ALLID '[' reference ']' ',' ALLID info { $$ = newNode(P_WRITE, synlineno(), /* Info */ $11, /* Name */ $3, 2, /* Addr */ $7); $$->appendExtraInfo(/* MemName */$5); $$->appendExtraInfo(/* clock */$10); }
+                   | Read  Mport ALLID '=' ALLID '[' reference ']' ',' ALLID info { $$ = newNode(P_READ , synlineno(), /* Info */ $11, /* Name */ $3, 2, /* Addr */ $7); $$->appendExtraInfo(/* MemName */$5); $$->appendExtraInfo(/* clock */$10); }
+                   | Infer Mport ALLID '=' ALLID '[' reference ']' ',' ALLID info { $$ = newNode(P_INFER, synlineno(), /* Info */ $11, /* Name */ $3, 2, /* Addr */ $7); $$->appendExtraInfo(/* MemName */$5); $$->appendExtraInfo(/* clock */$10); }
                    ;
 
 /* statements */
