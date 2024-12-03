@@ -282,6 +282,7 @@ class Node {
   void updateTreeWithNewWIdth();
   int repOpCount();
   void updateIsRoot();
+  void updateHeadTail();
 };
 
 enum SuperType {

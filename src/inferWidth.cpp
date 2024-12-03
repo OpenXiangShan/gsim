@@ -114,14 +114,12 @@ void ENode::inferWidth() {
       case OP_HEAD:
         Assert(getChildNum() == 1 && values.size() == 1, "invalid child");
         setWidth(values[0], false);
-        values[0] = w0 - values[0];
         break;
       case OP_TAIL:
         //  UInt<1>(0h0) => tail(UInt<1>(0), 1)
         Assert(w0 >= values[0], "the width of argument(%d) in tail is no greater than %d", w0, values[0]);
         Assert(getChildNum() == 1 && values.size() == 1, "invalid child");
         setWidth(w0-values[0], false);
-        values[0] = w0 - values[0];
         break;
       case OP_BITS: // values[0] may exceeds w0 due to the shrink width of add
         Assert(getChildNum() == 1 && values.size() == 2, "invalid child");
@@ -250,6 +248,29 @@ void graph::inferAllWidth() {
           }
         }
       }
+    }
+  }
+  for (SuperNode* super : sortedSuper) {
+    for (Node* node : super->member) {
+      node->updateHeadTail();
+      node->updateTreeWithNewWIdth();
+    }
+  }
+}
+
+void Node::updateHeadTail() {
+  std::stack<ENode*> s;
+  for (ExpTree* tree : assignTree) s.push(tree->getRoot());
+  for (ExpTree* tree : arrayVal) s.push(tree->getRoot());
+  if (updateTree) s.push(updateTree->getRoot());
+  if (resetTree) s.push(resetTree->getRoot());
+  if (resetVal) s.push(resetVal->getRoot());
+  while (!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    if (top->opType == OP_HEAD || top->opType == OP_TAIL) top->values[0] = top->getChild(0)->width - top->values[0];
+    for (ENode* enode : top->child) {
+      if (enode) s.push(enode);
     }
   }
 }
