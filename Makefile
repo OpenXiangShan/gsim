@@ -16,7 +16,7 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 OBJ_DIR = obj
 $(shell mkdir -p $(OBJ_DIR))
 
-dutName ?= xiangshan
+dutName ?= rocket
 
 ifeq ($(dutName),ysyx3)
 	NAME ?= newtop
@@ -37,7 +37,7 @@ else ifeq ($(dutName),rocket)
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-rocketchip.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
-	TEST_FILE = ready-to-run/$(NAME)
+	TEST_FILE = ready-to-run/rocket-chirrtl/$(NAME)
 	SUPER_BOUND ?= 20
 else ifeq ($(dutName),boom)
 	NAME ?= TestHarness
@@ -75,12 +75,12 @@ EVENT_DRIVEN ?= 0
 
 
 CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror \
-	-DDST_NAME=\"$(NAME)\" -DEVENT_DRIVEN=$(EVENT_DRIVEN) -DSUPER_BOUND=$(SUPER_BOUND)
+	-DDST_NAME=\"$(NAME)\" -DEVENT_DRIVEN=$(EVENT_DRIVEN) -DSUPER_BOUND=$(SUPER_BOUND) --std=c++20
 CXX = clang++
 CCACHE := ccache
 TARGET = GraphEmu
 
-FIRRTL_FILE = $(TEST_FILE).hi.fir
+FIRRTL_FILE = $(TEST_FILE).fir
 
 EMU_DIR = emu
 EMU_SRC = $(EMU_DIR)/emu.cpp $(shell find $(EMU_SRC_DIR) -name "*.cpp")
