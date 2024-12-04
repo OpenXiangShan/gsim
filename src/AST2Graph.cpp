@@ -187,7 +187,7 @@ TypeInfo* visitFields(graph* g, PNode* fields, NodeType parentType) {
 
 /*
 type_aggregate: '{' fields '}'  { $$ = new PNode(P_AG_FIELDS, synlineno()); $$->appendChildList($2); }
-    | type '[' INT ']'          { $$ = newNode(P_AG_TYPE, synlineno(), emptyStr, 1, $1); $$->appendExtraInfo($3); }
+    | type '[' INT ']'          { $$ = newNode(P_AG_ARRAY, synlineno(), emptyStr, 1, $1); $$->appendExtraInfo($3); }
 type_ground: Clock    { $$ = new PNode(P_Clock, synlineno()); }
     | IntType width   { $$ = newNode(P_INT_TYPE, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); }
     | anaType width   { TODO(); }
@@ -195,7 +195,7 @@ type_ground: Clock    { $$ = new PNode(P_Clock, synlineno()); }
 update width/sign/dimension/aggrtype
 */
 TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType) {
-  TYPE_CHECK(ptype, 0, INT32_MAX, P_AG_FIELDS, P_AG_TYPE, P_Clock, P_INT_TYPE, P_ASYRESET);
+  TYPE_CHECK(ptype, 0, INT32_MAX, P_AG_FIELDS, P_AG_ARRAY, P_Clock, P_INT_TYPE, P_ASYRESET);
   TypeInfo* info = NULL;
   switch (ptype->type) {
     case P_Clock:
@@ -217,8 +217,8 @@ TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType) {
       info = visitFields(g, ptype, parentType);
       info->newParent(topPrefix());
       break;
-    case P_AG_TYPE:
-      TYPE_CHECK(ptype, 1, 1, P_AG_TYPE);
+    case P_AG_ARRAY:
+      TYPE_CHECK(ptype, 1, 1, P_AG_ARRAY);
       info = visitType(g, ptype->getChild(0), parentType);
       info->addDim(p_stoi(ptype->getExtra(0).c_str()));
       break;
