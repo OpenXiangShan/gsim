@@ -447,9 +447,6 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", node->depth);
   for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
   fprintf(fp, "; // width = %d\n", node->width);
-#ifdef VERILATOR_DIFF
-  genDiffSig(fp, node);
-#endif
   /* save reset registers */
   if (node->isReset() && node->type == NODE_REG_SRC) {
     Assert(!node->isArray() && node->width <= BASIC_WIDTH, "%s is treated as reset (isArray: %d width: %d)", node->name.c_str(), node->isArray(), node->width);
