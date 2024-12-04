@@ -247,6 +247,7 @@ void graph::inferAllWidth() {
       if (node->width < node->getSrc()->width) {
         node->width = node->getSrc()->width;
       } else {
+        reinferNodes.push(node->getSrc()); // re-infer the src node for updateTree
         node->getSrc()->width = node->width;
         for (Node* next : node->getSrc()->next) {
           if (uniqueNodes.find(next) == uniqueNodes.end() && fixedWidth.find(next) == fixedWidth.end()) {
