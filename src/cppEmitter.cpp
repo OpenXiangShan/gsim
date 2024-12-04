@@ -449,12 +449,12 @@ void graph::genNodeDef(FILE* fp, Node* node) {
 #ifdef VERILATOR_DIFF
   genDiffSig(fp, node);
 #endif
+  fprintf(fp, "; // width = %d\n", node->width);
   /* save reset registers */
   if (node->isReset() && node->type == NODE_REG_SRC) {
     Assert(!node->isArray() && node->width <= BASIC_WIDTH, "%s is treated as reset (isArray: %d width: %d)", node->name.c_str(), node->isArray(), node->width);
     fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), RESET_NAME(node).c_str());
   }
-  fprintf(fp, "; // width = %d\n", node->width);
 }
 
 FILE* graph::genSrcStart(std::string name) {
