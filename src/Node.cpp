@@ -77,9 +77,6 @@ void Node::constructSuperNode() {
   switch (type) {
     case NODE_INVALID:
     case NODE_MEMORY:
-    case NODE_READER:
-    case NODE_WRITER:
-    case NODE_READWRITER:
       Panic();
     case NODE_MEM_MEMBER:
       memSuper(this);
@@ -140,6 +137,7 @@ void TypeInfo::mergeInto(TypeInfo* info) {
 void TypeInfo::addDim(int num) {
   if (isAggr()) {
     for (auto entry : aggrMember) entry.first->dimension.insert(entry.first->dimension.begin(), num);
+    dimension.insert(dimension.begin(), num);
   } else {
     dimension.insert(dimension.begin(), num);
   }

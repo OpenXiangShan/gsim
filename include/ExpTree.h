@@ -64,6 +64,8 @@ enum OPType {
   OP_GROUP,
 /* special nodes for memory */
   OP_READ_MEM,
+  OP_WRITE_MEM,
+  OP_INFER_MEM,
 /* special nodes for invalid node */
   OP_INVALID,
   OP_RESET,
@@ -115,6 +117,7 @@ private:
   valInfo* instsIndex(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsInt(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsReadMem(Node* node, std::string lvalue, bool isRoot);
+  valInfo* instsWriteMem(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsInvalid(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsReset(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsGroup(Node* node, std::string lvalue, bool isRoot);
@@ -178,6 +181,7 @@ public:
   bool isClock = false;
   ResetType reset = UNCERTAIN;
   int usedBit = -1;
+  Node* memoryNode = nullptr;
   // bool islvalue = false;  // true for root and L_INDEX, otherwise false
   int id; // unique identifier
   std::vector<int> values;     // used in int_noinit/int_init leaf

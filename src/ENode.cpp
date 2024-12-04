@@ -348,6 +348,7 @@ ENode* ENode::dup() {
   ret->width = width;
   ret->values.insert(ret->values.end(), values.begin(), values.end());
   ret->strVal = strVal;
+  ret->memoryNode = memoryNode;
   /* TODO : check isClock */
   for (ENode* childNode : child) {
     if (childNode) ret->addChild(childNode->dup());

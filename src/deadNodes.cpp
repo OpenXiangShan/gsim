@@ -8,11 +8,11 @@
 static std::set<Node*> nodesInUpdateTree;
 
 static inline bool potentialDead(Node* node) {
-  return (node->type == NODE_OTHERS || node->type == NODE_REG_SRC || (node->type == NODE_MEM_MEMBER && node->parent->type == NODE_READER)) && nodesInUpdateTree.find(node) == nodesInUpdateTree.end();
+  return (node->type == NODE_OTHERS || node->type == NODE_REG_SRC || node->type == NODE_READER) && nodesInUpdateTree.find(node) == nodesInUpdateTree.end();
 }
 
 static inline bool isSink(Node* node) {
-  return node->type == NODE_REG_DST || node->type == NODE_SPECIAL || node->type == NODE_OUT || node->type == NODE_MEM_MEMBER;
+  return node->type == NODE_REG_DST || node->type == NODE_SPECIAL || node->type == NODE_OUT || node->type == NODE_READER || node->type == NODE_WRITER || node->type == NODE_READWRITER;
 }
 
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes) {

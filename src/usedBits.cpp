@@ -113,6 +113,10 @@ void ENode::passWidthToChild() {
     case OP_READ_MEM:
       childBits.push_back(Child(0, width));
       break;
+    case OP_WRITE_MEM:
+      childBits.push_back(Child(0, width));
+      childBits.push_back(memoryNode->width);
+      break;
     case OP_RESET:
       childBits.push_back(1);
       childBits.push_back(usedBit);
@@ -191,22 +195,7 @@ void graph::usedBits() {
   for (Node* out : output) checkNodes.push_back(out);
   for (Node* mem : memory) { // all memory input
     for (Node* port : mem->member) {
-      if (port->type == NODE_READER) {
-        checkNodes.push_back(port->get_member(READER_ADDR));
-        checkNodes.push_back(port->get_member(READER_EN));
-        // checkNodes.push(port->get_member(READER_CLK));
-      } else if (port->type == NODE_WRITER) {
-        checkNodes.push_back(port->get_member(WRITER_ADDR));
-        checkNodes.push_back(port->get_member(WRITER_EN));
-        checkNodes.push_back(port->get_member(WRITER_MASK));
-        checkNodes.push_back(port->get_member(WRITER_DATA));
-      } else if (port->type == NODE_READWRITER) {
-        checkNodes.push_back(port->get_member(READWRITER_ADDR));
-        checkNodes.push_back(port->get_member(READWRITER_EN));
-        checkNodes.push_back(port->get_member(READWRITER_WDATA));
-        checkNodes.push_back(port->get_member(READWRITER_WMASK));
-        checkNodes.push_back(port->get_member(READWRITER_WMODE));
-      }
+      if (port->type == NODE_READER) checkNodes.push_back(port);
     }
   }
 
@@ -224,15 +213,15 @@ void graph::usedBits() {
         int usedBit = 0;
         for (Node* port : mem->member) {
           if (port->type == NODE_READER) {
-            usedBit = MAX(port->get_member(READER_DATA)->usedBit, usedBit);
+            usedBit = MAX(port->usedBit, usedBit);
           }
         }
         if (mem->usedBit != usedBit) {
           mem->usedBit = usedBit;
           for (Node* port : mem->member) {
             if (port->type == NODE_WRITER) {
-              port->get_member(WRITER_DATA)->usedBit = usedBit;
-              checkNodes.push_back(port->get_member(WRITER_DATA));
+              port->usedBit = usedBit;
+              checkNodes.push_back(port);
             }
           }
         }

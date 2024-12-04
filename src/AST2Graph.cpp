@@ -34,6 +34,8 @@ static std::set<std::string> moduleInstances;
 static std::set<Node*> stmtsNodes;
 static bool haveChirrtl{false};
 
+static std::map<std::string, std::pair<std::vector<Node*>, std::vector<AggrParentNode*>>> memoryMap;
+
 static inline void typeCheck(PNode* node, const int expect[], int size, int minChildNum, int maxChildNum) {
   const int* expectEnd = expect + size;
   Assert((size == 0) || (std::find(expect, expectEnd, node->type) != expectEnd),
@@ -326,35 +328,6 @@ ASTExpTree* allocIndex(graph* g, PNode* expr) {
   return exprTree;
 }
 
-static std::string removePrefix(const std::string& str) {
-  auto pos = str.find('$');
-  return (pos != std::string::npos) ? str.substr(pos + 1) : str;
-}
-
-static Node* findChirrtlRef(std::string& Name) {
-  Node* ret = nullptr;
-
-  if (!haveChirrtl) return ret;
-
-  // In CHIRRTL, the port ownership is not explicitly known, for example:
-  //     connect MPORT[0], wdata[0]
-  // In this function, the name appears as `btb$MPORT`, but its origin is actually `btb$array$MPORT`.
-  // Therefore, we remove the module prefix and proceed with the search.
-  auto RawPortname = removePrefix(Name);
-
-  for (const auto& [key, value] : allSignals) {
-    auto isMem = value->type == NODE_MEM_MEMBER;
-    if (key.find("$" + RawPortname + "$") != key.npos && isMem)
-
-      if (key.find("$$data") != std::string::npos) {
-        ret = value;
-        break;
-      }
-  }
-
-  return ret;
-}
-
 /*
     reference: ALLID  { $$ = newNode(P_REF, synlineno(), $1, 0); }
     | reference '.' ALLID  { $$ = $1; $1->appendChild(newNode(P_REF_DOT, synlineno(), $3, 0)); }
@@ -371,12 +344,6 @@ ASTExpTree* visitReference(graph* g, PNode* expr) {
     }
   }
   ASTExpTree* ret = nullptr;
-
-  if (auto access = findChirrtlRef(name)) {
-    ret = new ASTExpTree(false);
-    ret->getExpRoot()->setNode(access);
-    return ret;
-  }
 
   if (isAggr(name)) { // add all signals and their names into aggr
     AggrParentNode* parent = getDummy(name);
@@ -1138,17 +1105,30 @@ struct ChirrtlVistor {
   }
 };
 
-static Node* visitChirrtlPort(PNode* port, int width, int depth, bool sign, std::string suffix, Node* node) {
-  assert(port->type == P_READ || port->type == P_WRITE);
-
+static Node* visitChirrtlPort(PNode* port, int width, int depth, bool sign, std::string suffix, Node* node, Node* addr_node, Node* clock_node) {
+  assert(port->type == P_READ || port->type == P_WRITE || port->type == P_INFER);
   // Add prefix port name
   prefix_append(SEP_MODULE, port->name);
+  NodeType type;
+  OPType op;
+  if (port->type == P_READ) {
+    type = NODE_READER;
+    op = OP_READ_MEM;
+  } else if (port->type == P_WRITE) {
+    type = NODE_WRITER;
+    op = OP_WRITE_MEM;
+  } else if (port->type == P_INFER) {
+    type = NODE_INFER;
+    op = OP_INFER_MEM;
+  } else TODO();
 
-  auto type = ChirrtlVistor::createType(port);
-  auto* ret = allocNode(type, topPrefix());
-
-  ChirrtlVistor::resetMember(ret);
-  ChirrtlVistor::createMembers(ret, width, depth, sign, suffix, node);
+  Node* ret = allocNode(type, topPrefix() + suffix);
+  ret->dimension = node->dimension;
+  ENode* enode = new ENode(op);
+  enode->memoryNode = node;
+  enode->addChild(new ENode(addr_node));
+  ret->memTree = new ExpTree(enode, ret);
+  ret->clock = clock_node;
 
   prefix_pop();
   return ret;
@@ -1157,39 +1137,41 @@ static Node* visitChirrtlPort(PNode* port, int width, int depth, bool sign, std:
 static void visitChirrtlMemPort(graph* g, PNode* port) {
   // If we are in the top module, 
   //    the memory name does not need to have the prefix added.
-  auto fixName = [&](std::string Name) { return prefixTrace.empty() ? Name : topPrefix() + SEP_MODULE + Name; };
-  auto* addr = visitReference(g, port->getChild(0));
+  ASTExpTree* addr = visitReference(g, port->getChild(0));
+  Node* addr_node = addr->getExpRoot()->getNode();
+  Node* clock_node = getSignal(prefixName(SEP_MODULE, port->getExtra(1)));
+  // prefix_append(SEP_MODULE, port->getExtra(0));
+  std::string memName = prefixName(SEP_MODULE, port->getExtra(0));
 
-  prefix_append(SEP_MODULE, port->getExtra(0));
-  auto memName = topPrefix();
-
-  // Find existing memory by name
-  auto* Mem = ChirrtlVistor::findMemory(g, memName);
-  if (Mem == nullptr) Assert(0, "Could not find memory: %s", memName.c_str());
-
-  auto depth = Mem->depth;
-  auto sign = Mem->sign;
-  auto width = Mem->width;
-
-  auto* portNode = visitChirrtlPort(port, width, depth, sign, "", Mem);
-  Mem->add_member(portNode);
-  for (auto* Member : portNode->member) {
-    // std::cout << "Add signal: " << Member->name << " Depth: " << Member->whenDepth << std::endl;
-    // There is no need to call addSignal
-    //    we dont want assignment whenDepth.
-    allSignals[Member->name] = Member;
+  Assert(memoryMap.find(memName) != memoryMap.end(), "Could not find memory: %s", memName.c_str());
+  std::vector<Node*> memoryMembers;
+  for (Node* mem : memoryMap[memName].first) {
+    int depth = mem->depth;
+    bool sign = mem->sign;
+    int width = mem->width;
+    std::string suffix = replacePrefix(memName, "", mem->name).c_str();
+    Node* portNode = visitChirrtlPort(port, width, depth, sign, suffix, mem, addr_node, clock_node);
+    mem->add_member(portNode);
+    addSignal(portNode->name, portNode);
+    memoryMembers.push_back(portNode);
   }
-
-  auto portName = fixName(port->name);
-  ChirrtlVistor::createAccess(portName, addr, port->type == P_WRITE, Mem->dimension.size());
-  prefix_pop();
+  // prefix_pop();
+  for (AggrParentNode* memParent : memoryMap[memName].second) {
+    std::string suffix = replacePrefix(memName, "", memParent->name).c_str();
+    AggrParentNode* parent = new AggrParentNode(prefixName(SEP_MODULE, port->name) + suffix);
+    for (auto entry : memParent->member) {
+      std::string memberSuffix = replacePrefix(memName, "", entry.first->name).c_str();
+      Node* memberNode = getSignal(prefixName(SEP_MODULE, port->name) + memberSuffix);
+      parent->addMember(memberNode, entry.second);
+    }
+    addDummy(parent->name, parent);
+  }
 }
 
 // TODO: Comb memory support
 static void visitChirrtlMemory(graph* g, PNode* mem) {
   assert(mem->type == P_SEQ_MEMORY || mem->type == P_COMB_MEMORY);
   prefix_append(SEP_MODULE, mem->name);
-
   bool isSeq = mem->type == P_SEQ_MEMORY;
   haveChirrtl = true;
 
@@ -1198,31 +1180,32 @@ static void visitChirrtlMemory(graph* g, PNode* mem) {
   //    =>
   //        type : UInt<32>[1]
   //        depth: 2
-  auto* type = visitMemType(g, mem->getChild(0));
+  TypeInfo* type = visitMemType(g, mem->getChild(0));
   int depth = type->dimension.front();
   type->dimension.erase(type->dimension.begin());
-
   // Convert to firrtl memory
   int rlatency = isSeq;
   int wlatency = 1;
-  if (isSeq) visitRUW(mem->getChild(1));
+  if (isSeq && mem->getChildNum() >= 2) visitRUW(mem->getChild(1));
 
   moduleInstances.insert(topPrefix());
 
   if (type->isAggr()) {
-    std::vector<Node*> allSubMem;
+    memoryMap[topPrefix()] = std::pair(std::vector<Node*>(), std::vector<AggrParentNode*>());
     for (auto& entry : type->aggrMember) {
+      entry.first->dimension.erase(entry.first->dimension.begin());
       auto* node = entry.first;
       node->type = NODE_MEMORY;
-      allSubMem.push_back(node);
+      memoryMap[topPrefix()].first.push_back(node);
       g->memory.push_back(node);
       node->set_memory(depth, rlatency, wlatency);
     }
+    memoryMap[topPrefix()].second = type->aggrParent;
   } else {
     auto* memNode = allocNode(NODE_MEMORY, topPrefix());
+    memoryMap[topPrefix()] = std::pair(std::vector<Node*>{memNode}, std::vector<AggrParentNode*>());
     g->memory.push_back(memNode);
     memNode->updateInfo(type);
-
     memNode->set_memory(depth, rlatency, wlatency);
   }
 
@@ -1547,6 +1530,33 @@ ENode* getWhenEnode(ExpTree* valTree, int depth) {
   return whenNode;
 }
 
+void whenConnect(graph* g, Node* node, ENode* lvalue, ENode* rvalue, PNode* connect) {
+  if (!node) {
+    printf("connect lineno %d\n", connect->lineno);
+    TODO();
+  }
+  ExpTree* valTree = nullptr;
+  ENode* whenNode;
+  int connectDepth = (node->type == NODE_WRITER || node->type == NODE_INFER) ? 0 :node->whenDepth;
+  if (node->isArray()) {
+    std::tie(valTree, whenNode) = growWhenTrace(nullptr, connectDepth);
+  } else {
+    std::tie(valTree, whenNode) = growWhenTrace(node->valTree, connectDepth);
+  }
+  valTree->setlval(lvalue);
+  if (node->type == NODE_WRITER || node->type == NODE_INFER) {
+    ENode* writeENode = node->memTree->getRoot()->dup();
+    writeENode->opType = OP_WRITE_MEM;
+    writeENode->addChild(rvalue);
+    rvalue = writeENode;
+    node->set_writer();
+  }
+  if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, rvalue);
+  else valTree->setRoot(rvalue);
+  if (node->isArray()) node->addArrayVal(valTree);
+  else node->valTree = valTree;
+}
+
 /*
 | reference "<=" expr info  { $$ = newNode(P_CONNECT, $1->lineno, $4, NULL, 2, $1, $3); }
 */
@@ -1558,56 +1568,20 @@ void visitWhenConnect(graph* g, PNode* connect) {
 
   if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i++) {
-      ExpTree* valTree = nullptr;
-      ENode* whenNode;
       if (exp->getFlip(i)) {
         Node* node = exp->getAggr(i)->getNode();
         stmtsNodes.insert(node);
-        if (!node) {
-          printf("connect lineno %d\n", connect->lineno);
-          TODO();
-        }
-        if (node->isArray()) {
-          std::tie(valTree, whenNode) = growWhenTrace(nullptr, node->whenDepth);
-        } else {
-          std::tie(valTree, whenNode) = growWhenTrace(node->valTree, node->whenDepth);
-        }
-        valTree->setlval(exp->getAggr(i));
-        if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, ref->getAggr(i));
-        else valTree->setRoot(ref->getAggr(i));
-        if (node->isArray()) node->addArrayVal(valTree);
-        else node->valTree = valTree;
+        whenConnect(g, node, exp->getAggr(i), ref->getAggr(i), connect);
       } else {
         Node* node = ref->getAggr(i)->getNode();
         stmtsNodes.insert(node);
-        if (node->isArray()) {
-          std::tie(valTree, whenNode) = growWhenTrace(nullptr, node->whenDepth);
-        } else {
-          std::tie(valTree, whenNode) = growWhenTrace(node->valTree, node->whenDepth);
-        }
-        valTree->setlval(ref->getAggr(i));
-        if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getAggr(i));
-        else valTree->setRoot(exp->getAggr(i));
-        if (node->isArray()) node->addArrayVal(valTree);
-        else node->valTree = valTree;
+        whenConnect(g, node, ref->getAggr(i), exp->getAggr(i), connect);
       }
     }
-
   } else {
     Node* node = ref->getExpRoot()->getNode();
     stmtsNodes.insert(node);
-    ExpTree* valTree;
-    ENode* whenNode;
-    if (node->isArray()) {
-      std::tie(valTree, whenNode) = growWhenTrace(nullptr, node->whenDepth);
-    } else {
-      std::tie(valTree, whenNode) = growWhenTrace(node->valTree, node->whenDepth);
-    }
-    valTree->setlval(ref->getExpRoot());
-    if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, exp->getExpRoot());
-    else valTree->setRoot(exp->getExpRoot());
-    if (node->isArray()) node->addArrayVal(valTree);
-    else node->valTree = valTree;
+    whenConnect(g, node, ref->getExpRoot(), exp->getExpRoot(), connect);
   }
 }
 /*
@@ -1694,8 +1668,8 @@ void visitWhenStmt(graph* g, PNode* stmt) {
     case P_INST: visitInst(g, stmt); break;
     case P_REG_DEF: visitRegDef(g, stmt, P_REG_DEF); break;
     case P_REG_RESET_DEF: visitRegDef(g, stmt, P_REG_RESET_DEF); break;
-    case P_READ : visitChirrtlMemPort(g, stmt); break;
-    case P_WRITE : visitChirrtlMemPort(g, stmt); break;
+    case P_READ :
+    case P_WRITE :
     case P_INFER : visitChirrtlMemPort(g, stmt); break;
     default: printf("Invalid type %d %d\n", stmt->type, stmt->lineno); Panic();
   }
@@ -1827,7 +1801,9 @@ void visitStmt(graph* g, PNode* stmt) {
     case P_MEMORY: visitMemory(g, stmt); break;
     case P_SEQ_MEMORY : visitChirrtlMemory(g, stmt); break;
     case P_COMB_MEMORY: visitChirrtlMemory(g, stmt); break;
-    case P_READ: visitChirrtlMemPort(g, stmt); break;
+    case P_READ:
+    case P_WRITE:
+    case P_INFER: visitChirrtlMemPort(g, stmt); break;
     case P_NODE: visitNode(g, stmt); break;
     case P_CONNECT: visitConnect(g, stmt); break;
     case P_PAR_CONNECT: visitPartialConnect(g, stmt); break;
@@ -1875,14 +1851,14 @@ void updatePrevNext(Node* n) {
     case NODE_OUT:
     case NODE_MEM_MEMBER:
     case NODE_OTHERS:
+    case NODE_READER:
+    case NODE_WRITER:
+    case NODE_READWRITER:
       n->updateConnect();
       break;
 /* should not exists in allSignals */
     // case NODE_L1_RDATA:
     case NODE_MEMORY:
-    case NODE_READER:
-    case NODE_WRITER:
-    case NODE_READWRITER:
     case NODE_INVALID:
     default: Panic();
 
@@ -1907,6 +1883,16 @@ graph* AST2Graph(PNode* root) {
   Assert(topModule, "Top module can not be NULL\n");
   visitTopModule(g, topModule);
 
+/* infer memory port */
+
+  for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
+    if (it->second->type == NODE_INFER || it->second->type == NODE_READER) {
+      it->second->memTree->getRoot()->opType = OP_READ_MEM;
+      it->second->valTree = it->second->memTree;
+      it->second->set_reader();
+    }
+  }
+
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     Node* node = it->second;
     if (node->valTree) {
@@ -1915,52 +1901,6 @@ graph* AST2Graph(PNode* root) {
     }
   }
   removeDummyDim(g);
-  /* add addrReg and reader_data trees */
-  for (Node* memory : g->memory) {
-    if (memory->rlatency == 0) {
-      for (Node* port : memory->member) {
-        if (port->type == NODE_WRITER) continue;
-        if (port->type == NODE_READWRITER) TODO();
-        ENode* enode = new ENode(OP_READ_MEM);
-        enode->addChild(new ENode(port->get_member(READER_ADDR)));
-        port->get_member(READER_DATA)->assignTree.push_back(new ExpTree(enode, port->get_member(READER_DATA)));
-      }
-    } else if (memory->rlatency == 1) {
-      for (Node* port : memory->member) {
-        if (port->type == NODE_WRITER) continue;
-        if (port->type == NODE_READWRITER) TODO();
-        /* alloc addr regs */
-        Node* addrNode = port->get_member(READER_ADDR);
-        Node* addrRegSrc = addrNode->dup();
-        addrRegSrc->type = NODE_REG_SRC;
-        addrRegSrc->name += "$IN";
-        g->addReg(addrRegSrc);
-        Node* addrRegDst = addrRegSrc->dup();
-        addrRegDst->type = NODE_REG_DST;
-        addrRegDst->name += "$NEXT";
-        addSignal(addrRegSrc->name, addrRegSrc);
-        addSignal(addrRegDst->name, addrRegDst);
-        addrRegSrc->bindReg(addrRegDst);
-        addrRegSrc->clock = addrRegDst->clock = port->get_member(READER_CLK);
-        ENode* resetCond = new ENode(OP_INT);
-        resetCond->width = 1;
-        resetCond->strVal = "h0";
-        addrRegSrc->resetCond = new ExpTree(resetCond, addrRegSrc);
-        addrRegSrc->resetVal = new ExpTree(new ENode(addrRegSrc), addrRegSrc);
-        /* update assignTree: set trees in addr to reg & add new tree for addr */
-        for (ExpTree* tree : addrNode->assignTree) {
-          addrRegSrc->assignTree.push_back(new ExpTree(tree->getRoot(), addrRegSrc));
-        }
-        addrNode->assignTree.clear();
-        addrNode->assignTree.push_back(new ExpTree(new ENode(addrRegSrc), addrNode));
-        ENode* enode = new ENode(OP_READ_MEM);
-        enode->addChild(new ENode(addrNode));
-        port->get_member(READER_DATA)->assignTree.push_back(new ExpTree(enode, port->get_member(READER_DATA)));
-      }
-    } else {
-      TODO();
-    }
-  }
 
   for (Node* reg : g->regsrc) {
     /* set lvalue to regDst */
@@ -2042,6 +1982,26 @@ bool ExpTree::isConstant() {
 
 bool nameExist(std::string str) {
   return allSignals.find(str) != allSignals.end();
+}
+
+void writer2Reg(ExpTree* tree) {
+  std::stack<std::tuple<ENode*, ENode*, int>>s;
+  s.push(std::make_tuple(tree->getRoot(), nullptr, 0));
+  while (!s.empty()) {
+    ENode* top, *parent;
+    int idx;
+    std::tie(top, parent, idx) = s.top();
+    s.pop();
+    if (top->opType == OP_WRITE_MEM) {
+      ENode* newChild = top->getChild(1);
+      if (parent) parent->setChild(idx, newChild);
+      else tree->setRoot(newChild);
+    } else {
+      for (int i = 0; i < top->getChildNum(); i ++) {
+        if (top->getChild(i)) s.push(std::make_tuple(top->getChild(i), top, i));
+      }
+    }
+  }
 }
 
 void ExpTree::removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::set<ENode*>& visited) {
@@ -2132,9 +2092,8 @@ void removeDummyDim(graph* g) {
     Node* clock = nullptr;
     int readerCount = 0, writerCount = 0;
     for (Node* port : mem->member) {
-      Node* newClock = port->get_port_clock();
+      clock = port->clock;
       // Assert(!clock || clock == newClock, "memory %s has multiple clocks", mem->name.c_str());
-      clock = newClock;
       if (port->type == NODE_READER) readerCount ++;
       if (port->type == NODE_WRITER) writerCount ++;
     }
@@ -2155,28 +2114,19 @@ void removeDummyDim(graph* g) {
     /* update all ports */
     for (Node* port : mem->member) {
       if (port->type == NODE_READER) {
-        Node* addr = port->get_member(READER_ADDR);
-        setZeroTree(addr);
-        Node* data = port->get_member(READER_DATA);
-        data->type = NODE_OTHERS;
-        data->assignTree.clear();
-        data->assignTree.push_back(new ExpTree(new ENode(regSrc), data));
+        port->assignTree.clear();
+        port->assignTree.push_back(new ExpTree(new ENode(regSrc), port));
+        port->type = NODE_OTHERS;
       } else if (port->type == NODE_WRITER) {
-        setZeroTree(port->get_member(WRITER_ADDR));
-        Node* mask = port->get_member(WRITER_MASK);
-        mask->type = NODE_OTHERS;
-        Node* data = port->get_member(WRITER_DATA);
-        data->type = NODE_OTHERS;
-        Node* en = port->get_member(WRITER_EN);
-        en->type = NODE_OTHERS;
-        ENode* andENode = new ENode(OP_AND);
-        andENode->addChild(new ENode(en));
-        andENode->addChild(new ENode(mask));
-        ENode* root = new ENode(OP_WHEN);
-        root->addChild(andENode);
-        root->addChild(new ENode(data));
-        root->addChild(nullptr);
-        regSrc->assignTree.push_back(new ExpTree(root, regSrc));
+        for (ExpTree* tree : port->assignTree) {
+          writer2Reg(tree);
+          regSrc->assignTree.push_back(tree);
+        }
+        for (ExpTree* tree : port->arrayVal) {
+          writer2Reg(tree);
+          regSrc->arrayVal.push_back(tree);
+        }
+        port->assignTree.clear();
       }
     }
       mem->status = DEAD_NODE;

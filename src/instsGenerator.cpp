@@ -1480,8 +1480,8 @@ valInfo* ENode::instsGroup(Node* node, std::string lvalue, bool isRoot) {
 
 valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
-  Assert(node->type == NODE_MEM_MEMBER, "invalid type %d", node->type);
-  Node* memory = node->parent->parent;
+  Assert(node->type == NODE_READER, "invalid type %d", node->type);
+  Node* memory = memoryNode;
   ret->valStr = memory->name + "[" + ChildInfo(0, valStr) + "]";
   for (int i = 0; i < memory->dimension.size(); i ++) {
     computeInfo->valStr += "[i" + std::to_string(i) + "]";
@@ -1494,6 +1494,30 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = format("(%s.%s(%d))", ret->valStr.c_str(), tailName(width).c_str(), width);
   }
   ret->opNum = 0;
+  return ret;
+}
+
+valInfo* ENode::instsWriteMem(Node* node, std::string lvalue, bool isRoot) {
+  valInfo* ret = computeInfo;
+  Assert(node->type == NODE_WRITER, "invalid type %d", node->type);
+  Node* memory = memoryNode;
+
+  if (isSubArray(lvalue, node)) {
+    TODO();
+  } else {
+    std::string indexStr;
+    if (node->isArray()) {
+      Assert(lvalue.compare(0, node->name.length(), node->name) == 0, "writer lvalue %s does not start with %s", lvalue.c_str(), node->name.c_str());
+      indexStr = lvalue.substr(node->name.length());
+    }
+    if (memory->width < width) {
+      ret->valStr = format("%s[%s]%s = %s & %s;", memory->name.c_str(), ChildInfo(0, valStr).c_str(), indexStr.c_str(), ChildInfo(1, valStr).c_str(), bitMask(memory->width).c_str());
+    } else {
+      ret->valStr = format("%s[%s]%s = %s;", memory->name.c_str(), ChildInfo(0, valStr).c_str(), indexStr.c_str(), ChildInfo(1, valStr).c_str());
+    }
+  }
+  ret->opNum = -1;
+  ret->type = TYPE_STMT;
   return ret;
 }
 
@@ -1756,6 +1780,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     case OP_STMT: instsStmt(n, lvalue, isRoot); break;
     case OP_INT: instsInt(n, lvalue, isRoot); break;
     case OP_READ_MEM: instsReadMem(n, lvalue, isRoot); break;
+    case OP_WRITE_MEM: instsWriteMem(n, lvalue, isRoot); break;
     case OP_INVALID: instsInvalid(n, lvalue, isRoot); break;
     case OP_RESET: instsReset(n, lvalue, isRoot); break;
     case OP_GROUP: instsGroup(n, lvalue, isRoot); break;

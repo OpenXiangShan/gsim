@@ -21,6 +21,7 @@ enum NodeType{
   NODE_READER,
   NODE_WRITER,
   NODE_READWRITER,
+  NODE_INFER,
   NODE_MEM_MEMBER,
   NODE_OTHERS,
   NODE_REG_UPDATE,
@@ -114,6 +115,7 @@ class Node {
   std::set<Node*> prev;
   std::vector <ExpTree*> assignTree;
   ExpTree* valTree = nullptr;
+  ExpTree* memTree = nullptr;
   ExpTree* resetCond = nullptr;  // valid in reg_src
   ExpTree* resetVal = nullptr;   // valid in reg_src
   std::vector<ExpTree*> arrayVal;
@@ -199,6 +201,14 @@ class Node {
   Node* get_member(int idx) {
     Assert(idx < (int)member.size(), "idx %d is out of bound [0, %ld)", idx, member.size());
     return member[idx];
+  }
+  void set_writer() {
+    Assert(type == NODE_WRITER || type == NODE_INFER, "invalid type %d\n", type);
+    type = NODE_WRITER;
+  }
+  void set_reader() {
+    Assert(type == NODE_READER || type == NODE_INFER, "invalid type %d\n", type);
+    type = NODE_READER;
   }
   Node* get_port_clock() {
     Assert(type == NODE_READER || type == NODE_WRITER, "invalid type %d in node %s", type, name.c_str());

@@ -127,18 +127,10 @@ void graph::clockOptimize() {
       } else {
         clockVal* val = nullptr;
         Node* clockMember = nullptr;
-        if (node->type == NODE_READER) {
-          Assert(clockMap.find(node->get_member(READER_CLK)) != clockMap.end(), "%s: clock %s not found", node->name.c_str(), node->get_member(READER_CLK)->name.c_str());
-          val = clockMap[node->get_member(READER_CLK)];
-          clockMember = node->get_member(READER_CLK);
-        } else if (node->type ==  NODE_WRITER) {
-          Assert(clockMap.find(node->get_member(WRITER_CLK)) != clockMap.end(), "%s: clock %s not found", node->name.c_str(), node->get_member(WRITER_CLK)->name.c_str());
-          val = clockMap[node->get_member(WRITER_CLK)];
-          clockMember = node->get_member(WRITER_CLK);
-        } else if (node->type == NODE_READWRITER) {
-          Assert(clockMap.find(node->get_member(READWRITER_CLK)) != clockMap.end(), "%s: clock %s not found", node->name.c_str(), node->get_member(READWRITER_CLK)->name.c_str());
-          val = clockMap[node->get_member(READWRITER_CLK)];
-          clockMember = node->get_member(READWRITER_CLK);
+        if (node->type == NODE_READER || node->type == NODE_WRITER || node->type == NODE_READWRITER) {
+          Assert(clockMap.find(node->clock) != clockMap.end(), "%s: clock %s not found", node->name.c_str(), node->clock->name.c_str());
+          val = clockMap[node->clock];
+          clockMember = node->clock;
         }
         if (val) {
           if (val->node) {

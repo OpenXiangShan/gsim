@@ -749,68 +749,6 @@ void graph::genResetAll(FILE* fp) {
   fprintf(fp, "}\n");
 }
 
-void graph::genMemWrite(FILE* fp) {
-  /* update memory*/
-  /* writer affects other nodes through reader, no need to activate in writer */
-  fprintf(fp, "void S%s::writeMem(){\n", name.c_str());
-  for (Node* mem : memory) {
-    std::set<int> readerNextId;
-    for (Node* port : mem->member) {
-      if (port->type == NODE_READER) {
-        if (port->get_member(READER_DATA)->super->cppId >= 0)
-          readerNextId.insert(port->get_member(READER_DATA)->super->cppId);
-      }
-    }
-    Assert(mem->rlatency <= 1 && mem->wlatency == 1, "rlatency %d wlatency %d in mem %s\n", mem->rlatency, mem->wlatency, mem->name.c_str());
-    for (Node* port : mem->member) {
-      if (port->type == NODE_WRITER) {
-        valInfo* info_en = port->member[WRITER_EN]->computeInfo;
-        valInfo* info_mask = port->member[WRITER_MASK]->computeInfo;
-        if (info_en->status == VAL_CONSTANT && mpz_sgn(info_en->consVal) == 0) continue;
-        if (info_mask->status == VAL_CONSTANT && mpz_sgn(info_mask->consVal) == 0) continue;
-        if (port->member[WRITER_DATA]->isArray() != 0) {
-          Node* writerData = port->member[WRITER_DATA];
-          fprintf(fp, "if(unlikely(%s)) {\n", port->member[WRITER_EN]->computeInfo->valStr.c_str());
-          std::string indexStr, bracket;
-          for (size_t i = 0; i < writerData->dimension.size(); i ++) {
-            fprintf(fp, "for (int i%ld = 0; i%ld < %d; i%ld ++) {", i, i, writerData->dimension[i], i);
-            indexStr += format("[i%ld]", i);
-            bracket += "}\n";
-          }
-          std::string wdataStr = port->member[WRITER_DATA]->computeInfo->status == VAL_CONSTANT ? port->member[WRITER_DATA]->computeInfo->valStr : port->member[WRITER_DATA]->computeInfo->valStr + indexStr;
-          if (info_mask->status == VAL_CONSTANT && mpz_sgn(info_mask->consVal) != 0) {
-            fprintf(fp, "%s[%s]%s = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str(),
-                                                  wdataStr.c_str());
-
-          } else {
-            fprintf(fp, "if (%s%s) %s[%s]%s = %s;\n", port->member[WRITER_MASK]->computeInfo->valStr.c_str(), indexStr.c_str(),
-                                                  mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), indexStr.c_str(),
-                                                  wdataStr.c_str());
-
-          }
-          fprintf(fp, "%s", bracket.c_str());
-        } else {
-          std::string cond;
-          if (info_en->status != VAL_CONSTANT) cond += port->member[WRITER_EN]->computeInfo->valStr.c_str();
-          if (info_mask->status != VAL_CONSTANT) cond += (cond.length() == 0 ? "" : " & ") + port->member[WRITER_MASK]->computeInfo->valStr;
-          fprintf(fp, "if(unlikely(%s)) {\n", cond.c_str());
-          fprintf(fp, "%s[%s] = %s;\n", mem->name.c_str(), port->member[WRITER_ADDR]->computeInfo->valStr.c_str(), port->member[WRITER_DATA]->computeInfo->valStr.c_str());
-        }
-        std::map<uint64_t, ActiveType> bitMapInfo;
-        activeSet2bitMap(readerNextId, bitMapInfo, -1);
-        for (auto iter : bitMapInfo) {
-          fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
-        }
-        fprintf(fp, "}\n");
-
-      } else if (port->type == NODE_READWRITER) {
-        TODO();
-      }
-    }
-  }
-  fprintf(fp, "}\n");
-}
-
 void graph::saveDiffRegs(FILE* fp) {
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
   fprintf(fp, "void S%s::saveDiffRegs(){\n", name.c_str());
@@ -853,7 +791,6 @@ void graph::genStep(FILE* fp) {
     fprintf(fp, "subStep%d();\n", i);
   }
 
-  fprintf(fp, "writeMem();\n");
   fprintf(fp, "resetAll();\n");
   fprintf(fp, "cycles ++;\n");
   fprintf(fp, "}\n");
@@ -921,7 +858,6 @@ void graph::cppEmitter() {
     fprintf(header, "void subStep%d();\n", i);
   }
 
-  fprintf(header, "void writeMem();\n");
   fprintf(header, "void resetAll();\n");
 
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
@@ -930,7 +866,6 @@ void graph::cppEmitter() {
 
   /* main evaluation loop (step)*/
   genActivate(src);
-  genMemWrite(src);
   genResetAll(src);
   saveDiffRegs(src);
   genStep(src);

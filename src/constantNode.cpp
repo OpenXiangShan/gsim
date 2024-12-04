@@ -575,7 +575,12 @@ valInfo* ENode::consInt(bool isLvalue) {
 }
 
 valInfo* ENode::consReadMem(bool isLvalue) {
-  return new valInfo(width, sign);
+  valInfo* ret = new valInfo(width, sign);
+  if (consMap.find(memoryNode) != consMap.end() && consMap[memoryNode]->status == VAL_CONSTANT) {
+    ret->status = VAL_CONSTANT;
+    mpz_set(ret->consVal, consMap[memoryNode]->consVal);
+  }
+  return ret;
 }
 
 valInfo* ENode::consInvalid(bool isLvalue) {
@@ -722,6 +727,7 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
     case OP_GROUP: ret = consGroup(node, isLvalue); break;
     case OP_INT: ret = consInt(isLvalue); break;
     case OP_READ_MEM: ret = consReadMem(isLvalue); break;
+    case OP_WRITE_MEM: ret = new valInfo(width, sign); break;
     case OP_INVALID: ret = consInvalid(isLvalue); break;
     case OP_RESET: ret = consReset(isLvalue); break;
     case OP_PRINTF: ret = consPrint(); break;
@@ -840,6 +846,8 @@ valInfo* Node::computeConstantArray() {
       std::tie(infoIdxBeg, infoIdxEnd) = tree->getlval()->getIdx(this);
       if (infoIdxBeg == infoIdxEnd) {
         ret->memberInfo[infoIdxBeg] = consEMap[tree->getRoot()];
+      } else if (consEMap[tree->getRoot()]->status == VAL_CONSTANT) {
+        for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) ret->memberInfo[infoIdxBeg + i] = consEMap[tree->getRoot()];
       } else if (consEMap[tree->getRoot()]->memberInfo.size() != 0) {
         for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) {
           ret->memberInfo[infoIdxBeg + i] = consEMap[tree->getRoot()]->getMemberInfo(i);
@@ -852,6 +860,9 @@ valInfo* Node::computeConstantArray() {
       std::tie(infoIdxBeg, infoIdxEnd) = tree->getlval()->getIdx(this);
       if (infoIdxBeg == infoIdxEnd) {
         ret->memberInfo[infoIdxBeg] = consEMap[tree->getRoot()];
+      } else if (consEMap[tree->getRoot()]->status == VAL_CONSTANT) {
+        for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++)
+          ret->memberInfo[infoIdxBeg + i] = consEMap[tree->getRoot()];
       } else if (consEMap[tree->getRoot()]->memberInfo.size() != 0) {
         for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) {
           ret->memberInfo[infoIdxBeg + i] = consEMap[tree->getRoot()]->getMemberInfo(i);
@@ -909,12 +920,12 @@ void graph::constantMemory() {
       bool isFirst = true;
       for (Node* port : mem->member) {
         if (port->type == NODE_WRITER) {
-          Node* wdata = port->get_member(WRITER_DATA);
-          if (wdata->status == CONSTANT_NODE) {
+          valInfo* info = consMap[port];
+          if (port->status == CONSTANT_NODE || info->sameConstant) {
             if (isFirst) {
-              mpz_set(val, consMap[wdata]->consVal);
+              mpz_set(val, info->assignmentCons);
               isFirst = false;
-            } else if (mpz_cmp(consMap[wdata]->consVal, val) == 0) {
+            } else if (mpz_cmp(info->assignmentCons, val) == 0) {
 
             } else {
               isConstant = false;
@@ -930,19 +941,16 @@ void graph::constantMemory() {
         num ++;
         for (Node* port : mem->member) {
           if (port->type == NODE_READER) {
-            setNodeCons(port->get_member(READER_ADDR), "0");
-            setNodeCons(port->get_member(READER_EN), "0");
-            setNodeCons(port->get_member(READER_DATA), mpz_get_str(NULL, 16, val));
-            for (Node* next : port->get_member(READER_DATA)->next) {
+            setNodeCons(port, mpz_get_str(NULL, 16, val));
+            for (Node* next : port->next) {
               if (consMap.find(next) != consMap.end()) addRecompute(next);
             }
           } else if (port->type == NODE_WRITER) {
-            setNodeCons(port->get_member(WRITER_ADDR), "0");
-            setNodeCons(port->get_member(WRITER_EN), "0");
-            setNodeCons(port->get_member(WRITER_MASK), "0");
+            setNodeCons(port, mpz_get_str(NULL, 16, val));
           } else TODO();
         }
         mem->status = CONSTANT_NODE;
+        setNodeCons(mem, mpz_get_str(NULL, 16, val));
       }
     }
     if (recomputeQueue.empty()) break;

@@ -155,7 +155,10 @@ void ENode::inferWidth() {
         }
         break;
       case OP_READ_MEM:
-        setWidth(getChild(0)->nodePtr->parent->parent->width, getChild(0)->nodePtr->parent->parent->sign);
+        setWidth(memoryNode->width, memoryNode->sign);
+        break;
+      case OP_WRITE_MEM:
+        setWidth(w1, s1);
         break;
       case OP_INVALID:
         setWidth(0, false);
@@ -186,6 +189,7 @@ void Node::inferWidth() {
     for (Node* member : arrayMember) member->inferWidth();
   }
   for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();
+  for (ExpTree* tree : arrayVal) tree->getRoot()->inferWidth();
   if (updateTree) updateTree->getRoot()->inferWidth();
   if (resetTree) resetTree->getRoot()->inferWidth();
   if (resetVal) resetVal->getRoot()->inferWidth();
@@ -199,13 +203,16 @@ void Node::inferWidth() {
       newSign = tree->getRoot()->sign;
       newClock |= tree->getRoot()->isClock;
     }
+    for (ExpTree* tree : arrayVal) {
+      newWidth = MAX(newWidth, tree->getRoot()->width);
+      newSign = tree->getRoot()->sign;
+      newClock |= tree->getRoot()->isClock;
+    }
     setType(newWidth, newSign);
     isClock = newClock;
   }
 
   for (ExpTree* arrayTree : arrayVal) {
-    if (!arrayTree) continue;
-    arrayTree->getRoot()->inferWidth();
     arrayTree->getlval()->inferWidth();
   }
 }
