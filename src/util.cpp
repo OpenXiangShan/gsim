@@ -13,17 +13,19 @@
    In the new FIRRTL spec, there are 'int' and 'rint'.*/
 std::pair<int, std::string> firStrBase(std::string s) {
   if (s.length() <= 1) { return std::make_pair(10, s); }
-
   std::string ret;
 
-  int idx  = 1;
+  int idx  = 0;
   int base = -1;
 
   // Check if the constant is negative.
   if (s[0] == '-') {
     ret += '-';
-    idx = 2;
+    idx = 1;
   }
+  if (s[idx] != '0') return std::make_pair(10, s);
+
+  idx ++;
 
   // If there is no "0b", "0o", "0d", or "0h" prefix, treat it as a base-10 integer.
   if ((s[idx] != 'b') && (s[idx] != 'o') && (s[idx] != 'd') && (s[idx] != 'h')) {
@@ -32,14 +34,14 @@ std::pair<int, std::string> firStrBase(std::string s) {
   }
 
   // Determine the base from the prefix.
-  switch (s[2]) {
+  switch (s[idx]) {
     case 'b': base = 2; break;
     case 'o': base = 8; break;
     case 'h': base = 16; break;
     default: base = 10; break;
   }
 
-  idx = 2;
+  idx ++;
   ret += s.substr(idx);
 
   return std::make_pair(base, ret);
