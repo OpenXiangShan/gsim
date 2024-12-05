@@ -67,18 +67,18 @@ class SigFilter():
           continue
         if mod_width > 128 and mod_width <= 256:
           num = int((ref_width + 31) / 32)
-          self.dstfp.writelines("uint256_t " + refUName + " = " + refName + "[" + str(num-1) +"U]);\n")
+          self.dstfp.writelines("uint256_t " + refUName + " = " + refName + "[" + str(num-1) +"U];\n")
           for i in range(num - 1, 0, -1):
-            self.dstfp.writelines(refUName + " = " + refUName + " << 32 + " + refName + "[" + str(i-1) + "U]);\n")
+            self.dstfp.writelines(refUName + " = (" + refUName + " << 32) + " + refName + "[" + str(i-1) + "U];\n")
 
         refName128 = ""
         if ref_width > 64:
           num = int((ref_width + 31) / 32)
-          for i in range(min(4, num)):
-            refName128 = refName128 + (" | " if i != 0 else "") + "((__uint128_t)" + refName + "[" + str(i) + "] << " + str(i * 32) + ")"
+          for i in range(min(8, num)):
+            refName128 = refName128 + (" | " if i != 0 else "") + "((uint256_t)" + refName + "[" + str(i) + "] << " + str(i * 32) + ")"
           refName = refName.lstrip("ref->rootp->") + "_128"
-          self.dstfp.writelines("__uint128_t " + refName + " = " + refName128 + ";\n")
-        # mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((__uint128_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
+          self.dstfp.writelines("uint256_t " + refName + " = " + refName128 + ";\n")
+        # mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((uint256_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
         mask = "(((uint256_t)1 << " + str(mod_width) + ") - 1)"
         self.dstfp.writelines( \
         "if(display || (" + modName + " & " + mask + ") != (" + refName + "&" + mask + ")){\n" + \
