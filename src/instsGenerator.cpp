@@ -449,7 +449,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       falseStr = falseInst + falseStr;
       getChild(2)->computeInfo->insts.clear();
     }
-    if (node->isArray()) {
+    if (node->isArray() || node->type == NODE_WRITER) {
       if (getChild(1) && ChildInfo(1, directUpdate)) trueStr += ASSIGN_LABLE;
       if (getChild(2) && ChildInfo(2, directUpdate)) falseStr += ASSIGN_LABLE;
     }

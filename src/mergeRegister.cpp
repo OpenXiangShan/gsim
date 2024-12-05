@@ -131,11 +131,6 @@ void graph::mergeRegister() {
 }
 
 void graph::constructRegs() {
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-  SuperNode* updateReg = new SuperNode();
-  updateReg->superType = SUPER_SAVE_REG;
-  sortedSuper.push_back(updateReg);
-#endif
   std::map<SuperNode*, SuperNode*> dstSuper2updateSuper;
   for (Node* node : regsrc) {
     if (node->status != VALID_NODE) continue;

@@ -375,7 +375,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
     }
     fprintf(fp, ";\n");
   }
-  std::string verilatorName = name + "__DOT__" + (node->type == NODE_REG_DST? node->getSrc()->name : node->name);
+  std::string verilatorName = name + "__DOT__" + node->name;
   size_t pos;
   while ((pos = verilatorName.find("$$")) != std::string::npos) {
     verilatorName.replace(pos, 2, "_");
@@ -384,9 +384,9 @@ void graph::genDiffSig(FILE* fp, Node* node) {
     verilatorName.replace(pos, 1, "__DOT__");
   }
   std::map<std::string, std::string> allNames;
-  std::string diffNodeName = node->type == NODE_REG_DST ? (node->getSrc()->name + "$prev") : node->name;
-  std::string originName = (node->type == NODE_REG_DST ? node->getSrc()->name : node->name);
-  if (node->type == NODE_MEMORY || node->type == NODE_REG_DST){
+  std::string diffNodeName = node->type == NODE_REG_SRC ? (node->getSrc()->name + "$prev") : node->name;
+  std::string originName = (node->type == NODE_REG_SRC ? node->getSrc()->name : node->name);
+  if (node->type == NODE_MEMORY){
 
   } else if (node->isArrayMember) {
     allNames[node->name] = node->name;
@@ -427,10 +427,8 @@ void graph::genDiffSig(FILE* fp, Node* node) {
   } else {
     allNames[diffNodeName] = verilatorName;
   }
-  if (node->type != NODE_REG_SRC) {
-    for (auto iter : allNames)
-      fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, iter.first.c_str(), iter.second.c_str());
-  }
+  for (auto iter : allNames)
+    fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, iter.first.c_str(), iter.second.c_str());
 }
 #endif
 
@@ -573,7 +571,21 @@ void graph::genNodeInsts(FILE* fp, Node* node, std::string flagName) {
       }
     }
     /* display all insts */
-    std::string indiStr = node->fullyUpdated || !node->isArray() || !node->anyNextActive() ? "" : format("\n%s = true;\n", ASSIGN_INDI(node).c_str());
+    std::string indiStr;
+    if (!node->fullyUpdated && node->isArray() && node->anyNextActive()) {
+      indiStr = format("\n%s = true;\n", ASSIGN_INDI(node).c_str());
+    } else if (node->type == NODE_WRITER) { // activate all readers
+      indiStr += "\n";
+      std::set<int> allReaderId;
+      for (Node* port : node->parent->member) {
+        if (port->type == NODE_READER && port->status == VALID_NODE) allReaderId.insert(port->super->cppId);
+      }
+      std::map<uint64_t, ActiveType> bitMapInfo;
+      activeSet2bitMap(allReaderId, bitMapInfo, -1);
+      for (auto iter : bitMapInfo) {
+        indiStr += format("%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+      }
+    }
     for (std::string inst : newInsts) {
       fprintf(fp, "%s\n", strReplace(inst, ASSIGN_LABLE, indiStr).c_str());
     }
@@ -585,20 +597,14 @@ void graph::genNodeInsts(FILE* fp, Node* node, std::string flagName) {
 
 void graph::genNodeStepStart(FILE* fp, SuperNode* node, uint64_t mask, int idx, std::string flagName) {
   nodeNum ++;
-  if(node->superType == SUPER_SAVE_REG) {
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-    fprintf(fp, "saveDiffRegs();\n");
+  if (!isAlwaysActive(node->cppId)) fprintf(fp, "if(unlikely(%s & 0x%lx)) { // id=%d\n", flagName.c_str(), mask, idx);
+  int id;
+  uint64_t newMask;
+  std::tie(id, newMask) = clearIdxMask(node->cppId);
+#ifdef PERF
+  fprintf(fp, "activeTimes[%d] ++;\n", node->cppId);
+  fprintf(fp, "bool isActivateValid = false;\n");
 #endif
-  } else {
-    if (!isAlwaysActive(node->cppId)) fprintf(fp, "if(unlikely(%s & 0x%lx)) { // id=%d\n", flagName.c_str(), mask, idx);
-    int id;
-    uint64_t mask;
-    std::tie(id, mask) = clearIdxMask(node->cppId);
-  #ifdef PERF
-    fprintf(fp, "activeTimes[%d] ++;\n", node->cppId);
-    fprintf(fp, "bool isActivateValid = false;\n");
-  #endif
-  }
 }
 
 void graph::nodeDisplay(FILE* fp, Node* member) {
@@ -616,6 +622,8 @@ void graph::nodeDisplay(FILE* fp, Node* member) {
     std::string nameIdx = member->name + idxStr;
     if (member->width > BASIC_WIDTH) {
       fprintf(fp, "%s.displayn();\n", nameIdx.c_str());
+    } else if (member->width > 128) {
+      fprintf(fp, "printf(\"%%lx|%%lx%%lx|%%lx \", (uint64_t)(%s >> 192), (uint64_t)(%s >> 128) (uint64_t)(%s >> 64), (uint64_t)(%s));", nameIdx.c_str(), nameIdx.c_str(), nameIdx.c_str(), nameIdx.c_str());
     } else if (member->width > 64) {
       fprintf(fp, "printf(\"%%lx|%%lx \", (uint64_t)(%s >> 64), (uint64_t)(%s));", nameIdx.c_str(), nameIdx.c_str());
     } else {
@@ -627,7 +635,13 @@ void graph::nodeDisplay(FILE* fp, Node* member) {
     fprintf(fp, "printf(\"%%ld %d %s: \", cycles);\n", member->super->cppId, member->name.c_str());
     fprintf(fp, "%s.displayn();\n", member->name.c_str());
     fprintf(fp, "printf(\"\\n\");\n");
-  } else if (member->width > 64 && member->width <= BASIC_WIDTH) {
+  } else if (member->width > 128) {
+    if (member->anyNextActive()) {// display old value and new value
+      fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx|%%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 192), (uint64_t)(%s >> 128), (uint64_t)(%s >> 64), (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str(), member->name.c_str(), member->name.c_str());
+    } else if (member->type != NODE_SPECIAL) {
+      fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx|%%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 192), (uint64_t)(%s >> 128), (uint64_t)(%s >> 64), (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str(), member->name.c_str(), member->name.c_str());
+    }
+  } else if (member->width > 64) {
     if (member->anyNextActive()) {// display old value and new value
       fprintf(fp, "printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
     } else if (member->type != NODE_SPECIAL) {
@@ -649,7 +663,7 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
   fprintf(fp, "validActive[%d] += isActivateValid;\n", node->cppId);
 #endif
 
-  if(node->superType != SUPER_SAVE_REG && !isAlwaysActive(node->cppId)) fprintf(fp, "}\n");
+  if(!isAlwaysActive(node->cppId)) fprintf(fp, "}\n");
 }
 
 void graph::genActivate(FILE* fp) {
@@ -668,8 +682,7 @@ void graph::genActivate(FILE* fp) {
         }
         prevActiveWhole = true;
         for (int j = 0; j < ACTIVE_WIDTH && idx + j < superId; j ++) {
-          SuperNode* super = cppId2Super[idx + j];
-          if (isAlwaysActive(idx + j) || super->superType == SUPER_SAVE_REG) prevActiveWhole = false;
+          if (isAlwaysActive(idx + j)) prevActiveWhole = false;
         }
         if (prevActiveWhole) {
           fprintf(fp, "if(unlikely(activeFlags[%d] != 0)) {\n", id);
@@ -681,7 +694,24 @@ void graph::genActivate(FILE* fp) {
       std::string flagName = prevActiveWhole ? "oldFlag" : format("activeFlags[%d]", id);
       genNodeStepStart(fp, super, mask, idx, flagName);
       for (Node* n : super->member) {
-        if (n->insts.size() == 0) continue;
+        if (n->insts.size() == 0) {
+#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
+          if (n->type == NODE_REG_SRC) {
+            if (n->isArray()) {
+              std::string idxStr, bracket, inst;
+              for (int i = 0; i < n->dimension.size(); i ++) {
+                inst += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, n->dimension[i], i);
+                idxStr += "[i" + std::to_string(i) + "]";
+                bracket += "}\n";
+              }
+              inst += format("%s$prev%s = %s%s;\n", n->name.c_str(), idxStr.c_str(), n->name.c_str(), idxStr.c_str());
+              inst += bracket;
+              n->insts.push_back(inst);
+            } else n->insts.push_back(format("%s$prev = %s;\n", n->name.c_str(), n->name.c_str()));
+          }
+#endif
+          continue;
+        }
         genNodeInsts(fp, n, flagName);
         nodeDisplay(fp, n);
       }
@@ -783,7 +813,9 @@ void graph::genStep(FILE* fp) {
       }
     }
   }
-
+#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
+  fprintf(fp, "saveDiffRegs();\n");
+#endif
   for (int i = 0; i < subStepNum; i ++) {
     fprintf(fp, "subStep%d();\n", i);
   }
@@ -795,14 +827,18 @@ void graph::genStep(FILE* fp) {
 
 bool SuperNode::instsEmpty() {
   for (Node* n : member) {
+#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
+    if (n->insts.size() != 0 || n->type == NODE_REG_SRC) return false;
+#else
     if (n->insts.size() != 0) return false;
+#endif
   }
   return true;
 }
 
 void graph::cppEmitter() {
   for (SuperNode* super : sortedSuper) {
-    if (super->superType == SUPER_SAVE_REG || !super->instsEmpty()) {
+    if (!super->instsEmpty()) {
       super->cppId = superId ++;
       cppId2Super[super->cppId] = super;
 #if 0
