@@ -94,14 +94,6 @@ void ENode::usedBitWithFixRoot(int rootWidth) {
   width = MIN(width, rootWidth);
 }
 
-void ENode::clearWidth() {
-  std::stack<ENode*> s;
-  for (ENode* childENode : child) {
-    if (childENode) childENode->clearWidth();
-  }
-  if (opType != OP_INT) width = -1;
-}
-
 void ENode::updateWidth() {
   for (ENode* childENode : child) {
     if (childENode) childENode->updateWidth();

@@ -179,6 +179,29 @@ void ENode::inferWidth() {
   }
 }
 
+void ENode::clearWidth() {
+  std::stack<ENode*> s;
+  for (ENode* childENode : child) {
+    if (childENode) childENode->clearWidth();
+  }
+  if (opType != OP_INT) width = -1;
+}
+
+void Node::clearWidth() {
+  if (isArray() && arraySplitted()) {
+    Panic();
+    for (Node* member : arrayMember) member->clearWidth();
+  }
+  for (ExpTree* tree : assignTree) tree->getRoot()->clearWidth();
+  for (ExpTree* tree : arrayVal) {
+    tree->getRoot()->clearWidth();
+    tree->getlval()->clearWidth();
+  }
+  if (updateTree) updateTree->getRoot()->clearWidth();
+  if (resetTree) resetTree->getRoot()->clearWidth();
+  if (resetVal) resetVal->getRoot()->clearWidth();
+}
+
 /*
 infer width of node and all ENodes in valTree
 inverse topological order or [infer all encountered nodes]
@@ -208,6 +231,7 @@ void Node::inferWidth() {
       newSign = tree->getRoot()->sign;
       newClock |= tree->getRoot()->isClock;
     }
+    if (resetVal) newWidth = MAX(newWidth, resetVal->getRoot()->width);
     setType(newWidth, newSign);
     isClock = newClock;
   }
@@ -237,8 +261,9 @@ void graph::inferAllWidth() {
     node->inferWidth();
     if (prevWidth != node->width) {
       for (Node* next : node->next) {
-        if (uniqueNodes.find(next) == uniqueNodes.end() && fixedWidth.find(next) == fixedWidth.end()) {
-          next->width = -1;
+        if (uniqueNodes.find(next) == uniqueNodes.end()) {
+          next->clearWidth();
+          if (fixedWidth.find(next) == fixedWidth.end()) next->width = -1;
           reinferNodes.push(next);
         }
       }
@@ -250,8 +275,8 @@ void graph::inferAllWidth() {
         reinferNodes.push(node->getSrc()); // re-infer the src node for updateTree
         node->getSrc()->width = node->width;
         for (Node* next : node->getSrc()->next) {
-          if (uniqueNodes.find(next) == uniqueNodes.end() && fixedWidth.find(next) == fixedWidth.end()) {
-            next->width = -1;
+          if (uniqueNodes.find(next) == uniqueNodes.end()) {
+            if (fixedWidth.find(next) == fixedWidth.end()) next->width = -1;
             reinferNodes.push(next);
           }
         }
@@ -260,6 +285,7 @@ void graph::inferAllWidth() {
   }
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) {
+      if (node->type == NODE_REG_SRC) node->updateTree->getRoot()->inferWidth();
       node->updateHeadTail();
       node->updateTreeWithNewWIdth();
     }

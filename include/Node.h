@@ -256,6 +256,7 @@ class Node {
   }
   void updateConnect();
   void inferWidth();
+  void clearWidth();
   void addReset();
   void addUpdateTree();
   void constructSuperNode(); // alloc superNode for every node
