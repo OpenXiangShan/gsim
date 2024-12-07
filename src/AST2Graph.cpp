@@ -1105,7 +1105,7 @@ struct ChirrtlVistor {
   }
 };
 
-static Node* visitChirrtlPort(PNode* port, int width, int depth, bool sign, std::string suffix, Node* node, Node* addr_node, Node* clock_node) {
+static Node* visitChirrtlPort(graph* g, PNode* port, int width, int depth, bool sign, std::string suffix, Node* node, Node* addr_node, Node* clock_node) {
   assert(port->type == P_READ || port->type == P_WRITE || port->type == P_INFER);
   // Add prefix port name
   prefix_append(SEP_MODULE, port->name);
@@ -1114,6 +1114,26 @@ static Node* visitChirrtlPort(PNode* port, int width, int depth, bool sign, std:
   if (port->type == P_READ) {
     type = NODE_READER;
     op = OP_READ_MEM;
+    if (node->rlatency == 1) {
+      Node* addr_src = addr_node->dup();
+      addr_src->type = NODE_REG_SRC;
+      addr_src->name += format("%s%s", SEP_AGGR, "IN");
+      g->addReg(addr_src);
+      Node* addr_dst = addr_src->dup();
+      addr_dst->type = NODE_REG_DST;
+      addr_dst->name += format("%s%s", SEP_AGGR, "NEXT");
+      addSignal(addr_src->name, addr_src);
+      addSignal(addr_dst->name, addr_dst);
+      addr_src->bindReg(addr_dst);
+      addr_src->clock = addr_dst->clock = clock_node;
+      addr_src->valTree = new ExpTree(new ENode(addr_node), addr_src);
+      ENode* resetCond = new ENode(OP_INT);
+      resetCond->width = 1;
+      resetCond->strVal = "h0";
+      addr_src->resetCond = new ExpTree(resetCond, addr_src);
+      addr_src->resetVal = new ExpTree(new ENode(addr_src), addr_src);
+      addr_node = addr_src;
+    }
   } else if (port->type == P_WRITE) {
     type = NODE_WRITER;
     op = OP_WRITE_MEM;
@@ -1150,7 +1170,7 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
     bool sign = mem->sign;
     int width = mem->width;
     std::string suffix = replacePrefix(memName, "", mem->name).c_str();
-    Node* portNode = visitChirrtlPort(port, width, depth, sign, suffix, mem, addr_node, clock_node);
+    Node* portNode = visitChirrtlPort(g, port, width, depth, sign, suffix, mem, addr_node, clock_node);
     mem->add_member(portNode);
     addSignal(portNode->name, portNode);
     memoryMembers.push_back(portNode);
