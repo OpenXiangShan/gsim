@@ -578,7 +578,7 @@ void graph::genNodeInsts(FILE* fp, Node* node, std::string flagName) {
       indiStr += "\n";
       std::set<int> allReaderId;
       for (Node* port : node->parent->member) {
-        if (port->type == NODE_READER && port->status == VALID_NODE) allReaderId.insert(port->super->cppId);
+        if (port->type == NODE_READER && (port->status == VALID_NODE || port->status == MERGED_NODE)) allReaderId.insert(port->super->cppId);
       }
       std::map<uint64_t, ActiveType> bitMapInfo;
       activeSet2bitMap(allReaderId, bitMapInfo, -1);
