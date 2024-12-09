@@ -1157,8 +1157,13 @@ static Node* visitChirrtlPort(graph* g, PNode* port, int width, int depth, bool 
 static void visitChirrtlMemPort(graph* g, PNode* port) {
   // If we are in the top module, 
   //    the memory name does not need to have the prefix added.
-  ASTExpTree* addr = visitReference(g, port->getChild(0));
+  ASTExpTree* addr = visitExpr(g, port->getChild(0));
   Node* addr_node = addr->getExpRoot()->getNode();
+  if (!addr_node) {
+    addr_node = allocNode(NODE_OTHERS, prefixName(SEP_MODULE, port->name + SEP_AGGR + "addr"));
+    addr_node->valTree = new ExpTree(addr->getExpRoot(), addr_node);
+    addSignal(addr_node->name, addr_node);
+  }
   Node* clock_node = getSignal(prefixName(SEP_MODULE, port->getExtra(1)));
   // prefix_append(SEP_MODULE, port->getExtra(0));
   std::string memName = prefixName(SEP_MODULE, port->getExtra(0));
