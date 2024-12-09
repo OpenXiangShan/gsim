@@ -262,6 +262,8 @@ intmodule: Intmodule ALLID ':' info INDENT ports Intrinsic '=' ALLID params DEDE
 /* in-line anotations */
 member:
     | String ':' String {}
+    | String ':' INT {}
+    | String ':' json {}
 
 members:  
     | member             {}
