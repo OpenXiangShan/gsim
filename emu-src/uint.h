@@ -6,6 +6,7 @@
 #define uint128_t __uint128_t
 #define int128_t __int128_t
 
+class int256_t;
 class uint512_t;
 class uint1024_t;
 class uint2048_t;
@@ -47,10 +48,15 @@ public:
     u128_0 = val;
     u128_1 = 0;
   }
+  uint256_t(long val) {
+    u128_0 = val;
+    u128_1 = 0;
+  }
   uint256_t(uint128_t val) {
     u128_0 = val;
     u128_1 = 0;
   }
+  uint256_t(int256_t val);
   void operator = (int data) {
     u128_0 = data;
     u128_1 = 0;
@@ -79,6 +85,9 @@ public:
   }
   bool operator != (uint256_t b) {
     return u128_1 != b.u128_1 || u128_0 != b.u128_0;
+  }
+  bool operator > (int b) {
+    return u128_0 > b || u128_1 > 0;
   }
   uint256_t operator << (int shiftNum) {
     uint256_t ret;
@@ -275,6 +284,9 @@ public:
                     (s128_1 >> (shiftNum - 128)) :
                     (u128_0 >> shiftNum) | (s128_1 << (128 - shiftNum)));
     return ret;
+  }
+  uint64_t operator & (int a) {
+    return u128_0 & a;
   }
   uint64_t operator & (uint64_t a) {
     return u128_0 & a;
@@ -929,8 +941,15 @@ public:
     uint512_t ret;
     ret.u256_0 = (uint256_t)data[3] << 192 | (uint256_t)data[2] << 128 | (uint256_t)data[1] << 64 | (uint256_t)data[0];
     ret.u256_1 = (uint256_t)data[7] << 192 | (uint256_t)data[6] << 128 | (uint256_t)data[5] << 64 | (uint256_t)data[4];
+#if SUPPORT_U256
     ret.u256_0 &= a.u256_0;
     ret.u256_1 &= a.u256_1;
+#else
+    ret.u256_0.u128_0 &= a.u256_0.u128_0;
+    ret.u256_0.u128_1 &= a.u256_0.u128_1;
+    ret.u256_1.u128_0 &= a.u256_1.u128_0;
+    ret.u256_1.u128_1 &= a.u256_1.u128_1;
+#endif
     return ret;
   }
   template<int num1> wide_t<_dataNum> operator | (wide_t<num1> a) {

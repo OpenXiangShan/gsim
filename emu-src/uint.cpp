@@ -70,6 +70,12 @@ uint256_t::operator int256_t() {
   ret.s128_1 = u128_1;
   return ret;
 }
+
+uint256_t::uint256_t(int256_t val) {
+  u128_0 = val.u128_0;
+  u128_1 = val.s128_1;
+}
+
 #endif
 
 void uint512_t::operator = (uint1024_t data) {
