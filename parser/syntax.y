@@ -30,7 +30,7 @@ int p_stoi(const char* str);
 {
     #define synlineno() scanner->lineno()
     #define yylex(x) scanner->lex(x)
-    /* #define yylex(x) scanner->lex_debug(x) */
+    // #define yylex(x) scanner->lex_debug(x)
 }
 
 %union {
