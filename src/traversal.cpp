@@ -57,7 +57,8 @@ static std::map<OPType, const char*> OP2Name = {
   {OP_SHR, "shr"}, {OP_HEAD, "head"}, {OP_TAIL, "tail"}, {OP_BITS, "bits"}, {OP_INDEX_INT, "index_int"},
   {OP_INDEX, "index"}, {OP_WHEN, "when"}, {OP_PRINTF, "printf"}, {OP_ASSERT, "assert"}, {OP_INT, "int"},
   {OP_READ_MEM, "readMem"}, {OP_WRITE_MEM, "writeMem"}, {OP_INFER_MEM, "inferMem"},
-  {OP_RESET, "reset"}, {OP_STMT, "stmts"}, {OP_SEXT, "sext"}, {OP_BITS_NOSHIFT, "bits_noshift"}
+  {OP_RESET, "reset"}, {OP_STMT, "stmts"}, {OP_SEXT, "sext"}, {OP_BITS_NOSHIFT, "bits_noshift"},
+  {OP_GROUP, "group"}
 };
 
 static std::map<NodeType, const char*> NodeType2Name = {
