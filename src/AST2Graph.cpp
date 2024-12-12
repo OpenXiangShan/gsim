@@ -1114,26 +1114,6 @@ static Node* visitChirrtlPort(graph* g, PNode* port, int width, int depth, bool 
   if (port->type == P_READ) {
     type = NODE_READER;
     op = OP_READ_MEM;
-    if (node->rlatency == 1) {
-      Node* addr_src = addr_node->dup();
-      addr_src->type = NODE_REG_SRC;
-      addr_src->name += format("%s%s", SEP_AGGR, "IN");
-      g->addReg(addr_src);
-      Node* addr_dst = addr_src->dup();
-      addr_dst->type = NODE_REG_DST;
-      addr_dst->name += format("%s%s", SEP_AGGR, "NEXT");
-      addSignal(addr_src->name, addr_src);
-      addSignal(addr_dst->name, addr_dst);
-      addr_src->bindReg(addr_dst);
-      addr_src->clock = addr_dst->clock = clock_node;
-      addr_src->valTree = new ExpTree(new ENode(addr_node), addr_src);
-      ENode* resetCond = new ENode(OP_INT);
-      resetCond->width = 1;
-      resetCond->strVal = "h0";
-      addr_src->resetCond = new ExpTree(resetCond, addr_src);
-      addr_src->resetVal = new ExpTree(new ENode(addr_src), addr_src);
-      addr_node = addr_src;
-    }
   } else if (port->type == P_WRITE) {
     type = NODE_WRITER;
     op = OP_WRITE_MEM;
@@ -1167,6 +1147,27 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
   Node* clock_node = getSignal(prefixName(SEP_MODULE, port->getExtra(1)));
   // prefix_append(SEP_MODULE, port->getExtra(0));
   std::string memName = prefixName(SEP_MODULE, port->getExtra(0));
+
+ if (port->type == P_READ && memoryMap[memName].first[0]->rlatency == 1) {
+    Node* addr_src = addr_node->dup();
+    addr_src->type = NODE_REG_SRC;
+    addr_src->name += format("%s%s%s%s", SEP_MODULE, port->name.c_str(), SEP_AGGR, "IN");
+    g->addReg(addr_src);
+    Node* addr_dst = addr_src->dup();
+    addr_dst->type = NODE_REG_DST;
+    addr_dst->name += format("%s%s", SEP_AGGR, "NEXT");
+    addSignal(addr_src->name, addr_src);
+    addSignal(addr_dst->name, addr_dst);
+    addr_src->bindReg(addr_dst);
+    addr_src->clock = addr_dst->clock = clock_node;
+    addr_src->valTree = new ExpTree(new ENode(addr_node), addr_src);
+    ENode* resetCond = new ENode(OP_INT);
+    resetCond->width = 1;
+    resetCond->strVal = "h0";
+    addr_src->resetCond = new ExpTree(resetCond, addr_src);
+    addr_src->resetVal = new ExpTree(new ENode(addr_src), addr_src);
+    addr_node = addr_src;
+  }
 
   Assert(memoryMap.find(memName) != memoryMap.end(), "Could not find memory: %s", memName.c_str());
   std::vector<Node*> memoryMembers;
