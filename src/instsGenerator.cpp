@@ -167,12 +167,31 @@ int memberConstant(valInfo* info) {
   return ret;
 }
 
-static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo) {
+static std::string constantAssign(std::string lvalue, int dimIdx, Node* node, valInfo* rinfo) {
+  std::string ret;
+  if(node->width <= BASIC_WIDTH && mpz_sgn(rinfo->consVal) == 0) {
+    ret = format("memset(%s, 0, sizeof(%s));", lvalue.c_str(), lvalue.c_str());
+  } else {
+    std::string idxStr, bracket;
+    for (int i = 0; i < node->dimension.size() - dimIdx; i ++) {
+      ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i + dimIdx], i);
+      idxStr += "[i" + std::to_string(i) + "]";
+      bracket += "}\n";
+    }
+    ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
+    ret += bracket;
+  }
+  return ret;
+}
+
+static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int dimIdx = -1) {
   std::string ret;
   int num = 1;
-  int dimIdx = countArrayIndex(lvalue);
+  if (dimIdx < 0) dimIdx = countArrayIndex(lvalue);
   for (size_t i = dimIdx; i < node->dimension.size(); i ++) num *= node->dimension[i];
-  if (memberValid(rinfo, num)) {
+  if (rinfo->status == VAL_CONSTANT) {
+    ret = constantAssign(lvalue, dimIdx, node, rinfo);
+  } else if (memberValid(rinfo, num)) {
     int consType = memberConstant(rinfo);
     if (consType == 0 || consType == 1) {
       for (int i = 0; i < num; i ++) {
@@ -181,18 +200,7 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo) {
         ret += format("%s%s = %s;\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
       }
     } else if (consType == 2) {
-      if(node->width <= BASIC_WIDTH && mpz_sgn(rinfo->memberInfo[0]->consVal) == 0) {
-        ret = format("memset(%s, 0, sizeof(%s));", lvalue.c_str(), lvalue.c_str());
-      } else {
-        std::string idxStr, bracket;
-        for (int i = 0; i < node->dimension.size() - dimIdx; i ++) {
-          ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i + dimIdx], i);
-          idxStr += "[i" + std::to_string(i) + "]";
-          bracket += "}\n";
-        }
-        ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->memberInfo[0]->valStr.c_str());
-        ret += bracket;
-      }
+      ret = constantAssign(lvalue, dimIdx, node, rinfo->memberInfo[0]);
     } else Panic();
 
   } else {
@@ -1502,14 +1510,15 @@ valInfo* ENode::instsWriteMem(Node* node, std::string lvalue, bool isRoot) {
   Assert(node->type == NODE_WRITER, "invalid type %d", node->type);
   Node* memory = memoryNode;
 
+  std::string indexStr;
+  if (node->isArray()) {
+    Assert(lvalue.compare(0, node->name.length(), node->name) == 0, "writer lvalue %s does not start with %s", lvalue.c_str(), node->name.c_str());
+    indexStr = lvalue.substr(node->name.length());
+  }
   if (isSubArray(lvalue, node)) {
-    TODO();
+    std::string arraylvalue = format("%s[%s]%s", memory->name.c_str(), ChildInfo(0, valStr).c_str(), indexStr.c_str());
+    ret->valStr = arrayCopy(arraylvalue, node, Child(1, computeInfo), countArrayIndex(arraylvalue) - 1);
   } else {
-    std::string indexStr;
-    if (node->isArray()) {
-      Assert(lvalue.compare(0, node->name.length(), node->name) == 0, "writer lvalue %s does not start with %s", lvalue.c_str(), node->name.c_str());
-      indexStr = lvalue.substr(node->name.length());
-    }
     if (memory->width < width) {
       ret->valStr = format("%s[%s]%s = %s & %s;", memory->name.c_str(), ChildInfo(0, valStr).c_str(), indexStr.c_str(), ChildInfo(1, valStr).c_str(), bitMask(memory->width).c_str());
     } else {
