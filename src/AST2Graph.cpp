@@ -1105,7 +1105,7 @@ struct ChirrtlVistor {
   }
 };
 
-static Node* visitChirrtlPort(graph* g, PNode* port, int width, int depth, bool sign, std::string suffix, Node* node, Node* addr_node, Node* clock_node) {
+static Node* visitChirrtlPort(graph* g, PNode* port, int width, int depth, bool sign, std::string suffix, Node* node, ENode* addr_enode, Node* clock_node) {
   assert(port->type == P_READ || port->type == P_WRITE || port->type == P_INFER);
   // Add prefix port name
   prefix_append(SEP_MODULE, port->name);
@@ -1126,7 +1126,7 @@ static Node* visitChirrtlPort(graph* g, PNode* port, int width, int depth, bool 
   ret->dimension = node->dimension;
   ENode* enode = new ENode(op);
   enode->memoryNode = node;
-  enode->addChild(new ENode(addr_node));
+  enode->addChild(addr_enode);
   ret->memTree = new ExpTree(enode, ret);
   ret->clock = clock_node;
 
@@ -1138,20 +1138,12 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
   // If we are in the top module, 
   //    the memory name does not need to have the prefix added.
   ASTExpTree* addr = visitExpr(g, port->getChild(0));
-  Node* addr_node = addr->getExpRoot()->getNode();
-  if (!addr_node) {
-    addr_node = allocNode(NODE_OTHERS, prefixName(SEP_MODULE, port->name + SEP_AGGR + "addr"));
-    addr_node->valTree = new ExpTree(addr->getExpRoot(), addr_node);
-    addSignal(addr_node->name, addr_node);
-  }
+  ENode* addr_enode = addr->getExpRoot();
   Node* clock_node = getSignal(prefixName(SEP_MODULE, port->getExtra(1)));
-  // prefix_append(SEP_MODULE, port->getExtra(0));
   std::string memName = prefixName(SEP_MODULE, port->getExtra(0));
 
  if (port->type == P_READ && memoryMap[memName].first[0]->rlatency == 1) {
-    Node* addr_src = addr_node->dup();
-    addr_src->type = NODE_REG_SRC;
-    addr_src->name += format("%s%s%s%s", SEP_MODULE, port->name.c_str(), SEP_AGGR, "IN");
+    Node* addr_src = allocNode(NODE_REG_SRC, format("%s%s%s%s%s", topPrefix().c_str(), SEP_MODULE, port->name.c_str(), SEP_AGGR, "IN"));
     g->addReg(addr_src);
     Node* addr_dst = addr_src->dup();
     addr_dst->type = NODE_REG_DST;
@@ -1160,13 +1152,13 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
     addSignal(addr_dst->name, addr_dst);
     addr_src->bindReg(addr_dst);
     addr_src->clock = addr_dst->clock = clock_node;
-    addr_src->valTree = new ExpTree(new ENode(addr_node), addr_src);
+    addr_src->valTree = new ExpTree(addr_enode, addr_src);
     ENode* resetCond = new ENode(OP_INT);
     resetCond->width = 1;
     resetCond->strVal = "h0";
     addr_src->resetCond = new ExpTree(resetCond, addr_src);
     addr_src->resetVal = new ExpTree(new ENode(addr_src), addr_src);
-    addr_node = addr_src;
+    addr_enode = new ENode(addr_src);
   }
 
   Assert(memoryMap.find(memName) != memoryMap.end(), "Could not find memory: %s", memName.c_str());
@@ -1176,12 +1168,12 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
     bool sign = mem->sign;
     int width = mem->width;
     std::string suffix = replacePrefix(memName, "", mem->name).c_str();
-    Node* portNode = visitChirrtlPort(g, port, width, depth, sign, suffix, mem, addr_node, clock_node);
+    Node* portNode = visitChirrtlPort(g, port, width, depth, sign, suffix, mem, addr_enode, clock_node);
     mem->add_member(portNode);
     addSignal(portNode->name, portNode);
     memoryMembers.push_back(portNode);
   }
-  // prefix_pop();
+
   for (AggrParentNode* memParent : memoryMap[memName].second) {
     std::string suffix = replacePrefix(memName, "", memParent->name).c_str();
     AggrParentNode* parent = new AggrParentNode(prefixName(SEP_MODULE, port->name) + suffix);
