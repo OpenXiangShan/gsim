@@ -36,6 +36,23 @@ void Node::updateConnect() {
       if (top->getChild(i)) q.push(top->getChild(i));
     }
   }
+  if (type == NODE_READER) {
+    Node* memory = parent;
+    for (Node* port : memory->member) {
+      if (port->type == NODE_WRITER) {
+        next.insert(port);
+        port->prev.insert(this);
+      }
+    }
+  } else if (type == NODE_WRITER) {
+    Node* memory = parent;
+    for (Node* port : memory->member) {
+      if (port->type == NODE_READER) {
+        prev.insert(port);
+        port->next.insert(this);
+      }
+    }
+  }
 }
 
 /* construct superNodes for all memory_member in the port the (member) belongs to */
