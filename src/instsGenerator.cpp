@@ -1704,11 +1704,14 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
         int extendedWidth = widthBits(width);
         int shiftBits = extendedWidth - computeInfo->width;
         if (extendedWidth != width)
-          computeInfo->valStr = format("(((%s%s%s << %d) >> %d) & %s)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits, bitMask(width).c_str());
+          computeInfo->valStr = format("((%s(%s%s << %d) >> %d) & %s)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits, bitMask(width).c_str());
         else
-          computeInfo->valStr = format("((%s%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
+          computeInfo->valStr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
         computeInfo->opNum = 1;
         computeInfo->width = width;
+      } else if (sign && (nodePtr->nodeIsRoot && computeInfo->width < widthBits(width))) {
+        int shiftBits = widthBits(width) - computeInfo->width;
+        computeInfo->valStr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
       } else if (sign) {
         computeInfo->valStr = format("%s%s", Cast(width, true).c_str(), computeInfo->valStr.c_str());
       }
