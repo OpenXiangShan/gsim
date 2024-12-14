@@ -553,6 +553,9 @@ public:
     ret.u256_0 = u256_0 ^ a.u256_0;
     return ret;
   }
+  operator uint16_t () {
+    return (uint16_t)u256_0;
+  }
   operator int () {
     return (int)u256_0;
   }
