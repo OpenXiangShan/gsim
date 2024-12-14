@@ -16,7 +16,7 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 OBJ_DIR = obj
 $(shell mkdir -p $(OBJ_DIR))
 
-dutName ?= rocket
+dutName ?= boom
 
 ifeq ($(dutName),ysyx3)
 	NAME ?= newtop
@@ -44,14 +44,15 @@ else ifeq ($(dutName),boom)
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
-	TEST_FILE = ready-to-run/$(NAME).LargeBoomConfig
+	TEST_FILE = ready-to-run/large-boom-chirrtl/$(NAME)-LargeBoom
 	SUPER_BOUND ?= 35
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
 	mainargs = ready-to-run/bin/bbl-test1.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
-	TEST_FILE = ready-to-run/$(NAME).SmallBoomConfig
+	TEST_FILE = ready-to-run/small-boom-chirrtl/$(NAME)-SmallBoom
+	SUPER_BOUND ?= 35
 else ifeq ($(dutName),xiangshan)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
@@ -100,7 +101,7 @@ VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME) --max-num-wid
 VERI_CFLAGS = $(addprefix -I../, $(VERI_INC_DIR)) $(MODE_FLAGS) -fbracket-depth=2048 -Wno-parentheses-equality
 VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\" -DDUTNAME=\\\"$(dutName)\\\"
 VERI_LDFLAGS = -O3 -lgmp
-VERI_VSRCS = $(TEST_FILE).v
+VERI_VSRCS = $(TEST_FILE).sv
 VERI_VSRCS += $(addprefix ready-to-run/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v DifftestMemInitializer.v)
 VERI_CSRCS = $(shell find $(EMU_SRC_DIR) -name "*.cpp") $(EMU_DIFFTEST) $(shell find $(OBJ_DIR)/$(NAME) -name "*.cpp")
 VERI_HEADER = $(OBJ_DIR)/$(NAME).h
