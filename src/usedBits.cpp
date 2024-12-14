@@ -160,10 +160,6 @@ void Node::passWidthToPrev() {
       tree->getlval()->passWidthToChild();
     }
   }
-  if (resetVal) {
-    resetVal->getRoot()->usedBit = usedBit;
-    resetVal->getRoot()->passWidthToChild();
-  }
   if (updateTree) {
     updateTree->getRoot()->usedBit = usedBit;
     updateTree->getRoot()->passWidthToChild();
@@ -235,7 +231,6 @@ void graph::usedBits() {
     node->width = node->usedBit;
     for (ExpTree* tree : node->assignTree) tree->getRoot()->updateWidth();
     for (ExpTree* tree : node->arrayVal) tree->getRoot()->updateWidth();
-    if (node->resetVal) node->resetVal->getRoot()->updateWidth();
     if (node->updateTree) node->updateTree->getRoot()->updateWidth();
     if (node->resetTree) node->resetTree->getRoot()->updateWidth();
   }
@@ -256,7 +251,6 @@ void Node::updateTreeWithNewWIdth() {
   /* add ops to match tree width */
   for (ExpTree* tree : assignTree) tree->updateWithNewWidth();
   for (ExpTree* tree : arrayVal) tree->updateWithNewWidth();
-  if (resetVal) resetVal->updateWithNewWidth();
   if (updateTree) updateTree->updateWithNewWidth();
   if (resetTree) resetTree->updateWithNewWidth();
 
@@ -268,7 +262,6 @@ void Node::updateTreeWithNewWIdth() {
     tree->when2mux(width);
     tree->matchWidth(width);
   }
-  if (resetVal) resetVal->matchWidth(width);
   if (updateTree) updateTree->matchWidth(width);
   if (resetTree) resetTree->matchWidth(width);
 }

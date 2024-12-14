@@ -1585,12 +1585,12 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
       computeInfo->status = VAL_EMPTY_SRC;
       return computeInfo;
     } else {
-      computeInfo = Child(1, computeInfo); //node->resetVal->getRoot()->compute(node, node->name, isRoot);
+      computeInfo = Child(1, computeInfo);
     }
     return computeInfo;
   }
 
-  valInfo* resetVal = Child(1, computeInfo);//node->resetVal->getRoot()->compute(node, node->name, isRoot);
+  valInfo* resetVal = Child(1, computeInfo);
   std::string ret;
   if (node->isArray() && isSubArray(lvalue, node)) {
       ret = arrayCopy(lvalue, node, resetVal);

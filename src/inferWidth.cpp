@@ -245,6 +245,16 @@ void graph::inferAllWidth() {
   std::set<Node*> uniqueNodes;
   std::set<Node*> fixedWidth;
 
+  auto addRecomputeNext = [&uniqueNodes, &fixedWidth, &reinferNodes](Node* node) {
+    for (Node* next : node->next) {
+      if (uniqueNodes.find(next) == uniqueNodes.end()) {
+        next->clearWidth();
+        if (fixedWidth.find(next) == fixedWidth.end()) next->width = -1;
+        reinferNodes.push(next);
+      }
+    }
+  };
+
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) {
       if (node->width != -1) fixedWidth.insert(node);
@@ -258,13 +268,7 @@ void graph::inferAllWidth() {
     int prevWidth = node->width;
     node->inferWidth();
     if (prevWidth != node->width) {
-      for (Node* next : node->next) {
-        if (uniqueNodes.find(next) == uniqueNodes.end()) {
-          next->clearWidth();
-          if (fixedWidth.find(next) == fixedWidth.end()) next->width = -1;
-          reinferNodes.push(next);
-        }
-      }
+      addRecomputeNext(node);
     }
     if (node->type == NODE_REG_DST && node->width != node->getSrc()->width) {
       if (node->getSrc()->width == -1) node->getSrc()->inferWidth();
@@ -273,10 +277,18 @@ void graph::inferAllWidth() {
       } else {
         reinferNodes.push(node->getSrc()); // re-infer the src node for updateTree
         node->getSrc()->width = node->width;
-        for (Node* next : node->getSrc()->next) {
-          if (uniqueNodes.find(next) == uniqueNodes.end()) {
-            if (fixedWidth.find(next) == fixedWidth.end()) next->width = -1;
-            reinferNodes.push(next);
+        addRecomputeNext(node->getSrc());
+      }
+    }
+    if (reinferNodes.empty()) { // re-checking reset tree, the resetVal may be inferred after registers
+      for (SuperNode* super : sortedSuper) {
+        for (Node* node : super->member) {
+          if (!node->resetTree || node->resetTree->getRoot()->width != -1) continue;
+          node->resetTree->getRoot()->inferWidth();
+          if (node->resetTree->getRoot()->width > node->width) {
+            node->width = node->resetTree->getRoot()->width;
+            node->getDst()->width = node->width;
+            addRecomputeNext(node);
           }
         }
       }

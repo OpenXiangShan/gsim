@@ -440,7 +440,6 @@ void graph::splitArray() {
       }
     }
     if (node->updateTree) node->updateTree->updateSplittedArray(node, splittedArray);
-    if (node->resetVal) node->resetVal->updateSplittedArray(node, splittedArray);
     if (node->resetTree) node->resetTree->updateSplittedArray(node, splittedArray);
   }
 }
