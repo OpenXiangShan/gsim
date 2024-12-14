@@ -2294,6 +2294,7 @@ void graph::instsGenerator() {
     }
   }
   removeNodes(CONSTANT_NODE);
+
   size_t optimizeNodes = countNodes();
   size_t optimizeSuper = sortedSuper.size();
   printf("[instGenerator] remove %ld constantNodes (%ld -> %ld)\n", totalNodes - optimizeNodes, totalNodes, optimizeNodes);
