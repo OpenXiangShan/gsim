@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
 #endif
 #ifdef VERILATOR
   ref = new REF_NAME();
-
+#if 0
   std::vector<uint8_t*> memoryList = { \
       (uint8_t*)&ref->rootp->TestHarness__DOT__mem__DOT__srams__DOT__mem_0, (uint8_t*)&ref->rootp->TestHarness__DOT__mem__DOT__srams__DOT__mem_1, \
       (uint8_t*)&ref->rootp->TestHarness__DOT__mem__DOT__srams__DOT__mem_2, (uint8_t*)&ref->rootp->TestHarness__DOT__mem__DOT__srams__DOT__mem_3, \
@@ -129,7 +129,8 @@ int main(int argc, char** argv) {
     *memoryList[i % 8] = program[i];
     memoryList[i % 8] ++;
   }
-  // memcpy(&ref->rootp->TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory, program, program_sz);
+#endif
+  memcpy(&ref->rootp->TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory, program, program_sz);
   ref_reset();
   // ref_cycle(1);
 #endif
