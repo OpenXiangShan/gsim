@@ -199,7 +199,6 @@ void Node::clearWidth() {
   }
   if (updateTree) updateTree->getRoot()->clearWidth();
   if (resetTree) resetTree->getRoot()->clearWidth();
-  if (resetVal) resetVal->getRoot()->clearWidth();
 }
 
 /*
@@ -215,7 +214,6 @@ void Node::inferWidth() {
   for (ExpTree* tree : arrayVal) tree->getRoot()->inferWidth();
   if (updateTree) updateTree->getRoot()->inferWidth();
   if (resetTree) resetTree->getRoot()->inferWidth();
-  if (resetVal) resetVal->getRoot()->inferWidth();
 
   if (width == -1) {
     int newWidth = 0;
@@ -231,7 +229,7 @@ void Node::inferWidth() {
       newSign = tree->getRoot()->sign;
       newClock |= tree->getRoot()->isClock;
     }
-    if (resetVal) newWidth = MAX(newWidth, resetVal->getRoot()->width);
+    if (resetTree) newWidth = MAX(newWidth, resetTree->getRoot()->width);
     setType(newWidth, newSign);
     isClock = newClock;
   }
@@ -269,6 +267,7 @@ void graph::inferAllWidth() {
       }
     }
     if (node->type == NODE_REG_DST && node->width != node->getSrc()->width) {
+      if (node->getSrc()->width == -1) node->getSrc()->inferWidth();
       if (node->width < node->getSrc()->width) {
         node->width = node->getSrc()->width;
       } else {
@@ -298,7 +297,6 @@ void Node::updateHeadTail() {
   for (ExpTree* tree : arrayVal) s.push(tree->getRoot());
   if (updateTree) s.push(updateTree->getRoot());
   if (resetTree) s.push(resetTree->getRoot());
-  if (resetVal) s.push(resetVal->getRoot());
   while (!s.empty()) {
     ENode* top = s.top();
     s.pop();
