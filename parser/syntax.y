@@ -262,25 +262,26 @@ intmodule: Intmodule ALLID ':' info INDENT ports Intrinsic '=' ALLID params DEDE
 		;
 /* in-line anotations */
 member:
-    | String ':' String {}
+      String ':' String {}
     | String ':' ALLID {}
     | String ':' INT {}
     | String ':' json {}
     | String ':' json_array {}
-
+    ;
 members:
     | member             {}
     | member ',' members {}
-
-json:
-    | '{' '}'  {}
+    ;
+Strings: String             {}
+    | String ',' Strings     {}
+    ;
+json: '{' '}'  {}
     | '{' INDENT members DEDENT '}' {}
-    | '[' INDENT String DEDENT ']' {}
-    
-jsons: 
-    | json            {}
-    | json ',' jsons  {}
-
+    | '[' INDENT Strings DEDENT ']' {}
+    ;
+jsons: json            {}
+     | json ',' jsons  {}
+     ;
 json_array: '[' INDENT jsons DEDENT ']' { }
 		;
 annotations: 
