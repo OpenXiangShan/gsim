@@ -98,6 +98,7 @@ ALLID: ID {$$ = $1; }
     | Skip {$$ = strdup("skip"); }
     | Write {$$ = strdup("write"); }
     | Read {$$ = strdup("read"); }
+    | Version {$$ = strdup("version"); }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
