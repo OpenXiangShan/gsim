@@ -135,8 +135,16 @@ Node* getSplitArray(graph* g) {
     if (point2self(node)) return node;
   }
   for (Node* node : partialVisited) {
-    printf("current %s\n", node->name.c_str());
+    int time = 0;
+    for (Node* prev : node->prev) {
+      if (fullyVisited.find(prev) != fullyVisited.end()) time ++;
+    }
+    printf("current %s %d/%ld\n", node->name.c_str(), time, node->prev.size());
+    for (Node* prev : node->prev) {
+      if (fullyVisited.find(prev) == fullyVisited.end()) printf("  missing %s\n", prev->name.c_str());
+    }
   }
+
   Panic();
 
 }
