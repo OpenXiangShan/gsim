@@ -438,6 +438,9 @@ public:
     u256_0 = (uint256_t)a.data[3] << 192 | (uint256_t)a.data[2] << 128 | (uint256_t)a.data[1] << 64 | (uint256_t)a.data[0];
     u256_1 = (uint256_t)a.data[7] << 192 | (uint256_t)a.data[6] << 128 | (uint256_t)a.data[5] << 64 | (uint256_t)a.data[4];
   }
+  bool operator == (int b) {
+    return u256_1 == 0 && u256_0 == b;
+  }
   bool operator == (uint512_t b) {
     return u256_1 == b.u256_1 && u256_0 == b.u256_0;
   }
@@ -553,11 +556,17 @@ public:
     ret.u256_0 = u256_0 ^ a.u256_0;
     return ret;
   }
+  operator uint8_t () {
+    return (uint8_t)u256_0;
+  }
   operator uint16_t () {
     return (uint16_t)u256_0;
   }
   operator int () {
     return (int)u256_0;
+  }
+  operator uint32_t () {
+    return (uint32_t)u256_0;
   }
   operator uint64_t () {
     return (uint64_t)u256_0;
@@ -983,6 +992,14 @@ public:
     ret.data[1] |= (uint64_t)(a >> 64);
     return ret;
   }
+  wide_t<_dataNum> operator | (uint256_t a) {
+    wide_t<_dataNum> ret = *this;
+    ret.data[0] |= (uint64_t)a;
+    ret.data[1] |= (uint64_t)(a >> 64);
+    ret.data[2] |= (uint64_t)(a >> 128);
+    ret.data[3] |= (uint64_t)(a >> 192);
+    return ret;
+  }
   wide_t<_dataNum> operator | (uint512_t a) {
     static_assert(_dataNum > 8, "width is not enough");
     wide_t<_dataNum> ret = *this;
@@ -1059,6 +1076,14 @@ public:
       ret.data[i] = data[i];
     }
     return ret;
+  }
+  uint256_t tail256(int n) {
+    uint256_t ret = (uint256_t)*this;
+#if SUPPORT_U256
+    return n == 256 ? ret : (ret & ((uint256_t)1 << n) - 1);
+#else
+    return ret.tail256(n);
+#endif
   }
   wide_t<_dataNum> tail(int n) {
     wide_t<_dataNum> ret;
