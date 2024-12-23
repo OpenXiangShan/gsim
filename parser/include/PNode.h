@@ -62,6 +62,7 @@ enum PNodeType{
   P_Clock,
   P_ASYRESET,
   P_INT_TYPE,
+  P_PROBE,
   P_EXPR_INT_NOINIT,
   P_EXPR_INT_INIT,
   P_EXPR_MUX,
@@ -69,6 +70,7 @@ enum PNodeType{
   P_PRINTF,
   P_EXPRS,
   P_ASSERT,
+  P_STOP, // exit
   P_INDEX,
   P_CONS_INDEX,
   P_L_CONS_INDEX,

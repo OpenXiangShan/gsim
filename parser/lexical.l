@@ -96,6 +96,8 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>Reset                   { yylval->typeGround = strdup(yytext); return token::Reset; }
 <normal>AsyncReset              { yylval->typeGround = strdup(yytext); return token::AsyReset; }
 <normal>UInt|SInt               { yylval->typeGround = strdup(yytext); return token::IntType; }
+<normal>Probe                   { yylval->typeGround = strdup(yytext); return token::ProbeType; }
+<normal>probe                   { yylval->typeGround = strdup(yytext); return token::Probe; }
 <normal>Analog                  { yylval->typeGround = strdup(yytext); return token::anaType; }
 <normal>Fixed                   { yylval->typeGround = strdup(yytext); return token::FixedType; }
 <normal>flip                    { return token::Flip;}
@@ -154,6 +156,8 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>circuit                 { return token::Circuit; }
 <normal>connect                 { return token::Connect; }
 <normal>public                  { return token::Public; }
+<normal>define                  { return token::Define; }
+<normal>const                   { return token::Const; }
 <normal>{id}                    { yylval->name = strdup(yytext); return token::ID; }
 <normal>{string}                { yylval->strVal = strdup(yytext); return token::String; }
 <normal>"=>"                    { return token::RightArrow; }

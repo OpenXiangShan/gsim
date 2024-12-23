@@ -50,7 +50,7 @@ int p_stoi(const char* str);
 %token <strVal> INT RINT String
 %token DoubleLeft "<<"
 %token DoubleRight ">>"
-%token <typeGround> Clock Reset IntType anaType FixedType AsyReset
+%token <typeGround> Clock Reset IntType anaType FixedType AsyReset Probe ProbeType
 /* %token <intVal> IntVal */
 
 %token <typeOP> E2OP E1OP E1I1OP E1I2OP  
@@ -59,6 +59,7 @@ int p_stoi(const char* str);
 %token Flip Mux Validif Invalidate Mem SMem CMem Wire Reg RegReset Inst Of Node Attach
 %token When Else Stop Printf Skip Input Output Assert
 %token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit Connect Public
+%token Define Const
 %token Firrtl Version INDENT DEDENT
 %token RightArrow "=>"
 %token Leftarrow "<-"
@@ -90,6 +91,7 @@ ALLID: ID {$$ = $1; }
     | Mem { $$ = strdup("mem"); }
     | Of { $$ = strdup("of"); }
     | Reg { $$ = strdup("reg"); }
+    | Input { $$ = strdup("input"); }
     | Output { $$ = strdup("output"); }
     | Invalidate { $$ = strdup("invalidate"); }
     | Mux { $$ = strdup("mux"); }
@@ -99,6 +101,9 @@ ALLID: ID {$$ = $1; }
     | Write {$$ = strdup("write"); }
     | Read {$$ = strdup("read"); }
     | Version {$$ = strdup("version"); }
+    | Probe {$$ = strdup("probe"); }
+    | Module { $$ = strdup("module"); }
+    | Const { $$ = strdup("const"); }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
@@ -113,11 +118,12 @@ width:                { $$ = -1; } /* infered width */
 binary_point:
     | "<<" INT ">>"   { TODO(); }
     ;
-type_ground: Clock    { $$ = new PNode(P_Clock, synlineno()); }
-    | Reset    { $$ = new PNode(P_INT_TYPE, synlineno()); $$->setWidth(1); $$->setSign(0);}
-    | AsyReset    { $$ = new PNode(P_ASYRESET, synlineno()); $$->setWidth(1); $$->setSign(0);}
-    | IntType width   { $$ = newNode(P_INT_TYPE, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); }
-    | anaType width   { TODO(); }
+type_ground: Clock              { $$ = new PNode(P_Clock, synlineno()); }
+    | Reset                     { $$ = new PNode(P_INT_TYPE, synlineno()); $$->setWidth(1); $$->setSign(0);}
+    | AsyReset                  { $$ = new PNode(P_ASYRESET, synlineno()); $$->setWidth(1); $$->setSign(0);}
+    | IntType width             { $$ = newNode(P_INT_TYPE, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); }
+    | ProbeType '<' IntType '>' { $$ = newNode(P_INT_TYPE, synlineno(), $3, 0); $$->setSign($3[0] == 'S'); }
+    | anaType width             { TODO(); }
     | FixedType width binary_point  { TODO(); }
     ;
 fields:                 { $$ = new PList(); }
@@ -131,7 +137,9 @@ field: ALLID ':' type { $$ = newNode(P_FIELD, synlineno(), $1, 1, $3); }
     | Flip ALLID ':' type  { $$ = newNode(P_FLIP_FIELD, synlineno(), $2, 1, $4); }
     ;
 type: type_ground  { $$ = $1; }
+    | Const type_ground  { $$ = $2; }
     | type_aggregate { $$ = $1; }
+    | Const type_aggregate { $$ = $2; }
     ;
 /* primitive operations */
 primop_2expr: E2OP expr ',' expr ')' { $$ = newNode(P_2EXPR, synlineno(), $1, 2, $2, $4); }
@@ -224,11 +232,15 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5
     | Inst ALLID Of ALLID info    { $$ = newNode(P_INST, synlineno(), $5, $2, 0); $$->appendExtraInfo($4); }
     | Node ALLID '=' expr info { $$ = newNode(P_NODE, synlineno(), $5, $2, 1, $4); }
     | Connect reference ',' expr info { $$ = newNode(P_CONNECT, $2->lineno, $5, NULL, 2, $2, $4); }
+    | Connect reference ',' Read '(' expr ')' info { $$ = newNode(P_CONNECT, $2->lineno, $8, NULL, 2, $2, $6); }
     | reference "<-" expr info  { $$ = newNode(P_PAR_CONNECT, $1->lineno, $4, NULL, 2, $1, $3); }
     | Invalidate reference info { $$ = newNode(P_INVALID, synlineno(), nullptr, 0); $$->setWidth(1); $$ = newNode(P_CONNECT, $2->lineno, $3, NULL, 2, $2, $$); }
+    | Define reference '=' Probe '(' expr ')' info { $$ = newNode(P_CONNECT, synlineno(), $8, NULL, 2, $2, $6); }
+    | Define reference '=' expr info { $$ = newNode(P_CONNECT, synlineno(), $5, NULL, 2, $2, $4); }
     | Attach '(' references ')' info { TODO(); }
     | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $2->lineno, $4, NULL, 3, $2, $6, $8); } /* expected newline before statement */
-    | Stop '(' expr ',' expr ',' INT ')' info   { TODO(); }
+    | Stop '(' expr ',' expr ',' INT ')' info   { $$ = newNode(P_STOP, synlineno(), $9, NULL, 2, $3, $5); $$->appendExtraInfo($7); }
+    | Stop '(' expr ',' expr ',' INT ')' ':' ALLID info   { $$ = newNode(P_STOP, synlineno(), $11, $10, 2, $3, $5); $$->appendExtraInfo($7); }
     | Printf '(' expr ',' expr ',' String exprs ')' ':' ALLID info { $$ = newNode(P_PRINTF, synlineno(), $12, $11, 3, $3, $5, $8); $$->appendExtraInfo($7); }
     | Printf '(' expr ',' expr ',' String exprs ')' info    { $$ = newNode(P_PRINTF, synlineno(), $10, NULL, 3, $3, $5, $8); $$->appendExtraInfo($7); }
     | Assert '(' expr ',' expr ',' expr ',' String ')' ':' ALLID info { $$ = newNode(P_ASSERT, synlineno(), $13, $12, 3, $3, $5, $7); $$->appendExtraInfo($9); }
