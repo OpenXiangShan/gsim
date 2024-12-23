@@ -184,6 +184,10 @@ class Node {
     if (type == NODE_REG_DST) return this->regNext;
     return this;
   }
+  Node* getBindReg() {
+    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node %s is not register", name.c_str());
+    return this->regNext;
+  }
   void set_memory(int _depth, int r, int w) {
     depth = _depth;
     rlatency = r;

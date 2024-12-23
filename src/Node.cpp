@@ -228,7 +228,7 @@ void Node::removeConnection() {
   for (Node* nextNode : next) nextNode->prev.erase(this);
 }
 
-ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index);
+ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index, Node* node);
 
 void splitTree(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees) {
   if (node->dimension.size() == tree->getlval()->getChildNum()) {
@@ -248,7 +248,7 @@ void splitTree(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees) {
       newDim[j-tree->getlval()->getChildNum()] = dim % node->dimension[j];
       dim = dim / node->dimension[j];
     }
-    ExpTree* newTree = dupTreeWithIdx(tree, newDim);
+    ExpTree* newTree = dupTreeWithIdx(tree, newDim, node);
     newTrees.push_back(newTree);
   }
 

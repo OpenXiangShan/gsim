@@ -7,6 +7,8 @@
 #include <tuple>
 #include <utility>
 
+bool nextVarConnect(Node* node);
+
 static std::set<Node*> fullyVisited;
 static std::set<Node*> partialVisited;
 
@@ -47,7 +49,7 @@ void partialDfs(std::set<Node*>&loop) {
   }
 }
 
-ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index) {
+ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index, Node* node) {
   ENode* lvalue = tree->getlval()->dup();
   for (int idx : index) {
     ENode* idxNode = new ENode(OP_INDEX_INT);
@@ -55,27 +57,40 @@ ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index) {
     lvalue->addChild(idxNode);
   }
   ENode* rvalue = tree->getRoot()->dup();
-  std::stack<ENode*> s;
-  s.push(rvalue);
+  int groupIdx = 0;
+  for (size_t i = 0; i < index.size(); i ++) {
+    groupIdx = groupIdx * node->dimension[i + node->dimension.size() - index.size()] + index[i];
+  }
+  std::stack<std::tuple<ENode*, ENode*, int>> s;
+  s.push(std::make_tuple(rvalue, nullptr, -1));
   while(!s.empty()) {
-    ENode* top = s.top();
+    auto top = s.top();
+    ENode* top_enode = std::get<0>(top);
+    ENode* parent = std::get<1>(top);
+    int top_idx = std::get<2>(top);
     s.pop();
-    for (int i = 0; i < top->getChildNum(); i ++) {
-      if (!top->getChild(i)) continue;
+    for (int i = 0; i < top_enode->getChildNum(); i ++) {
+      if (!top_enode->getChild(i)) continue;
     }
-    if (top->getNode()) {
-      Assert(top->getNode()->isArray(), "%s is not array", top->getNode()->name.c_str());
+    if (top_enode->getNode()) {
+      Assert(top_enode->getNode()->isArray(), "%s(%p) is not array", top_enode->getNode()->name.c_str(), top_enode);
       for (int idx : index) {
         ENode* idxNode = new ENode(OP_INDEX_INT);
         idxNode->addVal(idx);
-        top->addChild(idxNode);
+        top_enode->addChild(idxNode);
       }
+    } else if (top_enode->opType == OP_GROUP) {
+      ENode* select = top_enode->getChild(groupIdx);
+      if (!parent) rvalue = select;
+      else parent->setChild(top_idx, select);
+      top_enode = select;
+      continue;
     }
-    if (top->opType == OP_WHEN || top->opType == OP_MUX) {
-      if (top->getChild(1)) s.push(top->getChild(1));
-      if (top->getChild(2)) s.push(top->getChild(2));
-    } else if (top->opType == OP_RESET) {
-      if (top->getChild(1)) s.push(top->getChild(1));
+    if (top_enode->opType == OP_WHEN || top_enode->opType == OP_MUX) {
+      if (top_enode->getChild(1)) s.push(std::make_tuple(top_enode->getChild(1), top_enode, 1));
+      if (top_enode->getChild(2)) s.push(std::make_tuple(top_enode->getChild(2), top_enode, 2));
+    } else if (top_enode->opType == OP_RESET) {
+      if (top_enode->getChild(1)) s.push(std::make_tuple(top_enode->getChild(1), top_enode, 1));
     }
   }
   ExpTree* ret = new ExpTree(rvalue, lvalue);
@@ -108,7 +123,7 @@ bool point2self(Node* node) {
 Node* getSplitArray(graph* g) {
   /* array points to itself */
   for (Node* node : partialVisited) {
-    if (node->isArray() && node->next.find(node) != node->next.end()) return node;
+    if (node->isArray() && node->next.find(node) != node->next.end()) return node; // point to self directly
   }
 
   for (Node* node : partialVisited) {
@@ -221,7 +236,8 @@ void distributeTree(Node* node, ExpTree* tree) {
         subIdx[i - tree->getlval()->getChildNum()] = tmp % node->dimension[i];
         tmp /= node->dimension[i];
       }
-      ExpTree* newTree = dupTreeWithIdx(tree, subIdx);
+
+      ExpTree* newTree = dupTreeWithIdx(tree, subIdx, node);
       /* duplicate tree with idx */
       if (node->arrayMember[idx]->assignTree.size() == 0) node->arrayMember[idx]->assignTree.push_back(newTree);
       else {
@@ -244,12 +260,12 @@ void splitAssignMent(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees)
       subIdx[i - tree->getlval()->getChildNum()] = tmp % node->dimension[i];
       tmp /= node->dimension[i];
     }
-    ExpTree* dupTree = dupTreeWithIdx(tree, subIdx);
+    ExpTree* dupTree = dupTreeWithIdx(tree, subIdx, node);
     newTrees.push_back(dupTree);
   }
 }
 
-void ExpTree::updateSplittedArray(Node* array, std::set<Node*>& allSplittedArray) {
+void ExpTree::updateWithSplittedArray(Node* node, Node* array) {
   std::stack<std::tuple<ENode*, ENode*, int>> s;
   s.push(std::make_tuple(getRoot(), nullptr, 0));
   s.push(std::make_tuple(getlval(), nullptr, -2));
@@ -259,18 +275,41 @@ void ExpTree::updateSplittedArray(Node* array, std::set<Node*>& allSplittedArray
     ENode* top_enode = std::get<0>(top_tuple);
     ENode* top_parent = std::get<1>(top_tuple);
     int top_idx = std::get<2>(top_tuple);
-    if (!top_enode->nodePtr || allSplittedArray.find(top_enode->nodePtr) == allSplittedArray.end()) {
+    if (!top_enode->nodePtr || top_enode->nodePtr != array) {
       for (int i = 0; i < top_enode->getChildNum(); i ++) {
         if (top_enode->getChild(i)) s.push(std::make_tuple(top_enode->getChild(i), top_enode, top_idx < 0 ? top_idx : i));
       }
       continue;
     }
     auto range = top_enode->getIdx(top_enode->nodePtr);
-    if (range.first == range.second) {
+    if (range.first < 0) {
+      if (array->dimension.size() > 1) TODO();
+      ENode* enode = nullptr;
+      for (int i = array->arrayEntryNum() - 1; i >= 0; i --) {
+        Node* member = array->getArrayMember(i);
+        if (enode) {
+          ENode* mux = new ENode(OP_MUX);
+          ENode* cond = new ENode(OP_EQ);
+          ENode* idx = new ENode(OP_INT);
+          idx->strVal = std::to_string(i);
+          idx->width = upperLog2(array->arrayEntryNum());
+          cond->addChild(top_enode->getChild(0)->getChild(0));  // first dimension
+          cond->addChild(idx);
+          mux->addChild(cond);
+          mux->addChild(new ENode(member));
+          mux->addChild(enode);
+          enode = mux;
+        } else {
+          enode = new ENode(member);
+        }
+      }
+      if (top_parent) top_parent->setChild(top_idx, enode);
+      else setRoot(enode);
+    } else if (range.first == range.second) {
       top_enode->nodePtr = top_enode->nodePtr->getArrayMember(range.first);
       top_enode->child.clear();
     } else {
-      if (top_idx < 0) continue;
+      if (top_idx < 0) continue; // lvalue
       ENode* group = new ENode(OP_GROUP);
       group->width = top_enode->width;
       for (int i = range.first; i <= range.second; i ++) {
@@ -320,24 +359,43 @@ void graph::splitArrayNode(Node* node) {
         tmp /= node->dimension[i];
       }
       if (node->updateTree) {
-        ExpTree* newTree = dupTreeWithIdx(node->updateTree, subIdx);
+        ExpTree* newTree = dupTreeWithIdx(node->updateTree, subIdx, node);
         node->arrayMember[idx]->updateTree = newTree;
       }
       if (node->resetTree) {
-        ExpTree* newTree = dupTreeWithIdx(node->resetTree, subIdx);
+        ExpTree* newTree = dupTreeWithIdx(node->resetTree, subIdx, node);
         node->arrayMember[idx]->resetTree = newTree;
       }
     }
   }
+
+  std::set<Node*> checkNodes;
   /* construct connections */
+  if (node->type == NODE_REG_SRC || node->type == NODE_REG_DST) {
+    Node* regBind = node->getBindReg();
+    checkNodes.insert(regBind);
+    for (Node* member : regBind->arrayMember) {
+    checkNodes.insert(member);
+  }
+  }
   for (Node* member : node->arrayMember) {
-    member->updateConnect();
+    checkNodes.insert(member);
   }
   for (Node* next : node->next) {
+    checkNodes.insert(next);
     if (next != node) {
       next->prev.clear();
-      next->updateConnect();
     }
+  }
+  for (Node* n : checkNodes) {
+    for (ExpTree* tree : n->assignTree) tree->updateWithSplittedArray(n, node);
+    for (ExpTree* tree : n->arrayVal) tree->updateWithSplittedArray(n, node);
+    if (n->updateTree) n->updateTree->updateWithSplittedArray(n, node);
+    if (n->resetTree) n->resetTree->updateWithSplittedArray(n, node);
+  }
+
+  for (Node* n : checkNodes) {
+    n->updateConnect();
   }
 
   /* clear node connection */
@@ -424,23 +482,6 @@ void graph::splitArray() {
       }
       checkNodes.insert(member);
     }
-  }
-  for (Node* node : checkNodes) {
-    if (node->isArray()) {
-      for (int i = 0; i < (int)node->assignTree.size(); i ++) {
-        node->assignTree[i]->updateSplittedArray(node, splittedArray);
-      }
-      for (size_t i = 0; i < node->arrayVal.size(); i ++) {
-        node->arrayVal[i]->updateSplittedArray(node, splittedArray);
-      }
-    } else {
-      for (size_t i = 0; i < node->assignTree.size(); i ++) {
-        std::vector<ExpTree*> newTrees;
-        node->assignTree[i]->updateSplittedArray(node, splittedArray);
-      }
-    }
-    if (node->updateTree) node->updateTree->updateSplittedArray(node, splittedArray);
-    if (node->resetTree) node->resetTree->updateSplittedArray(node, splittedArray);
   }
 }
 
