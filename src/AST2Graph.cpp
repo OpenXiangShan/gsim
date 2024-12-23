@@ -2020,7 +2020,8 @@ graph* AST2Graph(PNode* root) {
     input->assignTree.clear();
   }
   for (auto it : allSignals) {
-    if ((it.second->type == NODE_OTHERS || it.second->type == NODE_MEM_MEMBER) && it.second->super->prev.size() == 0) {
+    if ((it.second->type == NODE_OTHERS || it.second->type == NODE_READER || it.second->type == NODE_WRITER ||
+        it.second->type == NODE_SPECIAL) && it.second->super->prev.size() == 0) {
       g->supersrc.insert(it.second->super);
     }
     if (it.second->isArray()) {
