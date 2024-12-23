@@ -265,10 +265,10 @@ ext_defname:                       {  }
 params:                            { $$ = new PList(); }
     | params param                 { $$ = $1; $$->append($2); }
     ;
-param: Parameter ALLID '=' String  { TODO(); }
-    | Parameter ALLID '=' INT      { TODO(); }
+param: Parameter ALLID '=' String  {  }
+    | Parameter ALLID '=' INT      {  }
     ;
-extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$ = newNode(P_EXTMOD, synlineno(), $4, $2, 1, $6); $$->appendChildList($8);}
+extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$ = newNode(P_EXTMOD, synlineno(), $4, $2, 1, $6);}
     ;
 intmodule: Intmodule ALLID ':' info INDENT ports Intrinsic '=' ALLID params DEDENT	{ TODO(); }
 		;
