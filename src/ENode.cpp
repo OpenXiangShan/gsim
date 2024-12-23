@@ -95,6 +95,9 @@ void ENode::usedBitWithFixRoot(int rootWidth) {
     child[i]->usedBitWithFixRoot(childBits[i]);
   }
   width = MIN(width, rootWidth);
+  if (opType == OP_BITS) {
+    values[0] = MIN(values[0], width - 1 + values[1]);
+  }
 }
 
 void ENode::updateWidth() {
