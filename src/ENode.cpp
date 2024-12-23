@@ -75,6 +75,9 @@ void ENode::usedBitWithFixRoot(int rootWidth) {
       childBits.push_back(1);
       childBits.push_back(rootWidth);
       break;
+    case OP_EXIT:
+      childBits.push_back(1);
+      break;
     case OP_PRINTF:
     case OP_ASSERT:
       for (int i = 0; i < getChildNum(); i ++) {

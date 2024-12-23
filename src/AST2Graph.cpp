@@ -1674,6 +1674,36 @@ void visitWhenAssert(graph* g, PNode* ass) {
   g->specialNodes.push_back(n);
 }
 
+void visitWhenStop(graph* g, PNode* stop) {
+  TYPE_CHECK(stop, 2, 2, P_STOP);
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stop->name));
+
+  ASTExpTree* exp = visitExpr(g, stop->getChild(1));
+
+  ENode* cond = exp->getExpRoot();
+  for (size_t i = 0; i < whenTrace.size(); i ++) {
+    ENode* andNode = new ENode(OP_AND);
+    andNode->addChild(cond);
+    ENode* condNode = new ENode(whenTrace[i].second);
+    if (whenTrace[i].first) {
+      andNode->addChild(condNode);
+    } else {
+      ENode* notNode = new ENode(OP_NOT);
+      notNode->addChild(condNode);
+      andNode->addChild(notNode);
+    }
+    cond = andNode;
+  }
+
+  ENode* enode = new ENode(OP_EXIT);
+  enode->strVal = stop->getExtra(0);
+  enode->addChild(cond);
+
+  n->valTree = new ExpTree(enode, new ENode(n));
+  addSignal(n->name, n);
+  g->specialNodes.push_back(n);
+}
+
 /* return the lvalue node */
 void visitWhenStmt(graph* g, PNode* stmt) {
   switch (stmt->type) {
@@ -1683,6 +1713,7 @@ void visitWhenStmt(graph* g, PNode* stmt) {
     case P_WIRE_DEF: visitWireDef(g, stmt); break;
     case P_PRINTF: visitWhenPrintf(g, stmt); break;
     case P_ASSERT: visitWhenAssert(g, stmt); break;
+    case P_STOP: visitWhenStop(g, stmt); break;
     case P_INST: visitInst(g, stmt); break;
     case P_REG_DEF: visitRegDef(g, stmt, P_REG_DEF); break;
     case P_REG_RESET_DEF: visitRegDef(g, stmt, P_REG_RESET_DEF); break;
@@ -1744,6 +1775,23 @@ void visitPrintf(graph* g, PNode* print) {
     enode->addChild(val->getExpRoot());
   }
 
+  n->valTree = new ExpTree(enode, new ENode(n));
+  addSignal(n->name, n);
+  g->specialNodes.push_back(n);
+}
+/*
+  | Stop '(' expr ',' expr ',' INT ')' info   { $$ = newNode(P_STOP, synlineno(), $9, NULL, 2, $3, $5); $$->appendExtraInfo($7); }
+  | Stop '(' expr ',' expr ',' INT ')' ':' ALLID info   { $$ = newNode(P_STOP, synlineno(), $11, $10, 2, $3, $5); $$->appendExtraInfo($7); }
+*/
+void visitStop(graph* g, PNode* stop) {
+  TYPE_CHECK(stop, 2, 2, P_STOP);
+
+  ASTExpTree* exp = visitExpr(g, stop->getChild(1));
+  ENode* enode = new ENode(OP_EXIT);
+  enode->addChild(exp->getExpRoot());
+  enode->strVal = stop->getExtra(0);
+
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stop->name));
   n->valTree = new ExpTree(enode, new ENode(n));
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
@@ -1831,6 +1879,7 @@ void visitStmt(graph* g, PNode* stmt) {
       break;
     case P_PRINTF: visitPrintf(g, stmt); break;
     case P_ASSERT: visitAssert(g, stmt); break;
+    case P_STOP: visitStop(g, stmt); break;
     default:
       printf("invalid stmt type %d in lineno %d\n", stmt->type, stmt->lineno);
       Panic();

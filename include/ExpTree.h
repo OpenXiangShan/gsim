@@ -58,6 +58,7 @@ enum OPType {
 /* special */
   OP_PRINTF,
   OP_ASSERT,
+  OP_EXIT,
 /* leaf non-node enode */
   OP_INT,
 /* for arrays */
@@ -123,6 +124,7 @@ private:
   valInfo* instsGroup(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsPrintf();
   valInfo* instsAssert();
+  valInfo* instsExit();
   /* used in constantNode */
   valInfo* consMux(bool isLvalue);
   valInfo* consAdd(bool isLvalue);
@@ -169,6 +171,7 @@ private:
   valInfo* consInvalid(bool isLvalue);
   valInfo* consReset(bool isLvalue);
   valInfo* consAssert();
+  valInfo* consExit();
   valInfo* consPrint();
   /* used in usedBits */
 

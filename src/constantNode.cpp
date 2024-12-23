@@ -624,6 +624,15 @@ valInfo* ENode::consPrint() {
   return ret;
 }
 
+valInfo* ENode::consExit() {
+  valInfo* ret = new valInfo(width, sign);
+  if (ChildCons(0, status) == VAL_CONSTANT && mpz_sgn(ChildCons(0, consVal)) == 0) {
+    mpz_set_ui(ret->consVal, 0);
+    ret->updateConsVal();
+  }
+  return ret;
+}
+
 /* compute enode */
 valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
   if (consEMap.find(this) != consEMap.end()) return consEMap[this];
@@ -732,6 +741,7 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
     case OP_RESET: ret = consReset(isLvalue); break;
     case OP_PRINTF: ret = consPrint(); break;
     case OP_ASSERT: ret = consAssert(); break;
+    case OP_EXIT: ret = consExit(); break;
     default:
       Panic();
   }
