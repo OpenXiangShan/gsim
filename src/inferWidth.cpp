@@ -117,9 +117,9 @@ void ENode::inferWidth() {
         break;
       case OP_TAIL:
         //  UInt<1>(0h0) => tail(UInt<1>(0), 1)
-        Assert(w0 >= values[0], "the width of argument(%d) in tail is no greater than %d", w0, values[0]);
         Assert(getChildNum() == 1 && values.size() == 1, "invalid child");
-        setWidth(w0-values[0], false);
+        if (w0 < values[0]) setWidth(0, false);
+        else setWidth(w0-values[0], false);
         break;
       case OP_BITS: // values[0] may exceeds w0 due to the shrink width of add
         Assert(getChildNum() == 1 && values.size() == 2, "invalid child");
