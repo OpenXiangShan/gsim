@@ -122,6 +122,7 @@ enum ResetType { UNCERTAIN, ASYRESET, UINTRESET, ZERO_RESET };
 std::string arrayMemberName(Node* node, std::string suffix);
 #define newBasic(node) (node->isArrayMember ? arrayMemberName(node, "new") : (node->name + "$new"))
 #define newName(node) newBasic(node)
+#define oldName(node) (node->name + "$old")
 #define ASSIGN_LABLE std::string("ASSIGN$$$LABEL")
 #define ASSIGN_INDI(node) (node->name + "$$UPDATE")
 #include "opFuncs.h"

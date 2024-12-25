@@ -694,27 +694,40 @@ void graph::genActivate(FILE* fp) {
       SuperNode* super = cppId2Super[idx];
       std::string flagName = prevActiveWhole ? "oldFlag" : format("activeFlags[%d]", id);
       genNodeStepStart(fp, super, mask, idx, flagName);
-      for (Node* n : super->member) {
-        if (n->insts.size() == 0) {
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-          if (n->type == NODE_REG_SRC) {
-            if (n->isArray()) {
-              std::string idxStr, bracket, inst;
-              for (int i = 0; i < n->dimension.size(); i ++) {
-                inst += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, n->dimension[i], i);
-                idxStr += "[i" + std::to_string(i) + "]";
-                bracket += "}\n";
-              }
-              inst += format("%s$prev%s = %s%s;\n", n->name.c_str(), idxStr.c_str(), n->name.c_str(), idxStr.c_str());
-              inst += bracket;
-              n->insts.push_back(inst);
-            } else n->insts.push_back(format("%s$prev = %s;\n", n->name.c_str(), n->name.c_str()));
-          }
-#endif
-          continue;
+      if (super->superType == SUPER_EXTMOD) {
+        /* save old EXT_OUT*/
+        for (size_t i = 1; i < super->member.size(); i ++) {
+          Node* extOut = super->member[i];
+          fprintf(fp, "%s %s = %s;\n", widthUType(extOut->width).c_str(), oldName(extOut).c_str(), extOut->name.c_str());
         }
-        genNodeInsts(fp, n, flagName);
-        nodeDisplay(fp, n);
+        genNodeInsts(fp, super->member[0], flagName);
+        for (size_t i = 1; i < super->member.size(); i ++) {
+          if (super->member[i]->isArray()) activateUncondNext(fp, super->member[i], super->member[i]->nextActiveId, false, flagName);
+          else activateNext(fp, super->member[i], super->member[i]->nextActiveId, oldName(super->member[i]), false, flagName);
+        }
+      } else {
+        for (Node* n : super->member) {
+          if (n->insts.size() == 0) {
+#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
+            if (n->type == NODE_REG_SRC) {
+              if (n->isArray()) {
+                std::string idxStr, bracket, inst;
+                for (int i = 0; i < n->dimension.size(); i ++) {
+                  inst += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, n->dimension[i], i);
+                  idxStr += "[i" + std::to_string(i) + "]";
+                  bracket += "}\n";
+                }
+                inst += format("%s$prev%s = %s%s;\n", n->name.c_str(), idxStr.c_str(), n->name.c_str(), idxStr.c_str());
+                inst += bracket;
+                n->insts.push_back(inst);
+              } else n->insts.push_back(format("%s$prev = %s;\n", n->name.c_str(), n->name.c_str()));
+            }
+#endif
+            continue;
+          }
+          genNodeInsts(fp, n, flagName);
+          nodeDisplay(fp, n);
+        }
       }
       genNodeStepEnd(fp, super);
     }
