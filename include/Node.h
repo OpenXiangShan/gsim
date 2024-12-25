@@ -104,6 +104,7 @@ class Node {
   }
 
   std::string name;  // concat the module name in order (member in structure / temp variable)
+  std::string extraInfo;
   int id = -1;
   NodeType type;
   int width = -1;
@@ -260,6 +261,9 @@ class Node {
   }
   bool isReset() {
     return asReset == NODE_UINT_RESET || asReset == NODE_ASYNC_RESET || asReset == NODE_ALL_RESET;
+  }
+  bool isExt() {
+    return type == NODE_EXT || type == NODE_EXT_IN || type == NODE_EXT_OUT;
   }
   void updateConnect();
   void inferWidth();

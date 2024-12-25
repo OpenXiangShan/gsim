@@ -67,6 +67,7 @@ class graph {
   std::vector<SuperNode*> sortedSuper;
   std::vector<SuperNode*> uintReset;
   std::set<Node*> splittedArray;
+  std::vector<std::string> extDecl;
   std::string name;
   int maxTmp = 0;
   int nodeNum = 0;

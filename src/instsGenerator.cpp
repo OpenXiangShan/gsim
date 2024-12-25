@@ -2212,7 +2212,7 @@ valInfo* Node::computeArray() {
 }
 
 void Node::updateIsRoot() {
-  if (anyExtEdge() || next.size() != 1 || isReset()) nodeIsRoot = true;
+  if (anyExtEdge() || next.size() != 1 || isReset() || isExt()) nodeIsRoot = true;
   if (isArrayMember) {
     for (Node* nextNode : next) {
       if (nextNode->isArray()) nodeIsRoot = true;
@@ -2227,15 +2227,50 @@ void Node::updateIsRoot() {
 
 std::string computeExtMod(SuperNode* super) {
   Assert(super->member[0]->type == NODE_EXT && super->member[0]->assignTree.size() == 1, "invalid extmod\n");
-  super->member[0]->compute();
-  printf("valStr = %s\n", super->member[0]->computeInfo->valStr.c_str());
-  std::string inst = super->member[0]->assignTree[0]->getRoot()->computeInfo->valStr;
-  for (int i = 1; i < (int)super->member.size(); i ++) {
-    inst += (inst.back() == '(' ? "" : ", ") + super->member[i]->name;
+
+  std::string funcName = (super->member[0]->extraInfo.length() ? super->member[0]->extraInfo : super->member[0]->name);
+
+  std::string funcDecl = "void " + funcName + "(";
+  std::string inst = funcName + "(";
+  int argIdx = 0;
+  for (size_t i = 0; i < super->member[0]->member.size(); i ++) {
+    Node* arg = super->member[0]->member[i];
+    if (i != 0) {
+      funcDecl += ", ";
+      inst += ", ";
+    }
+
+    if (arg->type == NODE_EXT_IN) {
+      if (arg->isArray()) {
+        for (size_t j = 0; j < arg->arrayEntryNum(); j ++) {
+          if (j != 0) {
+            funcDecl += ", ";
+            inst += ", ";
+          }
+          if (arg->status == CONSTANT_NODE) {
+            inst += arg->computeInfo->valStr;
+          } else {
+            inst += arg->name + "[" + std::to_string(j) + "]";
+          }
+          funcDecl += widthUType(arg->width) + " _" + std::to_string(argIdx ++);
+        }
+      } else {
+        funcDecl += widthUType(arg->width) + " _" + std::to_string(argIdx ++);
+        inst += arg->compute()->valStr;
+      }
+    } else {
+      if (arg->isArray()) {
+        TODO();
+      } else {
+        funcDecl += widthUType(arg->width) + "& _" + std::to_string(argIdx ++);
+        inst += arg->name;
+      }
+    }
   }
+  funcDecl += ");";
   inst += ");";
   super->member[0]->insts.push_back(inst);
-  return inst;
+  return funcDecl;
 }
 
 void graph::instsGenerator() {
@@ -2247,7 +2282,7 @@ void graph::instsGenerator() {
   }
   for (SuperNode* super : sortedSuper) {
     if (super->superType == SUPER_EXTMOD) {
-      computeExtMod(super);
+      extDecl.push_back(computeExtMod(super));
     } else {
       for (Node* n : super->member) {
         if (n->dimension.size() != 0) {

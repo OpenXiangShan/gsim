@@ -228,6 +228,7 @@ FILE* graph::genHeaderStart(std::string headerFile) {
     }
     fprintf(header, "#define UINT_CONCAT%d(%s) (%s)\n", num, param.c_str(), value.c_str());
   }
+  for (std::string str : extDecl) fprintf(header, "%s\n", str.c_str());
   newLine(header);
   /* class start*/
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
@@ -838,7 +839,7 @@ bool SuperNode::instsEmpty() {
 
 void graph::cppEmitter() {
   for (SuperNode* super : sortedSuper) {
-    if (!super->instsEmpty()) {
+    if (!super->instsEmpty() || super->superType == SUPER_EXTMOD) {
       super->cppId = superId ++;
       cppId2Super[super->cppId] = super;
 #if 0
@@ -873,6 +874,9 @@ void graph::cppEmitter() {
     // std::string insts;
     if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
       for (Node* n : super->member) genNodeDef(header, n);
+    }
+    if (super->superType == SUPER_EXTMOD) {
+      for (size_t i = 1; i < super->member.size(); i ++) genNodeDef(header, super->member[i]);
     }
   }
   /* memory definition */
