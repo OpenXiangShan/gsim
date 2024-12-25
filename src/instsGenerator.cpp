@@ -1617,6 +1617,18 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
   return computeInfo;
 }
 
+valInfo* ENode::instsExtFunc(Node* n) {
+  valInfo* ret = computeInfo;
+  ret->status = VAL_FINISH;
+  std::string extInst = n->name + "(";
+  for (int i = 0; i < getChildNum(); i ++) {
+    if (i != 0) extInst += ", ";
+    extInst += ChildInfo(i, valStr);
+  }
+  ret->valStr = extInst;
+  return ret;
+}
+
 /* compute enode */
 valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
   if (computeInfo) return computeInfo;
@@ -1808,7 +1820,10 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     case OP_GROUP: instsGroup(n, lvalue, isRoot); break;
     case OP_PRINTF: instsPrintf(); break;
     case OP_ASSERT: instsAssert(); break;
+    case OP_EXT_FUNC: instsExtFunc(n); break;
+    case OP_EXIT: instsExit(); break;
     default:
+      Assert(0, "invalid opType %d\n", opType);
       Panic();
   }
   MUX_DEBUG(printf("  %p %s op %d width %d val %s status %d sameConstant %d instsNum %ld opNum %d %p\n", this, n->name.c_str(), opType, width, computeInfo->valStr.c_str(), computeInfo->status, computeInfo->sameConstant, computeInfo->insts.size(), computeInfo->opNum, computeInfo));
@@ -1856,7 +1871,8 @@ valInfo* Node::compute() {
   valInfo* ret = nullptr;
   for (size_t i = 0; i < assignTree.size(); i ++) {
     ExpTree* tree = assignTree[i];
-    valInfo* info = tree->getRoot()->compute(this, name, isRoot);
+    std::string lvalue = type == NODE_EXT ? INVALID_LVALUE : name;
+    valInfo* info = tree->getRoot()->compute(this, lvalue, isRoot);
     if (info->status == VAL_EMPTY || info->status == VAL_INVALID) continue;
     ret = info->dupWithCons();
     if ((ret->status == VAL_INVALID || ret->status == VAL_CONSTANT) && (i < assignTree.size() - 1) ) {
@@ -2209,6 +2225,19 @@ void Node::updateIsRoot() {
   }
 }
 
+std::string computeExtMod(SuperNode* super) {
+  Assert(super->member[0]->type == NODE_EXT && super->member[0]->assignTree.size() == 1, "invalid extmod\n");
+  super->member[0]->compute();
+  printf("valStr = %s\n", super->member[0]->computeInfo->valStr.c_str());
+  std::string inst = super->member[0]->assignTree[0]->getRoot()->computeInfo->valStr;
+  for (int i = 1; i < (int)super->member.size(); i ++) {
+    inst += (inst.back() == '(' ? "" : ", ") + super->member[i]->name;
+  }
+  inst += ");";
+  super->member[0]->insts.push_back(inst);
+  return inst;
+}
+
 void graph::instsGenerator() {
   maxConcatNum = 0;
   std::set<Node*> s;
@@ -2217,13 +2246,17 @@ void graph::instsGenerator() {
     for (Node* n : super->member) n->updateIsRoot();
   }
   for (SuperNode* super : sortedSuper) {
-    for (Node* n : super->member) {
-      if (n->dimension.size() != 0) {
-        n->compute();
-        s_array.insert(n);
-      } else {
-        n->compute();
-        s.insert(n);
+    if (super->superType == SUPER_EXTMOD) {
+      computeExtMod(super);
+    } else {
+      for (Node* n : super->member) {
+        if (n->dimension.size() != 0) {
+          n->compute();
+          s_array.insert(n);
+        } else {
+          n->compute();
+          s.insert(n);
+        }
       }
     }
   }

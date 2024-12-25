@@ -65,7 +65,8 @@ static std::map<NodeType, const char*> NodeType2Name = {
   {NODE_INVALID, "invalid"}, {NODE_REG_SRC, "reg_src"}, {NODE_REG_DST, "reg_dst"}, {NODE_SPECIAL, "special"},
   {NODE_INP, "inp"}, {NODE_OUT, "out"}, {NODE_MEMORY, "memory"}, {NODE_READER, "reader"},
   {NODE_WRITER, "writer"}, {NODE_READWRITER, "readwriter"}, {NODE_MEM_MEMBER, "mem_member"},
-  {NODE_OTHERS, "others"}, {NODE_REG_UPDATE, "reg_update"}
+  {NODE_OTHERS, "others"}, {NODE_REG_UPDATE, "reg_update"}, {NODE_EXT, "ext"}, {NODE_EXT_IN, "ext_in"},
+  {NODE_EXT_OUT, "ext_out"}
 };
 
 static std::map<NodeStatus, const char*> NodeStatus2Name = {

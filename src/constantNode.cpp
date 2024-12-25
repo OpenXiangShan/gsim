@@ -742,6 +742,7 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
     case OP_PRINTF: ret = consPrint(); break;
     case OP_ASSERT: ret = consAssert(); break;
     case OP_EXIT: ret = consExit(); break;
+    case OP_EXT_FUNC: ret = new valInfo(width, sign); break;
     default:
       Panic();
   }

@@ -124,6 +124,16 @@ void graph::clockOptimize() {
           node->setConstantZero(node->width);
           node->regNext->setConstantZero(node->regNext->width);
         }
+      } else if (node->type == NODE_EXT && node->clock) {
+        clockVal* val = clockMap[node->clock];
+        if (val->node) {
+          ENode* clockENode = new ENode(val->node);
+          clockENode->width = val->node->width;
+          node->clock->assignTree[0]->setRoot(clockENode);
+        } else {
+          for (Node* member : node->member)
+            member->setConstantZero(member->width);
+        }
       } else {
         clockVal* val = nullptr;
         Node* clockMember = nullptr;

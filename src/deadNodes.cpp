@@ -12,7 +12,9 @@ static inline bool potentialDead(Node* node) {
 }
 
 static inline bool isSink(Node* node) {
-  return node->type == NODE_REG_DST || node->type == NODE_SPECIAL || node->type == NODE_OUT || node->type == NODE_READER || node->type == NODE_WRITER || node->type == NODE_READWRITER;
+  return node->type == NODE_REG_DST || node->type == NODE_SPECIAL || node->type == NODE_OUT ||
+        node->type == NODE_READER || node->type == NODE_WRITER || node->type == NODE_READWRITER ||
+        node->type == NODE_EXT_IN;
 }
 
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes) {
@@ -45,8 +47,9 @@ void ExpTree::getRelyNodes(std::set<Node*>& allNodes) {
 bool anyOuterEdge(Node* node) {
   bool ret = false;
   for (Node* next : node->next) {
-    if (next == node || (node->type == NODE_REG_SRC && next == node->getDst())) continue;
-    else ret = true;
+    if (next == node || (node->type == NODE_REG_SRC && next == node->getDst())
+      || next->status == DEAD_NODE /* point to dead registers */) continue;
+    ret = true;
   }
   return ret;
 }
@@ -67,6 +70,9 @@ void graph::removeDeadNodes() {
   for (SuperNode* super : sortedSuper) {
     totalNodes += super->member.size();
     for (Node* member : super->member) {
+      for (Node* next : member->next) {
+        if (next->status == DEAD_NODE) member->next.erase(next);
+      }
       if (!anyOuterEdge(member) && potentialDead(member)) {
         s.push(member);
       }

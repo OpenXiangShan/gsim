@@ -98,6 +98,17 @@ void Node::constructSuperNode() {
     case NODE_MEM_MEMBER:
       memSuper(this);
       break;
+    case NODE_EXT: {
+      super = new SuperNode(this);
+      super->superType = SUPER_EXTMOD;
+      for (Node* node : member) {
+        if (node->type == NODE_EXT_OUT) super->add_member(node);
+      }
+      break;
+    }
+    case NODE_EXT_OUT:
+      parent->constructSuperNode();
+      break;
     default:
       super = new SuperNode(this);
   }

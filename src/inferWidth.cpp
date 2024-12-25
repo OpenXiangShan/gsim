@@ -169,6 +169,7 @@ void ENode::inferWidth() {
       case OP_PRINTF:
       case OP_ASSERT:
       case OP_EXIT:
+      case OP_EXT_FUNC:
         setWidth(1, false);
         break;
       case OP_INDEX_INT:
