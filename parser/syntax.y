@@ -73,7 +73,7 @@ int p_stoi(const char* str);
 %type <pnode> chirrtl_memory chirrtl_memory_datatype chirrtl_memory_ruw chirrtl_memory_port
 %type <pnode> reference expr primop_2expr primop_1expr primop_1expr1int primop_1expr2int
 %type <pnode> field type_aggregate type_ground circuit
-%type <strVal> info ALLID
+%type <strVal> info ALLID ext_defname
 /* %token <pnode> */
 
 %nonassoc LOWER_THAN_ELSE
@@ -259,8 +259,8 @@ opt_public:   {}
     ;
 module: opt_public Module ALLID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, synlineno(), $5, $3, 2, $7, $8); }
     ;
-ext_defname:                       {  }
-    | Defname '=' ALLID            {  }
+ext_defname:                       { $$ = strdup(""); }
+    | Defname '=' ALLID            { $$ = $3; }
     ;
 params:                            { $$ = new PList(); }
     | params param                 { $$ = $1; $$->append($2); }
@@ -268,7 +268,7 @@ params:                            { $$ = new PList(); }
 param: Parameter ALLID '=' String  {  }
     | Parameter ALLID '=' INT      {  }
     ;
-extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$ = newNode(P_EXTMOD, synlineno(), $4, $2, 1, $6);}
+extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$ = newNode(P_EXTMOD, synlineno(), $4, $2, 1, $6); $$->appendExtraInfo($7); }
     ;
 intmodule: Intmodule ALLID ':' info INDENT ports Intrinsic '=' ALLID params DEDENT	{ TODO(); }
 		;

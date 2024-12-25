@@ -525,6 +525,7 @@ void visitExtModule(graph* g, PNode* module) {
   TYPE_CHECK(module, 1, 1, P_EXTMOD);
 
   Node* extNode = allocNode(NODE_EXT, module->name);
+  extNode->extraInfo = module->getExtra(0);
   addSignal(extNode->name, extNode);
 
   PNode* ports = module->getChild(0);
