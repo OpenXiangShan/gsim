@@ -855,6 +855,9 @@ void graph::cppEmitter() {
     if (!super->instsEmpty() || super->superType == SUPER_EXTMOD) {
       super->cppId = superId ++;
       cppId2Super[super->cppId] = super;
+      if (super->superType == SUPER_EXTMOD) {
+        alwaysActive.insert(super->cppId);
+      }
 #if 0
       if (super->member.size() == 1 && super->member[0]->ops < 1) {
         alwaysActive.insert(super->cppId);
