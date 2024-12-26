@@ -532,9 +532,8 @@ void visitExtModule(graph* g, PNode* module) {
   for (int i = 0; i < ports->getChildNum(); i ++) {
     TypeInfo* portInfo = visitPort(g, ports->getChild(i), P_EXTMOD);
     for (auto entry : portInfo->aggrMember) {
-      // if (!entry.first->isClock) {
-        extNode->add_member(entry.first);
-      // }
+      if (entry.first->isClock) entry.first->type = NODE_OTHERS;
+      else extNode->add_member(entry.first);
       addSignal(entry.first->name, entry.first);
     }
     for (AggrParentNode* dummy : portInfo->aggrParent) {
