@@ -522,6 +522,9 @@ public:
     ret.u256_0 = u256_0 | a;
     return ret;
   }
+  uint512_t operator | (int a) {
+    return *this | (uint32_t)a;
+  }
   uint512_t operator | (uint64_t a) {
     uint512_t ret;
     ret.u256_1 = u256_1;
@@ -945,6 +948,14 @@ public:
   }
   uint64_t operator & (uint64_t a) {
     return data[0] & a;
+  }
+  uint128_t operator & (uint128_t a) {
+    uint128_t ret = ((uint128_t)data[1] << 64) | data[0];
+    return ret & a;
+  }
+  uint256_t operator & (uint256_t a) {
+    uint128_t ret = (uint256_t)data[3] << 192 | (uint256_t)data[2] << 128 | (uint256_t)data[1] << 64 | (uint256_t)data[0];
+    return ret & a;
   }
   uint64_t operator & (int a) {
     return data[0] & a;
