@@ -2,6 +2,7 @@
 #define VALINFO_H
 
 std::string legalCppCons(std::string str);
+int upperPower2(int x);
 
 enum valStatus {VAL_EMPTY = 0, VAL_VALID, VAL_CONSTANT, VAL_FINISH /* for printf/assert*/ , VAL_INVALID, VAL_EMPTY_SRC};
 enum valType {TYPE_NORMAL = 0, TYPE_ARRAY, TYPE_STMT};
@@ -17,6 +18,7 @@ public:
   mpz_t consVal;
   int width = 0;
   bool sign = 0;
+  int typeWidth = 0;
   int consLength = 0;
   int beg = -1;
   int end = -1;
@@ -32,6 +34,7 @@ public:
     mpz_init(assignmentCons);
     width = _width;
     sign = _sign;
+    typeWidth = upperPower2(_width);
   }
   void mergeInsts(valInfo* newInfo) {
     insts.insert(insts.end(), newInfo->insts.begin(), newInfo->insts.end());
@@ -76,6 +79,7 @@ public:
     ret->status = status;
     mpz_set(ret->consVal, consVal);
     ret->width = width;
+    ret->typeWidth = typeWidth;
     ret->sign = sign;
     ret->consLength = consLength;
     ret->fullyUpdated = fullyUpdated;

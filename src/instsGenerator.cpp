@@ -823,7 +823,7 @@ valInfo* ENode::instsNeq(Node* node, std::string lvalue, bool isRoot) {
       ret->valStr = format("(%s%s != %s%s)", (ChildInfo(0, status) == VAL_CONSTANT ? "" : Cast(ChildInfo(0, width), ChildInfo(0, sign)).c_str()), ChildInfo(0, valStr).c_str(),
                                              (ChildInfo(1, status) == VAL_CONSTANT ? "" : Cast(ChildInfo(1, width), ChildInfo(1, sign)).c_str()), ChildInfo(1, valStr).c_str());
     } else {
-      if (ChildInfo(0, width) >= ChildInfo(1, width) && ChildInfo(0, status) != VAL_CONSTANT)
+      if (ChildInfo(0, typeWidth) >= ChildInfo(1, typeWidth) && ChildInfo(0, status) != VAL_CONSTANT)
         ret->valStr = "(" + ChildInfo(0, valStr) + " != " + ChildInfo(1, valStr) + ")";
       else
         ret->valStr = format("(%s != %s)", ChildInfo(1, valStr).c_str(), ChildInfo(0, valStr).c_str());
@@ -883,6 +883,9 @@ valInfo* ENode::instsDshr(Node* node, std::string lvalue, bool isRoot) {
     }
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   }
+  if (ChildInfo(0, typeWidth) > BASIC_WIDTH) {
+    ret->typeWidth = ChildInfo(0, typeWidth);
+  }
   return ret;
 }
 
@@ -904,11 +907,14 @@ valInfo* ENode::instsAnd(Node* node, std::string lvalue, bool isRoot) {
   } else if (ChildInfo(1, status) == VAL_CONSTANT && ChildInfo(0, width) == ChildInfo(1, width) && allOnes(ChildInfo(1, consVal), width)) {
     computeInfo = Child(0, computeInfo);
   } else {
-    if (ChildInfo(0, width) >= ChildInfo(1, width))
+    if (ChildInfo(0, typeWidth) >= ChildInfo(1, typeWidth))
       ret->valStr = "(" + ChildInfo(0, valStr) + " & " + ChildInfo(1, valStr) + ")";
     else
       ret->valStr = "(" + ChildInfo(1, valStr) + " & " + ChildInfo(0, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  }
+  if (ChildInfo(0, typeWidth) > BASIC_WIDTH || ChildInfo(1, typeWidth) > BASIC_WIDTH) {
+    ret->typeWidth = MAX(ChildInfo(0, typeWidth), ChildInfo(1, typeWidth));
   }
   return ret;
 }
@@ -930,11 +936,15 @@ valInfo* ENode::instsOr(Node* node, std::string lvalue, bool isRoot) {
     ret->valStr = ChildInfo(0, valStr);
     ret->opNum = ChildInfo(0, opNum);
   } else {
-    if (ChildInfo(0, width) >= ChildInfo(1, width))
+    printf("this %p width0 %d width1 %d\n", this, ChildInfo(0, typeWidth), ChildInfo(1, typeWidth));
+    if (ChildInfo(0, typeWidth) >= ChildInfo(1, typeWidth))
       ret->valStr = "(" + ChildInfo(0, valStr) + " | " + ChildInfo(1, valStr) + ")";
     else
       ret->valStr = "(" + ChildInfo(1, valStr) + " | " + ChildInfo(0, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  }
+  if (ChildInfo(0, typeWidth) > BASIC_WIDTH || ChildInfo(1, typeWidth) > BASIC_WIDTH) {
+    ret->typeWidth = MAX(ChildInfo(0, typeWidth), ChildInfo(1, typeWidth));
   }
   return ret;
 }
@@ -950,11 +960,14 @@ valInfo* ENode::instsXor(Node* node, std::string lvalue, bool isRoot) {
     u_xor(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
   } else {
-    if (ChildInfo(0, width) >= ChildInfo(1, width))
+    if (ChildInfo(0, typeWidth) >= ChildInfo(1, typeWidth))
       ret->valStr = "(" + ChildInfo(0, valStr) + " ^ " + ChildInfo(1, valStr) + ")";
     else
       ret->valStr = "(" + ChildInfo(1, valStr) + " ^ " + ChildInfo(0, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+  }
+  if (ChildInfo(0, typeWidth) > BASIC_WIDTH || ChildInfo(1, typeWidth) > BASIC_WIDTH) {
+    ret->typeWidth = MAX(ChildInfo(0, typeWidth), ChildInfo(1, typeWidth));
   }
   return ret;
 }
@@ -968,10 +981,8 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
   if (ChildInfo(0, status) == VAL_CONSTANT) {
     for (valInfo* info : Child(1, computeInfo)->memberInfo) {
       if (info && info->status == VAL_CONSTANT) {
-        valInfo* newMemberInfo = new valInfo();
+        valInfo* newMemberInfo = new valInfo(width, sign);
         newMemberInfo->status = VAL_CONSTANT;
-        newMemberInfo->width = width;
-        newMemberInfo->sign = sign;
         u_cat(newMemberInfo->consVal, ChildInfo(0, consVal), ChildInfo(0, width), info->consVal, info->width);
         newMemberInfo->setConsStr();
         ret->memberInfo.push_back(newMemberInfo);
@@ -1002,7 +1013,7 @@ valInfo* ENode::instsCat(Node* node, std::string lvalue, bool isRoot) {
       if (ChildInfo(1, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(1, consVal)) == 0) {
         ret->valStr = hi;
       } else {
-        ret->valStr = "(" + hi + " | " + ChildInfo(1, valStr) + ")";
+        ret->valStr = format("(%s | %s%s)", hi.c_str(), Cast(Child(1, width), false).c_str(), ChildInfo(1, valStr).c_str());
       }
       ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     }
@@ -1196,6 +1207,10 @@ valInfo* ENode::instsXorr(Node* node, std::string lvalue, bool isRoot) {
     } else if (Child(0, width) <= 128) {
       ret->valStr = format("(__builtin_parityl(%s >> 64) ^ __builtin_parityl(%s))", ChildInfo(0, valStr).c_str(), ChildInfo(0, valStr).c_str());
       ret->opNum = ChildInfo(0, opNum) + 1;
+    } else if (Child(0, width) <= 256) {
+      ret->valStr = format("(__builtin_parityl(%s >> 192) ^ __builtin_parityl(%s >> 128) ^__builtin_parityl(%s >> 64) ^ __builtin_parityl(%s))",
+              ChildInfo(0, valStr).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(0, valStr).c_str());
+      ret->opNum = ChildInfo(0, opNum) + 1;
     } else TODO();
   }
   return ret;
@@ -1272,6 +1287,9 @@ valInfo* ENode::instsShr(Node* node, std::string lvalue, bool isRoot) {
   } else {
     ret->valStr = "(" + ChildInfo(0, valStr) + " >> " + std::to_string(n) + ")";
     ret->opNum = ChildInfo(0, opNum) + 1;
+  }
+  if (ChildInfo(0, typeWidth) > BASIC_WIDTH) {
+    ret->typeWidth = ChildInfo(0, typeWidth);
   }
   return ret;
 }
@@ -1400,6 +1418,7 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
         memInfo->insts.insert(memInfo->insts.end(), info->insts.begin(), info->insts.end());
         memInfo->width = ret->width;
         memInfo->sign = ret->sign;
+        memInfo->typeWidth = upperPower2(ret->width);
         infoBits(memInfo, this, info);
         ret->memberInfo.push_back(memInfo);
       } else {
@@ -1767,9 +1786,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     return computeInfo;
   }
 
-  valInfo* ret = new valInfo();
-  ret->width = width;
-  ret->sign = sign;
+  valInfo* ret = new valInfo(width, sign);
   computeInfo = ret;
   switch(opType) {
     case OP_ADD: instsAdd(n, lvalue, isRoot); break;
@@ -1953,6 +1970,7 @@ valInfo* Node::compute() {
   } else if (isRoot || assignTree.size() > 1 || ret->type == TYPE_STMT){  // TODO: count validInfoNum, replace assignTree by validInfuNum
     ret->valStr = name;
     ret->opNum = 0;
+    ret->typeWidth = upperPower2(ret->width);
     ret->type = TYPE_NORMAL;
     ret->status = VAL_VALID;
   } else {
