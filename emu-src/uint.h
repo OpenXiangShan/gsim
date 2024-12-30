@@ -498,8 +498,11 @@ public:
     ret.u256_0 = u256_0 & a.u256_0;
     return ret;
   }
-  uint64_t operator & (int a) {
+  uint32_t operator & (int a) {
     return (int)u256_0 & a;
+  }
+  uint32_t operator & (uint32_t a) {
+    return (uint32_t)u256_0 & a;
   }
   uint64_t operator & (uint64_t a) {
     return (uint64_t)u256_0 & a;
