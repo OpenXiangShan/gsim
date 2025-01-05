@@ -124,7 +124,7 @@ type_ground: Clock              { $$ = new PNode(P_Clock, synlineno()); }
     | IntType width             { $$ = newNode(P_INT_TYPE, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); }
     | ProbeType '<' IntType '>' { $$ = newNode(P_INT_TYPE, synlineno(), $3, 0); $$->setWidth(-1); $$->setSign($3[0] == 'S'); }
     | ProbeType '<' IntType width '>' { $$ = newNode(P_INT_TYPE, synlineno(), $3, 0); $$->setWidth($4); $$->setSign($3[0] == 'S'); }
-    | ProbeType '<' IntType '<' INT ">>" { $$ = newNode(P_INT_TYPE, synlineno(), $3, 0); $$->setWidth($5); $$->setSign($3[0] == 'S'); }
+    | ProbeType '<' IntType '<' INT ">>" { $$ = newNode(P_INT_TYPE, synlineno(), $3, 0); $$->setWidth(p_stoi($5)); $$->setSign($3[0] == 'S'); }
     | anaType width             { TODO(); }
     | FixedType width binary_point  { TODO(); }
     ;
