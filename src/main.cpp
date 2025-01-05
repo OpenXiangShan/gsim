@@ -16,8 +16,6 @@ void preorder_traversal(PNode* root);
 graph* AST2Graph(PNode* root);
 void inferAllWidth();
 
-extern PNode* root;
-
 #define FUNC_TIMER(func) \
   do { \
     clock_t start = clock(); \
@@ -89,7 +87,8 @@ int main(int argc, char** argv) {
   FUNC_TIMER(syntax.parse());
   graph* g;
   static int dumpIdx = 0;
-  FUNC_WRAPPER(g = AST2Graph(root), "Init");
+  PNode* globalRoot = lexical.root;
+  FUNC_WRAPPER(g = AST2Graph(globalRoot), "Init");
 
   FUNC_TIMER(g->splitArray());
 

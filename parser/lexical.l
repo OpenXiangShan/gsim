@@ -1,19 +1,10 @@
 %{
-  #include <stack>
   #include <string>
   #include "common.h"
-  #include "PNode.h"
   #include "syntax.hh"
   #include "Parser.h"
-  int curr_indent = 0;
-  int angle_num = 0;
-  int square_num = 0;
-  int bracket_num = 0;
-  int parenthesis_num = 0;
-  static int TAB_WIDTH = 2;
-  std::stack<int>indentLevels;
+  static const int TAB_WIDTH = 2;
   #define YY_USER_INIT { \
-    indentLevels.push(0); \
     BEGIN(indent); \
   }
   typedef Parser::Syntax::token token;

@@ -1,14 +1,12 @@
 %{
   #include <iostream>
   #include "common.h"
-  #include "PNode.h"
   #include "syntax.hh"
   #include "Parser.h"
-  PNode* root;
 
 int p_stoi(const char* str);
 //   int  yylex (yy::parser::value_type* yylval);
-  char* emptyStr = NULL;
+static char* emptyStr = NULL;
 %}
 
 %language "c++"
@@ -82,7 +80,7 @@ int p_stoi(const char* str);
 
 %%
 /* remove version */
-circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, synlineno(), $6, $3, $8); root = $$; (void)yynerrs_;}
+circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, synlineno(), $6, $3, $8); scanner->root = $$; (void)yynerrs_;}
 	;
 ALLID: ID {$$ = $1; }
     | Inst { $$ = strdup("inst"); }
