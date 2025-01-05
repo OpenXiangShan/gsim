@@ -88,22 +88,25 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>"%[["   { BEGIN(anno); }
 <normal>"<<"    { return token::DoubleLeft; }
 <normal>">>"    { return token::DoubleRight; }
-<normal>Clock                   { yylval->typeGround = strdup(yytext); return token::Clock; }
-<normal>Reset                   { yylval->typeGround = strdup(yytext); return token::Reset; }
-<normal>AsyncReset              { yylval->typeGround = strdup(yytext); return token::AsyReset; }
-<normal>UInt|SInt               { yylval->typeGround = strdup(yytext); return token::IntType; }
-<normal>Probe                   { yylval->typeGround = strdup(yytext); return token::ProbeType; }
-<normal>probe                   { yylval->typeGround = strdup(yytext); return token::Probe; }
-<normal>Analog                  { yylval->typeGround = strdup(yytext); return token::anaType; }
-<normal>Fixed                   { yylval->typeGround = strdup(yytext); return token::FixedType; }
+<normal>Clock                   { yylval->typeGround = "Clock";      return token::Clock; }
+<normal>Reset                   { yylval->typeGround = "Reset";      return token::Reset; }
+<normal>AsyncReset              { yylval->typeGround = "AsyncReset"; return token::AsyReset; }
+<normal>UInt                    { yylval->typeGround = "UInt";       return token::IntType; }
+<normal>SInt                    { yylval->typeGround = "SInt";       return token::IntType; }
+<normal>Probe                   { yylval->typeGround = "Probe";      return token::ProbeType; }
+<normal>probe                   { yylval->typeGround = "probe";      return token::Probe; }
+<normal>Analog                  { yylval->typeGround = "Analog";     return token::anaType; }
+<normal>Fixed                   { yylval->typeGround = "Fixed";      return token::FixedType; }
 <normal>flip                    { return token::Flip;}
 <normal>(add|sub|mul|div|rem|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat)[(] { parenthesis_num++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E2OP; }
 <normal>(asUInt|asSInt|asClock|asAsyncReset|cvt|neg|not|andr|orr|xorr)[(] { parenthesis_num ++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1OP; }
 <normal>(pad|shl|shr|head|tail)[(]   { parenthesis_num ++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1I1OP; }
-<normal>bits[(]                 { parenthesis_num ++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1I2OP; }
+<normal>bits[(]                 { parenthesis_num ++; yylval->typeOP = "bits"; return token::E1I2OP; }
 <normal>mux                     { return token::Mux; }
 <normal>validif                 { return token::Validif; }
-<normal>old|new|undefined       { yylval->typeRUW = strdup(yytext); return token::Ruw; }
+<normal>old                     { yylval->typeRUW = "old"; return token::Ruw; }
+<normal>new                     { yylval->typeRUW = "new"; return token::Ruw; }
+<normal>undefined               { yylval->typeRUW = "undefined"; return token::Ruw; }
 <normal>mem                     { return token::Mem; }
 <normal>smem                    { return token::SMem; }
 <normal>cmem                    { return token::CMem; }

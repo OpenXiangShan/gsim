@@ -9,7 +9,7 @@
 void PNode::appendChild(PNode* p) {
   if (p) child.push_back(p);
 }
-void PNode::appendExtraInfo(char* info) { extraInfo.push_back(std::string(info)); }
+void PNode::appendExtraInfo(const char* info) { extraInfo.push_back(std::string(info)); }
 void PNode::appendChildList(PList* plist) {
   if (plist) child.insert(child.end(), plist->siblings.begin(), plist->siblings.end());
 }
@@ -28,7 +28,7 @@ void pnewNode(PNode* parent, int num, va_list valist) {
   }
 }
 
-PNode* newNode(PNodeType type, int lineno, char* info, char* name, int num, ...) {
+PNode* newNode(PNodeType type, int lineno, const char* info, const char* name, int num, ...) {
   PNode* parent = new PNode(type, lineno);
   if (info) parent->info = std::string(info);
   if (name) parent->name = std::string(name);
@@ -39,7 +39,7 @@ PNode* newNode(PNodeType type, int lineno, char* info, char* name, int num, ...)
   return parent;
 }
 
-PNode* newNode(PNodeType type, int lineno, char* name, int num, ...) {
+PNode* newNode(PNodeType type, int lineno, const char* name, int num, ...) {
   PNode* parent = new PNode(type, lineno);
   if (name) parent->name = std::string(name);
   va_list valist;
@@ -49,7 +49,7 @@ PNode* newNode(PNodeType type, int lineno, char* name, int num, ...) {
   return parent;
 }
 
-PNode* newNode(PNodeType type, int lineno, char* info, char* name, PList* plist) {
+PNode* newNode(PNodeType type, int lineno, const char* info, const char* name, PList* plist) {
   PNode* parent = new PNode(type, lineno);
   if (info) parent->info = std::string(info);
   if (name) parent->name = std::string(name);
