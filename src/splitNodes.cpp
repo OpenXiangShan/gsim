@@ -822,9 +822,6 @@ void graph::splitNodes() {
       addReInfer(node);
       /* extra update for registers */
       if (node->type == NODE_REG_SRC) {
-        if (supersrc.find(node->super) != supersrc.end()) {
-          supersrc.erase(node->super);
-        }
         for (Node* splittedNode : splittedNodesSet[node]) regsrc.push_back(splittedNode);
         addReInfer(node->getDst());
         for (Node* dst : splittedNodesSet[node->getDst()]) addReInfer(dst);

@@ -335,7 +335,7 @@ void ExpTree::updateWithSplittedArray(Node* node, Node* array) {
 
 void graph::splitArrayNode(Node* node) {
   splittedArray.insert(node);
-  if (supersrc.find(node->super) != supersrc.end()) supersrc.erase(node->super);
+  node->status = DEAD_NODE;
   /* remove prev connection */
   for (Node* prev : node->prev) prev->next.erase(node);
   for (SuperNode* super : node->super->prev) super->next.erase(node->super);
@@ -412,7 +412,7 @@ void graph::splitArrayNode(Node* node) {
 
   for (Node* member : node->arrayMember) member->constructSuperConnect();
   for (Node* member : node->arrayMember) {
-    if (member->super->prev.size() == 0) supersrc.insert(member->super);
+    if (member->super->prev.size() == 0) supersrc.push_back(member->super);
   }
 }
 
@@ -491,6 +491,10 @@ void graph::splitArray() {
       checkNodes.insert(member);
     }
   }
+  supersrc.erase(
+    std::remove_if(supersrc.begin(), supersrc.end(), [](const SuperNode* n) {return n->member[0]->status == DEAD_NODE; }),
+    supersrc.end()
+  );
 }
 
 Node* Node::arrayMemberNode(int idx) {

@@ -62,7 +62,7 @@ class graph {
   std::set<Node*> halfConstantArray;
   std::vector<Node*> specialNodes;
   /* used before toposort */
-  std::set<SuperNode*> supersrc;
+  std::vector<SuperNode*> supersrc;
   /* used after toposort */
   std::vector<SuperNode*> sortedSuper;
   std::vector<SuperNode*> uintReset;

@@ -2041,13 +2041,13 @@ graph* AST2Graph(PNode* root) {
   /* find all sources: regsrc, memory rdata, input, constant node */
   for (Node* reg : g->regsrc) {
     if (reg->prev.size() == 0)
-      g->supersrc.insert(reg->super);
+      g->supersrc.push_back(reg->super);
     if (reg->getDst()->prev.size() == 0)
-      g->supersrc.insert(reg->getDst()->super);
+      g->supersrc.push_back(reg->getDst()->super);
   }
 
   for (Node* input : g->input) {
-    g->supersrc.insert(input->super);
+    g->supersrc.push_back(input->super);
     for (ExpTree* tree : input->assignTree) Assert(tree->isInvalid(), "input %s not invalid", input->name.c_str());
     input->assignTree.clear();
   }
@@ -2055,7 +2055,7 @@ graph* AST2Graph(PNode* root) {
     if ((it.second->type == NODE_OTHERS || it.second->type == NODE_READER || it.second->type == NODE_WRITER ||
         it.second->type == NODE_SPECIAL || it.second->type == NODE_EXT || it.second->type == NODE_EXT_IN || it.second->type == NODE_EXT_OUT)
         && it.second->super->prev.size() == 0) {
-      g->supersrc.insert(it.second->super);
+      g->supersrc.push_back(it.second->super);
     }
     if (it.second->isArray()) {
       for (ExpTree* tree : it.second->arrayVal) {
