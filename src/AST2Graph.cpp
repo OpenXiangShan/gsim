@@ -2063,7 +2063,9 @@ graph* AST2Graph(PNode* root) {
       }
     }
   }
-
+#ifdef ORDERED_TOPO_SORT
+  std::sort(g->supersrc.begin(), g->supersrc.end(), [](SuperNode* a, SuperNode* b) {return a->id < b->id;});
+#endif
   return g;
 }
 
