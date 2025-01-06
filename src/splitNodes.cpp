@@ -861,9 +861,9 @@ void graph::splitNodes() {
         i += replaceSuper.size() - 1;
       }
       if (member->type == NODE_REG_DST && splittedNodesSet.find(member->getSrc()) != splittedNodesSet.end()) {
-        std::set<SuperNode*> replaceSuper;
+        std::vector<SuperNode*> replaceSuper;
         for (Node* node : splittedNodesSet[member->getSrc()]) {
-          replaceSuper.insert(node->getDst()->super);
+          replaceSuper.push_back(node->getDst()->super);
         }
         sortedSuper.erase(sortedSuper.begin() + i);
         sortedSuper.insert(sortedSuper.begin() + i, replaceSuper.begin(), replaceSuper.end());
