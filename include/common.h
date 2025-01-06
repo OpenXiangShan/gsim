@@ -22,6 +22,7 @@
 #include <cstdarg>
 
 // #define MEM_CHECK
+// #define ORDERED_TOPO_SORT
 // #define PERF
 // #define EMU_LOG
 // #define LOG_START 0

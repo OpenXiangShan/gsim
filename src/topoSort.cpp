@@ -23,7 +23,14 @@ void graph::topoSort() {
     Assert(visited.find(top) == visited.end(), "superNode %d is already visited\n", top->id);
     visited.insert(top);
     sortedSuper.push_back(top);
+#ifdef ORDERED_TOPO_SORT
+    std::vector<SuperNode*> sortedNext;
+    sortedNext.insert(sortedNext.end(), top->next.begin(), top->next.end());
+    std::sort(sortedNext.begin(), sortedNext.end(), [](SuperNode* a, SuperNode* b) {return a->id < b->id;});
+    for (SuperNode* next : sortedNext) {
+#else
     for (SuperNode* next : top->next) {
+#endif
       if (times.find(next) == times.end()) times[next] = 0;
       times[next] ++;
       if (times[next] == (int)next->prev.size()) {
