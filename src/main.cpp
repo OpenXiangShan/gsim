@@ -19,23 +19,17 @@ void preorder_traversal(PNode* root);
 graph* AST2Graph(PNode* root);
 void inferAllWidth();
 
-#define FUNC_TIMER(func) \
+#define FUNC_WRAPPER_INTERNAL(func, name, dumpCond) \
   do { \
-    clock_t start = clock(); \
+    struct timeval start = getTime(); \
     func; \
-    clock_t end = clock(); \
-    printf("{" #func "} = %ld s\n", (end - start) / CLOCKS_PER_SEC); \
+    struct timeval end = getTime(); \
+    showTime("{" #func "}", start, end); \
+    if (dumpCond && EnableDumpGraph) g->dump(std::to_string(dumpIdx ++) + name); \
   } while(0)
 
-#define FUNC_WRAPPER(func, name) \
-  do { \
-    clock_t start = clock(); \
-    func; \
-    clock_t end = clock(); \
-    printf("{" #func "} = %ld s\n", (end - start) / CLOCKS_PER_SEC); \
-    if (EnableDumpGraph) g->dump(std::to_string(dumpIdx ++) + name); \
-  } while(0)
-
+#define FUNC_TIMER(func)         FUNC_WRAPPER_INTERNAL(func, "", false)
+#define FUNC_WRAPPER(func, name) FUNC_WRAPPER_INTERNAL(func, name, true)
 
 static bool EnableDumpGraph{false};
 
@@ -95,6 +89,9 @@ static char* readFile(const char *InputFileName, size_t &size, size_t &mapSize) 
  * @return exit state.
  */
 int main(int argc, char** argv) {
+  TIMER_START(total);
+  graph* g = NULL;
+  static int dumpIdx = 0;
   const char *InputFileName = parseCommandLine(argc, argv);
 
   size_t size = 0, mapSize = 0;
@@ -105,8 +102,6 @@ int main(int argc, char** argv) {
   FUNC_TIMER(globalRoot= parseFIR(strbuf));
   munmap(strbuf, mapSize);
 
-  graph* g;
-  static int dumpIdx = 0;
   FUNC_WRAPPER(g = AST2Graph(globalRoot), "Init");
 
   FUNC_TIMER(g->splitArray());
@@ -154,6 +149,7 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->cppEmitter(), "Final");
 
+  TIMER_END(total);
 
   return 0;
 }

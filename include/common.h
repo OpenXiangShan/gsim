@@ -30,6 +30,11 @@
 
 #define LENGTH(a) (sizeof(a) / sizeof(a[0]))
 
+#define _STR(a) # a
+#define STR(a)  _STR(a)
+#define _CONCAT(a, b) a ## b
+#define CONCAT(a, b)  _CONCAT(a, b)
+
 #define MAX(a, b) ((a >= b) ? a : b)
 #define MIN(a, b) ((a >= b) ? b : a)
 #define ABS(a) (a >= 0 ? a : -a)
@@ -136,6 +141,13 @@ std::string arrayMemberName(Node* node, std::string suffix);
 #include "valInfo.h"
 #include "perf.h"
 
+#define TIMER_START(name) struct timeval CONCAT(__timer_, name) = getTime();
+#define TIMER_END(name) do { \
+  struct timeval t = getTime(); \
+  char buf[256]; \
+  snprintf(buf, sizeof(buf) - 1, "Timer.%s()." STR(name), __func__); \
+  showTime(buf, CONCAT(__timer_, name), t); \
+} while (0)
 
 struct ordercmp {
   bool operator()(Node* n1, Node* n2) {
