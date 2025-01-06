@@ -1,6 +1,7 @@
 #include "common.h"
 #include "syntax.hh"
 #include "Parser.h"
+#include <thread>
 
 PNode* parseFIR(char *strbuf) {
   char *p = strbuf;
@@ -17,13 +18,16 @@ PNode* parseFIR(char *strbuf) {
   std::istringstream *streamBuf = new std::istringstream(strbuf);
   Parser::Lexical *lexical = new Parser::Lexical(*streamBuf, std::cout);
   Parser::Syntax *syntax = new Parser::Syntax(lexical);
-  syntax->parse();
 
   std::istringstream *streamBuf2 = new std::istringstream(p);
   Parser::Lexical *lexical2 = new Parser::Lexical(*streamBuf2, std::cout);
   Parser::Syntax *syntax2 = new Parser::Syntax(lexical2);
   lexical2->set_lineno(next_lineno);
-  syntax2->parse();
+
+  std::thread a([&syntax]  { printf("start A\n"); syntax ->parse(); printf("finish A\n"); }),
+              b([&syntax2] { printf("start B\n"); syntax2->parse(); printf("finish B\n"); });
+  a.join();
+  b.join();
 
   PNode* globalRoot = lexical->root;
   lexical->list->concat(lexical2->list);
