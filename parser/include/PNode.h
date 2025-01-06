@@ -165,6 +165,6 @@ class PList {
 
 PNode* newNode(PNodeType type, int lineno, const char* info, const char* name, int num, ...);
 PNode* newNode(PNodeType type, int lineno, const char* name, int num, ...);
-PNode* newNode(PNodeType type, int lineno, const char* info, const char* name, PList* plist);
+PNode* newNode(PNodeType type, int lineno, const char* info, const char* name);
 
 #endif

@@ -7,8 +7,6 @@
 
 #include "common.h"
 #include "graph.h"
-#include "syntax.hh"
-#include "Parser.h"
 
 #include <getopt.h>
 #include <sys/mman.h>
@@ -16,6 +14,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+PNode* parseFIR(char *strbuf);
 void preorder_traversal(PNode* root);
 graph* AST2Graph(PNode* root);
 void inferAllWidth();
@@ -102,16 +101,8 @@ int main(int argc, char** argv) {
   char *strbuf;
   FUNC_TIMER(strbuf = readFile(InputFileName, size, mapSize));
 
-  std::istringstream *streamBuf = new std::istringstream(strbuf);
-  Parser::Lexical *lexical = new Parser::Lexical(*streamBuf, std::cout);
-  Parser::Syntax *syntax = new Parser::Syntax(lexical);
-
-  FUNC_TIMER(syntax->parse());
-  PNode* globalRoot = lexical->root;
-  delete syntax;
-  delete lexical;
-  delete streamBuf;
-
+  PNode* globalRoot;
+  FUNC_TIMER(globalRoot= parseFIR(strbuf));
   munmap(strbuf, mapSize);
 
   graph* g;

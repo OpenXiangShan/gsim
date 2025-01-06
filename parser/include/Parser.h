@@ -26,6 +26,7 @@ public:
   }
   int lex(Syntax::semantic_type* yylval);
   int lex_debug(Syntax::semantic_type* yylval);
+  void set_lineno(int n) { yylineno = n; }
 protected:
   int curr_indent = 0;
   int angle_num = 0;

@@ -49,11 +49,10 @@ PNode* newNode(PNodeType type, int lineno, const char* name, int num, ...) {
   return parent;
 }
 
-PNode* newNode(PNodeType type, int lineno, const char* info, const char* name, PList* plist) {
+PNode* newNode(PNodeType type, int lineno, const char* info, const char* name) {
   PNode* parent = new PNode(type, lineno);
   if (info) parent->info = std::string(info);
   if (name) parent->name = std::string(name);
-  if (plist) parent->child.assign(plist->siblings.begin(), plist->siblings.end());
   return parent;
 }
 

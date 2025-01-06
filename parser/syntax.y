@@ -80,7 +80,7 @@ static char* emptyStr = NULL;
 
 %%
 /* remove version */
-circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { scanner->root = newNode(P_CIRCUIT, synlineno(), $6, $3, $8); (void)yynerrs_;}
+circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { scanner->root = newNode(P_CIRCUIT, synlineno(), $6, $3); scanner->list = $8; (void)yynerrs_;}
   | INDENT cir_mods DEDENT { scanner->list = $2; }
   ;
 ALLID: ID {$$ = $1; }
