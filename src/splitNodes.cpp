@@ -855,9 +855,9 @@ void graph::splitNodes() {
         Assert(sortedSuper[i]->member.size() == 1, "invalid merged SuperNode");
       }
       if ((member->type == NODE_REG_SRC || member->type == NODE_OTHERS) && splittedNodesSet.find(member) != splittedNodesSet.end()) {
-        std::set<SuperNode*> replaceSuper;
+        std::vector<SuperNode*> replaceSuper;
         for (Node* node : splittedNodesSet[member]) {
-          replaceSuper.insert(node->super);
+          replaceSuper.push_back(node->super);
         }
         sortedSuper.erase(sortedSuper.begin() + i);
         sortedSuper.insert(sortedSuper.begin() + i, replaceSuper.begin(), replaceSuper.end());
