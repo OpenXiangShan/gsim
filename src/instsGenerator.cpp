@@ -936,7 +936,6 @@ valInfo* ENode::instsOr(Node* node, std::string lvalue, bool isRoot) {
     ret->valStr = ChildInfo(0, valStr);
     ret->opNum = ChildInfo(0, opNum);
   } else {
-    printf("this %p width0 %d width1 %d\n", this, ChildInfo(0, typeWidth), ChildInfo(1, typeWidth));
     if (ChildInfo(0, typeWidth) >= ChildInfo(1, typeWidth))
       ret->valStr = "(" + ChildInfo(0, valStr) + " | " + ChildInfo(1, valStr) + ")";
     else
