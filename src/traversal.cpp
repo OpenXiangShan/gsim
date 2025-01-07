@@ -149,6 +149,7 @@ void Node::display() {
 void ENode::display() {
   ExpTree* tmp = new ExpTree(this, new ENode());
   tmp->display();
+  delete tmp;
 }
 
 void graph::traversalNoTree() {
