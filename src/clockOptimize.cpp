@@ -57,6 +57,13 @@ clockVal* ENode::clockCompute() {
     case OP_INT:
       ret = new clockVal("0");
       break;
+    case OP_EQ:
+      ret = new clockVal("0");
+      printf("Warning: A clock signal driven by the == operator is detected. "
+             "It is not supported now and treated as a constant clock signal. "
+             "This may cause wrong result during simulation.\n");
+      display();
+      break;
     default:
       Assert(0, "invalid op %d", opType);
   }
