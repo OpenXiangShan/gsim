@@ -115,6 +115,7 @@ class Node {
   int order = -1;
   int orderInSuper = -1;
   int ops = 0;
+  int lineno = -1;
   std::set<Node*> next;
   std::set<Node*> prev;
   std::vector <ExpTree*> assignTree;

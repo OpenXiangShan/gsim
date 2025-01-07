@@ -143,6 +143,7 @@ Node* Node::dup(NodeType _type, std::string _name) {
   duplicate->sign = sign;
   duplicate->isClock = isClock;
   duplicate->reset = reset;
+  duplicate->lineno = lineno;
   for (int dim : dimension) duplicate->dimension.push_back(dim);
 
   return duplicate;

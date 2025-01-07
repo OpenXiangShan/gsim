@@ -47,9 +47,10 @@ static inline void typeCheck(PNode* node, const int expect[], int size, int minC
     "the childNum %d of node %s is out of bound [%d, %d]", node->getChildNum(), node->name.c_str(), minChildNum, maxChildNum);
 }
 
-static inline Node* allocNode(NodeType type = NODE_OTHERS, std::string name = "") {
+static inline Node* allocNode(NodeType type = NODE_OTHERS, std::string name = "", int lineno = -1) {
   Node* node = new Node(type);
   node->name = name;
+  node->lineno = lineno;
   return node;
 }
 
@@ -181,7 +182,7 @@ TypeInfo* visitFields(graph* g, PNode* fields, NodeType parentType) {
       if (parentType == NODE_EXT_OUT) curType = NODE_EXT_IN;
     }
     if (!fieldInfo->isAggr()) { // The type of field is ground
-      Node* fieldNode = allocNode(curType, prefixName(SEP_AGGR, field->name));
+      Node* fieldNode = allocNode(curType, prefixName(SEP_AGGR, field->name), fields->lineno);
       fieldNode->updateInfo(fieldInfo);
       info->add(fieldNode, field->type == P_FLIP_FIELD);
     } else { // The type of field is aggregate
@@ -249,7 +250,7 @@ TypeInfo* visitPort(graph* g, PNode* port, PNodeType modType) {
   TypeInfo* info = visitType(g, port->getChild(0), type);
 
   if (!info->isAggr()) {
-    Node* node = allocNode(type, topPrefix());
+    Node* node = allocNode(type, topPrefix(), port->lineno);
     node->updateInfo(info);
     info->add(node, false);
   }
@@ -524,7 +525,7 @@ extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$
 void visitExtModule(graph* g, PNode* module) {
   TYPE_CHECK(module, 1, 1, P_EXTMOD);
 
-  Node* extNode = allocNode(NODE_EXT, module->name);
+  Node* extNode = allocNode(NODE_EXT, module->name, module->lineno);
   extNode->extraInfo = module->getExtra(0);
   addSignal(extNode->name, extNode);
 
@@ -576,7 +577,7 @@ void visitWireDef(graph* g, PNode* wire) {
   }
   for (AggrParentNode* dummy : info->aggrParent) addDummy(dummy->name, dummy);
   if (!info->isAggr()) {
-    Node* node = allocNode(NODE_OTHERS, topPrefix());
+    Node* node = allocNode(NODE_OTHERS, topPrefix(), wire->lineno);
     node->updateInfo(info);
     addSignal(node->name, node);
   }
@@ -598,7 +599,7 @@ void visitRegDef(graph* g, PNode* reg, PNodeType t) {
   TypeInfo* info = visitType(g, reg->getChild(0), NODE_REG_SRC);
   /* alloc node for basic nodes */
   if (!info->isAggr()) {
-    Node* src = allocNode(NODE_REG_SRC, topPrefix());
+    Node* src = allocNode(NODE_REG_SRC, topPrefix(), reg->lineno);
     src->updateInfo(info);
     info->add(src, false);
   }
@@ -696,7 +697,7 @@ static inline Node* visitReader(PNode* reader, int width, int depth, bool sign, 
 
   prefix_append(SEP_MODULE, reader->name);
 
-  Node* ret = allocNode(NODE_READER, topPrefix());
+  Node* ret = allocNode(NODE_READER, topPrefix(), reader->lineno);
 
   for (int i = 0; i < READER_MEMBER_NUM; i ++) { // resize member vector
     ret->add_member(nullptr);
@@ -723,7 +724,7 @@ static inline Node* visitWriter(PNode* writer, int width, int depth, bool sign, 
 
   prefix_append(SEP_MODULE, writer->name);
 
-  Node* ret = allocNode(NODE_WRITER, topPrefix());
+  Node* ret = allocNode(NODE_WRITER, topPrefix(), writer->lineno);
 
   for (int i = 0; i < WRITER_MEMBER_NUM; i ++) {
     ret->add_member(nullptr);
@@ -752,7 +753,7 @@ static inline Node* visitReadWriter(PNode* readWriter, int width, int depth, boo
 
   prefix_append(SEP_MODULE, readWriter->name);
 
-  Node* ret = allocNode(NODE_READWRITER, topPrefix());
+  Node* ret = allocNode(NODE_READWRITER, topPrefix(), readWriter->lineno);
 
   for (int i = 0; i < READWRITER_MEMBER_NUM; i ++) {
     ret->add_member(nullptr);
@@ -919,7 +920,7 @@ void visitMemory(graph* g, PNode* mem) {
     }
 
   } else {
-    Node* memNode = allocNode(NODE_MEMORY, topPrefix());
+    Node* memNode = allocNode(NODE_MEMORY, topPrefix(), mem->lineno);
     g->memory.push_back(memNode);
     memNode->updateInfo(info);
 
@@ -1151,7 +1152,7 @@ static Node* visitChirrtlPort(graph* g, PNode* port, int width, int depth, bool 
     op = OP_INFER_MEM;
   } else TODO();
 
-  Node* ret = allocNode(type, topPrefix() + suffix);
+  Node* ret = allocNode(type, topPrefix() + suffix, port->lineno);
   ret->dimension = node->dimension;
   ENode* enode = new ENode(op);
   enode->memoryNode = node;
@@ -1172,7 +1173,7 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
   std::string memName = prefixName(SEP_MODULE, port->getExtra(0));
 
  if (port->type == P_READ && memoryMap[memName].first[0]->rlatency == 1) {
-    Node* addr_src = allocNode(NODE_REG_SRC, format("%s%s%s%s%s", topPrefix().c_str(), SEP_MODULE, port->name.c_str(), SEP_AGGR, "IN"));
+    Node* addr_src = allocNode(NODE_REG_SRC, format("%s%s%s%s%s", topPrefix().c_str(), SEP_MODULE, port->name.c_str(), SEP_AGGR, "IN"), port->lineno);
     g->addReg(addr_src);
     Node* addr_dst = addr_src->dup();
     addr_dst->type = NODE_REG_DST;
@@ -1249,7 +1250,7 @@ static void visitChirrtlMemory(graph* g, PNode* mem) {
     }
     memoryMap[topPrefix()].second = type->aggrParent;
   } else {
-    auto* memNode = allocNode(NODE_MEMORY, topPrefix());
+    auto* memNode = allocNode(NODE_MEMORY, topPrefix(), mem->lineno);
     memoryMap[topPrefix()] = std::pair(std::vector<Node*>{memNode}, std::vector<AggrParentNode*>());
     g->memory.push_back(memNode);
     memNode->updateInfo(type);
@@ -1348,7 +1349,7 @@ void visitNode(graph* g, PNode* node) {
     }
     addDummy(aggrNode->name, aggrNode);
   } else {
-    Node* n = allocNode(NODE_OTHERS, topPrefix());
+    Node* n = allocNode(NODE_OTHERS, topPrefix(), node->lineno);
     std::vector<int> dims = exp->getExpRoot()->getDim();
     n->dimension.insert(n->dimension.end(), dims.begin(), dims.end());
 
@@ -1637,7 +1638,7 @@ void visitWhenConnect(graph* g, PNode* connect) {
 */
 void visitWhenPrintf(graph* g, PNode* print) {
   TYPE_CHECK(print, 3, 3, P_PRINTF);
-  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, "PRINTF_" + std::to_string(print->lineno)));
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, "PRINTF_" + std::to_string(print->lineno)), print->lineno);
   ASTExpTree* exp = visitExpr(g, print->getChild(1));
 
   ENode* expRoot = exp->getExpRoot();
@@ -1672,7 +1673,7 @@ void visitWhenPrintf(graph* g, PNode* print) {
 
 void visitWhenAssert(graph* g, PNode* ass) {
   TYPE_CHECK(ass, 3, 3, P_ASSERT);
-  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, ass->name));
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, ass->name), ass->lineno);
 
   ASTExpTree* pred = visitExpr(g, ass->getChild(1));
   ASTExpTree* en = visitExpr(g, ass->getChild(2));
@@ -1705,7 +1706,7 @@ void visitWhenAssert(graph* g, PNode* ass) {
 
 void visitWhenStop(graph* g, PNode* stop) {
   TYPE_CHECK(stop, 2, 2, P_STOP);
-  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stop->name));
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stop->name), stop->lineno);
 
   ASTExpTree* exp = visitExpr(g, stop->getChild(1));
 
@@ -1760,7 +1761,7 @@ void visitWhenStmts(graph* g, PNode* stmts) {
 }
 
 Node* allocCondNode(ASTExpTree* condExp, PNode* when) {
-  Node* cond = allocNode(NODE_OTHERS, prefixName(SEP_MODULE, "WHEN_COND_" + std::to_string(when->lineno)));
+  Node* cond = allocNode(NODE_OTHERS, prefixName(SEP_MODULE, "WHEN_COND_" + std::to_string(when->lineno)), when->lineno);
   cond->valTree = new ExpTree(condExp->getExpRoot(), cond);
   addSignal(cond->name, cond);
   return cond;
@@ -1790,7 +1791,7 @@ void visitWhen(graph* g, PNode* when) {
 */
 void visitPrintf(graph* g, PNode* print) {
   TYPE_CHECK(print, 3, 3, P_PRINTF);
-  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, print->name));
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, print->name), print->lineno);
   ASTExpTree* exp = visitExpr(g, print->getChild(1));
 
   ENode* enode = new ENode(OP_PRINTF);
@@ -1820,7 +1821,7 @@ void visitStop(graph* g, PNode* stop) {
   enode->addChild(exp->getExpRoot());
   enode->strVal = stop->getExtra(0);
 
-  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stop->name));
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stop->name), stop->lineno);
   n->valTree = new ExpTree(enode, new ENode(n));
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
@@ -1832,7 +1833,7 @@ void visitStop(graph* g, PNode* stop) {
 */
 void visitAssert(graph* g, PNode* ass) {
   TYPE_CHECK(ass, 3, 3, P_ASSERT);
-  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, ass->name));
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, ass->name), ass->lineno);
 
   ASTExpTree* pred = visitExpr(g, ass->getChild(1));
   ASTExpTree* en = visitExpr(g, ass->getChild(2));
