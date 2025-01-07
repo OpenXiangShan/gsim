@@ -417,12 +417,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     return lvalue + " = " + expr + ";";
   };
   if (!isSubArray(lvalue, node) && node->assignTree.size() == 1 && stmtDepth == 0 && isRoot && node->width <= 128) {
-    if (!getChild(1) && getChild(2) && ChildInfo(2, opNum) >= 0 && ChildInfo(2, opNum) < 1 && ChildInfo(2, insts).size() == 0) {
+    if (!getChild(1) && getChild(2) && ChildInfo(2, opNum) >= 0 && ChildInfo(2, opNum) < 1 && ChildInfo(2, insts).size() == 0 && ChildInfo(2, status) != VAL_INVALID) {
       toMux = true;
       condStr = ChildInfo(0, valStr);
       trueStr = lvalue;
       falseStr = ChildInfo(2, valStr);
-    } else if (!getChild(2) && getChild(1) && ChildInfo(1, opNum) >= 0 && ChildInfo(1, opNum) < 1 && ChildInfo(1, insts).size() == 0) {
+    } else if (!getChild(2) && getChild(1) && ChildInfo(1, opNum) >= 0 && ChildInfo(1, opNum) < 1 && ChildInfo(1, insts).size() == 0 && ChildInfo(1, status) != VAL_INVALID) {
       toMux = true;
       condStr = ChildInfo(0, valStr);
       trueStr = ChildInfo(1, valStr);
