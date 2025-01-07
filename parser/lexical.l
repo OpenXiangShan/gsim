@@ -47,6 +47,7 @@ info        [0-9A-Za-z.{}:,/ _-]+
 /* %x initial */
 %x indent
 %x info
+%x anno
 %x dotId
 %x intid
 %s normal
@@ -88,8 +89,12 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <dotId>{int_dec}|{id} { yylval->name = strdup(yytext); BEGIN(normal); return token::ID; }
 <dotId>"`"      { BEGIN(intid); }
 
+<anno>"]]"      { BEGIN(normal); }
+<anno>"\n"|.    { }
+
 <normal>"@"     { BEGIN(info); }
 <normal>"`"     { BEGIN(intid); }
+<normal>"%[["   { BEGIN(anno); }
 <normal>"<<"    { return token::DoubleLeft; }
 <normal>">>"    { return token::DoubleRight; }
 <normal>Clock                   { yylval->typeGround = strdup(yytext); return token::Clock; }
