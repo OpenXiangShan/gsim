@@ -528,13 +528,14 @@ void visitExtModule(graph* g, PNode* module) {
   Node* extNode = allocNode(NODE_EXT, module->name, module->lineno);
   extNode->extraInfo = module->getExtra(0);
   addSignal(extNode->name, extNode);
-
   PNode* ports = module->getChild(0);
   for (int i = 0; i < ports->getChildNum(); i ++) {
     TypeInfo* portInfo = visitPort(g, ports->getChild(i), P_EXTMOD);
     for (auto entry : portInfo->aggrMember) {
-      if (entry.first->isClock) entry.first->type = NODE_OTHERS;
-      else extNode->add_member(entry.first);
+      if (entry.first->isClock) {
+        if (!extNode->clock) extNode->clock = entry.first;
+        else entry.first->type = NODE_OTHERS;
+      } else extNode->add_member(entry.first);
       addSignal(entry.first->name, entry.first);
     }
     for (AggrParentNode* dummy : portInfo->aggrParent) {
@@ -546,11 +547,8 @@ void visitExtModule(graph* g, PNode* module) {
   ENode* funcENode = new ENode(OP_EXT_FUNC);
   for (Node* node : extNode->member) {
     if (node->type == NODE_EXT_OUT) continue;
-    if (node->isClock) extNode->clock = node;
-    else {
-      ENode* inENode = new ENode(node);
-      funcENode->addChild(inENode);
-    }
+    ENode* inENode = new ENode(node);
+    funcENode->addChild(inENode);
   }
   extNode->valTree = new ExpTree(funcENode, extNode);
   /* ext -> out */
