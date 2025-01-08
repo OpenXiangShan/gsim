@@ -15,6 +15,10 @@
 
 #define MOD_IN(module) ((module == P_EXTMOD) ? NODE_EXT_IN : (module == P_MOD ? NODE_OTHERS : NODE_INP))
 #define MOD_OUT(module) ((module == P_EXTMOD) ? NODE_EXT_OUT : (module == P_MOD ? NODE_OTHERS : NODE_OUT))
+#define MOD_EXT_FLIP(type) (type == NODE_INP ? NODE_OUT : \
+                           (type == NODE_OUT ? NODE_INP : \
+                           (type == NODE_EXT_IN ? NODE_EXT_OUT : \
+                           (type == NODE_EXT_OUT ? NODE_EXT_IN : type))))
 
 int p_stoi(const char* str);
 TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType);
@@ -154,8 +158,7 @@ field: ALLID ':' type { $$ = newNode(P_FIELD, synlineno(), $1, 1, $3); }
 */
 TypeInfo* visitField(graph* g, PNode* field, NodeType parentType) {
   NodeType fieldType = parentType;
-  if (field->type == P_FLIP_FIELD) fieldType = parentType == NODE_INP ? NODE_OUT :
-                                              (parentType == NODE_OUT ? NODE_INP : fieldType);
+  if (field->type == P_FLIP_FIELD) fieldType = MOD_EXT_FLIP(fieldType);
   prefix_append(SEP_AGGR, field->name);
   TypeInfo* info = visitType(g, field->getChild(0), fieldType);
   if (field->type == P_FLIP_FIELD) info->flip();
@@ -176,10 +179,7 @@ TypeInfo* visitFields(graph* g, PNode* fields, NodeType parentType) {
     TypeInfo* fieldInfo = visitField(g, field, parentType);
     NodeType curType = parentType;
     if (field->type == P_FLIP_FIELD) {
-      if (parentType == NODE_INP) curType = NODE_OUT;
-      if (parentType == NODE_OUT) curType = NODE_INP;
-      if (parentType == NODE_EXT_IN) curType = NODE_EXT_OUT;
-      if (parentType == NODE_EXT_OUT) curType = NODE_EXT_IN;
+      curType = MOD_EXT_FLIP(parentType);
     }
     if (!fieldInfo->isAggr()) { // The type of field is ground
       Node* fieldNode = allocNode(curType, prefixName(SEP_AGGR, field->name), fields->lineno);
