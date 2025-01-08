@@ -78,13 +78,15 @@ clockVal* Node::clockCompute() {
   }
   Assert(assignTree.size() <= 1, "multiple clock assignment in %s", name.c_str());
   if (assignTree.size() != 0) {
-    clockVal* ret = assignTree[0]->getRoot()->clockCompute();
-    clockMap[this] = ret;
-    return ret;
+    clockMap[this] = assignTree[0]->getRoot()->clockCompute();
+  } else {
+    clockMap[this] = new clockVal("0");
+    printf("Warning: An external clock signal is detected. "
+           "It is not supported now and treated as a constant clock signal. "
+           "This may cause wrong result during simulation.\n");
+    display();
   }
-  printf("status %d type %d\n", status, type);
-  display();
-  Panic();
+  return clockMap[this];
 }
 
 Node* Node::clockAlias() {
