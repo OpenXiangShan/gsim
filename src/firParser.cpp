@@ -2,17 +2,17 @@
 #include "syntax.hh"
 #include "Parser.h"
 #include <future>
-#include <queue>
 #include <mutex>
 #include <condition_variable>
 
 typedef struct TaskRecord {
   off_t offset;
+  int len;
   int lineno;
   int id;
 } TaskRecord;
 
-static std::queue<TaskRecord> *taskQueue;
+static std::vector<TaskRecord> *taskQueue;
 static std::mutex m;
 static std::condition_variable cv;
 static PList **lists;
@@ -21,9 +21,9 @@ static PNode *globalRoot;
 void parseFunc(char *strbuf, int tid) {
   while (true) {
     std::unique_lock lk(m);
-    cv.wait(lk, []{ return taskQueue->size() > 0; });
-    auto e = taskQueue->front();
-    taskQueue->pop();
+    cv.wait(lk, []{ return !taskQueue->empty(); });
+    auto e = taskQueue->back();
+    taskQueue->pop_back();
     lk.unlock();
     cv.notify_one();
 
@@ -50,7 +50,7 @@ void parseFunc(char *strbuf, int tid) {
 }
 
 PNode* parseFIR(char *strbuf) {
-  taskQueue = new std::queue<TaskRecord>;
+  taskQueue = new std::vector<TaskRecord>;
   std::future<void> *threads = new std::future<void> [NR_THREAD];
 
   // create tasks
@@ -68,18 +68,21 @@ PNode* parseFIR(char *strbuf) {
       for (char *q = prev; (q = strchr(q, '\n')) != NULL; next_lineno ++, q ++);
       next_lineno ++; // '\0' is overwritten originally from '\n', so count it
     }
-    taskQueue->push(TaskRecord(prev - strbuf, prev_lineno, id));
+    taskQueue->push_back(TaskRecord(prev - strbuf, strlen(prev) + 1, prev_lineno, id));
     id ++;
     if (isEnd) break;
     next ++;
     prev = next;
   }
-
   printf("[Parser] using %d threads to parse %d modules...\n", NR_THREAD, id);
   lists = new PList* [id];
   for (int i = 0; i < NR_THREAD; i ++) {
-    taskQueue->push(TaskRecord(0, 0, -1)); // exit flags
+    taskQueue->push_back(TaskRecord(0, -1, -1, -1)); // exit flags
   }
+
+  // sort to handle the largest module first
+  std::sort(taskQueue->begin(), taskQueue->end(),
+      [](TaskRecord &a, TaskRecord &b){ return a.len < b.len; });
 
   // create threads
   for (int i = 0; i < NR_THREAD; i ++) {
@@ -90,7 +93,7 @@ PNode* parseFIR(char *strbuf) {
     printf("[Parser] waiting for thread %d/%d...\n", i, NR_THREAD - 1);
     threads[i].get();
   }
-  assert(taskQueue->size() == 0);
+  assert(taskQueue->empty());
 
   printf("[Parser] merging lists...\n");
   TIMER_START(MergeList);
