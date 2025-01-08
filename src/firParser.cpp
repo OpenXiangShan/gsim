@@ -5,6 +5,8 @@
 #include <mutex>
 #include <condition_variable>
 
+#define MODULES_PER_TASK 5
+
 typedef struct TaskRecord {
   off_t offset;
   int len;
@@ -55,13 +57,20 @@ PNode* parseFIR(char *strbuf) {
 
   // create tasks
   char *prev = strbuf;
-  char *next = strstr(prev, "\n  module ") + 1;
+  char *next = strstr(prev, "\n  module ");
   int next_lineno = 1;
   int id = 0;
+  int modules = 0;
   while (true) {
     int prev_lineno = next_lineno;
-    next = strstr(next, "\n  module ");
-    bool isEnd = (next == NULL);
+    bool isEnd = false;
+    for (int i = 0; i < MODULES_PER_TASK; i ++) {
+      next ++;
+      next = strstr(next, "\n  module ");
+      modules ++;
+      isEnd = (next == NULL);
+      if (isEnd) break;
+    }
     if (!isEnd) {
       assert(next[0] == '\n');
       next[0] = '\0';
@@ -71,10 +80,10 @@ PNode* parseFIR(char *strbuf) {
     taskQueue->push_back(TaskRecord(prev - strbuf, strlen(prev) + 1, prev_lineno, id));
     id ++;
     if (isEnd) break;
-    next ++;
-    prev = next;
+    prev = next + 1;
   }
-  printf("[Parser] using %d threads to parse %d modules...\n", NR_THREAD, id);
+  printf("[Parser] using %d threads to parse %d modules with %d tasks\n",
+      NR_THREAD, modules, id);
   lists = new PList* [id];
   for (int i = 0; i < NR_THREAD; i ++) {
     taskQueue->push_back(TaskRecord(0, -1, -1, -1)); // exit flags
