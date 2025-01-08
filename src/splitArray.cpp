@@ -598,19 +598,28 @@ void graph::splitOptionalArray() {
     std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
         regsrc.end()
   );
+#ifdef ORDERED_TOPO_SORT
+  std::vector<Node*> sortedArray;
   for (auto iter : arraySplitMap) {
-    if (iter.second) {
-      splitArrayNode(iter.first);
-      if (iter.first->type == NODE_REG_SRC) {
-        splitArrayNode(iter.first->getDst());
-        Assert(iter.first->arrayMember.size() == iter.first->getDst()->arrayMember.size(), "%p %s member not match", iter.first, iter.first->name.c_str());
-        for (size_t i = 0; i < iter.first->arrayMember.size(); i ++) {
-          regsrc.push_back(iter.first->arrayMember[i]);
-          iter.first->arrayMember[i]->bindReg(iter.first->getDst()->arrayMember[i]);
-        }
+    if (iter.second) sortedArray.push_back(iter.first);
+  }
+  std::sort(sortedArray.begin(), sortedArray.end(), [](Node* a, Node* b) {return a->id < b->id;});
+  for (Node* arrayNode : sortedArray) {
+#else
+  for (auto iter : arraySplitMap) {
+    if (!iter.second) continue;
+    Node* arrayNode = iter.first;
+#endif
+    splitArrayNode(arrayNode);
+    if (arrayNode->type == NODE_REG_SRC) {
+      splitArrayNode(arrayNode->getDst());
+      Assert(arrayNode->arrayMember.size() == arrayNode->getDst()->arrayMember.size(), "%p %s member not match", arrayNode, arrayNode->name.c_str());
+      for (size_t i = 0; i < arrayNode->arrayMember.size(); i ++) {
+        regsrc.push_back(arrayNode->arrayMember[i]);
+        arrayNode->arrayMember[i]->bindReg(arrayNode->getDst()->arrayMember[i]);
       }
-      num ++;
     }
+    num ++;
   }
   printf("[splitOptionalArray] split %d arrays\n", num);
 }
