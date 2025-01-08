@@ -523,7 +523,7 @@ Node* Node::arrayMemberNode(int idx) {
   member->reset = reset;
   member->setType(width, sign);
   member->constructSuperNode();
-
+  member->lineno = lineno;
   for ( ; i < dimension.size(); i ++) member->dimension.push_back(dimension[i]);
 
   return member;
