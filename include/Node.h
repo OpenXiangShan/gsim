@@ -146,7 +146,7 @@ class Node {
   int arrayIdx = -1;
   Node* arrayParent = nullptr;
 /* used for reg & memory */
-  Node* clock;
+  Node* clock = nullptr;
   bool isClock = false;
   ResetType reset = UNCERTAIN;
   AsReset asReset = EMPTY;
