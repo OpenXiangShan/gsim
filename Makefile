@@ -194,7 +194,7 @@ $(PARSER_BUILD)/%.cc:  $(PARSER_DIR)/%.y
 	bison -v -d $< -o $@
 
 $(PARSER_BUILD)/%.cc: $(PARSER_DIR)/%.l
-	flex -o $@ $<
+	flex -Cf -o $@ $<
 
 $(PARSER_BUILD)/%.o: $(PARSER_BUILD)/%.cc $(PARSER_SRCS)
 	@echo + CXX $<
