@@ -125,17 +125,3 @@ void print_stacktrace() {
   }
   free(stacktrace);
 }
-
-struct timeval getTime() {
-  struct timeval now;
-  gettimeofday(&now, NULL);
-  return now;
-}
-
-void showTime(const char *msg, struct timeval &t0, struct timeval &t1) {
-  uint64_t t0_us = t0.tv_sec * 1000000 + t0.tv_usec;
-  uint64_t t1_us = t1.tv_sec * 1000000 + t1.tv_usec;
-  uint64_t diff_ms = (t1_us - t0_us) / 1000;
-  printf(ANSI_FMT("%s = %ld ms\n", ANSI_FG_MAGENTA), msg, diff_ms);
-  fflush(stdout);
-}
