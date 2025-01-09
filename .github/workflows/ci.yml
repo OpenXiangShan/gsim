@@ -18,7 +18,7 @@ jobs:
           sudo apt install -y clang llvm doxygen flex bison libfl-dev ccache
       - name: Compile
         run: |
-          make compile dutName=NutShell -j `nproc`
+          make compile dutName=rocket -j `nproc`
       - name: Build EMU
         run: |
-          make build-emu-pgo MODE=0 dutName=NutShell -j `nproc`
+          make build-emu-pgo MODE=0 dutName=rocket -j `nproc`
