@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [ v1-dev, master ]
 jobs:
-  nutshell_microbench:
+  build_rocket:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out code
