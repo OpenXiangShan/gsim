@@ -106,6 +106,7 @@ class graph {
   void essentPartition();
   void inferAllWidth();
   void dump(std::string FileName);
+  void depthPerf();
 };
 
 #endif

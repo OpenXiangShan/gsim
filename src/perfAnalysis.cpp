@@ -145,3 +145,47 @@ void graph::perfAnalysis() {
   countAllNodeNum(this);
   countOps(this);
 }
+
+void graph::depthPerf() {
+  orderAllNodes();
+  /* count depth & nodeNum of superNode*/
+  std::map<SuperNode*, int> superDepth;
+  std::map<int, std::pair<int, int>> superNum;
+  for (SuperNode* super : sortedSuper) {
+    int depth = 0;
+    for (SuperNode* prev : super->prev) {
+      if (prev->order < super->order) {
+        depth = MAX(superDepth[prev] + 1, depth);
+      }
+    }
+    superDepth[super] = depth;
+    if (superNum.find(depth) == superNum.end()) superNum[depth] = std::make_pair(0, 0);
+    superNum[depth].first ++;
+    superNum[depth].second += super->member.size();
+  }
+
+  /* count depth of node */
+  std::map<Node*, int> nodeDepth;
+  std::map<int, int> nodeNum;
+  for (SuperNode* super : sortedSuper) {
+    for (Node* node : super->member) {
+      int depth = 0;
+      for (Node* prev : node->prev) {
+        if (prev->order < node->order) {
+          depth = MAX(nodeDepth[prev] + 1, depth);
+        }
+      }
+      nodeDepth[node] = depth;
+      if (nodeNum.find(depth) == nodeNum.end()) nodeNum[depth] = 0;
+      nodeNum[depth] ++;
+    }
+  }
+  printf("SuperNode info:\n");
+  for (auto iter : superNum) {
+    printf("depth %d superNum %d nodeNum %d\n", iter.first, iter.second.first, iter.second.second);
+  }
+  printf("Node info:\n");
+  for (auto iter : nodeNum) {
+    printf("depth %d nodeNum %d\n", iter.first, iter.second);
+  }
+}
