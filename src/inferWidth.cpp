@@ -253,6 +253,7 @@ void graph::inferAllWidth() {
         next->clearWidth();
         if (fixedWidth.find(next) == fixedWidth.end()) next->width = -1;
         reinferNodes.push(next);
+        uniqueNodes.insert(next);
       }
     }
   };
@@ -261,12 +262,14 @@ void graph::inferAllWidth() {
     for (Node* node : super->member) {
       if (node->width != -1) fixedWidth.insert(node);
       reinferNodes.push(node);
+      uniqueNodes.insert(node);
     }
   }
 
   while (!reinferNodes.empty()) {
     Node* node = reinferNodes.top();
     reinferNodes.pop();
+    uniqueNodes.erase(node);
     int prevWidth = node->width;
     node->inferWidth();
     if (prevWidth != node->width) {
@@ -278,6 +281,7 @@ void graph::inferAllWidth() {
         node->width = node->getSrc()->width;
       } else {
         reinferNodes.push(node->getSrc()); // re-infer the src node for updateTree
+        uniqueNodes.insert(node->getSrc());
         node->getSrc()->width = node->width;
         addRecomputeNext(node->getSrc());
       }
