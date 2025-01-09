@@ -39,7 +39,6 @@ static std::vector<std::pair<bool, Node*>> whenTrace;
 static std::set<std::string> moduleInstances;
 
 static std::set<Node*> stmtsNodes;
-static bool haveChirrtl{false};
 
 static std::map<std::string, std::pair<std::vector<Node*>, std::vector<AggrParentNode*>>> memoryMap;
 
@@ -1218,7 +1217,6 @@ static void visitChirrtlMemory(graph* g, PNode* mem) {
   assert(mem->type == P_SEQ_MEMORY || mem->type == P_COMB_MEMORY);
   prefix_append(SEP_MODULE, mem->name);
   bool isSeq = mem->type == P_SEQ_MEMORY;
-  haveChirrtl = true;
 
   // Transform the vector type into memory type
   // UInt<32>[1][2]
