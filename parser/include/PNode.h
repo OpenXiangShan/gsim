@@ -106,7 +106,7 @@ class PNode {
    *
    * @param str The string value of the node.
    */
-  PNode(char* str, int _lineno = -1) { name = std::string(str); lineno = _lineno; }
+  PNode(const char* str, int _lineno = -1) { name = std::string(str); lineno = _lineno; }
 
   /**
    * @brief A vector of child nodes.
@@ -131,7 +131,7 @@ class PNode {
   std::string consVal;
 
   void appendChild(PNode* p);
-  void appendExtraInfo(char* info);
+  void appendExtraInfo(const char* info);
   void appendChildList(PList* plist);
   void setWidth(int _width);
   int getChildNum();
@@ -163,8 +163,8 @@ class PList {
   void concat(PList* plist);
 };
 
-PNode* newNode(PNodeType type, int lineno, char* info, char* name, int num, ...);
-PNode* newNode(PNodeType type, int lineno, char* name, int num, ...);
-PNode* newNode(PNodeType type, int lineno, char* info, char* name, PList* plist);
+PNode* newNode(PNodeType type, int lineno, const char* info, const char* name, int num, ...);
+PNode* newNode(PNodeType type, int lineno, const char* name, int num, ...);
+PNode* newNode(PNodeType type, int lineno, const char* info, const char* name);
 
 #endif

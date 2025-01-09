@@ -1,14 +1,12 @@
 %{
   #include <iostream>
   #include "common.h"
-  #include "PNode.h"
   #include "syntax.hh"
   #include "Parser.h"
-  PNode* root;
 
 int p_stoi(const char* str);
 //   int  yylex (yy::parser::value_type* yylval);
-  char* emptyStr = NULL;
+static char* emptyStr = NULL;
 %}
 
 %language "c++"
@@ -34,12 +32,12 @@ int p_stoi(const char* str);
 }
 
 %union {
-  char*       name;
-  char*       strVal;
-  char*       typeGround;
-  char*       typeAggregate;
-  char*       typeOP;
-  char*       typeRUW;
+  const char* name;
+  const char* strVal;
+  const char* typeGround;
+  const char* typeAggregate;
+  const char* typeOP;
+  const char* typeRUW;
   int         intVal;
   PNode*      pnode;
   PList*      plist;
@@ -82,28 +80,29 @@ int p_stoi(const char* str);
 
 %%
 /* remove version */
-circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, synlineno(), $6, $3, $8); root = $$; (void)yynerrs_;}
-	;
+circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { scanner->root = newNode(P_CIRCUIT, synlineno(), $6, $3); scanner->list = $8; (void)yynerrs_;}
+  | INDENT cir_mods DEDENT { scanner->list = $2; }
+  ;
 ALLID: ID {$$ = $1; }
-    | Inst { $$ = strdup("inst"); }
-    | Printf { $$ = strdup("printf"); }
-    | Assert { $$ = strdup("assert"); }
-    | Mem { $$ = strdup("mem"); }
-    | Of { $$ = strdup("of"); }
-    | Reg { $$ = strdup("reg"); }
-    | Input { $$ = strdup("input"); }
-    | Output { $$ = strdup("output"); }
-    | Invalidate { $$ = strdup("invalidate"); }
-    | Mux { $$ = strdup("mux"); }
-    | Stop { $$ = strdup("stop"); }
-    | Depth {$$ = strdup("depth"); }
-    | Skip {$$ = strdup("skip"); }
-    | Write {$$ = strdup("write"); }
-    | Read {$$ = strdup("read"); }
-    | Version {$$ = strdup("version"); }
-    | Probe {$$ = strdup("probe"); }
-    | Module { $$ = strdup("module"); }
-    | Const { $$ = strdup("const"); }
+    | Inst { $$ = "inst"; }
+    | Printf { $$ = "printf"; }
+    | Assert { $$ = "assert"; }
+    | Mem { $$ = "mem"; }
+    | Of { $$ = "of"; }
+    | Reg { $$ = "reg"; }
+    | Input { $$ = "input"; }
+    | Output { $$ = "output"; }
+    | Invalidate { $$ = "invalidate"; }
+    | Mux { $$ = "mux"; }
+    | Stop { $$ = "stop"; }
+    | Depth {$$ = "depth"; }
+    | Skip {$$ = "skip"; }
+    | Write {$$ = "write"; }
+    | Read {$$ = "read"; }
+    | Version {$$ = "version"; }
+    | Probe {$$ = "probe"; }
+    | Module { $$ = "module"; }
+    | Const { $$ = "const"; }
     ;
 /* Fileinfo communicates Chisel source file and line/column info */
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
@@ -261,7 +260,7 @@ opt_public:   {}
     ;
 module: opt_public Module ALLID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, synlineno(), $5, $3, 2, $7, $8); }
     ;
-ext_defname:                       { $$ = strdup(""); }
+ext_defname:                       { $$ = ""; }
     | Defname '=' ALLID            { $$ = $3; }
     ;
 params:                            { $$ = new PList(); }
