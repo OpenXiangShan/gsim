@@ -33,12 +33,14 @@ digit_oct   [0-7]
 digit_dec   [0-9]
 digit_hex   [0-9A-Fa-f]
 /* Integer */
-int         \"b-?{digit_bin}+\"|\"o-?{digit_oct}+\"|\"h-?{digit_hex}+\"
+int         -?{digit_dec}+
+/* Radix-specified Integer Literals */
+rint        -?0b{digit_bin}+|-?0o{digit_oct}+|-?0d{digit_dec}+|-?0h{digit_hex}+
 int_dec     -?{digit_dec}+
 /* Identifiers define legal FIRRTL or Verilog names */
 letter      [A-Za-z]
 id          (_|{letter})(_|{letter}|{digit_dec})*
-string      \"((\\\")|[!|0-9A-Za-z %\\,:=_^.&~\t()-{}$'])*\"
+string      \"((\\\")|[!|0-9A-Za-z %\\,:=_^.&~\t()-{}$'#])*\"
 info        [0-9A-Za-z.{}:,/ _-]+
 /* Fileinfo communicates Chisel source file and line/column info */
 
@@ -46,6 +48,7 @@ info        [0-9A-Za-z.{}:,/ _-]+
 %x indent
 %x info
 %x dotId
+%x intid
 %s normal
 
 %%
@@ -75,19 +78,26 @@ info        [0-9A-Za-z.{}:,/ _-]+
                   }
                 }
 
+<intid>{int}    { yylval->strVal = strdup(yytext); return token::ID; }
+<intid>"`"      {  BEGIN(normal); }
+
 <info>"["       { }
-<info>{info}* { yylval->strVal = strdup(yytext); return token::Info; }
+<info>{info}*   { yylval->strVal = strdup(yytext); return token::Info; }
 <info>"]"       { BEGIN(normal); }
 
 <dotId>{int_dec}|{id} { yylval->name = strdup(yytext); BEGIN(normal); return token::ID; }
+<dotId>"`"      { BEGIN(intid); }
 
 <normal>"@"     { BEGIN(info); }
+<normal>"`"     { BEGIN(intid); }
 <normal>"<<"    { return token::DoubleLeft; }
 <normal>">>"    { return token::DoubleRight; }
 <normal>Clock                   { yylval->typeGround = strdup(yytext); return token::Clock; }
 <normal>Reset                   { yylval->typeGround = strdup(yytext); return token::Reset; }
 <normal>AsyncReset              { yylval->typeGround = strdup(yytext); return token::AsyReset; }
 <normal>UInt|SInt               { yylval->typeGround = strdup(yytext); return token::IntType; }
+<normal>Probe                   { yylval->typeGround = strdup(yytext); return token::ProbeType; }
+<normal>probe                   { yylval->typeGround = strdup(yytext); return token::Probe; }
 <normal>Analog                  { yylval->typeGround = strdup(yytext); return token::anaType; }
 <normal>Fixed                   { yylval->typeGround = strdup(yytext); return token::FixedType; }
 <normal>flip                    { return token::Flip;}
@@ -99,7 +109,14 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>validif                 { return token::Validif; }
 <normal>old|new|undefined       { yylval->typeRUW = strdup(yytext); return token::Ruw; }
 <normal>mem                     { return token::Mem; }
-<normal>{int}                   { yylval->strVal = strndup(yytext+1, strlen(yytext)-2); return token::INT; }
+<normal>smem                    { return token::SMem; }
+<normal>cmem                    { return token::CMem; }
+<normal>write                   { return token::Write; }
+<normal>read                    { return token::Read; }
+<normal>infer                   { return token::Infer; }
+<normal>mport                   { return token::Mport; }
+<normal>{int}                   { yylval->strVal = strdup(yytext); return token::INT; }
+<normal>{rint}                  { yylval->strVal = strdup(yytext); return token::RINT; }
 <normal>{int_dec}               { if (angle_num == 0 && square_num == 0 && parenthesis_num == 0 && bracket_num != 0) { \
                                     yylval->name = strdup(yytext); return token::ID; \
                                   } \
@@ -114,13 +131,11 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>readwriter              { return token::Readwriter; }
 <normal>wire                    { return token::Wire; }
 <normal>reg                     { return token::Reg; }
-<normal>"with :"                { return token::RegWith; }
-<normal>"reset =>"              { return token::RegReset; }
+<normal>regreset                { return token::RegReset; }
 <normal>inst                    { return token::Inst; }
 <normal>of                      { return token::Of; }
 <normal>node                    { return token::Node; }
-<normal>is                      { return token::Is; }
-<normal>invalid                 { return token::Invalid; }
+<normal>invalidate              { return token::Invalidate; }
 <normal>attach                  { return token::Attach; }
 <normal>when                    { return token::When; }
 <normal>else                    { return token::Else; }
@@ -136,15 +151,16 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>parameter               { return token::Parameter; }
 <normal>intmodule               { return token::Intmodule; }
 <normal>intrinsic               { return token::Intrinsic; }
-<normal>class                   { return token::Class; }
-<normal>target                  { return token::Target; }
 <normal>FIRRTL                  { return token::Firrtl; }
 <normal>version                 { return token::Version; }
 <normal>circuit                 { return token::Circuit; }
+<normal>connect                 { return token::Connect; }
+<normal>public                  { return token::Public; }
+<normal>define                  { return token::Define; }
+<normal>const                   { return token::Const; }
 <normal>{id}                    { yylval->name = strdup(yytext); return token::ID; }
 <normal>{string}                { yylval->strVal = strdup(yytext); return token::String; }
 <normal>"=>"                    { return token::RightArrow; }
-<normal>"<="                    { return token::LeftArrow; }
 <normal>"<-"                    { return token::Leftarrow; }
 <normal>"<"                     { angle_num ++; return yytext[0];}
 <normal>">"                     { angle_num --; return yytext[0];}

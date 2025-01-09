@@ -36,39 +36,22 @@ void Node::updateConnect() {
       if (top->getChild(i)) q.push(top->getChild(i));
     }
   }
-}
-static std::set<Node*>inferredNodes;
-/*
-infer width of node and all ENodes in valTree
-inverse topological order or [infer all encountered nodes]
-*/
-void Node::inferWidth() {
-  if (inferredNodes.find(this) != inferredNodes.end()) return;
-  inferredNodes.insert(this);
-  if (type == NODE_INVALID) return;
-  if (isArray() && arraySplitted()) {
-    for (Node* member : arrayMember) member->inferWidth();
-  }
-  for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();
-  if (updateTree) updateTree->getRoot()->inferWidth();
-  if (resetVal) resetVal->getRoot()->inferWidth();
-  if (width == -1) {
-    int width = 0;
-    bool sign = false;
-    bool clock = false;
-    for (ExpTree* tree : assignTree) {
-      width = MAX(width, tree->getRoot()->width);
-      sign = tree->getRoot()->sign;
-      clock |= tree->getRoot()->isClock;
+  if (type == NODE_READER) {
+    Node* memory = parent;
+    for (Node* port : memory->member) {
+      if (port->type == NODE_WRITER) {
+        next.insert(port);
+        port->prev.insert(this);
+      }
     }
-    setType(width, sign);
-    isClock = clock;
-  }
-
-  for (ExpTree* arrayTree : arrayVal) {
-    if (!arrayTree) continue;
-    arrayTree->getRoot()->inferWidth();
-    arrayTree->getlval()->inferWidth();
+  } else if (type == NODE_WRITER) {
+    Node* memory = parent;
+    for (Node* port : memory->member) {
+      if (port->type == NODE_READER) {
+        prev.insert(port);
+        port->next.insert(this);
+      }
+    }
   }
 }
 
@@ -111,12 +94,20 @@ void Node::constructSuperNode() {
   switch (type) {
     case NODE_INVALID:
     case NODE_MEMORY:
-    case NODE_READER:
-    case NODE_WRITER:
-    case NODE_READWRITER:
       Panic();
     case NODE_MEM_MEMBER:
       memSuper(this);
+      break;
+    case NODE_EXT: {
+      super = new SuperNode(this);
+      super->superType = SUPER_EXTMOD;
+      for (Node* node : member) {
+        if (node->type == NODE_EXT_OUT) super->add_member(node);
+      }
+      break;
+    }
+    case NODE_EXT_OUT:
+      parent->constructSuperNode();
       break;
     default:
       super = new SuperNode(this);
@@ -152,6 +143,7 @@ Node* Node::dup(NodeType _type, std::string _name) {
   duplicate->sign = sign;
   duplicate->isClock = isClock;
   duplicate->reset = reset;
+  duplicate->lineno = lineno;
   for (int dim : dimension) duplicate->dimension.push_back(dim);
 
   return duplicate;
@@ -174,6 +166,7 @@ void TypeInfo::mergeInto(TypeInfo* info) {
 void TypeInfo::addDim(int num) {
   if (isAggr()) {
     for (auto entry : aggrMember) entry.first->dimension.insert(entry.first->dimension.begin(), num);
+    dimension.insert(dimension.begin(), num);
   } else {
     dimension.insert(dimension.begin(), num);
   }
@@ -190,18 +183,13 @@ void TypeInfo::flip() {
 void Node::addUpdateTree() {
   ENode* dstENode = new ENode(getDst());
   dstENode->width = width;
-  if (resetCond->getRoot()->reset == UINTRESET || resetCond->getRoot()->reset == ZERO_RESET) {
-    updateTree = new ExpTree(dstENode, this);
-  } else if (resetCond->getRoot()->reset == ASYRESET) {
-    ENode* whenNode = new ENode(OP_WHEN);
+  updateTree = new ExpTree(dstENode, this);
+  if (resetCond->getRoot()->reset == UINTRESET) {
+    ENode* whenNode = new ENode(OP_RESET);
     whenNode->addChild(resetCond->getRoot());
-    whenNode->addChild(nullptr);
-    whenNode->addChild(dstENode);
-    updateTree = new ExpTree(whenNode, this);
-  } else {
-    Panic();
+    whenNode->addChild(resetVal->getRoot());
+    resetTree = new ExpTree(whenNode, this);
   }
-
 }
 
 bool Node::anyExtEdge() {
@@ -213,15 +201,15 @@ bool Node::anyExtEdge() {
   return false;
 }
 
-bool Node::needActivate() {
+bool Node::anyNextActive() {
   return nextActiveId.size() != 0;
 }
-
-bool Node::regNeedActivate() {
-  return regActivate.size() != 0;
+bool Node::needActivate() {
+  return nextNeedActivate.size() != 0;
 }
 
 void Node::updateActivate() {
+  if (isReset()) nextActiveId.insert(ACTIVATE_ALL);
   for (Node* nextNode : next) {
     if (nextNode->super != super) {
       if (nextNode->super->cppId != -1)
@@ -230,10 +218,6 @@ void Node::updateActivate() {
       if (super->cppId != -1)
         nextActiveId.insert(super->cppId);
     }
-    if (nextNode->super->cppId != -1) regActivate.insert(nextNode->super->cppId);
-  }
-  if (type == NODE_REG_DST) {
-    regActivate.insert(getSrc()->nextActiveId.begin(), getSrc()->nextActiveId.end());
   }
   if (type == NODE_REG_DST && !regSplit) {
     for (Node* nextNode : getSrc()->next) {
@@ -243,35 +227,81 @@ void Node::updateActivate() {
   }
 }
 
+void Node::updateNeedActivate(std::set<int>& alwaysActive) {
+  for (int id : nextActiveId) {
+    if (alwaysActive.find(id) == alwaysActive.end()) {
+      nextNeedActivate.insert(id);
+    }
+  }
+}
+
 void Node::removeConnection() {
   for (Node* prevNode : prev) prevNode->next.erase(this);
   for (Node* nextNode : next) nextNode->prev.erase(this);
 }
 
+ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index, Node* node);
+
+void splitTree(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees) {
+  if (node->dimension.size() == tree->getlval()->getChildNum()) {
+    newTrees.push_back(tree);
+    return;
+  }
+  int newBeg, newEnd;
+  std::tie(newBeg, newEnd) = tree->getlval()->getIdx(node);
+  if (newBeg < 0 || newBeg == newEnd) {
+    newTrees.push_back(tree);
+    return;
+  }
+  for (int i = newBeg; i <= newEnd; i ++) {
+    std::vector<int>newDim (node->dimension.size() - tree->getlval()->getChildNum());
+    int dim = i;
+    for (int j = node->dimension.size() - 1; j >= tree->getlval()->getChildNum() ; j --) {
+      newDim[j-tree->getlval()->getChildNum()] = dim % node->dimension[j];
+      dim = dim / node->dimension[j];
+    }
+    ExpTree* newTree = dupTreeWithIdx(tree, newDim, node);
+    newTrees.push_back(newTree);
+  }
+
+}
+
 void Node::addArrayVal(ExpTree* val) {
-  if (val->getRoot()->opType == OP_INVALID) ;
-  else if (val->getRoot()->opType == OP_WHEN) {
+  if (val->getRoot()->opType == OP_INVALID) return;
+  if (arrayVal.size() == 1 && arrayVal[0]->getRoot()->opType != OP_WHEN) {
+    ExpTree* oldTree = arrayVal[0];
+    arrayVal.clear();
+    std::vector<ExpTree*> newTrees;
+    splitTree(this, oldTree, newTrees);
+    for (ExpTree* tree : newTrees) arrayVal.push_back(tree);
+  }
+  if (val->getRoot()->opType == OP_WHEN) {
     arrayVal.push_back(val);
   } else {
-    bool replace = true;
-    int idx = -1;
     int newBeg, newEnd;
     std::tie(newBeg, newEnd) = val->getlval()->getIdx(this);
-    if (newBeg < 0) replace = false;
-    else {
+    if (newBeg < 0 || arrayVal.size() == 0) {
+      arrayVal.push_back(val);
+      return;
+    }
+    std::vector<ExpTree*> newTrees;
+    splitTree(this, val, newTrees);
+    for (ExpTree* tree : newTrees) {
+      int beg, end;
+      std::tie(beg, end) = tree->getlval()->getIdx(this);
+      int replaceIdx = -1;
       for (size_t i = 0; i < arrayVal.size(); i ++) {
-        int beg, end;
-        std::tie(beg, end) = arrayVal[i]->getlval()->getIdx(this);
-        if (beg < 0 || ((!(newBeg > end || newEnd < beg)) && (newBeg != beg || newEnd != end))) { // overlap and not same
-          replace = false;
-          break;
-        } else if (newBeg == beg && newEnd == end) {
-          idx = i;
+        int prevBeg, prevEnd;
+        std::tie(prevBeg, prevEnd) = arrayVal[i]->getlval()->getIdx(this);
+        if (prevBeg == beg && prevEnd == end) {
+          replaceIdx = i;
           break;
         }
       }
+      if (replaceIdx >= 0) {
+        arrayVal.erase(arrayVal.begin() + replaceIdx);
+      }
+      arrayVal.push_back(tree);
     }
-    if (replace && idx >= 0) arrayVal[idx] = val;
-    else arrayVal.push_back(val);
   }
 }

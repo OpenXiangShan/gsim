@@ -1,7 +1,13 @@
 #include "common.h"
+#include <cstdio>
+#include <queue>
 #include <stack>
 #include <set>
 #include <map>
+#include <tuple>
+#include <utility>
+
+bool nextVarConnect(Node* node);
 
 static std::set<Node*> fullyVisited;
 static std::set<Node*> partialVisited;
@@ -43,7 +49,7 @@ void partialDfs(std::set<Node*>&loop) {
   }
 }
 
-ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index) {
+ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index, Node* node) {
   ENode* lvalue = tree->getlval()->dup();
   for (int idx : index) {
     ENode* idxNode = new ENode(OP_INDEX_INT);
@@ -51,27 +57,40 @@ ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index) {
     lvalue->addChild(idxNode);
   }
   ENode* rvalue = tree->getRoot()->dup();
-  std::stack<ENode*> s;
-  s.push(rvalue);
+  int groupIdx = 0;
+  for (size_t i = 0; i < index.size(); i ++) {
+    groupIdx = groupIdx * node->dimension[i + node->dimension.size() - index.size()] + index[i];
+  }
+  std::stack<std::tuple<ENode*, ENode*, int>> s;
+  s.push(std::make_tuple(rvalue, nullptr, -1));
   while(!s.empty()) {
-    ENode* top = s.top();
+    auto top = s.top();
+    ENode* top_enode = std::get<0>(top);
+    ENode* parent = std::get<1>(top);
+    int top_idx = std::get<2>(top);
     s.pop();
-    for (int i = 0; i < top->getChildNum(); i ++) {
-      if (!top->getChild(i)) continue;
+    for (int i = 0; i < top_enode->getChildNum(); i ++) {
+      if (!top_enode->getChild(i)) continue;
     }
-    if (top->getNode()) {
-      Assert(top->getNode()->isArray(), "%s is not array", top->getNode()->name.c_str());
+    if (top_enode->getNode()) {
+      Assert(top_enode->getNode()->isArray(), "%s(%p) is not array", top_enode->getNode()->name.c_str(), top_enode);
       for (int idx : index) {
         ENode* idxNode = new ENode(OP_INDEX_INT);
         idxNode->addVal(idx);
-        top->addChild(idxNode);
+        top_enode->addChild(idxNode);
       }
+    } else if (top_enode->opType == OP_GROUP) {
+      ENode* select = top_enode->getChild(groupIdx);
+      if (!parent) rvalue = select;
+      else parent->setChild(top_idx, select);
+      top_enode = select;
+      continue;
     }
-    if (top->opType == OP_WHEN || top->opType == OP_MUX) {
-      if (top->getChild(1)) s.push(top->getChild(1));
-      if (top->getChild(2)) s.push(top->getChild(2));
-    } else if (top->opType == OP_RESET) {
-      if (top->getChild(1)) s.push(top->getChild(1));
+    if (top_enode->opType == OP_WHEN || top_enode->opType == OP_MUX) {
+      if (top_enode->getChild(1)) s.push(std::make_tuple(top_enode->getChild(1), top_enode, 1));
+      if (top_enode->getChild(2)) s.push(std::make_tuple(top_enode->getChild(2), top_enode, 2));
+    } else if (top_enode->opType == OP_RESET) {
+      if (top_enode->getChild(1)) s.push(std::make_tuple(top_enode->getChild(1), top_enode, 1));
     }
   }
   ExpTree* ret = new ExpTree(rvalue, lvalue);
@@ -104,7 +123,7 @@ bool point2self(Node* node) {
 Node* getSplitArray(graph* g) {
   /* array points to itself */
   for (Node* node : partialVisited) {
-    if (node->isArray() && node->next.find(node) != node->next.end()) return node;
+    if (node->isArray() && node->next.find(node) != node->next.end()) return node; // point to self directly
   }
 
   for (Node* node : partialVisited) {
@@ -116,15 +135,23 @@ Node* getSplitArray(graph* g) {
     if (point2self(node)) return node;
   }
   for (Node* node : partialVisited) {
-    printf("current %s\n", node->name.c_str());
+    int time = 0;
+    for (Node* prev : node->prev) {
+      if (fullyVisited.find(prev) != fullyVisited.end()) time ++;
+    }
+    printf("current %s %d/%ld\n", node->name.c_str(), time, node->prev.size());
+    for (Node* prev : node->prev) {
+      if (fullyVisited.find(prev) == fullyVisited.end()) printf("  missing %s\n", prev->name.c_str());
+    }
   }
+
   Panic();
 
 }
 
-void fillEmptyWhen(ExpTree* newTree, ENode* oldNode) {
+void fillEmptyENodeWhen(ENode* newENode, ENode* oldENode) {
   std::stack<ENode*> s;
-  s.push(newTree->getRoot());
+  s.push(newENode);
   while(!s.empty()) {
     ENode* top = s.top();
     s.pop();
@@ -141,22 +168,71 @@ void fillEmptyWhen(ExpTree* newTree, ENode* oldNode) {
       }
     }
     if (top->opType == OP_WHEN) {
-      if (!top->getChild(1)) top->setChild(1, oldNode);
-      if (!top->getChild(2)) top->setChild(2, oldNode);
+      if (!top->getChild(1)) top->setChild(1, oldENode);
+      if (!top->getChild(2)) top->setChild(2, oldENode);
     }
   }
+}
+
+void fillEmptyWhen(ExpTree* newTree, ENode* oldNode) {
+  fillEmptyENodeWhen(newTree->getRoot(), oldNode);
+}
+
+bool subTreeEq(ENode* enode1, ENode* enode2);
+int countEmptyENodeWhen(ENode* enode);
+
+ExpTree* mergeWhenTree(ExpTree* tree1, ExpTree* tree2) {
+  int emptyWhen = countEmptyENodeWhen(tree2->getRoot());
+  if (emptyWhen == 0) return tree2;
+  if (emptyWhen == 1 && tree1->getRoot()->opType != OP_WHEN) {
+    fillEmptyWhen(tree2, tree1->getRoot());
+    return tree2;
+  }
+
+  std::queue<std::tuple<ENode*, ENode*, ENode*, int>> s;
+  s.push((std::make_tuple(tree1->getRoot(), tree2->getRoot(), nullptr, -1)));
+  ExpTree* ret = nullptr;
+  while (!s.empty()) {
+    ENode* enode1, *enode2, *parent2;
+    int idx2;
+    std::tie(enode1, enode2, parent2, idx2) = s.front();
+    s.pop();
+    if (enode1->opType == OP_WHEN && enode2->opType == OP_WHEN) {
+      if (subTreeEq(enode1->getChild(0), enode2->getChild(0))) {
+        if (enode1->getChild(1) && enode2->getChild(1)) s.push(std::make_tuple(enode1->getChild(1), enode2->getChild(1), enode2, 1));
+        if (enode1->getChild(2) && enode2->getChild(2)) s.push(std::make_tuple(enode1->getChild(2), enode2->getChild(2), enode2, 2));
+        if (!enode2->getChild(1) && enode1->getChild(1)) enode2->setChild(1, enode1->getChild(1));
+        if (!enode2->getChild(2) && enode1->getChild(2)) enode2->setChild(2, enode1->getChild(2));
+        ret = tree2;
+      } else {
+        if (ret) { // already merged some nodes
+          ENode* enode = new ENode(OP_STMT);
+          enode->addChild(enode1);
+          enode->addChild(enode2);
+          parent2->setChild(idx2, enode);
+          ret = tree2;
+        } else Assert(s.empty(), "should not reach here");
+      }
+    } else {
+      if (ret) fillEmptyENodeWhen(enode2, enode1);
+      else {
+        Assert(s.empty(), "should not reach here");
+      }
+    }
+  }
+
+  return ret;
 }
 
 void distributeTree(Node* node, ExpTree* tree) {
   ArrayMemberList* list = tree->getlval()->getArrayMember(node);
   if (list->member.size() == 1) {
     int idx = list->idx[0];
-    if (node->arrayMember[idx]->assignTree.size() != 0 && node->arrayMember[idx]->assignTree.back()->getRoot()->opType != OP_WHEN) {
-      ExpTree* oldTree = node->arrayMember[idx]->assignTree.back();
-      fillEmptyWhen(tree, oldTree->getRoot());
-      node->arrayMember[idx]->assignTree.back() = tree;
-    } else {
-      node->arrayMember[idx]->assignTree.push_back(tree);
+    if (node->arrayMember[idx]->assignTree.size() == 0) node->arrayMember[idx]->assignTree.push_back(tree);
+    else {
+      ExpTree* replaceTree = mergeWhenTree(node->arrayMember[idx]->assignTree.back(), tree);
+      if (replaceTree) node->arrayMember[idx]->assignTree.back() = replaceTree;
+      else node->arrayMember[idx]->assignTree.push_back(tree);
     }
   } else {
     for (size_t i = 0; i < list->member.size(); i ++) {
@@ -168,22 +244,98 @@ void distributeTree(Node* node, ExpTree* tree) {
         subIdx[i - tree->getlval()->getChildNum()] = tmp % node->dimension[i];
         tmp /= node->dimension[i];
       }
-      ExpTree* newTree = dupTreeWithIdx(tree, subIdx);
+
+      ExpTree* newTree = dupTreeWithIdx(tree, subIdx, node);
       /* duplicate tree with idx */
-      if (node->arrayMember[idx]->assignTree.size() != 0 && node->arrayMember[idx]->assignTree.back()->getRoot()->opType != OP_WHEN) {
-        ExpTree* oldTree = node->arrayMember[idx]->assignTree.back();
-        fillEmptyWhen(newTree, oldTree->getRoot());
-        node->arrayMember[idx]->assignTree.back() = newTree;
-      } else {
-        node->arrayMember[idx]->assignTree.push_back(newTree);
+      if (node->arrayMember[idx]->assignTree.size() == 0) node->arrayMember[idx]->assignTree.push_back(newTree);
+      else {
+        ExpTree* replaceTree = mergeWhenTree(node->arrayMember[idx]->assignTree.back(), newTree);
+        if (replaceTree) node->arrayMember[idx]->assignTree.back() = replaceTree;
+        else node->arrayMember[idx]->assignTree.push_back(newTree);
       }
+    }
+  }
+}
+
+void splitAssignMent(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees) {
+  int range = 1;
+  for (int i = tree->getlval()->getChildNum(); i < (int)node->dimension.size(); i ++) range *= node->dimension[i];
+
+  for (int idx = 0; idx < range; idx ++) {
+    std::vector<int> subIdx(node->dimension.size() - tree->getlval()->getChildNum());
+    int tmp = idx;
+    for (int i = node->dimension.size() - 1; i >= tree->getlval()->getChildNum(); i --) {
+      subIdx[i - tree->getlval()->getChildNum()] = tmp % node->dimension[i];
+      tmp /= node->dimension[i];
+    }
+    ExpTree* dupTree = dupTreeWithIdx(tree, subIdx, node);
+    newTrees.push_back(dupTree);
+  }
+}
+
+void ExpTree::updateWithSplittedArray(Node* node, Node* array) {
+  std::stack<std::tuple<ENode*, ENode*, int>> s;
+  s.push(std::make_tuple(getRoot(), nullptr, 0));
+  s.push(std::make_tuple(getlval(), nullptr, -2));
+  while(!s.empty()) {
+    auto top_tuple = s.top();
+    s.pop();
+    ENode* top_enode = std::get<0>(top_tuple);
+    ENode* top_parent = std::get<1>(top_tuple);
+    int top_idx = std::get<2>(top_tuple);
+    if (!top_enode->nodePtr || top_enode->nodePtr != array) {
+      for (int i = 0; i < top_enode->getChildNum(); i ++) {
+        if (top_enode->getChild(i)) s.push(std::make_tuple(top_enode->getChild(i), top_enode, top_idx < 0 ? top_idx : i));
+      }
+      continue;
+    }
+    auto range = top_enode->getIdx(top_enode->nodePtr);
+    if (range.first < 0) {
+      if (array->dimension.size() > 1) TODO();
+      ENode* enode = nullptr;
+      for (int i = array->arrayEntryNum() - 1; i >= 0; i --) {
+        Node* member = array->getArrayMember(i);
+        if (enode) {
+          ENode* mux = new ENode(OP_MUX);
+          ENode* cond = new ENode(OP_EQ);
+          ENode* idx = new ENode(OP_INT);
+          idx->strVal = std::to_string(i);
+          idx->width = upperLog2(array->arrayEntryNum());
+          cond->addChild(top_enode->getChild(0)->getChild(0));  // first dimension
+          cond->addChild(idx);
+          mux->addChild(cond);
+          mux->addChild(new ENode(member));
+          mux->addChild(enode);
+          enode = mux;
+        } else {
+          enode = new ENode(member);
+        }
+      }
+      if (top_parent) top_parent->setChild(top_idx, enode);
+      else setRoot(enode);
+    } else if (range.first == range.second) {
+      top_enode->nodePtr = top_enode->nodePtr->getArrayMember(range.first);
+      top_enode->child.clear();
+    } else {
+      if (top_idx < 0) continue; // lvalue
+      ENode* group = new ENode(OP_GROUP);
+      group->width = top_enode->width;
+      for (int i = range.first; i <= range.second; i ++) {
+        Node* member = top_enode->nodePtr->getArrayMember(i);
+        ENode* enode = new ENode(member);
+        enode->width = member->width;
+        enode->sign = member->sign;
+        group->addChild(enode);
+      }
+      if (top_parent) top_parent->setChild(top_idx, group);
+      else setRoot(group);
     }
   }
 }
 
 void graph::splitArrayNode(Node* node) {
   splittedArray.insert(node);
-  if (supersrc.find(node->super) != supersrc.end()) supersrc.erase(node->super);
+  node->status = DEAD_NODE;
   /* remove prev connection */
   for (Node* prev : node->prev) prev->next.erase(node);
   for (SuperNode* super : node->super->prev) super->next.erase(node->super);
@@ -205,7 +357,7 @@ void graph::splitArrayNode(Node* node) {
   /* distribute arrayVal */
   for (ExpTree* tree : node->assignTree) distributeTree(node, tree);
   for (ExpTree* tree : node->arrayVal) distributeTree(node, tree);
-  if (node->updateTree) {
+  if (node->updateTree || node->resetTree) {
     for (int idx = 0; idx < node->arrayEntryNum(); idx ++) {
       /* compute index for all array operands in tree */
       std::vector<int> subIdx(node->dimension.size());
@@ -214,19 +366,44 @@ void graph::splitArrayNode(Node* node) {
         subIdx[i] = tmp % node->dimension[i];
         tmp /= node->dimension[i];
       }
-      ExpTree* newTree = dupTreeWithIdx(node->updateTree, subIdx);
-      node->arrayMember[idx]->updateTree = newTree;
+      if (node->updateTree) {
+        ExpTree* newTree = dupTreeWithIdx(node->updateTree, subIdx, node);
+        node->arrayMember[idx]->updateTree = newTree;
+      }
+      if (node->resetTree) {
+        ExpTree* newTree = dupTreeWithIdx(node->resetTree, subIdx, node);
+        node->arrayMember[idx]->resetTree = newTree;
+      }
     }
   }
+
+  std::set<Node*> checkNodes;
   /* construct connections */
+  if (node->type == NODE_REG_SRC || node->type == NODE_REG_DST) {
+    Node* regBind = node->getBindReg();
+    checkNodes.insert(regBind);
+    for (Node* member : regBind->arrayMember) {
+    checkNodes.insert(member);
+  }
+  }
   for (Node* member : node->arrayMember) {
-    member->updateConnect();
+    checkNodes.insert(member);
   }
   for (Node* next : node->next) {
+    checkNodes.insert(next);
     if (next != node) {
       next->prev.clear();
-      next->updateConnect();
     }
+  }
+  for (Node* n : checkNodes) {
+    for (ExpTree* tree : n->assignTree) tree->updateWithSplittedArray(n, node);
+    for (ExpTree* tree : n->arrayVal) tree->updateWithSplittedArray(n, node);
+    if (n->updateTree) n->updateTree->updateWithSplittedArray(n, node);
+    if (n->resetTree) n->resetTree->updateWithSplittedArray(n, node);
+  }
+
+  for (Node* n : checkNodes) {
+    n->updateConnect();
   }
 
   /* clear node connection */
@@ -235,7 +412,7 @@ void graph::splitArrayNode(Node* node) {
 
   for (Node* member : node->arrayMember) member->constructSuperConnect();
   for (Node* member : node->arrayMember) {
-    if (member->super->prev.size() == 0) supersrc.insert(member->super);
+    if (member->super->prev.size() == 0) supersrc.push_back(member->super);
   }
 }
 
@@ -277,7 +454,6 @@ void graph::splitArray() {
       /* split arrays in partialVisited until s.size() != 0 */
       Node* node = getSplitArray(this);
       Assert(!node->arraySplitted(), "%s is already splitted", node->name.c_str());
-      // printf("split array %s\n", node->name.c_str());
       num ++;
       splitArrayNode(node);
       /* add into s and visitedSet */
@@ -303,6 +479,22 @@ void graph::splitArray() {
   Assert(partialVisited.size() == 0, "partial is not empty!");
   printf("[splitArray] split %d arrays\n", num);
   splitOptionalArray();
+  /* treat arrayMember with no arrayNext as normal nodes, update assignTree */
+  /* with arrayNext can also be updated */
+  std::set<Node*> checkNodes;
+  for (Node* node : splittedArray) {
+    for (Node* member : node->arrayMember) {
+      for (Node* next : member->next) {
+        checkNodes.insert(next);
+        if (next->isArray()) member->isArrayMember = true;
+      }
+      checkNodes.insert(member);
+    }
+  }
+  supersrc.erase(
+    std::remove_if(supersrc.begin(), supersrc.end(), [](const SuperNode* n) {return n->member[0]->status == DEAD_NODE; }),
+    supersrc.end()
+  );
 }
 
 Node* Node::arrayMemberNode(int idx) {
@@ -319,19 +511,19 @@ Node* Node::arrayMemberNode(int idx) {
   std::string memberName = name;
   size_t i;
   for (i = 0; i < index.size(); i ++) {
-    memberName += "[" + std::to_string(index[i]) + "]";
+    memberName += "__" + std::to_string(index[i]);
   }
 
   Node* member = new Node(type);
-  member->isArrayMember = true;
   member->name = memberName;
   member->arrayIdx = idx;
   arrayMember.push_back(member);
   member->arrayParent = this;
   member->clock = clock;
+  member->reset = reset;
   member->setType(width, sign);
   member->constructSuperNode();
-
+  member->lineno = lineno;
   for ( ; i < dimension.size(); i ++) member->dimension.push_back(dimension[i]);
 
   return member;
@@ -395,6 +587,7 @@ void graph::checkNodeSplit(Node* node) {
     arraySplitMap[node] = false;
   }
 }
+
 /* splitted separately assigned, no variable index acceesing arrays */
 void graph::splitOptionalArray() {
   int num = 0;
@@ -405,19 +598,28 @@ void graph::splitOptionalArray() {
     std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
         regsrc.end()
   );
+#ifdef ORDERED_TOPO_SORT
+  std::vector<Node*> sortedArray;
   for (auto iter : arraySplitMap) {
-    if (iter.second) {
-      splitArrayNode(iter.first);
-      if (iter.first->type == NODE_REG_SRC) {
-        splitArrayNode(iter.first->getDst());
-        Assert(iter.first->arrayMember.size() == iter.first->getDst()->arrayMember.size(), "%p %s member not match", iter.first, iter.first->name.c_str());
-        for (size_t i = 0; i < iter.first->arrayMember.size(); i ++) {
-          regsrc.push_back(iter.first->arrayMember[i]);
-          iter.first->arrayMember[i]->bindReg(iter.first->getDst()->arrayMember[i]);
-        }
+    if (iter.second) sortedArray.push_back(iter.first);
+  }
+  std::sort(sortedArray.begin(), sortedArray.end(), [](Node* a, Node* b) {return a->id < b->id;});
+  for (Node* arrayNode : sortedArray) {
+#else
+  for (auto iter : arraySplitMap) {
+    if (!iter.second) continue;
+    Node* arrayNode = iter.first;
+#endif
+    splitArrayNode(arrayNode);
+    if (arrayNode->type == NODE_REG_SRC) {
+      splitArrayNode(arrayNode->getDst());
+      Assert(arrayNode->arrayMember.size() == arrayNode->getDst()->arrayMember.size(), "%p %s member not match", arrayNode, arrayNode->name.c_str());
+      for (size_t i = 0; i < arrayNode->arrayMember.size(); i ++) {
+        regsrc.push_back(arrayNode->arrayMember[i]);
+        arrayNode->arrayMember[i]->bindReg(arrayNode->getDst()->arrayMember[i]);
       }
-      num ++;
     }
+    num ++;
   }
   printf("[splitOptionalArray] split %d arrays\n", num);
 }

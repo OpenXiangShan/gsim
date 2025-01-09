@@ -1,5 +1,21 @@
 #include "common.h"
 
+void graph::reconnectAll() {
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      member->prev.clear();
+      member->next.clear();
+    }
+  }
+
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      member->updateConnect();
+    }
+  }
+  reconnectSuper();
+}
+
 void graph::reconnectSuper() {
   for (SuperNode* super : sortedSuper) {
     super->prev.clear();
@@ -17,6 +33,7 @@ void graph::removeNodesNoConnect(NodeStatus status) {
       super->member.end()
     );
   }
+  removeEmptySuper();
 }
 
 size_t graph::countNodes() {
@@ -36,8 +53,4 @@ void graph::removeEmptySuper() {
     std::remove_if(sortedSuper.begin(), sortedSuper.end(), [](const SuperNode* super) {return (super->superType == SUPER_VALID || super->superType == SUPER_UPDATE_REG) && super->member.size() == 0; }),
     sortedSuper.end()
   );
-}
-
-bool graph::inSrc(SuperNode* super) {
-  return supersrc.find(super) != supersrc.end();
 }

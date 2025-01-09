@@ -1,11 +1,27 @@
 #include "common.h"
+#include <cstdint>
 #include <stack>
 
-static std::map<uint64_t, std::vector<Node*>> exprId;
+#define MAX_COMMON_NEXT 5
+
+static std::map<uint64_t, std::set<Node*>> exprId;
+static std::map<uint64_t, std::set<Node*>> exprVisitedNodes;
+static std::map<Node*, uint64_t> nodeId;
+static std::map<Node*, Node*> realValueMap;
 static std::map<Node*, Node*> aliasMap;
 
+Node* getLeafNode(bool isArray, ENode* enode);
+
 uint64_t ENode::keyHash() {
-  if (nodePtr) return nodePtr->id;
+  if (nodePtr) {
+    Node* node = getLeafNode(true, this);
+    if (node) {
+      Assert(nodeId.find(node) != nodeId.end(), "node %s not found status %d type %d", node->name.c_str(), node->status, node->type);
+      return nodeId[node];
+    } else {
+      return nodePtr->id;
+    }
+  }
   else return opType * width;
 }
 
@@ -16,7 +32,7 @@ uint64_t ExpTree::keyHash() {
   while (!s.empty()) {
     ENode* top = s.top();
     s.pop();
-    ret += top->keyHash();
+    ret = ret * 123 + top->keyHash();
     for (ENode* childENode : top->child) {
       if (childENode) s.push(childENode);
     }
@@ -31,15 +47,17 @@ uint64_t Node::keyHash() {
   return ret;
 }
 
-static bool checkENodeEq(ENode* enode1, ENode* enode2) {
+bool checkENodeEq(ENode* enode1, ENode* enode2) {
   if (!enode1 && !enode2) return true;
   if (!enode1 || !enode2) return false;
-  if (enode1->getNode() != enode2->getNode()) return false;
   if (enode1->opType != enode2->opType) return false;
   if (enode1->width != enode2->width || enode1->sign != enode2->sign) return false;
   if (enode1->child.size() != enode2->child.size()) return false;
   if (enode1->opType == OP_INT && enode1->strVal != enode2->strVal) return false;
   if (enode1->values.size() != enode2->values.size()) return false;
+  if ((!enode1->getNode() && enode2->getNode()) || (enode1->getNode() && !enode2->getNode())) return false;
+  bool realEq = realValueMap.find(enode1->getNode()) != realValueMap.end() && realValueMap.find(enode2->getNode()) != realValueMap.end() && realValueMap[enode1->getNode()] == realValueMap[enode2->getNode()];
+  if (enode1->getNode() && enode2->getNode() && enode1->getNode() != enode2->getNode() && !realEq) return false;
   for (size_t i = 0; i < enode1->values.size(); i ++) {
     if (enode1->values[i] != enode2->values[i]) return false;
   }
@@ -95,49 +113,66 @@ void ExpTree::replace(std::map<Node*, Node*>& aliasMap) {
 /* TODO: check common regs */
 void graph::commonExpr() {
   for (SuperNode* super : sortedSuper) {
-    if (super->superType != SUPER_VALID) continue;
+    if (super->superType != SUPER_VALID) {
+      for (Node* node : super->member) nodeId[node] = node->id;
+      continue;
+    }
     for (Node* node : super->member) {
-      if (node->type != NODE_OTHERS || node->isArray() || node->isArrayMember) continue;
+      if(node->status != VALID_NODE) continue;
+      nodeId[node] = node->id;
+      if (node->type != NODE_OTHERS || node->isArray()) continue;
       if (node->prev.size() == 0) continue;
       // if (node->next.size() == 1) continue;
       uint64_t key = node->keyHash();
       if (exprId.find(key) == exprId.end()) {
-        exprId[key] = std::vector<Node*>();
+        exprId[key] = std::set<Node*>();
       }
-      exprId[key].push_back(node);
+      exprId[key].insert(node);
+      nodeId[node] = key;
     }
   }
-  
-  for (auto iter : exprId) {
-    if (iter.second.size() <= 1) continue;
-    std::vector<Node*> uniqueNodes;
-    /* pair-wise checking */
-    for (Node* node : iter.second) {
-      if (uniqueNodes.size() == 0) {
-        uniqueNodes.push_back(node);
+
+  std::map<Node*, std::vector<Node*>> uniqueNodes;
+  for (SuperNode* super : sortedSuper) {
+    for (Node* node : super->member) {
+      uint64_t key = nodeId[node];
+      if (exprId[key].size() <= 1) { // hash slot with only one member
+        realValueMap[node] = node;
+        uniqueNodes[node] = std::vector<Node*>(1, node);
         continue;
       }
-      bool isUnique = true;
-      for (Node* prevNode : uniqueNodes) {
-        if (checkNodeEq(node, prevNode)) {
-          aliasMap[node] = prevNode;
-          node->status = DEAD_NODE;
-          // printf("common %s to %s\n", node->name.c_str(), prevNode->name.c_str());
-          isUnique = false;
-          break;
+      for (Node* elseNode : exprVisitedNodes[key]) {
+        if (elseNode == node) continue;
+        if (uniqueNodes.find(elseNode) != uniqueNodes.end() && checkNodeEq(node, elseNode)) {
+          uniqueNodes[elseNode].push_back(node);
+          realValueMap[node] = elseNode;
         }
       }
-      if (isUnique) {
-        uniqueNodes.push_back(node);
-      }
-    }
-    if (uniqueNodes.size() > 1) {
-      printf("different trees with same hash(size=%ld):\n", uniqueNodes.size());
-      for (Node* node : uniqueNodes) {
-        node->display();
+      if (realValueMap.find(node) == realValueMap.end()) {
+        realValueMap[node] = node;
+        uniqueNodes[node] = std::vector<Node*>(1, node);
+        exprVisitedNodes[key].insert(node);
       }
     }
   }
+
+  for (auto iter : uniqueNodes) {
+    bool mergeCond = iter.second.size() >= MAX_COMMON_NEXT || iter.second[0]->width > BASIC_WIDTH;
+    if (!mergeCond) {
+      for (auto iter1 : iter.second) {
+        if (iter1->next.size() > 1) mergeCond = true;
+      }
+    }
+    if (mergeCond) {
+      Node* aliasNode = iter.second[0];
+      for (size_t i = 1; i < iter.second.size(); i ++) {
+        Node* node = iter.second[i];
+        aliasMap[node] = aliasNode;
+        node->status = DEAD_NODE;
+      }
+    }
+  }
+
 /* update assignTrees */
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
@@ -147,11 +182,11 @@ void graph::commonExpr() {
       }
       for (ExpTree* tree : member->assignTree) tree->replace(aliasMap);
       if (member->updateTree) member->updateTree->replace(aliasMap);
+      if (member->resetTree) member->resetTree->replace(aliasMap);
     }
   }
 /* apdate arrayMember */
   for (Node* array: splittedArray) {
-    printf("checking %s\n", array->name.c_str());
     for (size_t i = 0; i < array->arrayMember.size(); i ++) {
       if (array->arrayMember[i] && aliasMap.find(array->arrayMember[i]) != aliasMap.end()) {
         array->arrayMember[i] = aliasMap[array->arrayMember[i]];

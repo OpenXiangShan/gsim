@@ -7,6 +7,9 @@
 #include <numeric>
 #include <algorithm>
 #include <fstream>
+#include <set>
+#include <csignal>
+#include <chrono>
 
 #if defined(GSIM)
 #include <SimTop.h>
@@ -27,6 +30,7 @@ REF_NAME* ref;
 #define MAX_PROGRAM_SIZE 0x8000000
 uint8_t program[MAX_PROGRAM_SIZE];
 int program_sz = 0;
+bool dut_end = false;
 
 template <typename T>
 std::vector<size_t> sort_indexes(const std::vector<T> &v) {
@@ -143,12 +147,20 @@ int main(int argc, char** argv) {
   std::cout << "start testing.....\n";
   // printf("size = %lx %lx\n", sizeof(*ref->rootp),
   // (uintptr_t)&(ref->rootp->SimTop__DOT__l_soc__DOT__misc__DOT__buffers__DOT__nodeOut_a_q__DOT__ram_opcode) - (uintptr_t)(ref->rootp));
-  bool dut_end = false;
+  std::signal(SIGINT, [](int){
+    dut_end = true;
+  });
+  std::signal(SIGTERM, [](int){
+    dut_end = true;
+  });
   uint64_t cycles = 0;
-  clock_t start = clock();
+  auto start = std::chrono::system_clock::now();
+  auto prevTime = start;
 #ifdef PERF
   FILE* activeFp = fopen(ACTIVE_FILE, "w");
 #endif
+  int max_cycles = 3100000;
+  if (strcmp(DUTNAME, "xiangshan") == 0) max_cycles = 6400000;
   while(!dut_end) {
 #ifdef VERILATOR
     ref_cycle(1);
@@ -163,14 +175,18 @@ int main(int argc, char** argv) {
     ref->step();
 #endif
     cycles ++;
-    if(cycles % 100000 == 0 && cycles <= 6400000) {
-      clock_t dur = clock() - start;
-      printf("cycles %ld (%ld ms, %ld per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+    if(cycles % 100000 == 0 && cycles <= max_cycles) {
+      auto now = std::chrono::system_clock::now();
+      auto dur = now - start;
+      auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
+      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec / current %ld ) \n", cycles,
+            msec.count(), cycles * 1000 / msec.count(), 100000 * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(now - prevTime).count());
+      prevTime = now;
 #ifdef PERF
       fprintf(activeFp, "cycles: %ld\n", cycles);
       size_t totalActives = 0;
       size_t validActives = 0;
-      for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
+      for (size_t i = 0; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
         totalActives += mod->activeTimes[i];
         validActives += mod->validActive[i];
       }
@@ -179,11 +195,14 @@ int main(int argc, char** argv) {
       fprintf(activeFp, "totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
           totalActives, totalActives / cycles, validActives, validActives / cycles);
       for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
-        fprintf(activeFp, "%ld: activeTimes %ld validActive %ld\n", i, mod->activeTimes[i], mod->validActive[i]);
+        fprintf(activeFp, "%ld: nodeNum %d activeTimes %ld validActive %ld\n", i, mod->nodeNum[i], mod->activeTimes[i], mod->validActive[i]);
+        for (auto iter : mod->activator[i]) {
+          fprintf(activeFp, "    %ld: times %ld\n", iter.first, iter.second);
+        }
       }
       if (cycles == 500000) return 0;
 #endif
-      if (cycles == 6400000) return 0;
+      if (cycles == max_cycles) return 0;
     }
 #if defined(GSIM)
     mod->step();
@@ -203,8 +222,5 @@ int main(int argc, char** argv) {
       return 0;
     }
 #endif
-    if(dut_end) {
-      clock_t dur = clock() - start;
-    }
   }
 }

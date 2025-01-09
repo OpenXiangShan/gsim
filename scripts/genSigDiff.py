@@ -41,12 +41,12 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
     self.reffp = open(refFile, "r")
     all_sigs = {}
     for line in self.reffp.readlines():
-      match = re.search(r'(uint[0-9]*_t)|mpz_t ', line)
+      match = re.search(r'((uint[0-9]*_t)|mpz_t)(.*)width =', line)
       if match:
         line = line.strip(" ;\n")
-        line = re.split(' |\[', line)
-        all_sigs[line[1]] = 0
-
+        line = re.split(' |\[|;', line)
+        width = line[-1]
+        all_sigs[line[1]] = int(width)
     self.newDstFile()
 
     for line in self.srcfp.readlines():
@@ -60,6 +60,8 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
       else:
         matchName = line[3][:index]
       if matchName in all_sigs:
+        if mod_width != all_sigs[matchName]:
+          continue
         if self.varNum == self.numPerFile:
           self.newDstFile()
         self.varNum += 1
@@ -67,7 +69,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
         modName = "mod->" + line[2]
 
         if mod_width <= 64:
-          mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((__uint128_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
+          mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((uint256_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
 
           self.dstfp.writelines( \
           "if(display || (" + modName + " & " + mask + ") != (" + refName + " & " + mask + ")){\n" + \
@@ -76,22 +78,36 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
           (modName if mod_width <= 64 else "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName) + " << \"  \" << +" + \
             (refName if mod_width <= 64 else "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName) + "<< std::endl;\n" + \
           "} \n")
-        elif mod_width <= 128 and not sign:
-          mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((__uint128_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
+        elif mod_width <= 256 and not sign:
+          mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((uint256_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
+          if mod_width <= 64:
+            outMod = modName
+            mask = hex((1 << mod_width) - 1)
+          elif mod_width <= 128:
+            outMod = "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName
+            mask = "((uint256_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
+          else:
+            outMod = "(uint64_t)(" + modName + " >> 192) <<" + "(uint64_t)(" + modName + " >> 128) <<" + "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName
+            mask = "((uint256_t)" + hex((1 << max(0, mod_width - 192))-1) + "<< 192 | " + "(uint256_t)" + hex((1 << min(64, mod_width - 128))-1) + "<< 128 | " + "(uint256_t)" + hex((1 << 64)-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
+          if mod_width <= 64:
+            outRef = refName
+          elif mod_width <= 128:
+            outRef = "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName
+          else:
+            outRef = "(uint64_t)(" + refName + " >> 192) <<" + "(uint64_t)(" + refName + " >> 128) <<" + "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName
           self.dstfp.writelines( \
           "if(display || (" + modName + " & " + mask + ") != (" + refName + " & " + mask + ")){\n" + \
           "  ret = true;\n" + \
-          "  std::cout << std::hex <<\"" + line[2] + ": \" << +" +  \
-          (modName if mod_width <= 64 else "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName) + " << \"  \" << +" + \
-            (refName if not mod_width else "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName) + "<< std::endl;\n" + \
+          "  std::cout << std::hex <<\"" + line[2] + ": \" << +" +  outMod + " << \"  \" << +" + outRef + "<< std::endl;\n" + \
           "} \n")
-        elif mod_width > 128:
+        elif mod_width > 256:
           self.dstfp.writelines( \
-          "if(display || mpz_cmp(" + modName + ", " + refName + ") != 0){\n" + \
+          "if(display || (" + modName + " != " + refName + ")){\n" + \
           "  ret = true;\n" + \
-          "  std::cout << \"" + line[2] + ": \";\n" + \
-          "  mpz_out_str(stdout, 16, " + modName + ");\n" + \
-          "  std::cout << \" \"; mpz_out_str(stdout, 16, " + refName + "); std::cout << std::endl;\n}\n")
+          "  std::cout << std::hex <<\"" + line[2] + ": \\n\"; \n" +  \
+          modName + ".displayn();\n" + \
+          refName + ".displayn();\n" + \
+          "} \n")
 
     self.srcfp.close()
     self.reffp.close()

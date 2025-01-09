@@ -15,6 +15,7 @@ void print_stacktrace();
       fprintf(stderr, "\33[1;31m"); \
       fprintf(stderr, __VA_ARGS__); \
       fprintf(stderr, "\33[0m\n");  \
+      fflush(stdout);               \
       assert(cond);                 \
     }                               \
   } while (0)

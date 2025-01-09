@@ -4,23 +4,47 @@
 
 #include "common.h"
 #include <stack>
+#include <tuple>
 Node* getLeafNode(bool isArray, ENode* enode);
+
 void ExpTree::replace(Node* oldNode, ENode* newENode) {
-  std::stack<ENode*> s;
-  if (getRoot()->getNode() && (getLeafNode(true, getRoot()) == oldNode)) {
-    setRoot(newENode);
-    return;
+  std::stack<std::tuple<ENode*, ENode*, int>> s;
+  s.push(std::make_tuple(getRoot(), nullptr, -1));
+  if (getlval()) {
+    for (int i = 0; i < getlval()->getChildNum(); i ++) s.push(std::make_tuple(getlval()->getChild(i), getlval(), i));
   }
-  if (getRoot()) s.push(getRoot());
 
   while(!s.empty()) {
-    ENode* top = s.top();
+    ENode* top, *parent;
+    int idx;
+    std::tie(top, parent, idx) = s.top();
     s.pop();
+    if (top->getNode() && getLeafNode(true, top) == oldNode) {
+      if (parent) parent->setChild(idx, newENode);
+      else setRoot(newENode);
+    }
+
     for (int i = 0; i < top->getChildNum(); i ++) {
       ENode* enode = top->getChild(i);
       if (!enode) continue;
-      if (enode->getNode() && getLeafNode(true, enode) == oldNode) top->setChild(i, newENode);
-      else s.push(enode);
+      s.push(std::make_tuple(enode, top, i));
+    }
+  }
+}
+
+void ExpTree::removeSelfAssignMent(Node* node) {
+  std::stack<ENode*> s;
+  s.push(getRoot());
+  while (!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    if (top->opType == OP_WHEN) {
+      for (size_t i = 1; i < top->getChildNum(); i ++) {
+        if (top->child[i] && node == getLeafNode(true, top->child[i])) top->child[i] = nullptr;
+      }
+    }
+    for (ENode* child : top->child) {
+      if (child) s.push(child);
     }
   }
 }
@@ -39,10 +63,12 @@ Node* laterNode(Node* node1, Node* node2) {
 }
 
 void graph::orderAllNodes() {
+  int order = 1;
   for (size_t i = 0; i < sortedSuper.size(); i ++) {
     sortedSuper[i]->order = i;
     for (size_t j = 0; j < sortedSuper[i]->member.size(); j ++) {
       sortedSuper[i]->member[j]->orderInSuper = j;
+      sortedSuper[i]->member[j]->order = order ++;
     }
   }
 }
@@ -101,31 +127,41 @@ void graph::mergeRegister() {
     }
   }
 
-  printf("[mergeRegister] merge %d (total %d) registers\n", num, totalNum);
+  printf("[mergeRegister] merge %d registers (total %d)\n", num, totalNum);
 }
 
 void graph::constructRegs() {
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-  SuperNode* updateReg = new SuperNode();
-  updateReg->superType = SUPER_SAVE_REG;
-  sortedSuper.push_back(updateReg);
-#endif
+  std::map<SuperNode*, SuperNode*> dstSuper2updateSuper;
   for (Node* node : regsrc) {
     if (node->status != VALID_NODE) continue;
     if (node->regSplit) {
       Node* nodeUpdate = node->dup(NODE_REG_UPDATE);
       node->regUpdate = nodeUpdate;
+      nodeUpdate->regNext = node;
       nodeUpdate->assignTree.push_back(node->updateTree);
-      nodeUpdate->super = new SuperNode(nodeUpdate);
-      nodeUpdate->super->superType = SUPER_UPDATE_REG;
-      sortedSuper.push_back(nodeUpdate->super);
+      SuperNode* dstSuper = node->getDst()->super;
+      if (dstSuper2updateSuper.find(dstSuper) != dstSuper2updateSuper.end()) {
+        nodeUpdate->super = dstSuper2updateSuper[dstSuper];
+        dstSuper2updateSuper[dstSuper]->member.push_back(nodeUpdate);
+      } else {
+        nodeUpdate->super = new SuperNode(nodeUpdate);
+        nodeUpdate->super->superType = SUPER_UPDATE_REG;
+        sortedSuper.push_back(nodeUpdate->super);
+        dstSuper2updateSuper[dstSuper] = nodeUpdate->super;
+      }
       nodeUpdate->next.insert(node->next.begin(), node->next.end());
       nodeUpdate->isArrayMember = node->isArrayMember;
       nodeUpdate->updateConnect();
     } else {
       Assert(node->getDst()->assignTree.size() == 1, "invalid assignTree for node %s", node->name.c_str());
       node->updateTree->replace(node->getDst(), node->getDst()->assignTree.back()->getRoot());
-      node->getDst()->assignTree[0] = node->updateTree;
+      /* remove self-assignments */
+      if (getLeafNode(true, node->updateTree->getRoot()) == node->getSrc()) node->getDst()->assignTree.clear();
+      else {
+        node->getDst()->assignTree[0] = node->updateTree;
+        node->getDst()->assignTree[0]->removeSelfAssignMent(node);
+      }
+      node->next.erase(node->getDst());
       node->getDst()->updateConnect();
       node->getDst()->status = VALID_NODE;
       node->getDst()->computeInfo = nullptr;

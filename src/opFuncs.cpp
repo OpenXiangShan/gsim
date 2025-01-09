@@ -195,6 +195,21 @@ void u_bits(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t h, mp_bitcnt
   mpz_and(dst, t1, t2);
 }
 
+void u_bits_noshift(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, mp_bitcnt_t h, mp_bitcnt_t l) {
+  if (mpz_sgn(src) < 0) {
+    mpz_set_ui(t1, 1);
+    mpz_mul_2exp(t1, t1, bitcnt);
+    mpz_add(t1, t1, src);
+  } else {
+    mpz_set(t1, src);
+  }
+  mpz_set_ui(t2, 1);
+  mpz_mul_2exp(t2, t2, h - l + 1);
+  mpz_sub_ui(t2, t2, 1);
+  mpz_mul_2exp(t2, t2, l);
+  mpz_and(dst, t1, t2);
+}
+
 void us_mux(mpz_t& dst, mpz_t& cond, mpz_t& src1, mpz_t& src2) {
   if (mpz_sgn(cond) != 0)
     mpz_set(dst, src1);

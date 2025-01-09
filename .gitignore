@@ -2,6 +2,7 @@ build/
 obj/
 .vscode/
 out/
+logs/
 *log*
 obj_dir
 tests
@@ -15,3 +16,4 @@ doc/html
 *.out
 *.data*
 *.txt
+emu/obj*

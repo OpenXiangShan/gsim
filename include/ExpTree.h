@@ -6,6 +6,7 @@
 
 class Node;
 class valInfo;
+class NodeComponent;
 
 enum OPType {
   OP_EMPTY,
@@ -47,6 +48,7 @@ enum OPType {
   OP_TAIL,
 /* 1expr2int */
   OP_BITS,
+  OP_BITS_NOSHIFT, // used for bit operations
 /* index */
   OP_INDEX_INT,
   OP_INDEX,
@@ -56,13 +58,22 @@ enum OPType {
 /* special */
   OP_PRINTF,
   OP_ASSERT,
+  OP_EXIT,
 /* leaf non-node enode */
   OP_INT,
+/* for arrays */
+  OP_GROUP,
 /* special nodes for memory */
   OP_READ_MEM,
+  OP_WRITE_MEM,
+  OP_INFER_MEM,
 /* special nodes for invalid node */
   OP_INVALID,
   OP_RESET,
+/* width processing */
+  OP_SEXT,
+/* extmodule / dipc */
+  OP_EXT_FUNC,
 };
 
 class ENode {
@@ -102,16 +113,21 @@ private:
   valInfo* instsHead(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsTail(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsBits(Node* n, std::string lvalue, bool isRoot);
+  valInfo* instsBitsNoShift(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsWhen(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsStmt(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsIndexInt(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsIndex(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsInt(Node* n, std::string lvalue, bool isRoot);
   valInfo* instsReadMem(Node* node, std::string lvalue, bool isRoot);
+  valInfo* instsWriteMem(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsInvalid(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsReset(Node* node, std::string lvalue, bool isRoot);
+  valInfo* instsGroup(Node* node, std::string lvalue, bool isRoot);
   valInfo* instsPrintf();
   valInfo* instsAssert();
+  valInfo* instsExtFunc(Node* node);
+  valInfo* instsExit();
   /* used in constantNode */
   valInfo* consMux(bool isLvalue);
   valInfo* consAdd(bool isLvalue);
@@ -147,14 +163,19 @@ private:
   valInfo* consHead(bool isLvalue);
   valInfo* consTail(bool isLvalue);
   valInfo* consBits(bool isLvalue);
+  valInfo* consBitsNoShift(bool isLvalue);
   valInfo* consWhen(Node* node, bool isLvalue);
   valInfo* consStmt(Node* node, bool isLvalue);
+  valInfo* consGroup(Node* node, bool isLvalue);
   valInfo* consIndexInt(bool isLvalue);
   valInfo* consIndex(bool isLvalue);
   valInfo* consInt(bool isLvalue);
   valInfo* consReadMem(bool isLvalue);
   valInfo* consInvalid(bool isLvalue);
   valInfo* consReset(bool isLvalue);
+  valInfo* consAssert();
+  valInfo* consExit();
+  valInfo* consPrint();
   /* used in usedBits */
 
 public:
@@ -166,6 +187,7 @@ public:
   bool isClock = false;
   ResetType reset = UNCERTAIN;
   int usedBit = -1;
+  Node* memoryNode = nullptr;
   // bool islvalue = false;  // true for root and L_INDEX, otherwise false
   int id; // unique identifier
   std::vector<int> values;     // used in int_noinit/int_init leaf
@@ -211,6 +233,8 @@ public:
     sign = _sign;
   }
   void inferWidth();
+  void usedBitWithFixRoot(int width);
+  void clearWidth();
   valInfo* compute(Node* n, std::string lvalue, bool isRoot);
   valInfo* computeConstant(Node* node, bool isLvalue);
   void passWidthToChild();
@@ -221,13 +245,13 @@ public:
   ENode* mergeSubTree(ENode* newSubTree);
   ENode* dup();
   int getArrayIndex(Node* node);
-  Node* getLeafNode(std::set<Node*>& s);
   std::vector<int> getDim();
   clockVal* clockCompute();
   ResetType inferReset();
   ArrayMemberList* getArrayMember(Node* node);
   void display();
   uint64_t keyHash();
+  NodeComponent* inferComponent(Node* node);
 };
 
 /* 
@@ -276,6 +300,9 @@ public:
     void replace(Node* oldNode, ENode* newENode);
     /* used in commonExpr */
     void replace(std::map<Node*, Node*>& aliasMap);
+    /* used in splitNodes */
+    void replaceAndUpdateWidth(Node* oldNode, Node* newNode);
+    void replace(Node* oldNode, Node* newNode);
     void clearInfo();
     bool isInvalid() {
       Assert(getRoot(), "empty root");
@@ -285,6 +312,16 @@ public:
     void removeConstant();
     void removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::set<ENode*>& visited);
     uint64_t keyHash();
+    void removeSelfAssignMent(Node* node);
+    void matchWidth(int width);
+    void when2mux(int width);
+    void updateWithNewWidth();
+    void updateNewChild(ENode* parent, ENode* child, int idx);
+    void treeOpt();
+    void getRelyNodes(std::set<Node*>& allNodes);
+    void updateWithSplittedNode();
+    void clearComponent();
+    void updateWithSplittedArray(Node* node, Node* array);
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes
@@ -359,15 +396,13 @@ public:
   void addChildSameTree(ASTExpTree* child) {
     Assert(!child->isAggr(), "require normal");
     if (isAggr()) {
-        for (size_t i = 0; i < aggrForest.size(); i++) {
-          aggrForest[i].first->addChild(child->getExpRoot());
-        }
-      }
-      else expRoot->addChild(child->getExpRoot());
+      for (size_t i = 0; i < aggrForest.size(); i++) aggrForest[i].first->addChild(child->getExpRoot()->dup());
+    }
+    else expRoot->addChild(child->getExpRoot());
   }
   void addChild(ENode* child) {
     if (isAggr()) {
-      for (auto entry : aggrForest) entry.first->addChild(child);
+      for (auto entry : aggrForest) entry.first->addChild(child->dup());
     } else {
       expRoot->addChild(child);
     }

@@ -57,6 +57,13 @@ clockVal* ENode::clockCompute() {
     case OP_INT:
       ret = new clockVal("0");
       break;
+    case OP_EQ:
+      ret = new clockVal("0");
+      printf("Warning: A clock signal driven by the == operator is detected. "
+             "It is not supported now and treated as a constant clock signal. "
+             "This may cause wrong result during simulation.\n");
+      display();
+      break;
     default:
       Assert(0, "invalid op %d", opType);
   }
@@ -71,13 +78,15 @@ clockVal* Node::clockCompute() {
   }
   Assert(assignTree.size() <= 1, "multiple clock assignment in %s", name.c_str());
   if (assignTree.size() != 0) {
-    clockVal* ret = assignTree[0]->getRoot()->clockCompute();
-    clockMap[this] = ret;
-    return ret;
+    clockMap[this] = assignTree[0]->getRoot()->clockCompute();
+  } else {
+    clockMap[this] = new clockVal("0");
+    printf("Warning: An external clock signal is detected. "
+           "It is not supported now and treated as a constant clock signal. "
+           "This may cause wrong result during simulation.\n");
+    display();
   }
-  printf("status %d type %d\n", status, type);
-  display();
-  Panic();
+  return clockMap[this];
 }
 
 Node* Node::clockAlias() {
@@ -124,21 +133,23 @@ void graph::clockOptimize() {
           node->setConstantZero(node->width);
           node->regNext->setConstantZero(node->regNext->width);
         }
+      } else if (node->type == NODE_EXT && node->clock) {
+        clockVal* val = clockMap[node->clock];
+        if (val->node) {
+          ENode* clockENode = new ENode(val->node);
+          clockENode->width = val->node->width;
+          node->clock->assignTree[0]->setRoot(clockENode);
+        } else {
+          for (Node* member : node->member)
+            member->setConstantZero(member->width);
+        }
       } else {
         clockVal* val = nullptr;
         Node* clockMember = nullptr;
-        if (node->type == NODE_READER) {
-          Assert(clockMap.find(node->get_member(READER_CLK)) != clockMap.end(), "%s: clock %s not found", node->name.c_str(), node->get_member(READER_CLK)->name.c_str());
-          val = clockMap[node->get_member(READER_CLK)];
-          clockMember = node->get_member(READER_CLK);
-        } else if (node->type ==  NODE_WRITER) {
-          Assert(clockMap.find(node->get_member(WRITER_CLK)) != clockMap.end(), "%s: clock %s not found", node->name.c_str(), node->get_member(WRITER_CLK)->name.c_str());
-          val = clockMap[node->get_member(WRITER_CLK)];
-          clockMember = node->get_member(WRITER_CLK);
-        } else if (node->type == NODE_READWRITER) {
-          Assert(clockMap.find(node->get_member(READWRITER_CLK)) != clockMap.end(), "%s: clock %s not found", node->name.c_str(), node->get_member(READWRITER_CLK)->name.c_str());
-          val = clockMap[node->get_member(READWRITER_CLK)];
-          clockMember = node->get_member(READWRITER_CLK);
+        if (node->type == NODE_READER || node->type == NODE_WRITER || node->type == NODE_READWRITER) {
+          Assert(clockMap.find(node->clock) != clockMap.end(), "%s: clock %s not found", node->name.c_str(), node->clock->name.c_str());
+          val = clockMap[node->clock];
+          clockMember = node->clock;
         }
         if (val) {
           if (val->node) {

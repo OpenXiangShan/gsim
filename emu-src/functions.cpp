@@ -1,7 +1,7 @@
 #include <gmp.h>
 #include <assert.h>
 #include <iostream>
-
+#if 0
 static mpz_t t1;
 static mpz_t t2;
 
@@ -503,3 +503,4 @@ void init_functions() {
   mpz_init(t1);
   mpz_init(t2);
 }
+#endif

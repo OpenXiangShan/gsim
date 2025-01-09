@@ -1,179 +1,293 @@
 #include "common.h"
+#include <stack>
 #include <tuple>
+#include <utility>
 
 int ENode::counter = 1;
 
-#define w0 getChild(0)->width
-#define w1 getChild(1)->width
-#define w2 getChild(2)->width
-#define s0 getChild(0)->sign
-#define s1 getChild(1)->sign
-#define s2 getChild(2)->sign
+#define Child(id, name) getChild(id)->name
 
-void ENode::inferWidth() {
-  for (ENode* enode : child) {
-    if (enode) enode->inferWidth();
-  }
-  if (width != -1) return;
+void ENode::usedBitWithFixRoot(int rootWidth) {
   if (nodePtr) {
-    Node* realNode = nodePtr;
-    if(nodePtr->isArray() && nodePtr->arraySplitted()) {
-      ArrayMemberList* list = getArrayMember(nodePtr);
-      realNode = list->member[0];
-    }
-    realNode->inferWidth();
-    setWidth(realNode->width, realNode->sign);
-    isClock = realNode->isClock;
-  } else {
-    isClock = false;
-    switch (opType) {
-      case OP_ADD:  case OP_SUB:
-        Assert(getChildNum() == 2 && s0 == s1, "invalid child");
-        setWidth(MAX(w0, w1) + 1, s0);
-        break;
-      case OP_MUL:
-        Assert(getChildNum() == 2 && s0 == s1, "invalid child");
-        setWidth(w0 + w1, s0);
-        break;
-      case OP_CAT:
-        Assert(getChildNum() == 2 && s0 == s1, "invalid child");
-        setWidth(w0 + w1, false);
-        break;
-      case OP_DIV:
-        Assert(getChildNum() == 2 && s0 == s1, "invalid child");
-        setWidth(w0 + s0, s0);
-        break;
-      case OP_REM:
-        Assert(getChildNum() == 2 && s0 == s1, "invalid child");
-        setWidth(MIN(w0, w1), s0);
-        break;
-      case OP_LT: case OP_LEQ: case OP_GT: case OP_GEQ: case OP_EQ: case OP_NEQ:
-        Assert(getChildNum() == 2 && s0 == s1, "invalid child");
-        setWidth(1, false);
-        break;
-      case OP_DSHL:
-        Assert(getChildNum() == 2 && !s1, "invalid child");
-        setWidth(w0 + (1 << w1) - 1, s0);
-        break;
-      case OP_DSHR:
-        Assert(getChildNum() == 2, "invalid child");
-        setWidth(w0, s0);
-        break;
-      case OP_AND: // the width is actually max, while the upper bits are zeros
-        Assert(getChildNum() == 2 && s0 == s1, "invalid child");
-        if (getChild(0)->nodePtr && getChild(1)->nodePtr) setWidth(MIN(w0, w1), false);
-        else setWidth(MAX(w0, w1), false);
-        break;
-      case OP_OR: case OP_XOR:
-        Assert(getChildNum() == 2 && s0 == s1, "invalid child");
-        setWidth(MAX(w0, w1), false);
-        break;
-      case OP_ASUINT:
-        Assert(getChildNum() == 1, "invalid child");
-        setWidth(w0, false);
-        break;
-      case OP_ASSINT:
-        Assert(getChildNum() == 1, "invalid child");
-        setWidth(w0, true);
-        break;
-      case OP_ASCLOCK:
-        isClock = true;
-      case OP_ASASYNCRESET:
-        Assert(getChildNum() == 1, "invalid child");
-        setWidth(1, false);
-        break;
-      case OP_CVT:
-        Assert(getChildNum() == 1, "invalid child");
-        setWidth(w0 + !s0, true);
-        break;
-      case OP_NEG:
-        Assert(getChildNum() == 1, "invalid child");
-        setWidth(w0 + 1, true);
-        break;
-      case OP_NOT:
-        Assert(getChildNum() == 1, "invalid child");
-        setWidth(w0, false);
-        break;
-      case OP_ANDR:
-      case OP_ORR:
-      case OP_XORR:
-        Assert(getChildNum() == 1, "invalid child");
-        setWidth(1, false);
-        break;
-      case OP_PAD:
-        Assert(getChildNum() == 1 && values.size() == 1, "invalid child");
-        setWidth(MAX(w0, values[0]), s0);
-        break;
-      case OP_SHL:
-        Assert(getChildNum() == 1 && values.size() == 1, "invalid child");
-        setWidth(w0 + values[0], s0);
-        break;
-      case OP_SHR:
-        Assert(getChildNum() == 1 && values.size() == 1, "invalid child");
-        setWidth(MAX(w0-values[0], 1), s0);
-        break;
-      case OP_HEAD:
-        Assert(getChildNum() == 1 && values.size() == 1, "invalid child");
-        setWidth(values[0], false);
-        values[0] = w0 - values[0];
-        break;
-      case OP_TAIL:
-        Assert(w0 > values[0], "the width of argument(%d) in tail is no greater than %d", w0, values[0]);
-        Assert(getChildNum() == 1 && values.size() == 1, "invalid child");
-        setWidth(w0-values[0], false);
-        values[0] = w0 - values[0];
-        break;
-      case OP_BITS: // values[0] may exceeds w0 due to the shrink width of add
-        Assert(getChildNum() == 1 && values.size() == 2, "invalid child");
-        // Assert(w0 > values[0] && values[0] >= values[1], "invalid bits(%d, %d) with argument(%d) ", values[0], values[1], w0);
-        setWidth(values[0]-values[1] + 1, false);
-        break;
-      case OP_MUX:
-      case OP_WHEN:
-        if (getChild(1) && getChild(2)) {
-          if (w1 > w2) getChild(2)->setWidth(w1, s2);
-          if (w2 > w1) getChild(1)->setWidth(w2, s1);
-        }
-        Assert(getChildNum() == 3 && (getChild(1) || getChild(2)), "invalid child");
-        if (getChild(1) && getChild(2)) setWidth(MAX(w1, w2), s1);
-        else if (getChild(1)) setWidth(w1, s1);
-        else setWidth(w2, s2);
-        break;
-      case OP_STMT:
-        for (ENode* enode : child) {
-          setWidth(MAX(width, enode->width), enode->sign);
-        }
-        for (ENode* enode : child) {
-          if (enode->width != width) enode->setWidth(width, sign);
-        }
-        break;
-      case OP_READ_MEM:
-        setWidth(getChild(0)->nodePtr->parent->parent->width, getChild(0)->nodePtr->parent->parent->sign);
-        break;
-      case OP_INVALID:
-        setWidth(0, false);
-        break;
-      case OP_RESET:
-        setWidth(1, false);
-        break;
-      case OP_PRINTF:
-      case OP_ASSERT:
-        setWidth(1, false);
-        break;
-      case OP_INDEX_INT:
-      case OP_INDEX:
-        break;
-      default:
-        Panic();
-    }
+    return;
+  }
+  std::vector<int>childBits;
+  if (child.size() == 0) return;
+  switch (opType) {
+    case OP_ADD: case OP_SUB: case OP_OR: case OP_XOR: case OP_AND:
+      childBits.push_back(rootWidth);
+      childBits.push_back(rootWidth);
+      break;
+    case OP_MUL:
+      childBits.push_back(MIN(rootWidth, Child(0, width)));
+      childBits.push_back(MIN(rootWidth, Child(1, width)));
+      break;
+    case OP_DIV: case OP_REM: case OP_DSHL: case OP_DSHR:
+    case OP_LT: case OP_LEQ: case OP_GT: case OP_GEQ: case OP_EQ: case OP_NEQ:
+      childBits.push_back(Child(0, width));
+      childBits.push_back(Child(1, width));
+      break;
+    case OP_CAT:
+      childBits.push_back(MAX(rootWidth - Child(1, width), 0));
+      childBits.push_back(MIN(Child(1, width), rootWidth));
+      break;
+    case OP_CVT:
+      childBits.push_back(Child(0, sign) ? rootWidth : rootWidth - 1);
+      break;
+    case OP_ASCLOCK: case OP_ASASYNCRESET: case OP_ANDR:
+    case OP_ORR: case OP_XORR: case OP_INDEX_INT: case OP_INDEX:
+      childBits.push_back(Child(0, width));
+      break;
+    case OP_ASUINT: case OP_ASSINT: case OP_NOT: case OP_NEG: case OP_PAD: case OP_TAIL:
+      childBits.push_back(rootWidth);
+      break;
+    case OP_SHL:
+      childBits.push_back(MAX(0, rootWidth - values[0]));
+      break;
+    case OP_SHR:
+      childBits.push_back(rootWidth + values[0]);
+      break;
+    case OP_HEAD:
+      childBits.push_back(rootWidth + values[0]);
+      break;
+    case OP_BITS:
+      childBits.push_back(MIN(rootWidth + values[1], values[0] + 1));
+      break;
+    case OP_BITS_NOSHIFT:
+      childBits.push_back(rootWidth);
+      break;
+    case OP_SEXT:
+      childBits.push_back(rootWidth);
+      break;
+    case OP_MUX:
+    case OP_WHEN:
+      childBits.push_back(1);
+      childBits.push_back(rootWidth);
+      childBits.push_back(rootWidth);
+      break;
+    case OP_STMT:
+      for (int i = 0; i < getChildNum(); i ++) childBits.push_back(rootWidth);
+      break;
+    case OP_READ_MEM:
+      childBits.push_back(Child(0, width));
+      break;
+    case OP_RESET:
+      childBits.push_back(1);
+      childBits.push_back(rootWidth);
+      break;
+    case OP_EXIT:
+      childBits.push_back(1);
+      break;
+    case OP_PRINTF:
+    case OP_ASSERT:
+      for (int i = 0; i < getChildNum(); i ++) {
+        childBits.push_back(Child(i, width));
+      }
+      break;
+    default:
+      printf("invalid op %d\n", opType);
+      Panic();
+   }
+
+  Assert(child.size() == childBits.size(), "child.size %ld childBits.size %ld in op %d", child.size(), childBits.size(), opType);
+  for (size_t i = 0; i < child.size(); i ++) {
+    if (!child[i]) continue;
+    child[i]->usedBitWithFixRoot(childBits[i]);
+  }
+  width = MIN(width, rootWidth);
+  if (opType == OP_BITS) {
+    values[0] = MIN(values[0], width - 1 + values[1]);
   }
 }
 
 void ENode::updateWidth() {
- for (ENode* childENode : child) {
-  if (childENode) childENode->updateWidth();
- }
- width = usedBit;
+  for (ENode* childENode : child) {
+    if (childENode) childENode->updateWidth();
+  }
+  width = usedBit;
+}
+/* add extention/bits for nodePtr when enode->width != nodePtr->width*/
+void ExpTree::updateWithNewWidth() {
+  std::stack<std::pair<ENode*, ENode*>> s;
+  s.push(std::make_pair(getRoot(), nullptr));
+  while (!s.empty()) {
+    ENode* top, *parent;
+    std::tie(top, parent) = s.top();
+    s.pop();
+    bool remove = false;
+    ENode* newChild = nullptr;
+    if (top->nodePtr) {
+      if (top->width < top->nodePtr->width) {
+        if (parent && parent->opType == OP_BITS) {
+          top->width = top->nodePtr->width;
+        } else {
+          ENode* bits = new ENode(OP_BITS);
+          bits->width = top->width;
+          bits->addVal(top->width - 1);
+          bits->addVal(0);
+          bits->addChild(top);
+          top->width = top->nodePtr->width;
+          newChild = bits;
+          if (top->sign) {
+            ENode* asSint = new ENode(OP_ASSINT);
+            asSint->width = bits->width;
+            asSint->sign = true;
+            asSint->addChild(bits);
+            newChild = asSint;
+          }
+          remove = true;
+        }
+      } else if (top->width > top->nodePtr->width) {
+        if (top->sign) {
+          ENode* sext = new ENode(OP_SEXT);
+          sext->width = top->width;
+          sext->sign = true;
+          sext->addVal(top->width);
+          sext->addChild(top);
+          top->width = top->nodePtr->width;
+          remove = true;
+          newChild = sext;
+        } else {
+          ENode* enode = new ENode(OP_PAD);
+          enode->addVal(top->width);
+          enode->width = top->width;
+          enode->addChild(top);
+          top->width = top->nodePtr->width;
+          remove = true;
+          newChild = enode;
+        }
+      }
+    } else {
+      switch(top->opType) {
+        case OP_BITS:
+          if (top->width == top->getChild(0)->width && top->sign == top->getChild(0)->sign) {
+            remove = true;
+            newChild = top->getChild(0);
+            break;
+          } else if (top->width > top->getChild(0)->width) {
+            if (top->sign) {
+              top->opType = OP_SEXT;
+              top->values.clear();
+              top->addVal(top->width);
+            } else {
+              top->opType = OP_PAD;
+              top->values.clear();
+              top->addVal(top->width);
+            }
+          } else if ((top->values[0] - top->values[1] + 1) > top->width) top->values[0] = top->values[1] + top->width - 1;
+          break;
+        case OP_PAD:
+          if (top->width == top->getChild(0)->width) {
+            remove = true;
+            newChild = top->getChild(0);
+          } else if (top->values[0] > top->width) top->values[0] = top->width;
+          break;
+        case OP_SEXT:
+          if (top->width == top->getChild(0)->width) {
+            remove = true;
+            newChild = top->getChild(0);
+            break;
+          }
+          top->values[0] = top->width;
+          Assert(top->width >= top->getChild(0)->width, "invalid sext %p width %d childWidth %d", top, top->width, top->getChild(0)->width);
+          break;
+        case OP_CAT:
+          if (top->width == top->getChild(1)->width) {
+            remove = true;
+            newChild = top->getChild(1);
+          }
+          Assert(top->width >= top->getChild(1)->width, "invalid cat");
+          break;
+        case OP_TAIL:
+        case OP_HEAD:
+          if (top->width == top->getChild(0)->width) {
+            remove = true;
+            newChild = top->getChild(0);
+          }
+          break;
+        case OP_MUL:
+          if (top->width != top->getChild(0)->width + top->getChild(1)->width) {
+            remove = true;
+            ENode* bits = new ENode(OP_BITS);
+            bits->addChild(top);
+            bits->addVal(top->width-1);
+            bits->addVal(0);
+            bits->width = top->width;
+            bits->sign = top->sign;
+            top->width = top->getChild(0)->width + top->getChild(1)->width;
+            newChild = bits;
+          }
+          break;
+        case OP_EQ: case OP_NEQ: case OP_LT: case OP_LEQ: case OP_GT: case OP_GEQ: case OP_ADD: case OP_SUB: {
+          int maxWidth = MAX(top->getChild(0)->width, top->getChild(1)->width);
+          if (maxWidth != top->getChild(0)->width) {
+            ENode* newENode = nullptr;
+            if (top->getChild(0)->sign) {
+              newENode = new ENode(OP_SEXT);
+              newENode->width = maxWidth;
+              newENode->sign = true;
+              newENode->addVal(maxWidth);
+            } else {
+              newENode = new ENode(OP_PAD);
+              newENode->width = maxWidth;
+              newENode->addVal(maxWidth);
+            }
+            newENode->addChild(top->getChild(0));
+            top->setChild(0, newENode);
+          }
+          if (maxWidth != top->getChild(1)->width) {
+            ENode* newENode = nullptr;
+            if (top->getChild(1)->sign) {
+              newENode = new ENode(OP_SEXT);
+              newENode->width = maxWidth;
+              newENode->sign = true;
+              newENode->addVal(maxWidth);
+            } else {
+              newENode = new ENode(OP_PAD);
+              newENode->width = maxWidth;
+              newENode->addVal(maxWidth);
+            }
+            newENode->addChild(top->getChild(1));
+            top->setChild(1, newENode);
+          }
+          break;
+        }
+        case OP_OR: case OP_XOR:
+          if (top->getChild(0)->width < top->width) {
+            ENode* pad = new ENode(OP_PAD);
+            pad->width = top->width;
+            pad->sign = top->getChild(0)->sign;
+            pad->addVal(top->width);
+            pad->addChild(top->getChild(0));
+            top->setChild(0, pad);
+          }
+          if (top->getChild(1)->width < top->width) {
+            ENode* pad = new ENode(OP_PAD);
+            pad->width = top->width;
+            pad->sign = top->getChild(1)->sign;
+            pad->addVal(top->width);
+            pad->addChild(top->getChild(1));
+            top->setChild(1, pad);
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    if (remove) {
+      if (!parent) setRoot(newChild);
+      else {
+        for (int i = 0; i < parent->getChildNum(); i ++) {
+          if (parent->getChild(i) == top) parent->setChild(i, newChild);
+        }
+      }
+      s.push(std::make_pair(newChild, parent));
+    } else {
+      for (ENode* child : top->child) {
+        if (child) s.push(std::make_pair(child, top));
+      }
+    }
+  }
 }
 /*
 return the index of lvalue(required to be array)
@@ -231,6 +345,8 @@ ENode* ENode::dup() {
   ret->sign = sign;
   ret->width = width;
   ret->values.insert(ret->values.end(), values.begin(), values.end());
+  ret->strVal = strVal;
+  ret->memoryNode = memoryNode;
   /* TODO : check isClock */
   for (ENode* childNode : child) {
     if (childNode) ret->addChild(childNode->dup());
@@ -260,7 +376,7 @@ int ENode::getArrayIndex(Node* node) {
 }
 
 ArrayMemberList* ENode::getArrayMember(Node* node) {
-  Assert(nodePtr, "empty  node");
+  Assert(nodePtr, "empty node");
   Assert(nodePtr == node, "lvalue not match %s != %s", nodePtr->name.c_str(), node->name.c_str());
   Assert(child.size() <= node->dimension.size(), "%s index out of bound", node->name.c_str());
   ArrayMemberList* ret = new ArrayMemberList();

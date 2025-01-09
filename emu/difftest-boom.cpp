@@ -7,6 +7,8 @@
 #include <numeric>
 #include <algorithm>
 #include <fstream>
+#include <csignal>
+#include <chrono>
 
 #if defined(GSIM)
 #include <TestHarness.h>
@@ -27,6 +29,7 @@ REF_NAME* ref;
 #define MAX_PROGRAM_SIZE 0x8000000
 uint8_t program[MAX_PROGRAM_SIZE];
 int program_sz = 0;
+bool dut_end = false;
 
 template <typename T>
 std::vector<size_t> sort_indexes(const std::vector<T> &v) {
@@ -116,7 +119,7 @@ int main(int argc, char** argv) {
 #endif
 #ifdef VERILATOR
   ref = new REF_NAME();
-
+#if 0
   std::vector<uint8_t*> memoryList = { \
       (uint8_t*)&ref->rootp->TestHarness__DOT__mem__DOT__srams__DOT__mem_0, (uint8_t*)&ref->rootp->TestHarness__DOT__mem__DOT__srams__DOT__mem_1, \
       (uint8_t*)&ref->rootp->TestHarness__DOT__mem__DOT__srams__DOT__mem_2, (uint8_t*)&ref->rootp->TestHarness__DOT__mem__DOT__srams__DOT__mem_3, \
@@ -126,7 +129,8 @@ int main(int argc, char** argv) {
     *memoryList[i % 8] = program[i];
     memoryList[i % 8] ++;
   }
-  // memcpy(&ref->rootp->TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory, program, program_sz);
+#endif
+  memcpy(&ref->rootp->TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory, program, program_sz);
   ref_reset();
   // ref_cycle(1);
 #endif
@@ -139,12 +143,17 @@ int main(int argc, char** argv) {
   std::cout << "start testing.....\n";
   // printf("size = %lx %lx\n", sizeof(*ref->rootp),
   // (uintptr_t)&(ref->rootp->TestHarness__DOT__chiptop0__DOT__system__DOT__pbus__DOT__buffer__DOT__nodeOut_a_q__DOT__ram_opcode) - (uintptr_t)(ref->rootp));
-  bool dut_end = false;
+  std::signal(SIGINT, [](int){
+    dut_end = true;
+  });
+  std::signal(SIGTERM, [](int){
+    dut_end = true;
+  });
   uint64_t cycles = 0;
 #ifdef PERF
   FILE* activeFp = fopen(ACTIVE_FILE, "w");
 #endif
-  clock_t start = clock();
+  auto start = std::chrono::system_clock::now();
   while(!dut_end) {
 #ifdef VERILATOR
     ref_cycle(1);
@@ -154,9 +163,10 @@ int main(int argc, char** argv) {
 #endif
     cycles ++;
 #if (!defined(GSIM) && defined(VERILATOR)) || (defined(GSIM) && !defined(VERILATOR))
-    if(cycles % 10000000 == 0 && cycles <= 600000000) {
-      clock_t dur = clock() - start;
-      printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+    if(cycles % 10000000 == 0 && cycles <= 100000000) {
+      auto dur = std::chrono::system_clock::now() - start;
+      auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
+      fprintf(stderr, "cycles %d (%d ms, %d per sec) \n", cycles, msec.count(), cycles * 1000 / msec.count());
 #ifdef PERF
       size_t totalActives = 0;
       size_t validActives = 0;
@@ -173,7 +183,7 @@ int main(int argc, char** argv) {
       }
       if (cycles == 50000000) return 0;
 #endif
-      if (cycles == 600000000) return 0;
+      if (cycles == 100000000) return 0;
     }
 #endif
 #if defined(GSIM)

@@ -33,8 +33,12 @@ ResetType ENode::inferReset() {
       break;
     case OP_INT:
       std::tie(base, str) = firStrBase(strVal);
-      if (str == "0") reset = ZERO_RESET;
-      else TODO();
+      if (str == "h0" || str == "0")
+        reset = ZERO_RESET;
+      else {
+        std::cout << "Unknown :" << str << std::endl;
+        TODO();
+      }
       break;
     case OP_ASASYNCRESET:
       reset = ASYRESET;
@@ -68,23 +72,7 @@ void Node::addReset() {
   if (resetType == ZERO_RESET) {
     /* do nothing */
   } else if (resetType == UINTRESET) {
-    ENode* regTop = new ENode(OP_WHEN);
-    regTop->addChild(resetCond->getRoot());
-    regTop->addChild(resetVal->getRoot());
-    if (getDst()->assignTree.size() != 0) {
-      regTop->addChild(getDst()->assignTree.back()->getRoot());
-      getDst()->assignTree.back()->setRoot(regTop);
-    } else {
-      regTop->addChild(nullptr);
-      getDst()->assignTree.push_back(new ExpTree(regTop, this->getDst()));
-    }
-    for (ExpTree* tree : getDst()->arrayVal) {
-      ENode* arrayWhenTop = new ENode(OP_WHEN);
-      arrayWhenTop->addChild(resetCond->getRoot());
-      arrayWhenTop->addChild(nullptr);
-      arrayWhenTop->addChild(tree->getRoot());
-      tree->setRoot(arrayWhenTop);
-    }
+
   } else if (resetType == ASYRESET) {
     ENode* regTop = new ENode(OP_RESET);
     regTop->addChild(resetCond->getRoot());
@@ -94,11 +82,6 @@ void Node::addReset() {
       regTop->addChild(nullptr);
     assignTree.clear();
     assignTree.push_back(new ExpTree(regTop, this));
-    if (getDst()->assignTree.size() != 0) {
-      fillEmptyWhen(getDst()->assignTree[0], new ENode(this));
-    } else {
-      getDst()->assignTree.push_back(new ExpTree(new ENode(this), getDst()));
-    }
   } else {
     Panic();
   }

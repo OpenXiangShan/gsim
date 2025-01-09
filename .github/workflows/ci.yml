@@ -1,0 +1,24 @@
+name: ci
+on:
+  push:
+    branches: [ v1-dev, master ]
+  pull_request:
+    branches: [ v1-dev, master ]
+jobs:
+  nutshell_microbench:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+      - name: Install dependencies
+        run: |
+          sudo apt install -y clang llvm doxygen flex bison libfl-dev ccache
+      - name: Compile
+        run: |
+          make compile dutName=NutShell -j `nproc`
+      - name: Build EMU
+        run: |
+          make build-emu-pgo MODE=0 dutName=NutShell -j `nproc`

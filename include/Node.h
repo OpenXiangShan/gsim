@@ -8,6 +8,8 @@
 #include "debug.h"
 std::string format(const char *fmt, ...);
 
+class NodeComponent;
+
 enum NodeType{
   NODE_INVALID,
   NODE_REG_SRC,
@@ -19,13 +21,18 @@ enum NodeType{
   NODE_READER,
   NODE_WRITER,
   NODE_READWRITER,
+  NODE_INFER,
   NODE_MEM_MEMBER,
   NODE_OTHERS,
   NODE_REG_UPDATE,
+  NODE_EXT_IN,
+  NODE_EXT_OUT,
+  NODE_EXT,
 };
 
-enum NodeStatus{ VALID_NODE, DEAD_NODE, CONSTANT_NODE, MERGED_NODE, DEAD_SRC };
+enum NodeStatus{ VALID_NODE, DEAD_NODE, CONSTANT_NODE, MERGED_NODE, DEAD_SRC, REPLICATION_NODE, SPLITTED_NODE };
 enum IndexType{ INDEX_INT, INDEX_NODE };
+enum AsReset { EMPTY, NODE_ASYNC_RESET, NODE_UINT_RESET, NODE_ALL_RESET};
 
 enum ReaderMember { READER_ADDR = 0, READER_EN, READER_CLK, READER_DATA, READER_MEMBER_NUM};
 enum WriterMember { WRITER_ADDR = 0, WRITER_EN, WRITER_CLK, WRITER_DATA, WRITER_MASK, WRITER_MEMBER_NUM};
@@ -97,6 +104,7 @@ class Node {
   }
 
   std::string name;  // concat the module name in order (member in structure / temp variable)
+  std::string extraInfo;
   int id = -1;
   NodeType type;
   int width = -1;
@@ -106,13 +114,15 @@ class Node {
   std::vector<int> dimension;
   int order = -1;
   int orderInSuper = -1;
-
+  int ops = 0;
+  int lineno = -1;
   std::set<Node*> next;
   std::set<Node*> prev;
   std::vector <ExpTree*> assignTree;
   ExpTree* valTree = nullptr;
+  ExpTree* memTree = nullptr;
   ExpTree* resetCond = nullptr;  // valid in reg_src
-  ExpTree* resetVal = nullptr;   // valid in reg_src
+  ExpTree* resetVal = nullptr;   // valid in reg_src, used in AST2Graph
   std::vector<ExpTree*> arrayVal;
   std::set<int> invalidIdx;
 
@@ -127,6 +137,7 @@ class Node {
   Node* regNext = nullptr;
   Node* regUpdate = nullptr;
   ExpTree* updateTree = nullptr;
+  ExpTree* resetTree = nullptr;
   bool regSplit = true;
 /* used for instGerator */
   valInfo* computeInfo = nullptr;
@@ -135,19 +146,26 @@ class Node {
   int arrayIdx = -1;
   Node* arrayParent = nullptr;
 /* used for reg & memory */
-  Node* clock;
+  Node* clock = nullptr;
   bool isClock = false;
   ResetType reset = UNCERTAIN;
+  AsReset asReset = EMPTY;
   bool isArrayMember = false;
 /* used for visitWhen in AST2Graph */
 
   int whenDepth = 0;
 
+/* used in instsGenerator */
+  bool fullyUpdated = true;
+  bool nodeIsRoot = false;
+
 /* used in cppEmitter */
   std::set<int> nextActiveId;
-  std::set<int> regActivate;
+  std::set<int> nextNeedActivate;
 
   std::vector<std::string> insts;
+  std::vector<std::string> resetInsts;
+  std::vector<std::string> initInsts;
 
   void updateInfo(TypeInfo* info);
   void setType(int _width, bool _sign) {
@@ -162,14 +180,18 @@ class Node {
   }
 
   Node* getDst () {
-    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node is not register");
+    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node %s is not register", name.c_str());
     if (type == NODE_REG_SRC) return this->regNext;
     return this;
   }
   Node* getSrc () {
-    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node is not register");
+    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node %s is not register", name.c_str());
     if (type == NODE_REG_DST) return this->regNext;
     return this;
+  }
+  Node* getBindReg() {
+    Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node %s is not register", name.c_str());
+    return this->regNext;
   }
   void set_memory(int _depth, int r, int w) {
     depth = _depth;
@@ -188,6 +210,20 @@ class Node {
   Node* get_member(int idx) {
     Assert(idx < (int)member.size(), "idx %d is out of bound [0, %ld)", idx, member.size());
     return member[idx];
+  }
+  void set_writer() {
+    Assert(type == NODE_WRITER || type == NODE_INFER, "invalid type %d\n", type);
+    type = NODE_WRITER;
+  }
+  void set_reader() {
+    Assert(type == NODE_READER || type == NODE_INFER, "invalid type %d\n", type);
+    type = NODE_READER;
+  }
+  Node* get_port_clock() {
+    Assert(type == NODE_READER || type == NODE_WRITER, "invalid type %d in node %s", type, name.c_str());
+    if (type == NODE_READER) return get_member(READER_CLK);
+    else if (type == NODE_WRITER) return get_member(WRITER_CLK);
+    Panic();
   }
   void set_parent(Node* _parent) {
     Assert(!parent, "parent in %s is already set", name.c_str());
@@ -210,8 +246,29 @@ class Node {
   void update_usedBit(int bits) {
     usedBit = MIN(width, MAX(bits, usedBit));
   }
+  void setAsyncReset() {
+    if (asReset == NODE_UINT_RESET || asReset == NODE_ALL_RESET) asReset = NODE_ALL_RESET;
+    else asReset = NODE_ASYNC_RESET;
+  }
+  void setUIntReset() {
+    if (asReset == NODE_ASYNC_RESET || asReset == NODE_ALL_RESET) asReset = NODE_ALL_RESET;
+    else asReset = NODE_UINT_RESET;
+  }
+  bool isAsyncReset() {
+    return asReset == NODE_ASYNC_RESET || asReset == NODE_ALL_RESET;
+  }
+  bool isUIntReset() {
+    return asReset == NODE_UINT_RESET || asReset == NODE_ALL_RESET;
+  }
+  bool isReset() {
+    return asReset == NODE_UINT_RESET || asReset == NODE_ASYNC_RESET || asReset == NODE_ALL_RESET;
+  }
+  bool isExt() {
+    return type == NODE_EXT || type == NODE_EXT_IN || type == NODE_EXT_OUT;
+  }
   void updateConnect();
   void inferWidth();
+  void clearWidth();
   void addReset();
   void addUpdateTree();
   void constructSuperNode(); // alloc superNode for every node
@@ -227,8 +284,9 @@ class Node {
   ENode* isAlias();
   bool anyExtEdge();
   bool needActivate();
-  bool regNeedActivate();
+  bool anyNextActive();
   void updateActivate();
+  void updateNeedActivate(std::set<int>& alwaysActive);
   void removeConnection();
   void allocArrayVal();
   Node* clockAlias();
@@ -242,11 +300,19 @@ class Node {
   void invalidArrayOptimize();
   void fillArrayInvalid(ExpTree* tree);
   uint64_t keyHash();
+  NodeComponent* inferComponent();
+  NodeComponent* reInferComponent();
+  void updateTreeWithNewWIdth();
+  int repOpCount();
+  void updateIsRoot();
+  void updateHeadTail();
 };
 
 enum SuperType {
   SUPER_VALID,
-  SUPER_SAVE_REG,
+  SUPER_EXTMOD,
+  SUPER_ASYNC_RESET,
+  SUPER_UINT_RESET,
   SUPER_UPDATE_REG,
 };
 
@@ -262,6 +328,7 @@ public:
   int order;
   int cppId = -1;
   SuperType superType = SUPER_VALID;
+  Node* resetNode = nullptr;
   int localTmpNum = 0;
   int mpzTmpNum = 0;
   SuperNode() {

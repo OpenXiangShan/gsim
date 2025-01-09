@@ -10,19 +10,66 @@
 #include "syntax.hh"
 #include "Parser.h"
 
+#include <getopt.h>
+
 void preorder_traversal(PNode* root);
 graph* AST2Graph(PNode* root);
 void inferAllWidth();
 
 extern PNode* root;
 
-#define FUNC_WRAPPER(func) \
+#define FUNC_TIMER(func) \
   do { \
     clock_t start = clock(); \
     func; \
     clock_t end = clock(); \
     printf("{" #func "} = %ld s\n", (end - start) / CLOCKS_PER_SEC); \
   } while(0)
+
+#define FUNC_WRAPPER(func, name) \
+  do { \
+    clock_t start = clock(); \
+    func; \
+    clock_t end = clock(); \
+    printf("{" #func "} = %ld s\n", (end - start) / CLOCKS_PER_SEC); \
+    if (EnableDumpGraph) g->dump(std::to_string(dumpIdx ++) + name); \
+  } while(0)
+
+
+static std::string InputFileName{""};
+static bool EnableDumpGraph{false};
+
+static void printUsage(const char* ProgName) {
+  std::cout << "Usage: " << ProgName << " [options] <input file>\n"
+            << "Options:\n"
+            << "  -h, --help           Display this help message and exit.\n"
+            << "      --dump           Enable dumping of the graph.\n";
+}
+
+static void parseCommandLine(int argc, char** argv) {
+  if (argc <= 1) {
+    printUsage(argv[0]);
+    exit(EXIT_SUCCESS);
+  }
+
+  const struct option Table[] = {
+      {"help", no_argument, nullptr, 'h'},
+      {"dump", no_argument, nullptr, 'd'},
+      {nullptr, no_argument, nullptr, 0},
+  };
+
+  int Option{0};
+  while ((Option = getopt_long(argc, argv, "-h", Table, nullptr)) != -1) {
+    switch (Option) {
+      case 1: InputFileName = optarg; return;
+      case 'd': EnableDumpGraph = true; break;
+      default: {
+        printUsage(argv[0]);
+        exit(EXIT_SUCCESS);
+      }
+    }
+  }
+}
 
 /**
  * @brief main function.
@@ -32,55 +79,63 @@ extern PNode* root;
  * @return exit state.
  */
 int main(int argc, char** argv) {
-  if (argc <= 1) { std::cout << "Usage: \n"; }
+  parseCommandLine(argc, argv);
 
-  std::ifstream infile(argv[1]);
+  std::ifstream infile(InputFileName);
 
   Parser::Lexical lexical{infile, std::cout};
   Parser::Syntax syntax{&lexical};
 
-  FUNC_WRAPPER(syntax.parse());
-
-  MUX_DEBUG(std::cout << "parser finished\n");
-
+  FUNC_TIMER(syntax.parse());
   graph* g;
-  FUNC_WRAPPER(g = AST2Graph(root));
+  static int dumpIdx = 0;
+  FUNC_WRAPPER(g = AST2Graph(root), "Init");
 
-  MUX_DEBUG(preorder_traversal(root));
+  FUNC_TIMER(g->splitArray());
 
-  FUNC_WRAPPER(g->splitArray());
+  FUNC_TIMER(g->detectLoop());
 
-  FUNC_WRAPPER(g->detectLoop());
-  
-  FUNC_WRAPPER(inferAllWidth());
+  FUNC_WRAPPER(g->topoSort(), "TopoSort");
 
-  FUNC_WRAPPER(g->topoSort());
+  FUNC_TIMER(g->inferAllWidth());
 
-  FUNC_WRAPPER(g->clockOptimize());
+  FUNC_WRAPPER(g->clockOptimize(), "ClockOptimize");
 
-  FUNC_WRAPPER(g->removeDeadNodes());
+  FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
 
-  // FUNC_WRAPPER(g->traversal());
-  FUNC_WRAPPER(g->usedBits());
+  FUNC_WRAPPER(g->exprOpt(), "ExprOpt");
 
-  FUNC_WRAPPER(g->constantAnalysis());
+  FUNC_TIMER(g->usedBits());
 
-  FUNC_WRAPPER(g->removeDeadNodes());
+  FUNC_TIMER(g->splitNodes());
 
-  FUNC_WRAPPER(g->aliasAnalysis());
+  FUNC_TIMER(g->removeDeadNodes());
 
-  // FUNC_WRAPPER(g->commonExpr());
+  FUNC_WRAPPER(g->constantAnalysis(), "ConstantAnalysis");
 
-  FUNC_WRAPPER(g->mergeNodes());
+  FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
 
-  FUNC_WRAPPER(g->mergeRegister());
-  FUNC_WRAPPER(g->constructRegs());
+  FUNC_WRAPPER(g->aliasAnalysis(), "AliasAnalysis");
 
-  // g->mergeRegister();
+  FUNC_WRAPPER(g->patternDetect(), "PatternDetect");
+
+  FUNC_WRAPPER(g->commonExpr(), "CommonExpr");
+
+  FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
+
+  // FUNC_WRAPPER(g->mergeNodes(), "MergeNodes");
+  FUNC_WRAPPER(g->graphPartition(), "graphPartition");
+
+  FUNC_WRAPPER(g->replicationOpt(), "Replication");
+
+  FUNC_WRAPPER(g->mergeRegister(), "MergeRegister");
+
+  FUNC_WRAPPER(g->constructRegs(), "ConstructRegs");
  
-  FUNC_WRAPPER(g->instsGenerator());
+  FUNC_TIMER(g->instsGenerator());
 
-  FUNC_WRAPPER(g->cppEmitter());
+  FUNC_WRAPPER(g->cppEmitter(), "Final");
+
 
   return 0;
 }

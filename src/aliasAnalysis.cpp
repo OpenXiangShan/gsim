@@ -24,7 +24,6 @@ ENode* Node::isAlias() {
   if (assignTree.size() != 1) return nullptr;
   if (!assignTree[0]->getRoot()->getNode()) return nullptr;
   if (prev.size() != 1) return nullptr;
-  if (isArrayMember && assignTree[0]->getRoot()->getNode()->isArray() && !assignTree[0]->getRoot()->getNode()->arraySplitted()) return nullptr;
   return assignTree[0]->getRoot();
 }
 
@@ -97,6 +96,7 @@ void graph::aliasAnalysis() {
   for (SuperNode* super : sortedSuper) {
     totalNodes += super->member.size();
     for (Node* member : super->member) {
+      if (member->status != VALID_NODE) continue;
       ENode* enode = member->isAlias();
       if (!enode) continue;
       aliasNum ++;
@@ -108,6 +108,8 @@ void graph::aliasAnalysis() {
       }
       if (member->isArrayMember && aliasENode->getNode()->isArray() && !aliasENode->getNode()->arraySplitted()) {
         /* do not alias array member to */
+      } else if (member->isArray() && (member->arraySplitted() ^ aliasENode->getNode()->arraySplitted())) {
+
       } else {
         member->status = DEAD_NODE;
         aliasMap[member] = aliasENode;
@@ -129,11 +131,21 @@ void graph::aliasAnalysis() {
     if (reg->updateTree) {
       reg->updateTree->replace(aliasMap, reg->isArray());
     }
+    if (reg->resetTree) reg->resetTree->replace(aliasMap, reg->isArray());
   }
   for (auto iter : aliasMap) {
     if(iter.first->isArrayMember) {
       Node* parent = iter.first->arrayParent;
       parent->arrayMember[iter.first->arrayIdx] = getLeafNode(false, iter.second);
+    }
+    if (iter.first->type == NODE_MEM_MEMBER) {
+      Node* parent = iter.first->parent;
+      for (size_t i = 0; i < parent->member.size(); i ++) {
+        if (parent->member[i] == iter.first) {
+          parent->member[i] = getLeafNode(false, iter.second);
+          break;
+        }
+      }
     }
   }
   for (SuperNode* super : sortedSuper) {
@@ -150,7 +162,7 @@ void graph::aliasAnalysis() {
   }
   removeNodes(DEAD_NODE);
 
-  printf("remove %ld alias (%ld -> %ld)\n", aliasNum, totalNodes, totalNodes - aliasNum);
-  printf("remove %ld superNodes (%ld -> %ld)\n", totalSuper - sortedSuper.size(), totalSuper, sortedSuper.size());
+  printf("[aliasAnalysis] remove %ld alias (%ld -> %ld)\n", aliasNum, totalNodes, totalNodes - aliasNum);
+  printf("[aliasAnalysis] remove %ld superNodes (%ld -> %ld)\n", totalSuper - sortedSuper.size(), totalSuper, sortedSuper.size());
 
 }

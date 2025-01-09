@@ -6,6 +6,8 @@
 #include <numeric>
 #include <algorithm>
 #include <fstream>
+#include <csignal>
+#include <chrono>
 
 #if defined(GSIM)
 #include <newtop.h>
@@ -26,6 +28,7 @@ REF_NAME* ref;
 #define MAX_PROGRAM_SIZE 0x8000000
 uint8_t program[MAX_PROGRAM_SIZE];
 int program_sz = 0;
+bool dut_end = false;
 
 template <typename T>
 std::vector<size_t> sort_indexes(const std::vector<T> &v) {
@@ -137,13 +140,18 @@ int main(int argc, char** argv) {
 #endif
   std::cout << "start testing.....\n";
   // printf("size = %lx %lx\n", sizeof(*ref->rootp),
-  // (uintptr_t)&(ref->rootp->newtop__DOT__cpu__DOT__icache__DOT__Ram_bw__DOT__ram__DOT__ram) - (uintptr_t)(ref->rootp));
-  bool dut_end = false;
+  // (uintptr_t)&(ref->rootp->newtop__DOT__cpu__DOT__icache__DOT__Ram_bw__DOT__ram__DOT__ram) - (uintptr_t)(ref->rootp));  
+  std::signal(SIGINT, [](int){
+    dut_end = true;
+  });
+  std::signal(SIGTERM, [](int){
+    dut_end = true;
+  });
   uint64_t cycles = 0;
 #ifdef PERF
   FILE* activeFp = fopen(ACTIVE_FILE, "w");
 #endif
-  clock_t start = clock();
+  auto start = std::chrono::system_clock::now();
   while(!dut_end) {
 #ifdef VERILATOR
     ref_cycle(1);
@@ -154,8 +162,9 @@ int main(int argc, char** argv) {
     cycles ++;
 #if (!defined(GSIM) && defined(VERILATOR)) || (defined(GSIM) && !defined(VERILATOR))
     if(cycles % 10000000 == 0 && cycles <= 600000000) {
-      clock_t dur = clock() - start;
-      printf("cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
+      auto dur = std::chrono::system_clock::now() - start;
+      auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
+      fprintf(stderr, "cycles %d (%d ms, %d per sec) \n", cycles, msec.count(), cycles * 1000 / msec.count());
 #ifdef PERF
       size_t totalActives = 0;
       size_t validActives = 0;
@@ -203,17 +212,5 @@ int main(int argc, char** argv) {
       return 0;
     }
 #endif
-    if(dut_end) {
-      clock_t dur = clock() - start;
-#if defined(GSIM)
-      if(mod->cpu$regs$regs[0] == 0){
-#else
-      if(ref->rootp->newtop__DOT__cpu__DOT__regs__DOT__regs_0 == 0) {
-#endif
-          printf("\33[1;32mCPU HIT GOOD TRAP after %d cycles (%d ms, %d per sec)\033[0m\n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
-      }else{
-          printf("\33[1;31mCPU HIT BAD TRAP after %d cycles\033[0m\n", cycles);
-      }
-    }
   }
 }
