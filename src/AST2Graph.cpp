@@ -244,8 +244,8 @@ all nodes are stored in aggrMember
 */
 TypeInfo* visitPort(graph* g, PNode* port, PNodeType modType) {
   TYPE_CHECK(port, 1, 1, P_INPUT, P_OUTPUT);
-
   NodeType type = port->type == P_INPUT ? MOD_IN(modType) : MOD_OUT(modType);
+if (modType == P_EXTMOD) printf("port type %d nodeType %d\n", modType, type);
   prefix_append(SEP_MODULE, port->name);
   TypeInfo* info = visitType(g, port->getChild(0), type);
 
