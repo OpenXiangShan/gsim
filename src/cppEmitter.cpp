@@ -697,11 +697,13 @@ void graph::genActivate(FILE* fp) {
       if (super->superType == SUPER_EXTMOD) {
         /* save old EXT_OUT*/
         for (size_t i = 1; i < super->member.size(); i ++) {
+          if (!super->member[i]->needActivate()) continue;
           Node* extOut = super->member[i];
           fprintf(fp, "%s %s = %s;\n", widthUType(extOut->width).c_str(), oldName(extOut).c_str(), extOut->name.c_str());
         }
         genNodeInsts(fp, super->member[0], flagName);
         for (size_t i = 1; i < super->member.size(); i ++) {
+          if (!super->member[i]->needActivate()) continue;
           if (super->member[i]->isArray()) activateUncondNext(fp, super->member[i], super->member[i]->nextActiveId, false, flagName);
           else activateNext(fp, super->member[i], super->member[i]->nextActiveId, oldName(super->member[i]), false, flagName);
         }
