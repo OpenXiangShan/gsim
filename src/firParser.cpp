@@ -9,7 +9,7 @@
 
 typedef struct TaskRecord {
   off_t offset;
-  int len;
+  size_t len; // contain the null-byte
   int lineno;
   int id;
 } TaskRecord;
@@ -77,7 +77,7 @@ PNode* parseFIR(char *strbuf) {
       for (char *q = prev; (q = strchr(q, '\n')) != NULL; next_lineno ++, q ++);
       next_lineno ++; // '\0' is overwritten originally from '\n', so count it
     }
-    taskQueue->push_back(TaskRecord(prev - strbuf, strlen(prev) + 1, prev_lineno, id));
+    taskQueue->push_back(TaskRecord{prev - strbuf, strlen(prev) + 1, prev_lineno, id});
     id ++;
     if (isEnd) break;
     prev = next + 1;
@@ -86,7 +86,7 @@ PNode* parseFIR(char *strbuf) {
       NR_THREAD, modules, id);
   lists = new PList* [id];
   for (int i = 0; i < NR_THREAD; i ++) {
-    taskQueue->push_back(TaskRecord(0, -1, -1, -1)); // exit flags
+    taskQueue->push_back(TaskRecord{0, 0, -1, -1}); // exit flags
   }
 
   // sort to handle the largest module first
