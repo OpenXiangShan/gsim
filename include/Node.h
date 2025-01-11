@@ -153,7 +153,7 @@ class Node {
   bool isArrayMember = false;
 /* used for visitWhen in AST2Graph */
 
-  int whenDepth = 0;
+  size_t whenDepth = 0;
 
 /* used in instsGenerator */
   bool fullyUpdated = true;
@@ -295,7 +295,7 @@ class Node {
   void setConstantZero(int w = -1);
   bool isFakeArray() { return dimension.size() == 1 && dimension[0] == 1; }
   void display();
-  int arrayEntryNum() { int num = 1; for (int idx : dimension) num *= idx; return num; }
+  size_t arrayEntryNum() { size_t num = 1; for (size_t idx : dimension) num *= idx; return num; }
   valInfo* computeConstant();
   void invalidArrayOptimize();
   void fillArrayInvalid(ExpTree* tree);

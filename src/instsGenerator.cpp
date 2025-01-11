@@ -178,7 +178,7 @@ static std::string constantAssign(std::string lvalue, int dimIdx, Node* node, va
     ret = format("memset(%s, 0, sizeof(%s));", lvalue.c_str(), lvalue.c_str());
   } else {
     std::string idxStr, bracket;
-    for (int i = 0; i < node->dimension.size() - dimIdx; i ++) {
+    for (size_t i = 0; i < node->dimension.size() - dimIdx; i ++) {
       ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i + dimIdx], i);
       idxStr += "[i" + std::to_string(i) + "]";
       bracket += "}\n";
@@ -210,7 +210,7 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int
 
   } else {
     std::string idxStr, bracket;
-    for (int i = 0; i < node->dimension.size() - dimIdx; i ++) {
+    for (size_t i = 0; i < node->dimension.size() - dimIdx; i ++) {
       ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i + dimIdx], i);
       idxStr += "[i" + std::to_string(i) + "]";
       bracket += "}\n";
@@ -223,7 +223,7 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int
 
 static int countArrayIndex(std::string name) {
   int count = 0;
-  int idx = 0;
+  size_t idx = 0;
   int midSquare = 0;
   for(idx = 0; idx < name.length(); ) {
     if (name[idx] == '[') {
@@ -1496,7 +1496,7 @@ valInfo* ENode::instsGroup(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   ret->opNum = 0;
   std::string str = format("(%s[]){", widthUType(node->width).c_str());
-  for (int i = 0; i < getChildNum(); i ++) {
+  for (size_t i = 0; i < getChildNum(); i ++) {
     ret->mergeInsts(Child(i, computeInfo));
     if (i != 0) str += ", ";
     str += ChildInfo(i, valStr);
@@ -1514,7 +1514,7 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   Assert(node->type == NODE_READER, "invalid type %d", node->type);
   Node* memory = memoryNode;
   ret->valStr = memory->name + "[" + ChildInfo(0, valStr) + "]";
-  for (int i = 0; i < memory->dimension.size(); i ++) {
+  for (size_t i = 0; i < memory->dimension.size(); i ++) {
     computeInfo->valStr += "[i" + std::to_string(i) + "]";
   }
 
@@ -1562,7 +1562,7 @@ valInfo* ENode::instsPrintf() {
   valInfo* ret = computeInfo;
   ret->status = VAL_FINISH;
   std::string printfInst = format("if %s { printf(%s", addBracket(ChildInfo(0, valStr)).c_str(), strVal.c_str());
-  for (int i = 1; i < getChildNum(); i ++) {
+  for (size_t i = 1; i < getChildNum(); i ++) {
     printfInst += ", " + ChildInfo(i, valStr);
   }
   printfInst += "); fflush(stdout); }";
@@ -1643,7 +1643,7 @@ valInfo* ENode::instsExtFunc(Node* n) {
   valInfo* ret = computeInfo;
   ret->status = VAL_FINISH;
   std::string extInst = n->name + "(";
-  for (int i = 0; i < getChildNum(); i ++) {
+  for (size_t i = 0; i < getChildNum(); i ++) {
     if (i != 0) extInst += ", ";
     extInst += ChildInfo(i, valStr);
   }
@@ -1681,7 +1681,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           for (ENode* childENode : child)
             computeInfo->valStr += childENode->computeInfo->valStr;
           if (!IS_INVALID_LVALUE(lvalue)) {
-            for (int i = 0; i < nodePtr->dimension.size() - getChildNum(); i ++) {
+            for (size_t i = 0; i < nodePtr->dimension.size() - getChildNum(); i ++) {
               computeInfo->valStr += "[i" + std::to_string(i) + "]";
             }
           }
@@ -1711,7 +1711,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       computeInfo->beg = beg;
       computeInfo->end = end;
       if (!IS_INVALID_LVALUE(lvalue) && computeInfo->status == VAL_VALID) {
-        for (int i = 0; i < nodePtr->dimension.size() - getChildNum(); i ++) {
+        for (size_t i = 0; i < nodePtr->dimension.size() - getChildNum(); i ++) {
           computeInfo->valStr += "[i" + std::to_string(i) + "]";
         }
       }

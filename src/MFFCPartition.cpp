@@ -121,7 +121,7 @@ void findAllPrev(std::set<SuperNode*>&prev, SuperNode* super) {
   }
 }
 
-void graph::mergeEssentSmallSubling(int maxSize, double sim) {
+void graph::mergeEssentSmallSubling(size_t maxSize, double sim) {
   int idx = 0;
   int seg = sortedSuper.size() / 10;
   int percent = 0;

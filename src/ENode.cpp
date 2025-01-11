@@ -66,7 +66,7 @@ void ENode::usedBitWithFixRoot(int rootWidth) {
       childBits.push_back(rootWidth);
       break;
     case OP_STMT:
-      for (int i = 0; i < getChildNum(); i ++) childBits.push_back(rootWidth);
+      for (size_t i = 0; i < getChildNum(); i ++) childBits.push_back(rootWidth);
       break;
     case OP_READ_MEM:
       childBits.push_back(Child(0, width));
@@ -80,7 +80,7 @@ void ENode::usedBitWithFixRoot(int rootWidth) {
       break;
     case OP_PRINTF:
     case OP_ASSERT:
-      for (int i = 0; i < getChildNum(); i ++) {
+      for (size_t i = 0; i < getChildNum(); i ++) {
         childBits.push_back(Child(i, width));
       }
       break;
@@ -277,7 +277,7 @@ void ExpTree::updateWithNewWidth() {
     if (remove) {
       if (!parent) setRoot(newChild);
       else {
-        for (int i = 0; i < parent->getChildNum(); i ++) {
+        for (size_t i = 0; i < parent->getChildNum(); i ++) {
           if (parent->getChild(i) == top) parent->setChild(i, newChild);
         }
       }

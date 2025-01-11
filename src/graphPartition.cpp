@@ -87,17 +87,17 @@ void graph::graphInitPartition() {
   /* compute T by dynamic programming */
   for (size_t i = 0; i < sortedSuper.size(); i ++) {
     // printf("T[%ld] = %d size %ld\n", i, T[i], sortedSuper[i]->member.size());
-    int nextBound = i + 1;
-    int accuCost = sortedSuper[i]->member.size();
+    size_t nextBound = i + 1;
+    size_t accuCost = sortedSuper[i]->member.size();
     for (; nextBound < sortedSuper.size() && accuCost + sortedSuper[nextBound]->member.size() <= SUPER_BOUND; nextBound ++) {
       accuCost += sortedSuper[nextBound]->member.size();
     }
     /* update T[i + 1] to T[nextBound] that jmp at i */
     int Cij = 0;
-    for (int j = i + 1; j <= nextBound; j ++) {
+    for (size_t j = i + 1; j <= nextBound; j ++) {
       Cij += sortedSuper[j - 1]->next.size();
       for (SuperNode* prev : sortedSuper[j - 1]->prev) {
-        if (prev->order >= i) Cij --;
+        if (prev->order >= (int)i) Cij --;
       }
       int newT = T[i] + Cij;
       if(T[j] > newT) {

@@ -102,7 +102,7 @@ class graph {
   void patternDetect();
   void graphPartition();
   void MFFCPartition();
-  void mergeEssentSmallSubling(int maxSize, double sim);
+  void mergeEssentSmallSubling(size_t maxSize, double sim);
   void essentPartition();
   void inferAllWidth();
   void dump(std::string FileName);

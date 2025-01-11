@@ -12,7 +12,7 @@ void Node::updateConnect() {
       if (!tree) continue;
       q.push(tree->getRoot());
       if (tree->getlval()) {
-        for (int i = 0; i < tree->getlval()->getChildNum(); i ++) q.push(tree->getlval()->getChild(i));
+        for (size_t i = 0; i < tree->getlval()->getChildNum(); i ++) q.push(tree->getlval()->getChild(i));
       }
     }
   }
@@ -32,7 +32,7 @@ void Node::updateConnect() {
         prevNode->next.insert(this);
       }
     }
-    for (int i = 0; i < top->getChildNum(); i ++) {
+    for (size_t i = 0; i < top->getChildNum(); i ++) {
       if (top->getChild(i)) q.push(top->getChild(i));
     }
   }
@@ -256,9 +256,10 @@ void splitTree(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees) {
   for (int i = newBeg; i <= newEnd; i ++) {
     std::vector<int>newDim (node->dimension.size() - tree->getlval()->getChildNum());
     int dim = i;
-    for (int j = node->dimension.size() - 1; j >= tree->getlval()->getChildNum() ; j --) {
+    for (size_t j = node->dimension.size() - 1; j >= tree->getlval()->getChildNum() ; j --) {
       newDim[j-tree->getlval()->getChildNum()] = dim % node->dimension[j];
       dim = dim / node->dimension[j];
+      if (j == 0) break;
     }
     ExpTree* newTree = dupTreeWithIdx(tree, newDim, node);
     newTrees.push_back(newTree);

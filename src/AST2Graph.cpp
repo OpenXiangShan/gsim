@@ -941,6 +941,7 @@ void visitMemory(graph* g, PNode* mem) {
 
 }
 
+#if 0
 struct ChirrtlVistor {
   static Node* findMemory(graph *g, std::string &Name) {
     Node* mem = nullptr;
@@ -1134,6 +1135,7 @@ struct ChirrtlVistor {
     }
   }
 };
+#endif
 
 static Node* visitChirrtlPort(graph* g, PNode* port, int width, int depth, bool sign, std::string suffix, Node* node, ENode* addr_enode, Node* clock_node) {
   assert(port->type == P_READ || port->type == P_WRITE || port->type == P_INFER);
@@ -1461,7 +1463,7 @@ void visitPartialConnect(graph* g, PNode* connect) {
 
 bool matchWhen(ENode* enode, int depth) {
   if (enode->opType != OP_WHEN) return false;
-  Assert(enode->getChildNum() == 3, "invalid child num %d", enode->getChildNum());
+  Assert(enode->getChildNum() == 3, "invalid child num %ld", enode->getChildNum());
   Assert(enode->getChild(0) && enode->getChild(0)->nodePtr, "invalid cond");
   if (enode->getChild(0)->nodePtr == whenTrace[depth].second) return true;
   return false;
@@ -1503,11 +1505,11 @@ newRoot:  when3
       cond3 a b
 replace oldRoot by newRoot
 */
-std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, int depth) {
+std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, size_t depth) {
   ENode* oldParent = nullptr;
-  int maxDepth = depth;
+  size_t maxDepth = depth;
   if (valTree) std::tie(oldParent, maxDepth) = getDeepestWhen(valTree, depth);
-  if (maxDepth == (int)whenTrace.size()) {
+  if (maxDepth == whenTrace.size()) {
     ExpTree* retTree = valTree ? valTree : new ExpTree(nullptr);
     return std::make_pair(retTree, getWhenEnode(retTree, depth));
   }
@@ -1528,7 +1530,7 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, int depth) {
   }
   ENode* newRoot = nullptr; // latest whenNode
   ENode* retENode = oldParent;
-  for (int depth = whenTrace.size() - 1; depth >= maxDepth ; depth --) {
+  for (size_t depth = whenTrace.size() - 1; depth >= maxDepth ; depth --) {
     ENode* whenNode = new ENode(OP_WHEN); // return the deepest whenNode
     if (depth == whenTrace.size() - 1) retENode = whenNode;
     ENode* condNode = new ENode(whenTrace[depth].second);
@@ -1543,6 +1545,7 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, int depth) {
       whenNode->addChild(newRoot);
     }
     newRoot = whenNode;
+    if (depth == 0) break;
   }
   if (!oldRoot) {
     if (maxDepth == depth) {
@@ -1584,7 +1587,7 @@ void whenConnect(graph* g, Node* node, ENode* lvalue, ENode* rvalue, PNode* conn
   }
   ExpTree* valTree = nullptr;
   ENode* whenNode;
-  int connectDepth = (node->type == NODE_WRITER || node->type == NODE_INFER) ? 0 :node->whenDepth;
+  size_t connectDepth = (node->type == NODE_WRITER || node->type == NODE_INFER) ? 0 :node->whenDepth;
   if (node->isArray()) {
     std::tie(valTree, whenNode) = growWhenTrace(nullptr, connectDepth);
   } else {
@@ -2100,7 +2103,7 @@ void writer2Reg(ExpTree* tree) {
       if (parent) parent->setChild(idx, newChild);
       else tree->setRoot(newChild);
     } else {
-      for (int i = 0; i < top->getChildNum(); i ++) {
+      for (size_t i = 0; i < top->getChildNum(); i ++) {
         if (top->getChild(i)) s.push(std::make_tuple(top->getChild(i), top, i));
       }
     }
@@ -2119,7 +2122,7 @@ void ExpTree::removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::s
     if (top->getNode() && arrayMap.find(top->getNode()) != arrayMap.end()) {
       std::vector<ENode*> childENode;
       for (size_t i = 0; i < arrayMap[top->getNode()].size(); i ++) {
-        int validIdx = arrayMap[top->getNode()][i];
+        size_t validIdx = arrayMap[top->getNode()][i];
         if (validIdx >= top->getChildNum()) break;
         childENode.push_back(top->getChild(validIdx));
       }
