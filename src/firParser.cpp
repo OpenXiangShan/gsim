@@ -21,6 +21,9 @@ static PList **lists;
 static PNode *globalRoot;
 
 void parseFunc(char *strbuf, int tid) {
+  std::istringstream s;
+  Parser::Lexical *lexical = new Parser::Lexical(s, std::cout);
+  Parser::Syntax *syntax = new Parser::Syntax(lexical);
   while (true) {
     std::unique_lock lk(m);
     cv.wait(lk, []{ return !taskQueue->empty(); });
@@ -29,13 +32,16 @@ void parseFunc(char *strbuf, int tid) {
     lk.unlock();
     cv.notify_one();
 
-    if (e.id == -1) { return; }
+    if (e.id == -1) {
+      delete syntax;
+      delete lexical;
+      return;
+    }
     //Log("e.offset = %ld, e.lineno = %d", e.offset, e.lineno);
     //for (int i = 0; i < 100; i ++) { putchar(strbuf[e.offset + i]); } putchar('\n');
 
-    std::istringstream *streamBuf = new std::istringstream(strbuf + e.offset);
-    Parser::Lexical *lexical = new Parser::Lexical(*streamBuf, std::cout);
-    Parser::Syntax *syntax = new Parser::Syntax(lexical);
+    s.rdbuf()->pubsetbuf(strbuf + e.offset, e.len - 1);
+    lexical->switch_streams(&s);
     lexical->set_lineno(e.lineno);
     syntax->parse();
 
@@ -44,10 +50,6 @@ void parseFunc(char *strbuf, int tid) {
       assert(lexical->root != NULL);
       globalRoot = lexical->root;
     }
-
-    delete syntax;
-    delete lexical;
-    delete streamBuf;
   }
 }
 
