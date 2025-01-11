@@ -63,12 +63,7 @@ typedef struct Context {
   void visitConnect(PNode* connect);
   void visitPartialConnect(PNode* connect);
   void visitWhenConnect(PNode* connect);
-  void visitWhenPrintf(PNode* print);
-  void visitWhenAssert(PNode* ass);
-  void visitWhenStop(PNode* stop);
-  void visitPrintf(PNode* print);
-  void visitStop(PNode* stop);
-  void visitAssert(PNode* ass);
+  void visitPrintfAssertStop(PNode* node, bool inWhen);
   AggrParentNode* allocNodeFromAggr(AggrParentNode* parent);
   Node* allocCondNode(ASTExpTree* condExp, PNode* when);
   ASTExpTree* visitIntNoInit(PNode* expr);
@@ -1663,102 +1658,69 @@ void Context::visitWhenConnect(PNode* connect) {
     whenConnect(node, ref->getExpRoot(), exp->getExpRoot(), connect);
   }
 }
+
 /*
   | Printf '(' expr ',' expr ',' String exprs ')' ':' ALLID info { $$ = newNode(P_PRINTF, synlineno(), $12, $11, 3, $3, $5, $8); $$->appendExtraInfo($7); }
   | Printf '(' expr ',' expr ',' String exprs ')' info    { $$ = newNode(P_PRINTF, synlineno(), $10, NULL, 3, $3, $5, $8); $$->appendExtraInfo($7); }
 */
-void Context::visitWhenPrintf(PNode* print) {
-  TYPE_CHECK(print, 3, 3, P_PRINTF);
-  Node* n = allocNode(NODE_SPECIAL, path->abspath(SEP_MODULE, "PRINTF_" + std::to_string(print->lineno)), print->lineno);
-  ASTExpTree* exp = visitExpr(print->getChild(1));
+/*
+    | Assert '(' expr ',' expr ',' expr ',' String ')' ':' ALLID info { $$ = newNode(P_ASSERT, synlineno(), $13, $12, 3, $3, $5, $7); $$->appendExtraInfo($9); }
+    | Assert '(' expr ',' expr ',' expr ',' String ')' info { $$ = newNode(P_ASSERT, synlineno(), $11, NULL, 3, $3, $5, $7); $$->appendExtraInfo($9); }
+*/
+/*
+  | Stop '(' expr ',' expr ',' INT ')' info   { $$ = newNode(P_STOP, synlineno(), $9, NULL, 2, $3, $5); $$->appendExtraInfo($7); }
+  | Stop '(' expr ',' expr ',' INT ')' ':' ALLID info   { $$ = newNode(P_STOP, synlineno(), $11, $10, 2, $3, $5); $$->appendExtraInfo($7); }
+*/
+void Context::visitPrintfAssertStop(PNode* node, bool inWhen) {
+  switch (node->type) {
+    case P_PRINTF: TYPE_CHECK(node, 3, 3, P_PRINTF); break;
+    case P_ASSERT: TYPE_CHECK(node, 3, 3, P_ASSERT); break;
+    default:       TYPE_CHECK(node, 2, 2, P_STOP);   break;
+  }
+  auto nodeName = (node->type == P_PRINTF ? "PRINTF_" + std::to_string(node->lineno)
+                                          : node->name);
+  Node* n = allocNode(NODE_SPECIAL, path->abspath(SEP_MODULE, nodeName), node->lineno);
 
-  ENode* expRoot = exp->getExpRoot();
-  for (size_t i = 0; i < whenTrace.size(); i ++) {
-    ENode* andNode = new ENode(OP_AND);
-    andNode->addChild(expRoot);
-    ENode* condNode = new ENode(whenTrace[i].second);
-    if (whenTrace[i].first) {
-      andNode->addChild(condNode);
-    } else {
-      ENode* notNode = new ENode(OP_NOT);
-      notNode->addChild(condNode);
-      andNode->addChild(notNode);
-    }
-    expRoot = andNode;
+  ASTExpTree* exp = visitExpr(node->getChild(1)); // pred for assert
+  ENode* expRoot = nullptr;
+  if (node->type == P_ASSERT) {
+    ASTExpTree* en = visitExpr(node->getChild(2));
+    expRoot = en->getExpRoot();  // enRoot for assert
+  } else {
+    expRoot = exp->getExpRoot(); // cond for stop
   }
 
-  ENode* enode = new ENode(OP_PRINTF);
-  enode->strVal = print->getExtra(0);
+  if (inWhen) {
+    for (size_t i = 0; i < whenTrace.size(); i ++) {
+      ENode* andNode = new ENode(OP_AND);
+      andNode->addChild(expRoot);
+      ENode* condNode = new ENode(whenTrace[i].second);
+      if (whenTrace[i].first) {
+        andNode->addChild(condNode);
+      } else {
+        ENode* notNode = new ENode(OP_NOT);
+        notNode->addChild(condNode);
+        andNode->addChild(notNode);
+      }
+      expRoot = andNode;
+    }
+  }
+
+  ENode* enode = new ENode(node->type == P_PRINTF ? OP_PRINTF :
+                          (node->type == P_ASSERT ? OP_ASSERT : OP_EXIT));
+  enode->strVal = node->getExtra(0);
+  if (node->type == P_ASSERT) {
+    enode->addChild(exp->getExpRoot());
+  }
   enode->addChild(expRoot);
 
-  PNode* exprs = print->getChild(2);
-  for (int i = 0; i < exprs->getChildNum(); i ++) {
-    ASTExpTree* val = visitExpr(exprs->getChild(i));
-    enode->addChild(val->getExpRoot());
-  }
-
-  n->valTree = new ExpTree(enode, new ENode(n));
-  addSignal(n->name, n);
-  g->specialNodes.push_back(n);
-}
-
-void Context::visitWhenAssert(PNode* ass) {
-  TYPE_CHECK(ass, 3, 3, P_ASSERT);
-  Node* n = allocNode(NODE_SPECIAL, path->abspath(SEP_MODULE, ass->name), ass->lineno);
-
-  ASTExpTree* pred = visitExpr(ass->getChild(1));
-  ASTExpTree* en = visitExpr(ass->getChild(2));
-
-  ENode* enRoot = en->getExpRoot();
-  for (size_t i = 0; i < whenTrace.size(); i ++) {
-    ENode* andNode = new ENode(OP_AND);
-    andNode->addChild(enRoot);
-    ENode* condNode = new ENode(whenTrace[i].second);
-    if (whenTrace[i].first) {
-      andNode->addChild(condNode);
-    } else {
-      ENode* notNode = new ENode(OP_NOT);
-      notNode->addChild(condNode);
-      andNode->addChild(notNode);
+  if (node->type == P_PRINTF) {
+    PNode* exprs = node->getChild(2);
+    for (int i = 0; i < exprs->getChildNum(); i ++) {
+      ASTExpTree* val = visitExpr(exprs->getChild(i));
+      enode->addChild(val->getExpRoot());
     }
-    enRoot = andNode;
   }
-
-  ENode* enode = new ENode(OP_ASSERT);
-  enode->strVal = ass->getExtra(0);
-
-  enode->addChild(pred->getExpRoot());
-  enode->addChild(enRoot);
-  
-  n->valTree = new ExpTree(enode, new ENode(n));
-  addSignal(n->name, n);
-  g->specialNodes.push_back(n);
-}
-
-void Context::visitWhenStop(PNode* stop) {
-  TYPE_CHECK(stop, 2, 2, P_STOP);
-  Node* n = allocNode(NODE_SPECIAL, path->abspath(SEP_MODULE, stop->name), stop->lineno);
-
-  ASTExpTree* exp = visitExpr(stop->getChild(1));
-
-  ENode* cond = exp->getExpRoot();
-  for (size_t i = 0; i < whenTrace.size(); i ++) {
-    ENode* andNode = new ENode(OP_AND);
-    andNode->addChild(cond);
-    ENode* condNode = new ENode(whenTrace[i].second);
-    if (whenTrace[i].first) {
-      andNode->addChild(condNode);
-    } else {
-      ENode* notNode = new ENode(OP_NOT);
-      notNode->addChild(condNode);
-      andNode->addChild(notNode);
-    }
-    cond = andNode;
-  }
-
-  ENode* enode = new ENode(OP_EXIT);
-  enode->strVal = stop->getExtra(0);
-  enode->addChild(cond);
 
   n->valTree = new ExpTree(enode, new ENode(n));
   addSignal(n->name, n);
@@ -1772,9 +1734,9 @@ void Context::visitWhenStmt(PNode* stmt) {
     case P_CONNECT: visitWhenConnect(stmt); break;
     case P_WHEN: visitWhen(stmt); break;
     case P_WIRE_DEF: visitWireDef(stmt); break;
-    case P_PRINTF: visitWhenPrintf(stmt); break;
-    case P_ASSERT: visitWhenAssert(stmt); break;
-    case P_STOP: visitWhenStop(stmt); break;
+    case P_PRINTF:
+    case P_ASSERT:
+    case P_STOP:  visitPrintfAssertStop(stmt, true); break;
     case P_INST: visitInst(stmt); break;
     case P_REG_DEF: visitRegDef(stmt, P_REG_DEF); break;
     case P_REG_RESET_DEF: visitRegDef(stmt, P_REG_RESET_DEF); break;
@@ -1813,70 +1775,6 @@ void Context::visitWhen(PNode* when) {
   visitWhenStmts(when->getChild(2));
   
   whenTrace.pop_back();
-}
-
-/*
-  | Printf '(' expr ',' expr ',' String exprs ')' ':' ALLID info { $$ = newNode(P_PRINTF, synlineno(), $12, $11, 3, $3, $5, $8); $$->appendExtraInfo($7); }
-  | Printf '(' expr ',' expr ',' String exprs ')' info    { $$ = newNode(P_PRINTF, synlineno(), $10, NULL, 3, $3, $5, $8); $$->appendExtraInfo($7); }
-*/
-void Context::visitPrintf(PNode* print) {
-  TYPE_CHECK(print, 3, 3, P_PRINTF);
-  Node* n = allocNode(NODE_SPECIAL, path->abspath(SEP_MODULE, print->name), print->lineno);
-  ASTExpTree* exp = visitExpr(print->getChild(1));
-
-  ENode* enode = new ENode(OP_PRINTF);
-  enode->strVal = print->getExtra(0);
-
-  enode->addChild(exp->getExpRoot());
-  
-  PNode* exprs = print->getChild(2);
-  for (int i = 0; i < exprs->getChildNum(); i ++) {
-    ASTExpTree* val = visitExpr(exprs->getChild(i));
-    enode->addChild(val->getExpRoot());
-  }
-
-  n->valTree = new ExpTree(enode, new ENode(n));
-  addSignal(n->name, n);
-  g->specialNodes.push_back(n);
-}
-/*
-  | Stop '(' expr ',' expr ',' INT ')' info   { $$ = newNode(P_STOP, synlineno(), $9, NULL, 2, $3, $5); $$->appendExtraInfo($7); }
-  | Stop '(' expr ',' expr ',' INT ')' ':' ALLID info   { $$ = newNode(P_STOP, synlineno(), $11, $10, 2, $3, $5); $$->appendExtraInfo($7); }
-*/
-void Context::visitStop(PNode* stop) {
-  TYPE_CHECK(stop, 2, 2, P_STOP);
-
-  ASTExpTree* exp = visitExpr(stop->getChild(1));
-  ENode* enode = new ENode(OP_EXIT);
-  enode->addChild(exp->getExpRoot());
-  enode->strVal = stop->getExtra(0);
-
-  Node* n = allocNode(NODE_SPECIAL, path->abspath(SEP_MODULE, stop->name), stop->lineno);
-  n->valTree = new ExpTree(enode, new ENode(n));
-  addSignal(n->name, n);
-  g->specialNodes.push_back(n);
-}
-
-/*
-    | Assert '(' expr ',' expr ',' expr ',' String ')' ':' ALLID info { $$ = newNode(P_ASSERT, synlineno(), $13, $12, 3, $3, $5, $7); $$->appendExtraInfo($9); }
-    | Assert '(' expr ',' expr ',' expr ',' String ')' info { $$ = newNode(P_ASSERT, synlineno(), $11, NULL, 3, $3, $5, $7); $$->appendExtraInfo($9); }
-*/
-void Context::visitAssert(PNode* ass) {
-  TYPE_CHECK(ass, 3, 3, P_ASSERT);
-  Node* n = allocNode(NODE_SPECIAL, path->abspath(SEP_MODULE, ass->name), ass->lineno);
-
-  ASTExpTree* pred = visitExpr(ass->getChild(1));
-  ASTExpTree* en = visitExpr(ass->getChild(2));
-
-  ENode* enode = new ENode(OP_ASSERT);
-  enode->strVal = ass->getExtra(0);
-
-  enode->addChild(pred->getExpRoot());
-  enode->addChild(en->getExpRoot());
-
-  n->valTree = new ExpTree(enode, new ENode(n));
-  addSignal(n->name, n);
-  g->specialNodes.push_back(n);
 }
 
 void saveWhenTree() {
@@ -1937,9 +1835,9 @@ void Context::visitStmt(PNode* stmt) {
       visitWhen(stmt);
       saveWhenTree();
       break;
-    case P_PRINTF: visitPrintf(stmt); break;
-    case P_ASSERT: visitAssert(stmt); break;
-    case P_STOP: visitStop(stmt); break;
+    case P_PRINTF:
+    case P_ASSERT:
+    case P_STOP:  visitPrintfAssertStop(stmt, false); break;
     default:
       printf("invalid stmt type %d in lineno %d\n", stmt->type, stmt->lineno);
       Panic();
