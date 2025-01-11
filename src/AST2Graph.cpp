@@ -43,10 +43,8 @@ typedef struct Context {
   graph *g;
   ModulePath *path;
 
-  void visitModule(PNode* module);
-  void visitTopModule(PNode* topModule);
+  void visitModule(PNode* module, bool isTop);
   void visitExtModule(PNode* module);
-  void visitTopPorts(PNode* ports);
   TypeInfo* visitPort(PNode* port, PNodeType modType);
   TypeInfo* visitType(PNode* ptype, NodeType parentType);
   TypeInfo* visitMemType(PNode* dataType);
@@ -305,27 +303,6 @@ TypeInfo* Context::visitPort(PNode* port, PNodeType modType) {
 }
 
 /*
-  ports:  { $$ = new PNode(P_PORTS); }
-      | ports port    { $$ = $1; $$->appendChild($2); }
-*/
-void Context::visitTopPorts(PNode* ports) {
-  TYPE_CHECK(ports, 0, INT32_MAX, P_PORTS);
-  // visit all ports
-  for (int i = 0; i < ports->getChildNum(); i ++) {
-    PNode* port = ports->getChild(i);
-    TypeInfo* info = visitPort(port, P_CIRCUIT);
-    for (auto entry : info->aggrMember) {
-      Node* node = entry.first;
-      addSignal(node->name, node);
-      if (node->type == NODE_INP) g->input.push_back(node);
-      else if (node->type == NODE_OUT) g->output.push_back(node);
-    }
-    for (AggrParentNode* dummy : info->aggrParent) {
-      addDummy(dummy->name, dummy);
-    }
-  }
-}
-/*
 expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S');}
 */
 ASTExpTree* Context::visitIntNoInit(PNode* expr) {
@@ -543,17 +520,23 @@ ASTExpTree* Context::visitExpr(PNode* expr) {
 /*
 module: Module ALLID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, synlineno(), $4, $2, 2, $6, $7); }
 */
-void Context::visitModule(PNode* module) {
+void Context::visitModule(PNode* module, bool isTop) {
   TYPE_CHECK(module, 2, 2, P_MOD);
   // printf("visit module %s\n", module->name.c_str());
 
   PNode* ports = module->getChild(0);
+  TYPE_CHECK(ports, 0, INT32_MAX, P_PORTS);
+  // visit all ports
   for (int i = 0; i < ports->getChildNum(); i ++) {
-    TypeInfo* portInfo = visitPort(ports->getChild(i), P_MOD);
+    TypeInfo* portInfo = visitPort(ports->getChild(i), isTop ? P_CIRCUIT : P_MOD);
 
     for (auto entry : portInfo->aggrMember) {
       Node* node = entry.first;
       addSignal(node->name, node);
+      if (isTop) {
+        if (node->type == NODE_INP) g->input.push_back(node);
+        else if (node->type == NODE_OUT) g->output.push_back(node);
+      }
     }
     for (AggrParentNode* dummy : portInfo->aggrParent) {
       addDummy(dummy->name, dummy);
@@ -1313,7 +1296,7 @@ void Context::visitInst(PNode* inst) {
   path->cd(SEP_MODULE, inst->name);
   moduleInstances.insert(path->cwd());
   switch(module->type) {
-    case P_MOD: visitModule(module); break;
+    case P_MOD: visitModule(module, false); break;
     case P_EXTMOD: visitExtModule(module); break;
     case P_INTMOD: TODO();
     default:
@@ -1968,16 +1951,6 @@ void Context::visitStmts(PNode* stmts) {
   }
 }
 
-/*
-  module: Module ALLID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, synlineno(), $4, $2, 2, $6, $7); }
-  children: ports, statments
-*/
-void Context::visitTopModule(PNode* topModule) {
-  TYPE_CHECK(topModule, 2, 2, P_MOD);
-  visitTopPorts(topModule->getChild(0));
-  visitStmts(topModule->getChild(1));
-}
-
 void updatePrevNext(Node* n) {
   switch (n->type) {
     case NODE_INP:
@@ -2026,7 +1999,7 @@ graph* AST2Graph(PNode* root) {
     moduleMap->emplace(module->name, module);
   }
   Assert(topModule, "Top module can not be NULL\n");
-  c.visitTopModule(topModule);
+  c.visitModule(topModule, true);
   delete moduleMap;
   delete c.path;
 
