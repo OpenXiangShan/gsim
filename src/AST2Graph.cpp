@@ -30,7 +30,7 @@ ENode* getWhenEnode(ExpTree* valTree, int depth);
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
 /* map between module name and module pnode*/
-static std::map<std::string, PNode*> moduleMap;
+static std::map<std::string, PNode*> *moduleMap;
 /* prefix trace. module1, module1$module2 module1$a_b_c...*/
 static std::stack<std::string> prefixTrace;
 static std::map<std::string, Node*> allSignals;
@@ -1266,9 +1266,10 @@ static void visitChirrtlMemory(graph* g, PNode* mem) {
 */
 void visitInst(graph* g, PNode* inst) {
   TYPE_CHECK(inst, 0, 0, P_INST);
-  Assert(inst->getExtraNum() >= 1 && moduleMap.find(inst->getExtra(0)) != moduleMap.end(),
+  auto iterator = moduleMap->find(inst->getExtra(0));
+  Assert(inst->getExtraNum() >= 1 && iterator != moduleMap->end(),
                "Module %s is not defined!\n", inst->getExtra(0).c_str());
-  PNode* module = moduleMap[inst->getExtra(0)];
+  PNode* module = iterator->second;
   prefix_append(SEP_MODULE, inst->name);
   moduleInstances.insert(topPrefix());
   switch(module->type) {
@@ -1977,13 +1978,15 @@ graph* AST2Graph(PNode* root) {
 
   PNode* topModule = NULL;
 
+  moduleMap = new std::map<std::string, PNode*>;
   for (int i = 0; i < root->getChildNum(); i++) {
     PNode* module = root->getChild(i);
     if (module->name == root->name) { topModule = module; }
-    moduleMap[module->name] = module;
+    moduleMap->emplace(module->name, module);
   }
   Assert(topModule, "Top module can not be NULL\n");
   visitTopModule(g, topModule);
+  delete moduleMap;
 
 /* infer memory port */
 
