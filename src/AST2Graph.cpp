@@ -40,8 +40,10 @@ public:
 };
 
 typedef struct Context {
+  typedef std::map<std::string, std::pair<std::vector<Node*>, std::vector<AggrParentNode*>>> MemoryInfo;
   graph *g;
   ModulePath *path;
+  MemoryInfo *memoryMap;
 
   void visitModule(PNode* module, bool isTop);
   void visitExtModule(PNode* module);
@@ -100,8 +102,6 @@ static std::map<std::string, AggrParentNode*> allDummy; // CHECK: any other dumm
 static std::vector<std::pair<bool, Node*>> whenTrace;
 
 static std::set<Node*> stmtsNodes;
-
-static std::map<std::string, std::pair<std::vector<Node*>, std::vector<AggrParentNode*>>> memoryMap;
 
 static inline void typeCheck(PNode* node, const int expect[], int size, int minChildNum, int maxChildNum) {
   const int* expectEnd = expect + size;
@@ -520,6 +520,8 @@ module: Module ALLID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MO
 */
 void Context::visitModule(PNode* module, bool isTop) {
   TYPE_CHECK(module, 2, 2, P_MOD);
+  MemoryInfo *memoryMapSave = memoryMap;
+  memoryMap = new MemoryInfo;
   // printf("visit module %s\n", module->name.c_str());
 
   PNode* ports = module->getChild(0);
@@ -543,6 +545,9 @@ void Context::visitModule(PNode* module, bool isTop) {
 
   visitStmts(module->getChild(1));
   // printf("leave module %s\n", module->name.c_str());
+
+  delete memoryMap;
+  memoryMap = memoryMapSave;
 }
 /*
 extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$ = newNode(P_EXTMOD, synlineno(), $4, $2, 1, $6); $$->appendChildList($8);}
@@ -1189,6 +1194,7 @@ Node* Context::visitChirrtlPort(PNode* port, int width, int depth, bool sign, st
 void Context::visitChirrtlMemPort(PNode* port) {
   // If we are in the top module, 
   //    the memory name does not need to have the prefix added.
+  MemoryInfo &memoryMap = *(this->memoryMap);
   ASTExpTree* addr = visitExpr(port->getChild(0));
   ENode* addr_enode = addr->getExpRoot();
   Node* clock_node = getSignal(path->abspath(SEP_MODULE, port->getExtra(1)));
@@ -1240,6 +1246,7 @@ void Context::visitChirrtlMemPort(PNode* port) {
 
 // TODO: Comb memory support
 void Context::visitChirrtlMemory(PNode* mem) {
+  MemoryInfo &memoryMap = *(this->memoryMap);
   assert(mem->type == P_SEQ_MEMORY || mem->type == P_COMB_MEMORY);
   path->cd(SEP_MODULE, mem->name);
   bool isSeq = mem->type == P_SEQ_MEMORY;
