@@ -39,11 +39,16 @@ public:
   void cdLast() { path.pop(); }
 };
 
+typedef std::pair<bool, Node*> WhenBlock;
+typedef std::vector<WhenBlock> WhenBlockInfo;
+
 typedef struct Context {
   typedef std::map<std::string, std::pair<std::vector<Node*>, std::vector<AggrParentNode*>>> MemoryInfo;
+
   graph *g;
   ModulePath *path;
   MemoryInfo *memoryMap;
+  WhenBlockInfo *whenTrace;
 
   void visitModule(PNode* module, bool isTop);
   void visitExtModule(PNode* module);
@@ -88,18 +93,18 @@ typedef struct Context {
   Node* visitWriter(PNode* writer, int width, int depth, bool sign, std::string suffix, Node* node);
   Node* visitReadWriter(PNode* readWriter, int width, int depth, bool sign, std::string suffix, Node* node);
   void whenConnect(Node* node, ENode* lvalue, ENode* rvalue, PNode* connect);
+  void addSignal(std::string s, Node* n);
+  void addOriginMember(Node* originPort, PNode* port);
+  void removeDummyDim();
 } Context;
 
 int p_stoi(const char* str);
-void removeDummyDim(graph* g);
-ENode* getWhenEnode(ExpTree* valTree, int depth);
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
 /* map between module name and module pnode*/
 static std::map<std::string, PNode*> *moduleMap;
 static std::map<std::string, Node*> allSignals;
 static std::map<std::string, AggrParentNode*> allDummy; // CHECK: any other dummy nodes ?
-static std::vector<std::pair<bool, Node*>> whenTrace;
 
 static std::set<Node*> stmtsNodes;
 
@@ -118,11 +123,11 @@ static inline Node* allocNode(NodeType type = NODE_OTHERS, std::string name = ""
   return node;
 }
 
-static inline void addSignal(std::string s, Node* n) {
+void Context::addSignal(std::string s, Node* n) {
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
   Assert(allDummy.find(s) == allDummy.end(), "Signal %s is already in allDummy\n", s.c_str());
   allSignals[s] = n;
-  n->whenDepth = whenTrace.size();
+  n->whenDepth = whenTrace->size();
   // printf("add signal %s\n", s.c_str());
 }
 
@@ -522,6 +527,12 @@ void Context::visitModule(PNode* module, bool isTop) {
   TYPE_CHECK(module, 2, 2, P_MOD);
   MemoryInfo *memoryMapSave = memoryMap;
   memoryMap = new MemoryInfo;
+
+  // temp fix for wrong whenDepth
+  bool useNewWhenBlockInfo = (whenTrace->size() == 0);
+  WhenBlockInfo *whenTraceSave = whenTrace;
+  if (useNewWhenBlockInfo) whenTrace = new WhenBlockInfo;
+
   // printf("visit module %s\n", module->name.c_str());
 
   PNode* ports = module->getChild(0);
@@ -547,7 +558,9 @@ void Context::visitModule(PNode* module, bool isTop) {
   // printf("leave module %s\n", module->name.c_str());
 
   delete memoryMap;
+  if (useNewWhenBlockInfo) delete whenTrace;
   memoryMap = memoryMapSave;
+  whenTrace = whenTraceSave;
 }
 /*
 extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$ = newNode(P_EXTMOD, synlineno(), $4, $2, 1, $6); $$->appendChildList($8);}
@@ -832,7 +845,7 @@ void memoryAlias(Node* origin, Node* alias) {
   }
 }
 
-void addOriginMember(Node* originPort, PNode* port) {
+void Context::addOriginMember(Node* originPort, PNode* port) {
   for (Node* member : originPort->member) member->type = NODE_OTHERS;
   Node* originMember;
   switch(port->type) {
@@ -1486,23 +1499,23 @@ void Context::visitPartialConnect(PNode* connect) {
 
 }
 
-bool matchWhen(ENode* enode, int depth) {
+bool matchWhen(ENode* enode, Node *node) {
   if (enode->opType != OP_WHEN) return false;
   Assert(enode->getChildNum() == 3, "invalid child num %ld", enode->getChildNum());
   Assert(enode->getChild(0) && enode->getChild(0)->nodePtr, "invalid cond");
-  if (enode->getChild(0)->nodePtr == whenTrace[depth].second) return true;
+  if (enode->getChild(0)->nodePtr == node) return true;
   return false;
 }
 
 /* find the latest matched when ENode and the number of matched */
-std::pair<ENode*, int> getDeepestWhen(ExpTree* valTree, int depth) {
+std::pair<ENode*, int> getDeepestWhen(WhenBlockInfo &whenTrace, ExpTree* valTree, int depth) {
   if (!valTree) return std::make_pair(nullptr, depth);
   ENode* checkNode = valTree->getRoot();
   ENode* whenNode = nullptr;
   int deep = depth;
 
   for (size_t i = depth; i < whenTrace.size(); i ++) {
-    if (checkNode && matchWhen(checkNode, i)) {
+    if (checkNode && matchWhen(checkNode, whenTrace[i].second)) {
       whenNode = checkNode;
       deep = i + 1;
       checkNode = whenTrace[i].first ? checkNode->getChild(1) : checkNode->getChild(2);
@@ -1530,13 +1543,17 @@ newRoot:  when3
       cond3 a b
 replace oldRoot by newRoot
 */
-std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, size_t depth) {
+std::pair<ExpTree*, ENode*> growWhenTrace(WhenBlockInfo &whenTrace, ExpTree* valTree, size_t depth) {
   ENode* oldParent = nullptr;
   size_t maxDepth = depth;
-  if (valTree) std::tie(oldParent, maxDepth) = getDeepestWhen(valTree, depth);
+  if (valTree) std::tie(oldParent, maxDepth) = getDeepestWhen(whenTrace, valTree, depth);
   if (maxDepth == whenTrace.size()) {
     ExpTree* retTree = valTree ? valTree : new ExpTree(nullptr);
-    return std::make_pair(retTree, getWhenEnode(retTree, depth));
+    ENode *whenNode;
+    size_t maxDepth;
+    std::tie(whenNode, maxDepth) = getDeepestWhen(whenTrace, retTree, depth);
+    Assert(maxDepth == whenTrace.size(), "when not match %ld %ld", maxDepth, whenTrace.size());
+    return std::make_pair(retTree, whenNode);
   }
 
   ENode* oldRoot = maxDepth == depth ?
@@ -1597,14 +1614,6 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, size_t depth) {
   return std::make_pair(valTree, retENode);
 }
 
-ENode* getWhenEnode(ExpTree* valTree, int depth) {
-  ENode* whenNode;
-  int maxDepth;
-  std::tie(whenNode, maxDepth) = getDeepestWhen(valTree, depth);
-  Assert(maxDepth == (int)whenTrace.size(), "when not match %d %ld", maxDepth, whenTrace.size());
-  return whenNode;
-}
-
 void Context::whenConnect(Node* node, ENode* lvalue, ENode* rvalue, PNode* connect) {
   if (!node) {
     printf("connect lineno %d\n", connect->lineno);
@@ -1612,11 +1621,12 @@ void Context::whenConnect(Node* node, ENode* lvalue, ENode* rvalue, PNode* conne
   }
   ExpTree* valTree = nullptr;
   ENode* whenNode;
+  WhenBlockInfo &whenTrace = *(this->whenTrace);
   size_t connectDepth = (node->type == NODE_WRITER || node->type == NODE_INFER) ? 0 :node->whenDepth;
   if (node->isArray()) {
-    std::tie(valTree, whenNode) = growWhenTrace(nullptr, connectDepth);
+    std::tie(valTree, whenNode) = growWhenTrace(whenTrace, nullptr, connectDepth);
   } else {
-    std::tie(valTree, whenNode) = growWhenTrace(node->valTree, connectDepth);
+    std::tie(valTree, whenNode) = growWhenTrace(whenTrace, node->valTree, connectDepth);
   }
   valTree->setlval(lvalue);
   if (node->type == NODE_WRITER || node->type == NODE_INFER) {
@@ -1692,6 +1702,7 @@ void Context::visitPrintfAssertStop(PNode* node, bool inWhen) {
   }
 
   if (inWhen) {
+    WhenBlockInfo &whenTrace = *(this->whenTrace);
     for (size_t i = 0; i < whenTrace.size(); i ++) {
       ENode* andNode = new ENode(OP_AND);
       andNode->addChild(expRoot);
@@ -1766,6 +1777,7 @@ Node* Context::allocCondNode(ASTExpTree* condExp, PNode* when) {
 */
 void Context::visitWhen(PNode* when) {
   TYPE_CHECK(when, 3, 3, P_WHEN);
+  WhenBlockInfo &whenTrace = *(this->whenTrace);
   ASTExpTree* condExp = visitExpr(when->getChild(0));
   Node* condNode = allocCondNode(condExp, when);
   // allocWhenId(when); distinguish when through condNode rather than id
@@ -1894,6 +1906,7 @@ graph* AST2Graph(PNode* root) {
   Context c;
   c.g = g;
   c.path = new ModulePath;
+  c.whenTrace = new WhenBlockInfo;
 
   PNode* topModule = NULL;
 
@@ -1907,6 +1920,7 @@ graph* AST2Graph(PNode* root) {
   c.visitModule(topModule, true);
   delete moduleMap;
   delete c.path;
+  delete c.whenTrace;
 
 /* infer memory port */
 
@@ -1925,7 +1939,7 @@ graph* AST2Graph(PNode* root) {
       node->valTree = nullptr;
     }
   }
-  removeDummyDim(g);
+  c.removeDummyDim();
 
   for (Node* reg : g->regsrc) {
     /* set lvalue to regDst */
@@ -2068,7 +2082,7 @@ void setZeroTree(Node* node) {
   node->assignTree.push_back(new ExpTree(zero, node));
 }
 
-void removeDummyDim(graph* g) {
+void Context::removeDummyDim() {
   /* remove dimensions of size 1 rom the array */
   std::map<Node*, std::vector<int>> arrayMap;
   for (auto iter : allSignals) {
