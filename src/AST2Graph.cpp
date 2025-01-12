@@ -8,6 +8,16 @@
 #include <map>
 #include <utility>
 
+bool isDUT(ENode *enode) {
+  if (enode->child[0] != nullptr) {
+    Node *n = enode->child[0]->nodePtr;
+    if (n != nullptr && n->name == "ldut$tile_prci_domain$element_reset_domain$rockettile$fpuOpt$fpiu$WHEN_COND_173355") {
+      return true;
+    }
+  }
+  return false;
+}
+
 /* check the node type and children num */
 #define TYPE_CHECK(node, min, max,...) typeCheck(node, (const int[]){__VA_ARGS__}, sizeof((const int[]){__VA_ARGS__}) / sizeof(int), min, max)
 #define SEP_MODULE "$" // seperator for module
@@ -39,69 +49,27 @@ public:
   void cdLast() { path.pop(); }
 };
 
-typedef struct Context {
-  typedef std::map<std::string, std::pair<std::vector<Node*>, std::vector<AggrParentNode*>>> MemoryInfo;
-  graph *g;
-  ModulePath *path;
-  MemoryInfo *memoryMap;
-
-  void visitModule(PNode* module, bool isTop);
-  void visitExtModule(PNode* module);
-  TypeInfo* visitPort(PNode* port, PNodeType modType);
-  TypeInfo* visitType(PNode* ptype, NodeType parentType);
-  TypeInfo* visitMemType(PNode* dataType);
-  TypeInfo* visitFields(PNode* fields, NodeType parentType);
-  TypeInfo* visitField(PNode* field, NodeType parentType);
-  void visitStmts(PNode* stmts);
-  void visitStmt(PNode* stmt);
-  void visitWireDef(PNode* wire);
-  void visitRegDef(PNode* reg, PNodeType t);
-  void visitInst(PNode* inst);
-  void visitWhenStmts(PNode* stmts);
-  void visitWhenStmt(PNode* stmt);
-  void visitWhen(PNode* when);
-  void visitMemory(PNode* mem);
-  void visitNode(PNode* node);
-  void visitConnect(PNode* connect);
-  void visitPartialConnect(PNode* connect);
-  void visitWhenConnect(PNode* connect);
-  void visitPrintfAssertStop(PNode* node, bool inWhen);
-  AggrParentNode* allocNodeFromAggr(AggrParentNode* parent);
-  Node* allocCondNode(ASTExpTree* condExp, PNode* when);
-  ASTExpTree* visitIntNoInit(PNode* expr);
-  ASTExpTree* visitInvalid(PNode* expr);
-  ASTExpTree* visitIntInit(PNode* expr);
-  ASTExpTree* allocIndex(PNode* expr);
-  ASTExpTree* visitReference(PNode* expr);
-  ASTExpTree* visit2Expr(PNode* expr);
-  ASTExpTree* visit1Expr(PNode* expr);
-  ASTExpTree* visit1Expr1Int(PNode* expr);
-  ASTExpTree* visit1Expr2Int(PNode* expr);
-  ASTExpTree* visitExpr(PNode* expr);
-  ASTExpTree* visitMux(PNode* expr);
-  Node* visitMemPort(PNode* port, int depth, int width, bool sign, std::string suffix, Node* node);
-  Node* visitChirrtlPort(PNode* port, int width, int depth, bool sign, std::string suffix, Node* node, ENode* addr_enode, Node* clock_node);
-  void visitChirrtlMemPort(PNode* port);
-  void visitChirrtlMemory(PNode* mem);
-  Node* add_member(Node* parent, std::string name, int idx, int width, int sign);
-  Node* visitReader(PNode* reader, int width, int depth, bool sign, std::string suffix, Node* node);
-  Node* visitWriter(PNode* writer, int width, int depth, bool sign, std::string suffix, Node* node);
-  Node* visitReadWriter(PNode* readWriter, int width, int depth, bool sign, std::string suffix, Node* node);
-  void whenConnect(Node* node, ENode* lvalue, ENode* rvalue, PNode* connect);
-} Context;
+typedef std::pair<bool, Node*> WhenBlock;
+typedef std::vector<WhenBlock> WhenBlockInfo;
 
 int p_stoi(const char* str);
+TypeInfo* visitType(graph* g, ModulePath *path, PNode* ptype, NodeType parentType);
+ASTExpTree* visitExpr(graph* g, ModulePath *path, PNode* expr);
+void visitStmts(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* stmts);
+void visitWhen(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* whenNode);
 void removeDummyDim(graph* g);
-ENode* getWhenEnode(ExpTree* valTree, int depth);
+ENode* getWhenEnode(WhenBlockInfo *when, ExpTree* valTree, int depth);
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
 /* map between module name and module pnode*/
 static std::map<std::string, PNode*> *moduleMap;
 static std::map<std::string, Node*> allSignals;
 static std::map<std::string, AggrParentNode*> allDummy; // CHECK: any other dummy nodes ?
-static std::vector<std::pair<bool, Node*>> whenTrace;
+static std::set<std::string> moduleInstances;
 
 static std::set<Node*> stmtsNodes;
+
+static std::map<std::string, std::pair<std::vector<Node*>, std::vector<AggrParentNode*>>> memoryMap;
 
 static inline void typeCheck(PNode* node, const int expect[], int size, int minChildNum, int maxChildNum) {
   const int* expectEnd = expect + size;
@@ -118,11 +86,11 @@ static inline Node* allocNode(NodeType type = NODE_OTHERS, std::string name = ""
   return node;
 }
 
-static inline void addSignal(std::string s, Node* n) {
+static inline void addSignal(std::string s, Node* n, int whenDepth) {
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
   Assert(allDummy.find(s) == allDummy.end(), "Signal %s is already in allDummy\n", s.c_str());
   allSignals[s] = n;
-  n->whenDepth = whenTrace.size();
+  n->whenDepth = whenDepth;
   // printf("add signal %s\n", s.c_str());
 }
 
@@ -195,11 +163,11 @@ field: ALLID ':' type { $$ = newNode(P_FIELD, synlineno(), $1, 1, $3); }
     | Flip ALLID ':' type  { $$ = newNode(P_FLIP_FIELD, synlineno(), $2, 1, $4); }
 @return: node list in this field
 */
-TypeInfo* Context::visitField(PNode* field, NodeType parentType) {
+TypeInfo* visitField(graph* g, ModulePath *path, PNode* field, NodeType parentType) {
   NodeType fieldType = parentType;
   if (field->type == P_FLIP_FIELD) fieldType = MOD_EXT_FLIP(fieldType);
   path->cd(SEP_AGGR, field->name);
-  TypeInfo* info = visitType(field->getChild(0), fieldType);
+  TypeInfo* info = visitType(g, path, field->getChild(0), fieldType);
   if (field->type == P_FLIP_FIELD) info->flip();
   path->cdLast();
   return info;
@@ -211,11 +179,11 @@ fields:                 { $$ = new PList(); }
     | fields ',' field  { $$ = $1; $$->append($3); }
     | field             { $$ = new PList($1); }
 */
-TypeInfo* Context::visitFields(PNode* fields, NodeType parentType) {
+TypeInfo* visitFields(graph* g, ModulePath *path, PNode* fields, NodeType parentType) {
   TypeInfo* info = new TypeInfo();
   for (int i = 0; i < fields->getChildNum(); i ++) {
     PNode* field = fields->getChild(i);
-    TypeInfo* fieldInfo = visitField(field, parentType);
+    TypeInfo* fieldInfo = visitField(g, path, field, parentType);
     NodeType curType = parentType;
     if (field->type == P_FLIP_FIELD) {
       curType = MOD_EXT_FLIP(parentType);
@@ -241,7 +209,7 @@ type_ground: Clock    { $$ = new PNode(P_Clock, synlineno()); }
     | FixedType width binary_point  { TODO(); }
 update width/sign/dimension/aggrtype
 */
-TypeInfo* Context::visitType(PNode* ptype, NodeType parentType) {
+TypeInfo* visitType(graph* g, ModulePath *path, PNode* ptype, NodeType parentType) {
   TYPE_CHECK(ptype, 0, INT32_MAX, P_AG_FIELDS, P_AG_ARRAY, P_Clock, P_INT_TYPE, P_ASYRESET);
   TypeInfo* info = NULL;
   switch (ptype->type) {
@@ -261,12 +229,12 @@ TypeInfo* Context::visitType(PNode* ptype, NodeType parentType) {
       info->set_reset(ASYRESET);
       break;
     case P_AG_FIELDS:
-      info = visitFields(ptype, parentType);
+      info = visitFields(g, path, ptype, parentType);
       info->newParent(path->cwd());
       break;
     case P_AG_ARRAY:
       TYPE_CHECK(ptype, 1, 1, P_AG_ARRAY);
-      info = visitType(ptype->getChild(0), parentType);
+      info = visitType(g, path, ptype->getChild(0), parentType);
       info->addDim(p_stoi(ptype->getExtra(0).c_str()));
       break;
     default:
@@ -281,11 +249,11 @@ port: Input ALLID ':' type info    { $$ = newNode(P_INPUT, synlineno(), $5, $2, 
     | Output ALLID ':' type info   { $$ = newNode(P_OUTPUT, synlineno(), $5, $2, 1, $4); }
 all nodes are stored in aggrMember
 */
-TypeInfo* Context::visitPort(PNode* port, PNodeType modType) {
+TypeInfo* visitPort(graph* g, ModulePath *path, PNode* port, PNodeType modType) {
   TYPE_CHECK(port, 1, 1, P_INPUT, P_OUTPUT);
   NodeType type = port->type == P_INPUT ? MOD_IN(modType) : MOD_OUT(modType);
   path->cd(SEP_MODULE, port->name);
-  TypeInfo* info = visitType(port->getChild(0), type);
+  TypeInfo* info = visitType(g, path, port->getChild(0), type);
 
   if (!info->isAggr()) {
     Node* node = allocNode(type, path->cwd(), port->lineno);
@@ -299,7 +267,7 @@ TypeInfo* Context::visitPort(PNode* port, PNodeType modType) {
 /*
 expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S');}
 */
-ASTExpTree* Context::visitIntNoInit(PNode* expr) {
+ASTExpTree* visitIntNoInit(graph* g, PNode* expr) {
   TYPE_CHECK(expr, 0, 0, P_EXPR_INT_NOINIT);
   ASTExpTree* ret = new ASTExpTree(false);
   ret->getExpRoot()->strVal = "0";
@@ -310,7 +278,7 @@ ASTExpTree* Context::visitIntNoInit(PNode* expr) {
 /*
   reference Is Invalid info
 */
-ASTExpTree* Context::visitInvalid(PNode* expr) {
+ASTExpTree* visitInvalid(graph* g, PNode* expr) {
   TYPE_CHECK(expr, 0, 0, P_INVALID);
   ASTExpTree* ret = new ASTExpTree(false);
   ret->setOp(OP_INVALID);
@@ -319,7 +287,7 @@ ASTExpTree* Context::visitInvalid(PNode* expr) {
 /*
 | IntType width '(' INT ')' { $$ = newNode(P_EXPR_INT_INIT, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); $$->appendExtraInfo($4);}
 */
-ASTExpTree* Context::visitIntInit(PNode* expr) {
+ASTExpTree* visitIntInit(graph* g, PNode* expr) {
   TYPE_CHECK(expr, 0, 0, P_EXPR_INT_INIT);
   ASTExpTree* ret = new ASTExpTree(false);
   ret->getExpRoot()->strVal = expr->getExtra(0);
@@ -338,8 +306,8 @@ ENode* allocIntIndex(std::string intStr) {
       \
       exprTree
 */
-ASTExpTree* Context::allocIndex(PNode* expr) {
-  ASTExpTree* exprTree = visitExpr(expr);
+ASTExpTree* allocIndex(graph* g, ModulePath *path, PNode* expr) {
+  ASTExpTree* exprTree = visitExpr(g, path, expr);
   if (exprTree->getExpRoot()->opType == OP_INT) {
     ENode* index = new ENode(OP_INDEX_INT);
     index->addVal(p_stoi(exprTree->getExpRoot()->strVal.c_str()));
@@ -357,13 +325,13 @@ ASTExpTree* Context::allocIndex(PNode* expr) {
     | reference '[' INT ']' { $$ = $1; $1->appendChild(newNode(P_REF_IDX_INT, synlineno(), $3, 0)); }
     | reference '[' expr ']' { $$ = $1; $1->appendChild(newNode(P_REF_IDX_EXPR, synlineno(), NULL, 1, $3)); }
 */
-ASTExpTree* Context::visitReference(PNode* expr) {
+ASTExpTree* visitReference(graph* g, ModulePath *path, PNode* expr) {
   TYPE_CHECK(expr, 0, INT32_MAX, P_REF);
   std::string name = path->subDir(SEP_MODULE, expr->name);
 
   for (int i = 0; i < expr->getChildNum(); i ++) {
     if (expr->getChild(i)->type == P_REF_DOT) {
-      name += (allDummy.find(name) == allDummy.end() ? SEP_MODULE : SEP_AGGR) + expr->getChild(i)->name;
+      name += (moduleInstances.find(name) != moduleInstances.end() ? SEP_MODULE : SEP_AGGR) + expr->getChild(i)->name;
     }
   }
   ASTExpTree* ret = nullptr;
@@ -386,7 +354,7 @@ ASTExpTree* Context::visitReference(PNode* expr) {
   for (int i = 0; i < expr->getChildNum(); i ++) {
     PNode* child = expr->getChild(i);
     switch(child->type) {
-      case P_REF_IDX_EXPR: ret->addChildSameTree(allocIndex(child->getChild(0))); break;
+      case P_REF_IDX_EXPR: ret->addChildSameTree(allocIndex(g, path, child->getChild(0))); break;
       case P_REF_IDX_INT: ret->addChild(allocIntIndex(child->name.c_str())); break;
       case P_REF_DOT: break;
       default: Panic();
@@ -397,12 +365,12 @@ ASTExpTree* Context::visitReference(PNode* expr) {
 /*
 | Mux '(' expr ',' expr ',' expr ')' { $$ = newNode(P_EXPR_MUX, synlineno(), NULL, 3, $3, $5, $7); }
 */
-ASTExpTree* Context::visitMux(PNode* expr) {
+ASTExpTree* visitMux(graph* g, ModulePath *path, PNode* expr) {
   TYPE_CHECK(expr, 3, 3, P_EXPR_MUX);
 
-  ASTExpTree* cond  = visitExpr(expr->getChild(0));
-  ASTExpTree* left  = visitExpr(expr->getChild(1));
-  ASTExpTree* right = visitExpr(expr->getChild(2));
+  ASTExpTree* cond  = visitExpr(g, path, expr->getChild(0));
+  ASTExpTree* left  = visitExpr(g, path, expr->getChild(1));
+  ASTExpTree* right = visitExpr(g, path, expr->getChild(2));
 
   ASTExpTree* ret = left->dupEmpty();
   ret->setOp(OP_MUX);
@@ -418,11 +386,11 @@ ASTExpTree* Context::visitMux(PNode* expr) {
 /*
 primop_2expr: E2OP expr ',' expr ')' { $$ = newNode(P_2EXPR, synlineno(), $1, 2, $2, $4); }
 */
-ASTExpTree* Context::visit2Expr(PNode* expr) {
+ASTExpTree* visit2Expr(graph* g, ModulePath *path, PNode* expr) {
   TYPE_CHECK(expr, 2, 2, P_2EXPR);
 
-  ASTExpTree* left  = visitExpr(expr->getChild(0));
-  ASTExpTree* right = visitExpr(expr->getChild(1));
+  ASTExpTree* left  = visitExpr(g, path, expr->getChild(0));
+  ASTExpTree* right = visitExpr(g, path, expr->getChild(1));
 
   ASTExpTree* ret = new ASTExpTree(false);
   ret->setOp(str2op_expr2(expr->name));
@@ -436,25 +404,26 @@ ASTExpTree* Context::visit2Expr(PNode* expr) {
 /*
 primop_1expr: E1OP expr ')' { $$ = newNode(P_1EXPR, synlineno(), $1, 1, $2); }
 */
-ASTExpTree* Context::visit1Expr(PNode* expr) {
+ASTExpTree* visit1Expr(graph* g, ModulePath *path, PNode* expr) {
   TYPE_CHECK(expr, 1, 1, P_1EXPR);
 
-  ASTExpTree* child = visitExpr(expr->getChild(0));
+  ASTExpTree* child = visitExpr(g, path, expr->getChild(0));
 
   ASTExpTree* ret = new ASTExpTree(false);
   ret->setOp(str2op_expr1(expr->name));
   ret->addChildTree(1, child);
 
   delete child;
+
   return ret;
 }
 /*
 primop_1expr1int: E1I1OP expr ',' INT ')' { $$ = newNode(P_1EXPR1INT, synlineno(), $1, 1, $2); $$->appendExtraInfo($4); }
 */
-ASTExpTree* Context::visit1Expr1Int(PNode* expr) {
+ASTExpTree* visit1Expr1Int(graph* g, ModulePath *path, PNode* expr) {
   TYPE_CHECK(expr, 1, 1, P_1EXPR1INT);
 
-  ASTExpTree* child = visitExpr(expr->getChild(0));
+  ASTExpTree* child = visitExpr(g, path, expr->getChild(0));
 
   ASTExpTree* ret = new ASTExpTree(false);
   ret->setOp(str2op_expr1int1(expr->name));
@@ -462,15 +431,16 @@ ASTExpTree* Context::visit1Expr1Int(PNode* expr) {
   ret->addVal(p_stoi(expr->getExtra(0).c_str()));
 
   delete child;
+
   return ret;
 }
 /*
 primop_1expr2int: E1I2OP expr ',' INT ',' INT ')' { $$ = newNode(P_1EXPR2INT, synlineno(), $1, 1, $2); $$->appendExtraInfo($4); $$->appendExtraInfo($6); }
 */
-ASTExpTree* Context::visit1Expr2Int(PNode* expr) {
+ASTExpTree* visit1Expr2Int(graph* g, ModulePath *path, PNode* expr) {
   TYPE_CHECK(expr, 1, 1, P_1EXPR2INT);
 
-  ASTExpTree* child = visitExpr(expr->getChild(0));
+  ASTExpTree* child = visitExpr(g, path, expr->getChild(0));
 
   ASTExpTree* ret = new ASTExpTree(false);
   ret->setOp(OP_BITS);
@@ -495,18 +465,18 @@ expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, synlineno(), $
     | primop_1expr2int  { $$ = $1; }
     ;
 */
-ASTExpTree* Context::visitExpr(PNode* expr) {
+ASTExpTree* visitExpr(graph* g, ModulePath *path, PNode* expr) {
   ASTExpTree* ret;
   switch (expr->type) {
-    case P_EXPR_INT_NOINIT: ret = visitIntNoInit(expr); break;
-    case P_EXPR_INT_INIT: ret = visitIntInit(expr); break;
-    case P_REF: ret = visitReference(expr); break;
-    case P_EXPR_MUX: ret = visitMux(expr); break;
-    case P_2EXPR: ret = visit2Expr(expr); break;
-    case P_1EXPR: ret = visit1Expr(expr); break;
-    case P_1EXPR1INT: ret = visit1Expr1Int(expr); break;
-    case P_1EXPR2INT: ret = visit1Expr2Int(expr); break;
-    case P_INVALID: ret = visitInvalid(expr); break;
+    case P_EXPR_INT_NOINIT: ret = visitIntNoInit(g, expr); break;
+    case P_EXPR_INT_INIT: ret = visitIntInit(g, expr); break;
+    case P_REF: ret = visitReference(g, path, expr); break;
+    case P_EXPR_MUX: ret = visitMux(g, path, expr); break;
+    case P_2EXPR: ret = visit2Expr(g, path, expr); break;
+    case P_1EXPR: ret = visit1Expr(g, path, expr); break;
+    case P_1EXPR1INT: ret = visit1Expr1Int(g, path, expr); break;
+    case P_1EXPR2INT: ret = visit1Expr2Int(g, path, expr); break;
+    case P_INVALID: ret = visitInvalid(g, expr); break;
     default: printf("Invalid type %d\n", expr->type); Panic();
   }
   return ret;
@@ -514,21 +484,23 @@ ASTExpTree* Context::visitExpr(PNode* expr) {
 /*
 module: Module ALLID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, synlineno(), $4, $2, 2, $6, $7); }
 */
-void Context::visitModule(PNode* module, bool isTop) {
+void visitModule(graph* g, ModulePath *path, PNode* module, bool isTop) {
   TYPE_CHECK(module, 2, 2, P_MOD);
-  MemoryInfo *memoryMapSave = memoryMap;
-  memoryMap = new MemoryInfo;
   // printf("visit module %s\n", module->name.c_str());
 
+  WhenBlockInfo *when = new WhenBlockInfo;
   PNode* ports = module->getChild(0);
   TYPE_CHECK(ports, 0, INT32_MAX, P_PORTS);
   // visit all ports
   for (int i = 0; i < ports->getChildNum(); i ++) {
-    TypeInfo* portInfo = visitPort(ports->getChild(i), isTop ? P_CIRCUIT : P_MOD);
+    TypeInfo* portInfo = visitPort(g, path, ports->getChild(i), isTop ? P_CIRCUIT : P_MOD);
 
     for (auto entry : portInfo->aggrMember) {
       Node* node = entry.first;
-      addSignal(node->name, node);
+      addSignal(node->name, node, when->size());
+      if (node->name == "ldut$tile_prci_domain$element_reset_domain$rockettile$fpuOpt$fpiu$conv$io$$in") {
+        Log("%s->whenDepth = %d", node->name.c_str(), node->whenDepth);
+      }
       if (isTop) {
         if (node->type == NODE_INP) g->input.push_back(node);
         else if (node->type == NODE_OUT) g->output.push_back(node);
@@ -539,30 +511,28 @@ void Context::visitModule(PNode* module, bool isTop) {
     }
   }
 
-  visitStmts(module->getChild(1));
+  visitStmts(g, path, when, module->getChild(1));
+  delete when;
   // printf("leave module %s\n", module->name.c_str());
-
-  delete memoryMap;
-  memoryMap = memoryMapSave;
 }
 /*
 extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$ = newNode(P_EXTMOD, synlineno(), $4, $2, 1, $6); $$->appendChildList($8);}
 */
-void Context::visitExtModule(PNode* module) {
+void visitExtModule(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* module) {
   TYPE_CHECK(module, 1, 1, P_EXTMOD);
 
   Node* extNode = allocNode(NODE_EXT, module->name, module->lineno);
   extNode->extraInfo = module->getExtra(0);
-  addSignal(extNode->name, extNode);
+  addSignal(extNode->name, extNode, when->size());
   PNode* ports = module->getChild(0);
   for (int i = 0; i < ports->getChildNum(); i ++) {
-    TypeInfo* portInfo = visitPort(ports->getChild(i), P_EXTMOD);
+    TypeInfo* portInfo = visitPort(g, path, ports->getChild(i), P_EXTMOD);
     for (auto entry : portInfo->aggrMember) {
       if (entry.first->isClock) {
         if (!extNode->clock) extNode->clock = entry.first;
         else entry.first->type = NODE_OTHERS;
       } else extNode->add_member(entry.first);
-      addSignal(entry.first->name, entry.first);
+      addSignal(entry.first->name, entry.first, when->size());
     }
     for (AggrParentNode* dummy : portInfo->aggrParent) {
       addDummy(dummy->name, dummy);
@@ -589,21 +559,21 @@ void Context::visitExtModule(PNode* module) {
 /*
 statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5, $2, 1, $4); }
 */
-void Context::visitWireDef(PNode* wire) {
+void visitWireDef(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* wire) {
   TYPE_CHECK(wire, 1, 1, P_WIRE_DEF);
 
   path->cd(SEP_MODULE, wire->name);
 
-  TypeInfo* info = visitType(wire->getChild(0), NODE_OTHERS);
+  TypeInfo* info = visitType(g, path, wire->getChild(0), NODE_OTHERS);
 
   for (auto entry : info->aggrMember) {
-    addSignal(entry.first->name, entry.first);
+    addSignal(entry.first->name, entry.first, when->size());
   }
   for (AggrParentNode* dummy : info->aggrParent) addDummy(dummy->name, dummy);
   if (!info->isAggr()) {
     Node* node = allocNode(NODE_OTHERS, path->cwd(), wire->lineno);
     node->updateInfo(info);
-    addSignal(node->name, node);
+    addSignal(node->name, node, when->size());
   }
 
   path->cdLast();
@@ -613,13 +583,14 @@ void Context::visitWireDef(PNode* wire) {
 statement: Reg ALLID ':' type ',' expr(1) RegWith INDENT RegReset '(' expr ',' expr ')' info DEDENT { $$ = newNode(P_REG_DEF, $4->lineno, $15, $2, 4, $4, $6, $11, $13); }
 expr(1) must be clock
 */
-void Context::visitRegDef(PNode* reg, PNodeType t) {
-  ASTExpTree* clkExp = visitExpr(reg->getChild(1));
+void visitRegDef(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* reg, PNodeType t) {
+
+  ASTExpTree* clkExp = visitExpr(g, path, reg->getChild(1));
   Assert(!clkExp->isAggr() && clkExp->getExpRoot()->getNode(), "unsupported clock in lineno %d", reg->lineno);
   Node* clockNode = clkExp->getExpRoot()->getNode();
 
   path->cd(SEP_MODULE, reg->name);
-  TypeInfo* info = visitType(reg->getChild(0), NODE_REG_SRC);
+  TypeInfo* info = visitType(g, path, reg->getChild(0), NODE_REG_SRC);
   /* alloc node for basic nodes */
   if (!info->isAggr()) {
     Node* src = allocNode(NODE_REG_SRC, path->cwd(), reg->lineno);
@@ -633,8 +604,8 @@ void Context::visitRegDef(PNode* reg, PNodeType t) {
     Node* dst = src->dup();
     dst->type = NODE_REG_DST;
     dst->name += "$NEXT";
-    addSignal(src->name, src);
-    addSignal(dst->name, dst);
+    addSignal(src->name, src, when->size());
+    addSignal(dst->name, dst, when->size());
     src->bindReg(dst);
     src->clock = dst->clock = clockNode;
 
@@ -656,8 +627,8 @@ void Context::visitRegDef(PNode* reg, PNodeType t) {
   if (t == P_REG_DEF)
     return ;
   
-  ASTExpTree* resetCond = visitExpr(reg->getChild(2));
-  ASTExpTree* resetVal  = visitExpr(reg->getChild(3));
+  ASTExpTree* resetCond = visitExpr(g, path, reg->getChild(2));
+  ASTExpTree* resetVal = visitExpr(g, path, reg->getChild(3));
   Assert(!resetCond->isAggr(), "reg %s: reset cond can never be aggregate\n", reg->name.c_str());
   // all aggregate nodes share the same resetCond ExpRoot
   for (size_t i = 0; i < info->aggrMember.size(); i ++) {
@@ -673,9 +644,9 @@ void Context::visitRegDef(PNode* reg, PNodeType t) {
 /*
 mem_datatype: DataType "=>" type { $$ = newNode(P_DATATYPE, synlineno(), NULL, 1, $3); }
 */
-TypeInfo* Context::visitMemType(PNode* dataType) {
+static inline TypeInfo* visitMemType(graph* g, ModulePath *path, PNode* dataType) {
   TYPE_CHECK(dataType, 1, 1, P_DATATYPE);
-  return visitType(dataType->getChild(0), NODE_INVALID);
+  return visitType(g, path, dataType->getChild(0), NODE_INVALID);
 }
 /*
 mem_depth: Depth "=>" INT   { $$ = newNode(P_DEPTH, synlineno(), $3, 0); }
@@ -706,7 +677,7 @@ static inline void visitRUW(PNode* ruw) {
   Assert(ruw->name == "undefined", "IMPLEMENT ME");
 }
 
-Node* Context::add_member(Node* parent, std::string name, int idx, int width, int sign) {
+static inline Node* add_member(ModulePath *path, Node* parent, std::string name, int idx, int width, int sign) {
   Node* member = allocNode(NODE_MEM_MEMBER, path->subDir(SEP_AGGR, name));
   member->setType(width, sign);
   parent->set_member(idx, member);
@@ -715,7 +686,7 @@ Node* Context::add_member(Node* parent, std::string name, int idx, int width, in
 /*
 mem_reader Reader "=>" ALLID  { $$ = $1; $$->append(newNode(P_READER, synlineno(), $4, 0));}
 */
-Node* Context::visitReader(PNode* reader, int width, int depth, bool sign, std::string suffix, Node* node) {
+static inline Node* visitReader(ModulePath *path, PNode* reader, int width, int depth, bool sign, std::string suffix, Node* node) {
   TYPE_CHECK(reader, 0, 0, P_READER);
 
   path->cd(SEP_MODULE, reader->name);
@@ -726,11 +697,11 @@ Node* Context::visitReader(PNode* reader, int width, int depth, bool sign, std::
     ret->add_member(nullptr);
   }
 
-  add_member(ret, "addr" + suffix, READER_ADDR, upperLog2(depth), false);
-  add_member(ret, "en" + suffix, READER_EN, 1, false);
-  Node* clk = add_member(ret, "clk" + suffix, READER_CLK, 1, false);
+  add_member(path, ret, "addr" + suffix, READER_ADDR, upperLog2(depth), false);
+  add_member(path, ret, "en" + suffix, READER_EN, 1, false);
+  Node* clk = add_member(path, ret, "clk" + suffix, READER_CLK, 1, false);
   clk->isClock = true;
-  Node* data = add_member(ret, "data" + suffix, READER_DATA, width, sign);
+  Node* data = add_member(path, ret, "data" + suffix, READER_DATA, width, sign);
   if (node) {
     data->dimension.insert(data->dimension.end(), node->dimension.begin(), node->dimension.end());
   }
@@ -742,7 +713,7 @@ Node* Context::visitReader(PNode* reader, int width, int depth, bool sign, std::
 /*
 mem_writer Writer "=>" ALLID    { $$ = $1; $$->append(newNode(P_WRITER, synlineno(), $4, 0));}
 */
-Node* Context::visitWriter(PNode* writer, int width, int depth, bool sign, std::string suffix, Node* node) {
+static inline Node* visitWriter(ModulePath *path, PNode* writer, int width, int depth, bool sign, std::string suffix, Node* node) {
   TYPE_CHECK(writer, 0, 0, P_WRITER);
 
   path->cd(SEP_MODULE, writer->name);
@@ -753,12 +724,12 @@ Node* Context::visitWriter(PNode* writer, int width, int depth, bool sign, std::
     ret->add_member(nullptr);
   }
 
-  add_member(ret, "addr" + suffix, WRITER_ADDR, upperLog2(depth), false);
-  add_member(ret, "en" + suffix, WRITER_EN, 1, false);
-  Node* clk = add_member(ret, "clk" + suffix, WRITER_CLK, 1, false);
+  add_member(path, ret, "addr" + suffix, WRITER_ADDR, upperLog2(depth), false);
+  add_member(path, ret, "en" + suffix, WRITER_EN, 1, false);
+  Node* clk = add_member(path, ret, "clk" + suffix, WRITER_CLK, 1, false);
   clk->isClock = true;
-  Node* data = add_member(ret, "data" + suffix, WRITER_DATA, width, sign);
-  Node* mask = add_member(ret, "mask" + suffix, WRITER_MASK, 1, false);
+  Node* data = add_member(path, ret, "data" + suffix, WRITER_DATA, width, sign);
+  Node* mask = add_member(path, ret, "mask" + suffix, WRITER_MASK, 1, false);
   if (node) {
     data->dimension.insert(data->dimension.end(), node->dimension.begin(), node->dimension.end());
     mask->dimension.insert(mask->dimension.end(), node->dimension.begin(), node->dimension.end());
@@ -771,7 +742,7 @@ Node* Context::visitWriter(PNode* writer, int width, int depth, bool sign, std::
 /*
 mem_readwriter Readwriter "=>" ALLID  { $$ = $1; $$->append(newNode(P_READWRITER, synlineno(), $4, 0));}
 */
-Node* Context::visitReadWriter(PNode* readWriter, int width, int depth, bool sign, std::string suffix, Node* node) {
+static inline Node* visitReadWriter(ModulePath *path, PNode* readWriter, int width, int depth, bool sign, std::string suffix, Node* node) {
   TYPE_CHECK(readWriter, 0, 0, P_READWRITER);
 
   path->cd(SEP_MODULE, readWriter->name);
@@ -782,14 +753,14 @@ Node* Context::visitReadWriter(PNode* readWriter, int width, int depth, bool sig
     ret->add_member(nullptr);
   }
 
-  add_member(ret, "addr" + suffix, READWRITER_ADDR, upperLog2(depth), false);
-  add_member(ret, "en" + suffix, READWRITER_EN, 1, false);
-  Node* clk = add_member(ret, "clk" + suffix, READWRITER_CLK, 1, false);
+  add_member(path, ret, "addr" + suffix, READWRITER_ADDR, upperLog2(depth), false);
+  add_member(path, ret, "en" + suffix, READWRITER_EN, 1, false);
+  Node* clk = add_member(path, ret, "clk" + suffix, READWRITER_CLK, 1, false);
   clk->isClock = true;
-  Node* rdata = add_member(ret, "rdata" + suffix, READWRITER_RDATA, width, sign);
-  Node* wdata = add_member(ret, "wdata" + suffix, READWRITER_WDATA, width, sign);
-  Node* wmask = add_member(ret, "wmask" + suffix, READWRITER_WMASK, 1, false);
-  add_member(ret, "wmode" + suffix, READWRITER_WMODE, 1, false);
+  Node* rdata = add_member(path, ret, "rdata" + suffix, READWRITER_RDATA, width, sign);
+  Node* wdata = add_member(path, ret, "wdata" + suffix, READWRITER_WDATA, width, sign);
+  Node* wmask = add_member(path, ret, "wmask" + suffix, READWRITER_WMASK, 1, false);
+  add_member(path, ret, "wmode" + suffix, READWRITER_WMODE, 1, false);
   if (node) {
     rdata->dimension.insert(rdata->dimension.end(), node->dimension.begin(), node->dimension.end());
     wdata->dimension.insert(wdata->dimension.end(), node->dimension.begin(), node->dimension.end());
@@ -801,12 +772,12 @@ Node* Context::visitReadWriter(PNode* readWriter, int width, int depth, bool sig
   return ret;
 }
 
-Node* Context::visitMemPort(PNode* port, int depth, int width, bool sign, std::string suffix, Node* node) {
+Node* visitMemPort(ModulePath *path, PNode* port, int depth, int width, bool sign, std::string suffix, Node* node) {
   Node* portNode = nullptr;
   switch(port->type) {
-    case P_READER: portNode = visitReader(port, width, depth, sign, suffix, node); break;
-    case P_WRITER: portNode = visitWriter(port, width, depth, sign, suffix, node); break;
-    case P_READWRITER: portNode = visitReadWriter(port, width, depth, sign, suffix, node); break;
+    case P_READER: portNode = visitReader(path, port, width, depth, sign, suffix, node); break;
+    case P_WRITER: portNode = visitWriter(path, port, width, depth, sign, suffix, node); break;
+    case P_READWRITER: portNode = visitReadWriter(path, port, width, depth, sign, suffix, node); break;
     default: Panic();
   }
   return portNode;
@@ -827,35 +798,35 @@ void memoryAlias(Node* origin, Node* alias) {
   }
 }
 
-void addOriginMember(Node* originPort, PNode* port) {
+void addOriginMember(WhenBlockInfo *when, Node* originPort, PNode* port) {
   for (Node* member : originPort->member) member->type = NODE_OTHERS;
   Node* originMember;
   switch(port->type) {
     case P_READER:
       originMember = originPort->get_member(READER_ADDR);
-      addSignal(originMember->name, originMember);
+      addSignal(originMember->name, originMember, when->size());
       originMember = originPort->get_member(READER_EN);
-      addSignal(originMember->name, originMember);
+      addSignal(originMember->name, originMember, when->size());
       originMember = originPort->get_member(READER_CLK);
-      addSignal(originMember->name, originMember);
+      addSignal(originMember->name, originMember, when->size());
       break;
     case P_WRITER:
       originMember = originPort->get_member(WRITER_ADDR);
-      addSignal(originMember->name, originMember);
+      addSignal(originMember->name, originMember, when->size());
       originMember = originPort->get_member(WRITER_EN);
-      addSignal(originMember->name, originMember);
+      addSignal(originMember->name, originMember, when->size());
       originMember = originPort->get_member(WRITER_CLK);
-      addSignal(originMember->name, originMember);
+      addSignal(originMember->name, originMember, when->size());
       break;
     case P_READWRITER:
       originMember = originPort->get_member(READWRITER_ADDR);
-      addSignal(originMember->name, originMember);
+      addSignal(originMember->name, originMember, when->size());
       originMember = originPort->get_member(READWRITER_EN);
-      addSignal(originMember->name, originMember);
+      addSignal(originMember->name, originMember, when->size());
       originMember = originPort->get_member(READWRITER_CLK);
-      addSignal(originMember->name, originMember);
+      addSignal(originMember->name, originMember, when->size());
       originMember = originPort->get_member(READWRITER_WMODE);
-      addSignal(originMember->name, originMember);
+      addSignal(originMember->name, originMember, when->size());
       break;
     default:
       Panic();
@@ -866,14 +837,16 @@ memory: Mem ALLID ':' info INDENT mem_compulsory mem_optional mem_ruw DEDENT { $
 mem_compulsory: mem_datatype mem_depth mem_rlatency mem_wlatency { $$ = new PList(); $$->append(4, $1, $2, $3, $4); }
 mem_optional: mem_reader mem_writer mem_readwriter { $$ = $1; $$->concat($2); $$->concat($3); }
 */
-void Context::visitMemory(PNode* mem) {
+void visitMemory(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* mem) {
   TYPE_CHECK(mem, 5, INT32_MAX, P_MEMORY);
   path->cd(SEP_MODULE, mem->name);
-  TypeInfo* info = visitMemType(mem->getChild(0));
+  TypeInfo* info = visitMemType(g, path, mem->getChild(0));
   int depth = visitMemDepth(mem->getChild(1));
   int rlatency = visitReadLatency(mem->getChild(2));
   int wlatency = visitWriteLatency(mem->getChild(3));
   visitRUW(mem->getChild(4));
+
+  moduleInstances.insert(path->cwd());
 
   if (info->isAggr()) {
     std::vector<Node*> allSubMem;
@@ -887,17 +860,17 @@ void Context::visitMemory(PNode* mem) {
     for (int i = 5; i < mem->getChildNum(); i ++) {
       // AggrParentNode* parent = new AggrParentNode(path->subDir(SEP_AGGR, mem->getChild(i)->name));
       /* data & mask is unused */
-      Node* originPort = visitMemPort(mem->getChild(i), depth, 0, 0, "", NULL);
-      addOriginMember(originPort, mem->getChild(i));
+      Node* originPort = visitMemPort(path, mem->getChild(i), depth, 0, 0, "", NULL);
+      addOriginMember(when, originPort, mem->getChild(i));
       std::map<Node*, Node*>allSubPort;
       /* create all ports */
       for (auto node : allSubMem) {
         std::string suffix = replacePrefix(path->cwd(), "", node->name).c_str();
-        Node* portNode = visitMemPort(mem->getChild(i), depth, node->width, node->sign, suffix, node);
+        Node* portNode = visitMemPort(path, mem->getChild(i), depth, node->width, node->sign, suffix, node);
         node->add_member(portNode);
         allSubPort[node] = portNode;
         for (Node* member : portNode->member) {
-          addSignal(member->name, member);
+          addSignal(member->name, member, when->size());
         }
         /* create alias */
         memoryAlias(originPort, portNode);
@@ -949,16 +922,17 @@ void Context::visitMemory(PNode* mem) {
 
     for (int i = 5; i < mem->getChildNum(); i ++) {
       PNode* port = mem->getChild(i);
-      Node* portNode = visitMemPort(port, depth, info->width, info->sign, "", memNode);
+      Node* portNode = visitMemPort(path, port, depth, info->width, info->sign, "", memNode);
       memNode->add_member(portNode);
       for (Node* member : portNode->member) {
-        addSignal(member->name, member);
+        addSignal(member->name, member, when->size());
       }
     }
 
 
   }
   path->cdLast();
+
 }
 
 #if 0
@@ -1157,7 +1131,7 @@ struct ChirrtlVistor {
 };
 #endif
 
-Node* Context::visitChirrtlPort(PNode* port, int width, int depth, bool sign, std::string suffix, Node* node, ENode* addr_enode, Node* clock_node) {
+static Node* visitChirrtlPort(graph* g, ModulePath *path, PNode* port, int width, int depth, bool sign, std::string suffix, Node* node, ENode* addr_enode, Node* clock_node) {
   assert(port->type == P_READ || port->type == P_WRITE || port->type == P_INFER);
   // Add prefix port name
   path->cd(SEP_MODULE, port->name);
@@ -1186,11 +1160,10 @@ Node* Context::visitChirrtlPort(PNode* port, int width, int depth, bool sign, st
   return ret;
 }
 
-void Context::visitChirrtlMemPort(PNode* port) {
+static void visitChirrtlMemPort(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* port) {
   // If we are in the top module, 
   //    the memory name does not need to have the prefix added.
-  MemoryInfo &memoryMap = *(this->memoryMap);
-  ASTExpTree* addr = visitExpr(port->getChild(0));
+  ASTExpTree* addr = visitExpr(g, path, port->getChild(0));
   ENode* addr_enode = addr->getExpRoot();
   Node* clock_node = getSignal(path->subDir(SEP_MODULE, port->getExtra(1)));
   std::string memName = path->subDir(SEP_MODULE, port->getExtra(0));
@@ -1201,8 +1174,8 @@ void Context::visitChirrtlMemPort(PNode* port) {
     Node* addr_dst = addr_src->dup();
     addr_dst->type = NODE_REG_DST;
     addr_dst->name += format("%s%s", SEP_AGGR, "NEXT");
-    addSignal(addr_src->name, addr_src);
-    addSignal(addr_dst->name, addr_dst);
+    addSignal(addr_src->name, addr_src, when->size());
+    addSignal(addr_dst->name, addr_dst, when->size());
     addr_src->bindReg(addr_dst);
     addr_src->clock = addr_dst->clock = clock_node;
     addr_src->valTree = new ExpTree(addr_enode, addr_src);
@@ -1221,9 +1194,9 @@ void Context::visitChirrtlMemPort(PNode* port) {
     bool sign = mem->sign;
     int width = mem->width;
     std::string suffix = replacePrefix(memName, "", mem->name).c_str();
-    Node* portNode = visitChirrtlPort(port, width, depth, sign, suffix, mem, addr_enode, clock_node);
+    Node* portNode = visitChirrtlPort(g, path, port, width, depth, sign, suffix, mem, addr_enode, clock_node);
     mem->add_member(portNode);
-    addSignal(portNode->name, portNode);
+    addSignal(portNode->name, portNode, when->size());
     memoryMembers.push_back(portNode);
   }
 
@@ -1240,8 +1213,7 @@ void Context::visitChirrtlMemPort(PNode* port) {
 }
 
 // TODO: Comb memory support
-void Context::visitChirrtlMemory(PNode* mem) {
-  MemoryInfo &memoryMap = *(this->memoryMap);
+static void visitChirrtlMemory(graph* g, ModulePath *path, PNode* mem) {
   assert(mem->type == P_SEQ_MEMORY || mem->type == P_COMB_MEMORY);
   path->cd(SEP_MODULE, mem->name);
   bool isSeq = mem->type == P_SEQ_MEMORY;
@@ -1251,13 +1223,15 @@ void Context::visitChirrtlMemory(PNode* mem) {
   //    =>
   //        type : UInt<32>[1]
   //        depth: 2
-  TypeInfo* type = visitMemType(mem->getChild(0));
+  TypeInfo* type = visitMemType(g, path, mem->getChild(0));
   int depth = type->dimension.front();
   type->dimension.erase(type->dimension.begin());
   // Convert to firrtl memory
   int rlatency = isSeq;
   int wlatency = 1;
   if (isSeq && mem->getChildNum() >= 2) visitRUW(mem->getChild(1));
+
+  moduleInstances.insert(path->cwd());
 
   if (type->isAggr()) {
     memoryMap[path->cwd()] = std::pair(std::vector<Node*>(), std::vector<AggrParentNode*>());
@@ -1284,16 +1258,17 @@ void Context::visitChirrtlMemory(PNode* mem) {
 /*
 | Inst ALLID Of ALLID info    { $$ = newNode(P_INST, synlineno(), $5, $2, 0); $$->appendExtraInfo($4); }
 */
-void Context::visitInst(PNode* inst) {
+void visitInst(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* inst) {
   TYPE_CHECK(inst, 0, 0, P_INST);
   auto iterator = moduleMap->find(inst->getExtra(0));
   Assert(inst->getExtraNum() >= 1 && iterator != moduleMap->end(),
                "Module %s is not defined!\n", inst->getExtra(0).c_str());
   PNode* module = iterator->second;
   path->cd(SEP_MODULE, inst->name);
+  moduleInstances.insert(path->cwd());
   switch(module->type) {
-    case P_MOD: visitModule(module, false); break;
-    case P_EXTMOD: visitExtModule(module); break;
+    case P_MOD: visitModule(g, path, module, false); break;
+    case P_EXTMOD: visitExtModule(g, path, when, module); break;
     case P_INTMOD: TODO();
     default:
       Panic();
@@ -1301,7 +1276,7 @@ void Context::visitInst(PNode* inst) {
   path->cdLast();
 }
 
-AggrParentNode* Context::allocNodeFromAggr(AggrParentNode* parent) {
+AggrParentNode* allocNodeFromAggr(graph* g, ModulePath *path, WhenBlockInfo *when, AggrParentNode* parent) {
   AggrParentNode* ret = new AggrParentNode(path->cwd());
   std::string oldPrefix = parent->name;
   /* alloc all real nodes */
@@ -1311,7 +1286,7 @@ AggrParentNode* Context::allocNodeFromAggr(AggrParentNode* parent) {
     /* the type of parent can be registers, thus the node->type cannot set to member->type */
     Node* node = member->dup(NODE_OTHERS, name); // SEP_AGGR is already in name
   
-    addSignal(node->name, node);
+    addSignal(node->name, node, when->size());
     ret->addMember(node, entry.second);
   }
   /* alloc all dummy nodes, and connect them to real nodes stored in allSignals */
@@ -1355,12 +1330,12 @@ std::vector<int> ENode::getDim() {
 /*
 | Node ALLID '=' expr info { $$ = newNode(P_NODE, synlineno(), $5, $2, 1, $4); }
 */
-void Context::visitNode(PNode* node) {
+void visitNode(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* node) {
   TYPE_CHECK(node, 1, 1, P_NODE);
-  ASTExpTree* exp = visitExpr(node->getChild(0));
+  ASTExpTree* exp = visitExpr(g, path, node->getChild(0));
   path->cd(SEP_MODULE, node->name);
   if (exp->isAggr()) {// create all nodes in aggregate
-    AggrParentNode* aggrNode = allocNodeFromAggr(exp->getParent());
+    AggrParentNode* aggrNode = allocNodeFromAggr(g, path, when, exp->getParent());
     Assert(aggrNode->size() == exp->getAggrNum(), "aggrMember num %d tree num %d", aggrNode->size(), exp->getAggrNum());
     for (int i = 0; i < aggrNode->size(); i ++) {
       aggrNode->member[i].first->valTree = new ExpTree(exp->getAggr(i), aggrNode->member[i].first);
@@ -1375,17 +1350,17 @@ void Context::visitNode(PNode* node) {
     n->dimension.insert(n->dimension.end(), dims.begin(), dims.end());
 
     n->valTree = new ExpTree(exp->getExpRoot(), n);
-    addSignal(n->name, n);
+    addSignal(n->name, n, when->size());
   }
   path->cdLast();
 }
 /*
 | reference "<=" expr info  { $$ = newNode(P_CONNECT, $1->lineno, $4, NULL, 2, $1, $3); }
 */
-void Context::visitConnect(PNode* connect) {
+void visitConnect(graph* g, ModulePath *path, PNode* connect) {
   TYPE_CHECK(connect, 2, 2, P_CONNECT);
-  ASTExpTree* ref = visitReference(connect->getChild(0));
-  ASTExpTree* exp = visitExpr(connect->getChild(1));
+  ASTExpTree* ref = visitReference(g, path, connect->getChild(0));
+  ASTExpTree* exp = visitExpr(g, path, connect->getChild(1));
 
   Assert(!(ref->isAggr() ^ exp->isAggr()) || exp->isInvalid(), "lineno %d type not match, ref aggr %d exp aggr %d", connect->getChild(0)->lineno, ref->isAggr(), exp->isAggr());
   if(ref->isAggr() && exp->isInvalid()) {
@@ -1441,10 +1416,10 @@ void Context::visitConnect(PNode* connect) {
   }
 }
 
-void Context::visitPartialConnect(PNode* connect) {
+void visitPartialConnect(graph* g, ModulePath *path, PNode* connect) {
   TYPE_CHECK(connect, 2, 2, P_PAR_CONNECT);
-  ASTExpTree* ref = visitReference(connect->getChild(0));
-  ASTExpTree* exp = visitExpr(connect->getChild(1));
+  ASTExpTree* ref = visitReference(g, path, connect->getChild(0));
+  ASTExpTree* exp = visitExpr(g, path, connect->getChild(1));
   Assert(ref->isAggr() && exp->isAggr(), "lineno %d type not match, ref aggr %d exp aggr %d", connect->getChild(0)->lineno, ref->isAggr(), exp->isAggr());
 
   std::map<std::string, std::pair<ENode*, bool>> refName;
@@ -1481,26 +1456,26 @@ void Context::visitPartialConnect(PNode* connect) {
 
 }
 
-bool matchWhen(ENode* enode, int depth) {
+bool matchWhen(WhenBlockInfo *when, ENode* enode, int depth) {
   if (enode->opType != OP_WHEN) return false;
   Assert(enode->getChildNum() == 3, "invalid child num %d", enode->getChildNum());
   Assert(enode->getChild(0) && enode->getChild(0)->nodePtr, "invalid cond");
-  if (enode->getChild(0)->nodePtr == whenTrace[depth].second) return true;
+  if (enode->getChild(0)->nodePtr == (*when)[depth].second) return true;
   return false;
 }
 
 /* find the latest matched when ENode and the number of matched */
-std::pair<ENode*, int> getDeepestWhen(ExpTree* valTree, int depth) {
+std::pair<ENode*, int> getDeepestWhen(WhenBlockInfo *when, ExpTree* valTree, int depth) {
   if (!valTree) return std::make_pair(nullptr, depth);
   ENode* checkNode = valTree->getRoot();
   ENode* whenNode = nullptr;
   int deep = depth;
 
-  for (size_t i = depth; i < whenTrace.size(); i ++) {
-    if (checkNode && matchWhen(checkNode, i)) {
+  for (size_t i = depth; i < when->size(); i ++) {
+    if (checkNode && matchWhen(when, checkNode, i)) {
       whenNode = checkNode;
       deep = i + 1;
-      checkNode = whenTrace[i].first ? checkNode->getChild(1) : checkNode->getChild(2);
+      checkNode = (*when)[i].first ? checkNode->getChild(1) : checkNode->getChild(2);
     } else {
       break;
     }
@@ -1525,18 +1500,18 @@ newRoot:  when3
       cond3 a b
 replace oldRoot by newRoot
 */
-std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, int depth) {
+std::pair<ExpTree*, ENode*> growWhenTrace(WhenBlockInfo *when, ExpTree* valTree, int depth) {
   ENode* oldParent = nullptr;
   int maxDepth = depth;
-  if (valTree) std::tie(oldParent, maxDepth) = getDeepestWhen(valTree, depth);
-  if (maxDepth == (int)whenTrace.size()) {
+  if (valTree) std::tie(oldParent, maxDepth) = getDeepestWhen(when, valTree, depth);
+  if (maxDepth == (int)when->size()) {
     ExpTree* retTree = valTree ? valTree : new ExpTree(nullptr);
-    return std::make_pair(retTree, getWhenEnode(retTree, depth));
+    return std::make_pair(retTree, getWhenEnode(when, retTree, depth));
   }
 
   ENode* oldRoot = maxDepth == depth ?
                           (valTree ? valTree->getRoot() : nullptr)
-                        : (whenTrace[maxDepth-1].first ? oldParent->getChild(1) : oldParent->getChild(2));
+                        : ((*when)[maxDepth-1].first ? oldParent->getChild(1) : oldParent->getChild(2));
   ENode* childRoot = nullptr;
   if (oldRoot) {
     /* e.g. a <= 0
@@ -1550,12 +1525,12 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, int depth) {
   }
   ENode* newRoot = nullptr; // latest whenNode
   ENode* retENode = oldParent;
-  for (int depth = whenTrace.size() - 1; depth >= maxDepth ; depth --) {
+  for (int depth = when->size() - 1; depth >= maxDepth ; depth --) {
     ENode* whenNode = new ENode(OP_WHEN); // return the deepest whenNode
-    if (depth == whenTrace.size() - 1) retENode = whenNode;
-    ENode* condNode = new ENode(whenTrace[depth].second);
+    if (depth == when->size() - 1) retENode = whenNode;
+    ENode* condNode = new ENode((*when)[depth].second);
 
-    if (whenTrace[depth].first) {
+    if ((*when)[depth].first) {
       whenNode->addChild(condNode);
       whenNode->addChild(newRoot);
       whenNode->addChild(childRoot);
@@ -1571,7 +1546,7 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, int depth) {
       if (valTree) valTree->setRoot(newRoot);
       else valTree = new ExpTree(newRoot);
     } else {
-      oldParent->setChild(whenTrace[maxDepth-1].first ? 1 : 2, newRoot);
+      oldParent->setChild((*when)[maxDepth-1].first ? 1 : 2, newRoot);
     }
   } else {
     if (maxDepth == depth) {
@@ -1585,21 +1560,26 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, int depth) {
         stmt->addChild(oldRoot);
       }
       stmt->addChild(newRoot);
-      oldParent->setChild(whenTrace[maxDepth-1].first ? 1 : 2, stmt);
+      oldParent->setChild((*when)[maxDepth-1].first ? 1 : 2, stmt);
     }
+  }
+  if (isDUT(retENode)) {
+    printf("+++++++++++++++++++++++++++++++++++++\n");
+    retENode->display();
+    printf("-------------------------------------\n");
   }
   return std::make_pair(valTree, retENode);
 }
 
-ENode* getWhenEnode(ExpTree* valTree, int depth) {
+ENode* getWhenEnode(WhenBlockInfo *when, ExpTree* valTree, int depth) {
   ENode* whenNode;
   int maxDepth;
-  std::tie(whenNode, maxDepth) = getDeepestWhen(valTree, depth);
-  Assert(maxDepth == (int)whenTrace.size(), "when not match %d %ld", maxDepth, whenTrace.size());
+  std::tie(whenNode, maxDepth) = getDeepestWhen(when, valTree, depth);
+  Assert(maxDepth == (int)when->size(), "when not match %d %ld", maxDepth, when->size());
   return whenNode;
 }
 
-void Context::whenConnect(Node* node, ENode* lvalue, ENode* rvalue, PNode* connect) {
+void whenConnect(graph* g, WhenBlockInfo *when, Node* node, ENode* lvalue, ENode* rvalue, PNode* connect) {
   if (!node) {
     printf("connect lineno %d\n", connect->lineno);
     TODO();
@@ -1608,9 +1588,9 @@ void Context::whenConnect(Node* node, ENode* lvalue, ENode* rvalue, PNode* conne
   ENode* whenNode;
   int connectDepth = (node->type == NODE_WRITER || node->type == NODE_INFER) ? 0 :node->whenDepth;
   if (node->isArray()) {
-    std::tie(valTree, whenNode) = growWhenTrace(nullptr, connectDepth);
+    std::tie(valTree, whenNode) = growWhenTrace(when, nullptr, connectDepth);
   } else {
-    std::tie(valTree, whenNode) = growWhenTrace(node->valTree, connectDepth);
+    std::tie(valTree, whenNode) = growWhenTrace(when, node->valTree, connectDepth);
   }
   valTree->setlval(lvalue);
   if (node->type == NODE_WRITER || node->type == NODE_INFER) {
@@ -1620,7 +1600,7 @@ void Context::whenConnect(Node* node, ENode* lvalue, ENode* rvalue, PNode* conne
     rvalue = writeENode;
     node->set_writer();
   }
-  if (whenNode) whenNode->setChild(whenTrace.back().first ? 1 : 2, rvalue);
+  if (whenNode) whenNode->setChild(when->back().first ? 1 : 2, rvalue);
   else valTree->setRoot(rvalue);
   if (node->isArray()) node->addArrayVal(valTree);
   else node->valTree = valTree;
@@ -1629,10 +1609,10 @@ void Context::whenConnect(Node* node, ENode* lvalue, ENode* rvalue, PNode* conne
 /*
 | reference "<=" expr info  { $$ = newNode(P_CONNECT, $1->lineno, $4, NULL, 2, $1, $3); }
 */
-void Context::visitWhenConnect(PNode* connect) {
+void visitWhenConnect(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* connect) {
   TYPE_CHECK(connect, 2, 2, P_CONNECT);
-  ASTExpTree* ref = visitReference(connect->getChild(0));
-  ASTExpTree* exp = visitExpr(connect->getChild(1));
+  ASTExpTree* ref = visitReference(g, path, connect->getChild(0));
+  ASTExpTree* exp = visitExpr(g, path, connect->getChild(1));
   Assert(!(ref->isAggr() ^ exp->isAggr()), "type not match, ref aggr %d exp aggr %d", ref->isAggr(), exp->isAggr());
 
   if (ref->isAggr()) {
@@ -1640,17 +1620,17 @@ void Context::visitWhenConnect(PNode* connect) {
       if (exp->getFlip(i)) {
         Node* node = exp->getAggr(i)->getNode();
         stmtsNodes.insert(node);
-        whenConnect(node, exp->getAggr(i), ref->getAggr(i), connect);
+        whenConnect(g, when, node, exp->getAggr(i), ref->getAggr(i), connect);
       } else {
         Node* node = ref->getAggr(i)->getNode();
         stmtsNodes.insert(node);
-        whenConnect(node, ref->getAggr(i), exp->getAggr(i), connect);
+        whenConnect(g, when, node, ref->getAggr(i), exp->getAggr(i), connect);
       }
     }
   } else {
     Node* node = ref->getExpRoot()->getNode();
     stmtsNodes.insert(node);
-    whenConnect(node, ref->getExpRoot(), exp->getExpRoot(), connect);
+    whenConnect(g, when, node, ref->getExpRoot(), exp->getExpRoot(), connect);
   }
 }
 
@@ -1666,7 +1646,7 @@ void Context::visitWhenConnect(PNode* connect) {
   | Stop '(' expr ',' expr ',' INT ')' info   { $$ = newNode(P_STOP, synlineno(), $9, NULL, 2, $3, $5); $$->appendExtraInfo($7); }
   | Stop '(' expr ',' expr ',' INT ')' ':' ALLID info   { $$ = newNode(P_STOP, synlineno(), $11, $10, 2, $3, $5); $$->appendExtraInfo($7); }
 */
-void Context::visitPrintfAssertStop(PNode* node, bool inWhen) {
+static void visitPrintfAssertStop(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* node, bool inWhen) {
   switch (node->type) {
     case P_PRINTF: TYPE_CHECK(node, 3, 3, P_PRINTF); break;
     case P_ASSERT: TYPE_CHECK(node, 3, 3, P_ASSERT); break;
@@ -1676,21 +1656,21 @@ void Context::visitPrintfAssertStop(PNode* node, bool inWhen) {
                                           : node->name);
   Node* n = allocNode(NODE_SPECIAL, path->subDir(SEP_MODULE, nodeName), node->lineno);
 
-  ASTExpTree* exp = visitExpr(node->getChild(1)); // pred for assert
+  ASTExpTree* exp = visitExpr(g, path, node->getChild(1)); // pred for assert
   ENode* expRoot = nullptr;
   if (node->type == P_ASSERT) {
-    ASTExpTree* en = visitExpr(node->getChild(2));
+    ASTExpTree* en = visitExpr(g, path, node->getChild(2));
     expRoot = en->getExpRoot();  // enRoot for assert
   } else {
     expRoot = exp->getExpRoot(); // cond for stop
   }
 
   if (inWhen) {
-    for (size_t i = 0; i < whenTrace.size(); i ++) {
+    for (size_t i = 0; i < when->size(); i ++) {
       ENode* andNode = new ENode(OP_AND);
       andNode->addChild(expRoot);
-      ENode* condNode = new ENode(whenTrace[i].second);
-      if (whenTrace[i].first) {
+      ENode* condNode = new ENode((*when)[i].second);
+      if ((*when)[i].first) {
         andNode->addChild(condNode);
       } else {
         ENode* notNode = new ENode(OP_NOT);
@@ -1712,64 +1692,64 @@ void Context::visitPrintfAssertStop(PNode* node, bool inWhen) {
   if (node->type == P_PRINTF) {
     PNode* exprs = node->getChild(2);
     for (int i = 0; i < exprs->getChildNum(); i ++) {
-      ASTExpTree* val = visitExpr(exprs->getChild(i));
+      ASTExpTree* val = visitExpr(g, path, exprs->getChild(i));
       enode->addChild(val->getExpRoot());
     }
   }
 
   n->valTree = new ExpTree(enode, new ENode(n));
-  addSignal(n->name, n);
+  addSignal(n->name, n, when->size());
   g->specialNodes.push_back(n);
 }
 
 /* return the lvalue node */
-void Context::visitWhenStmt(PNode* stmt) {
+void visitWhenStmt(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* stmt) {
   switch (stmt->type) {
-    case P_NODE: visitNode(stmt); break; // local nodes
-    case P_CONNECT: visitWhenConnect(stmt); break;
-    case P_WHEN: visitWhen(stmt); break;
-    case P_WIRE_DEF: visitWireDef(stmt); break;
+    case P_NODE: visitNode(g, path, when, stmt); break; // local nodes
+    case P_CONNECT: visitWhenConnect(g, path, when, stmt); break;
+    case P_WHEN: visitWhen(g, path, when, stmt); break;
+    case P_WIRE_DEF: visitWireDef(g, path, when, stmt); break;
     case P_PRINTF:
     case P_ASSERT:
-    case P_STOP:  visitPrintfAssertStop(stmt, true); break;
-    case P_INST: visitInst(stmt); break;
-    case P_REG_DEF: visitRegDef(stmt, P_REG_DEF); break;
-    case P_REG_RESET_DEF: visitRegDef(stmt, P_REG_RESET_DEF); break;
+    case P_STOP:  visitPrintfAssertStop(g, path, when, stmt, true); break;
+    case P_INST: visitInst(g, path, when, stmt); break;
+    case P_REG_DEF:       visitRegDef(g, path, when, stmt, P_REG_DEF); break;
+    case P_REG_RESET_DEF: visitRegDef(g, path, when, stmt, P_REG_RESET_DEF); break;
     case P_READ :
     case P_WRITE :
-    case P_INFER : visitChirrtlMemPort(stmt); break;
+    case P_INFER : visitChirrtlMemPort(g, path, when, stmt); break;
     default: printf("Invalid type %d %d\n", stmt->type, stmt->lineno); Panic();
   }
 }
-void Context::visitWhenStmts(PNode* stmts) {
+void visitWhenStmts(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* stmts) {
   TYPE_CHECK(stmts, 0, INT32_MAX, P_STATEMENTS);
   for (int i = 0; i < stmts->getChildNum(); i ++) {
-    visitWhenStmt(stmts->getChild(i));
+    visitWhenStmt(g, path, when, stmts->getChild(i));
   }
 }
 
-Node* Context::allocCondNode(ASTExpTree* condExp, PNode* when) {
-  Node* cond = allocNode(NODE_OTHERS, path->subDir(SEP_MODULE, "WHEN_COND_" + std::to_string(when->lineno)), when->lineno);
+Node* allocCondNode(ModulePath *path, WhenBlockInfo *when, ASTExpTree* condExp, PNode* whenNode) {
+  Node* cond = allocNode(NODE_OTHERS, path->subDir(SEP_MODULE, "WHEN_COND_" + std::to_string(whenNode->lineno)), whenNode->lineno);
   cond->valTree = new ExpTree(condExp->getExpRoot(), cond);
-  addSignal(cond->name, cond);
+  addSignal(cond->name, cond, when->size());
   return cond;
 }
 
 /*
 | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $2->lineno, $4, NULL, 3, $2, $6, $8); }
 */
-void Context::visitWhen(PNode* when) {
-  TYPE_CHECK(when, 3, 3, P_WHEN);
-  ASTExpTree* condExp = visitExpr(when->getChild(0));
-  Node* condNode = allocCondNode(condExp, when);
-  // allocWhenId(when); distinguish when through condNode rather than id
-  whenTrace.push_back(std::make_pair(true, condNode));
-  visitWhenStmts(when->getChild(1));
+void visitWhen(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* whenNode) {
+  TYPE_CHECK(whenNode, 3, 3, P_WHEN);
+  ASTExpTree* condExp = visitExpr(g, path, whenNode->getChild(0));
+  Node* condNode = allocCondNode(path, when, condExp, whenNode);
+  // allocWhenId(whenNode); distinguish when through condNode rather than id
+  when->push_back(std::make_pair(true, condNode));
+  visitWhenStmts(g, path, when, whenNode->getChild(1));
   
-  whenTrace.back().first = false;
-  visitWhenStmts(when->getChild(2));
+  when->back().first = false;
+  visitWhenStmts(g, path, when, whenNode->getChild(2));
   
-  whenTrace.pop_back();
+  when->pop_back();
 }
 
 void saveWhenTree() {
@@ -1810,29 +1790,29 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5
     | Assert '(' expr ',' expr ',' expr ',' String ')' info { $$ = newNode(P_ASSERT, synlineno(), $11, NULL, 3, $3, $5, $7); $$->appendExtraInfo($9); }
     | Skip info { $$ = NULL; }
 */
-void Context::visitStmt(PNode* stmt) {
+void visitStmt(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* stmt) {
   stmtsNodes.clear();
   switch (stmt->type) {
-    case P_WIRE_DEF: visitWireDef(stmt); break;
-    case P_REG_DEF: visitRegDef(stmt, P_REG_DEF); break;
-    case P_REG_RESET_DEF: visitRegDef(stmt, P_REG_RESET_DEF); break;
-    case P_INST: visitInst(stmt); break;
-    case P_MEMORY: visitMemory(stmt); break;
-    case P_SEQ_MEMORY :
-    case P_COMB_MEMORY: visitChirrtlMemory(stmt); break;
+    case P_WIRE_DEF: visitWireDef(g, path, when, stmt); break;
+    case P_REG_DEF: visitRegDef(g, path, when, stmt, P_REG_DEF); break;
+    case P_REG_RESET_DEF: visitRegDef(g, path, when, stmt, P_REG_RESET_DEF); break;
+    case P_INST: visitInst(g, path, when, stmt); break;
+    case P_MEMORY: visitMemory(g, path, when, stmt); break;
+    case P_SEQ_MEMORY : visitChirrtlMemory(g, path, stmt); break;
+    case P_COMB_MEMORY: visitChirrtlMemory(g, path, stmt); break;
     case P_READ:
     case P_WRITE:
-    case P_INFER: visitChirrtlMemPort(stmt); break;
-    case P_NODE: visitNode(stmt); break;
-    case P_CONNECT: visitConnect(stmt); break;
-    case P_PAR_CONNECT: visitPartialConnect(stmt); break;
+    case P_INFER: visitChirrtlMemPort(g, path, when, stmt); break;
+    case P_NODE: visitNode(g, path, when, stmt); break;
+    case P_CONNECT: visitConnect(g, path, stmt); break;
+    case P_PAR_CONNECT: visitPartialConnect(g, path, stmt); break;
     case P_WHEN:
-      visitWhen(stmt);
+      visitWhen(g, path, when, stmt);
       saveWhenTree();
       break;
     case P_PRINTF:
     case P_ASSERT:
-    case P_STOP:  visitPrintfAssertStop(stmt, false); break;
+    case P_STOP:  visitPrintfAssertStop(g, path, when, stmt, false); break;
     default:
       printf("invalid stmt type %d in lineno %d\n", stmt->type, stmt->lineno);
       Panic();
@@ -1843,10 +1823,10 @@ void Context::visitStmt(PNode* stmt) {
 statements: { $$ = new PNode(P_STATEMENTS, synlineno()); }
     | statements statement { $$ =  $1; $1->appendChild($2); }
 */
-void Context::visitStmts(PNode* stmts) {
+void visitStmts(graph* g, ModulePath *path, WhenBlockInfo *when, PNode* stmts) {
   TYPE_CHECK(stmts, 0, INT32_MAX, P_STATEMENTS);
   for (int i = 0; i < stmts->getChildNum(); i ++) {
-    visitStmt(stmts->getChild(i));
+    visitStmt(g, path, when, stmts->getChild(i));
   }
 }
 
@@ -1883,13 +1863,11 @@ void updatePrevNext(Node* n) {
   traverse the AST and generate graph
 */
 graph* AST2Graph(PNode* root) {
-  graph *g = new graph();
+  graph* g = new graph();
   g->name = root->name;
-  Context c;
-  c.g = g;
-  c.path = new ModulePath;
 
   PNode* topModule = NULL;
+  ModulePath *path = new ModulePath;
 
   moduleMap = new std::map<std::string, PNode*>;
   for (int i = 0; i < root->getChildNum(); i++) {
@@ -1898,9 +1876,9 @@ graph* AST2Graph(PNode* root) {
     moduleMap->emplace(module->name, module);
   }
   Assert(topModule, "Top module can not be NULL\n");
-  c.visitModule(topModule, true);
+  visitModule(g, path, topModule, true);
   delete moduleMap;
-  delete c.path;
+  delete path;
 
 /* infer memory port */
 
@@ -2126,8 +2104,8 @@ void removeDummyDim(graph* g) {
     Node* regDst = regSrc->dup(NODE_REG_DST, mem->name + "$NEXT");
     regSrc->bindReg(regDst);
     g->addReg(regSrc);
-    addSignal(regSrc->name, regSrc);
-    addSignal(regDst->name, regDst);
+    addSignal(regSrc->name, regSrc, -1);
+    addSignal(regDst->name, regDst, -1);
     regSrc->clock = regDst->clock = clock;
     ENode* resetCond = new ENode(OP_INT);
     resetCond->width = 1;
