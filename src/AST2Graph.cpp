@@ -98,7 +98,6 @@ static std::map<std::string, PNode*> *moduleMap;
 static std::map<std::string, Node*> allSignals;
 static std::map<std::string, AggrParentNode*> allDummy; // CHECK: any other dummy nodes ?
 static std::vector<std::pair<bool, Node*>> whenTrace;
-static std::set<std::string> moduleInstances;
 
 static std::set<Node*> stmtsNodes;
 
@@ -368,7 +367,7 @@ ASTExpTree* Context::visitReference(PNode* expr) {
 
   for (int i = 0; i < expr->getChildNum(); i ++) {
     if (expr->getChild(i)->type == P_REF_DOT) {
-      name += (moduleInstances.find(name) != moduleInstances.end() ? SEP_MODULE : SEP_AGGR) + expr->getChild(i)->name;
+      name += (allDummy.find(name) == allDummy.end() ? SEP_MODULE : SEP_AGGR) + expr->getChild(i)->name;
     }
   }
   ASTExpTree* ret = nullptr;
@@ -876,8 +875,6 @@ void Context::visitMemory(PNode* mem) {
   int wlatency = visitWriteLatency(mem->getChild(3));
   visitRUW(mem->getChild(4));
 
-  moduleInstances.insert(path->cwd());
-
   if (info->isAggr()) {
     std::vector<Node*> allSubMem;
     for (auto entry : info->aggrMember) {
@@ -1260,8 +1257,6 @@ void Context::visitChirrtlMemory(PNode* mem) {
   int wlatency = 1;
   if (isSeq && mem->getChildNum() >= 2) visitRUW(mem->getChild(1));
 
-  moduleInstances.insert(path->cwd());
-
   if (type->isAggr()) {
     memoryMap[path->cwd()] = std::pair(std::vector<Node*>(), std::vector<AggrParentNode*>());
     for (auto& entry : type->aggrMember) {
@@ -1294,7 +1289,6 @@ void Context::visitInst(PNode* inst) {
                "Module %s is not defined!\n", inst->getExtra(0).c_str());
   PNode* module = iterator->second;
   path->cd(SEP_MODULE, inst->name);
-  moduleInstances.insert(path->cwd());
   switch(module->type) {
     case P_MOD: visitModule(module, false); break;
     case P_EXTMOD: visitExtModule(module); break;
