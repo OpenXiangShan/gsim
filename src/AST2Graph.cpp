@@ -41,6 +41,7 @@ public:
 
 typedef std::pair<bool, Node*> WhenBlock;
 typedef std::vector<WhenBlock> WhenBlockInfo;
+typedef std::map<std::string, AggrParentNode*> DummyInfo;
 typedef std::map<std::string, Node*> SignalInfo;
 
 typedef struct Context {
@@ -51,6 +52,7 @@ typedef struct Context {
   MemoryInfo *memoryMap;
   WhenBlockInfo *whenTrace;
   SignalInfo *allSignals;
+  DummyInfo *allDummy; // CHECK: any other dummy nodes ?
 
   void visitModule(PNode* module, bool isTop);
   void visitExtModule(PNode* module);
@@ -102,6 +104,7 @@ typedef struct Context {
   Node* getSignal(std::string s);
   bool nameExist(std::string str);
   void addDummy(std::string s, AggrParentNode* n);
+  AggrParentNode* getDummy(std::string s);
   bool isAggr(std::string s);
 
 } Context;
@@ -111,7 +114,6 @@ void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
 /* map between module name and module pnode*/
 static std::map<std::string, PNode*> *moduleMap;
-static std::map<std::string, AggrParentNode*> allDummy; // CHECK: any other dummy nodes ?
 
 static std::set<Node*> stmtsNodes;
 
@@ -133,6 +135,7 @@ static inline Node* allocNode(NodeType type = NODE_OTHERS, std::string name = ""
 void Context::addSignal(std::string s, Node* n) {
   SignalInfo &allSignals = *(this->allSignals);
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
+  DummyInfo &allDummy = *(this->allDummy);
   Assert(allDummy.find(s) == allDummy.end(), "Signal %s is already in allDummy\n", s.c_str());
   allSignals[s] = n;
   n->whenDepth = whenTrace->size();
@@ -152,18 +155,21 @@ bool Context::nameExist(std::string str) {
 
 void Context::addDummy(std::string s, AggrParentNode* n) {
   SignalInfo &allSignals = *(this->allSignals);
+  DummyInfo &allDummy = *(this->allDummy);
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
   Assert(allDummy.find(s) == allDummy.end(), "Node %s is already in allDummy\n", s.c_str());
   allDummy[s] = n;
   // printf("add dummy %s\n", s.c_str());
 }
 
-static inline AggrParentNode* getDummy(std::string s) {
+AggrParentNode* Context::getDummy(std::string s) {
+  DummyInfo &allDummy = *(this->allDummy);
   Assert(allDummy.find(s) != allDummy.end(), "Node %s is not in allDummy\n", s.c_str());
   return allDummy[s];
 }
 
 bool Context::isAggr(std::string s) {
+  DummyInfo &allDummy = *(this->allDummy);
   if (allDummy.find(s) != allDummy.end()) return true;
   SignalInfo &allSignals = *(this->allSignals);
   if (allSignals.find(s) != allSignals.end()) return false;
@@ -384,6 +390,7 @@ ASTExpTree* Context::allocIndex(PNode* expr) {
 */
 ASTExpTree* Context::visitReference(PNode* expr) {
   TYPE_CHECK(expr, 0, INT32_MAX, P_REF);
+  DummyInfo &allDummy = *(this->allDummy);
   std::string name = path->abspath(SEP_MODULE, expr->name);
 
   for (int i = 0; i < expr->getChildNum(); i ++) {
@@ -1924,6 +1931,7 @@ graph* AST2Graph(PNode* root) {
   c.path = new ModulePath;
   c.whenTrace = new WhenBlockInfo;
   c.allSignals = new SignalInfo;
+  c.allDummy = new DummyInfo;
 
   PNode* topModule = NULL;
 
