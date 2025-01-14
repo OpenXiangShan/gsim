@@ -41,6 +41,7 @@ public:
 
 typedef std::pair<bool, Node*> WhenBlock;
 typedef std::vector<WhenBlock> WhenBlockInfo;
+typedef std::map<std::string, Node*> SignalInfo;
 
 typedef struct Context {
   typedef std::map<std::string, std::pair<std::vector<Node*>, std::vector<AggrParentNode*>>> MemoryInfo;
@@ -49,6 +50,7 @@ typedef struct Context {
   ModulePath *path;
   MemoryInfo *memoryMap;
   WhenBlockInfo *whenTrace;
+  SignalInfo *allSignals;
 
   void visitModule(PNode* module, bool isTop);
   void visitExtModule(PNode* module);
@@ -93,9 +95,15 @@ typedef struct Context {
   Node* visitWriter(PNode* writer, int width, int depth, bool sign, std::string suffix, Node* node);
   Node* visitReadWriter(PNode* readWriter, int width, int depth, bool sign, std::string suffix, Node* node);
   void whenConnect(Node* node, ENode* lvalue, ENode* rvalue, PNode* connect);
-  void addSignal(std::string s, Node* n);
   void addOriginMember(Node* originPort, PNode* port);
   void removeDummyDim();
+
+  void addSignal(std::string s, Node* n);
+  Node* getSignal(std::string s);
+  bool nameExist(std::string str);
+  void addDummy(std::string s, AggrParentNode* n);
+  bool isAggr(std::string s);
+
 } Context;
 
 int p_stoi(const char* str);
@@ -103,7 +111,6 @@ void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
 /* map between module name and module pnode*/
 static std::map<std::string, PNode*> *moduleMap;
-static std::map<std::string, Node*> allSignals;
 static std::map<std::string, AggrParentNode*> allDummy; // CHECK: any other dummy nodes ?
 
 static std::set<Node*> stmtsNodes;
@@ -124,6 +131,7 @@ static inline Node* allocNode(NodeType type = NODE_OTHERS, std::string name = ""
 }
 
 void Context::addSignal(std::string s, Node* n) {
+  SignalInfo &allSignals = *(this->allSignals);
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
   Assert(allDummy.find(s) == allDummy.end(), "Signal %s is already in allDummy\n", s.c_str());
   allSignals[s] = n;
@@ -131,12 +139,19 @@ void Context::addSignal(std::string s, Node* n) {
   // printf("add signal %s\n", s.c_str());
 }
 
-static inline Node* getSignal(std::string s) {
+Node* Context::getSignal(std::string s) {
+  SignalInfo &allSignals = *(this->allSignals);
   Assert(allSignals.find(s) != allSignals.end(), "Signal %s is not in allSignals\n", s.c_str());
   return allSignals[s];  
 }
 
-static inline void addDummy(std::string s, AggrParentNode* n) {
+bool Context::nameExist(std::string str) {
+  SignalInfo &allSignals = *(this->allSignals);
+  return allSignals.find(str) != allSignals.end();
+}
+
+void Context::addDummy(std::string s, AggrParentNode* n) {
+  SignalInfo &allSignals = *(this->allSignals);
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
   Assert(allDummy.find(s) == allDummy.end(), "Node %s is already in allDummy\n", s.c_str());
   allDummy[s] = n;
@@ -148,8 +163,9 @@ static inline AggrParentNode* getDummy(std::string s) {
   return allDummy[s];
 }
 
-static inline bool isAggr(std::string s) {
+bool Context::isAggr(std::string s) {
   if (allDummy.find(s) != allDummy.end()) return true;
+  SignalInfo &allSignals = *(this->allSignals);
   if (allSignals.find(s) != allSignals.end()) return false;
   Assert(0, "%s is not added\n", s.c_str());
 }
@@ -1907,6 +1923,7 @@ graph* AST2Graph(PNode* root) {
   c.g = g;
   c.path = new ModulePath;
   c.whenTrace = new WhenBlockInfo;
+  c.allSignals = new SignalInfo;
 
   PNode* topModule = NULL;
 
@@ -1924,6 +1941,7 @@ graph* AST2Graph(PNode* root) {
 
 /* infer memory port */
 
+  SignalInfo &allSignals = *(c.allSignals);
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     if (it->second->type == NODE_INFER || it->second->type == NODE_READER) {
       it->second->memTree->getRoot()->opType = OP_READ_MEM;
@@ -2023,10 +2041,6 @@ bool ExpTree::isConstant() {
   return true;
 }
 
-bool nameExist(std::string str) {
-  return allSignals.find(str) != allSignals.end();
-}
-
 void writer2Reg(ExpTree* tree) {
   std::stack<std::tuple<ENode*, ENode*, int>>s;
   s.push(std::make_tuple(tree->getRoot(), nullptr, 0));
@@ -2085,7 +2099,7 @@ void setZeroTree(Node* node) {
 void Context::removeDummyDim() {
   /* remove dimensions of size 1 rom the array */
   std::map<Node*, std::vector<int>> arrayMap;
-  for (auto iter : allSignals) {
+  for (auto iter : *allSignals) {
     Node* node = iter.second;
     if (!node->isArray()) continue;
     std::vector<int> validIndex;
@@ -2112,7 +2126,7 @@ void Context::removeDummyDim() {
     }
   }
   std::set<ENode*> visited;
-  for (auto iter : allSignals) {
+  for (auto iter : *allSignals) {
     Node* node = iter.second;
     for (ExpTree* tree : node->arrayVal) tree->removeDummyDim(arrayMap, visited);
     for (ExpTree* tree : node->assignTree) tree->removeDummyDim(arrayMap, visited);
