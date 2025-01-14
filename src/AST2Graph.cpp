@@ -53,6 +53,7 @@ typedef struct Context {
   WhenBlockInfo *whenTrace;
   SignalInfo *allSignals;
   DummyInfo *allDummy; // CHECK: any other dummy nodes ?
+  std::set<Node*> *stmtsNodes;
 
   void visitModule(PNode* module, bool isTop);
   void visitExtModule(PNode* module);
@@ -99,6 +100,7 @@ typedef struct Context {
   void whenConnect(Node* node, ENode* lvalue, ENode* rvalue, PNode* connect);
   void addOriginMember(Node* originPort, PNode* port);
   void removeDummyDim();
+  void saveWhenTree();
 
   void addSignal(std::string s, Node* n);
   Node* getSignal(std::string s);
@@ -106,7 +108,6 @@ typedef struct Context {
   void addDummy(std::string s, AggrParentNode* n);
   AggrParentNode* getDummy(std::string s);
   bool isAggr(std::string s);
-
 } Context;
 
 int p_stoi(const char* str);
@@ -114,8 +115,6 @@ void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
 /* map between module name and module pnode*/
 static std::map<std::string, PNode*> *moduleMap;
-
-static std::set<Node*> stmtsNodes;
 
 static inline void typeCheck(PNode* node, const int expect[], int size, int minChildNum, int maxChildNum) {
   const int* expectEnd = expect + size;
@@ -1674,6 +1673,7 @@ void Context::visitWhenConnect(PNode* connect) {
   ASTExpTree* exp = visitExpr(connect->getChild(1));
   Assert(!(ref->isAggr() ^ exp->isAggr()), "type not match, ref aggr %d exp aggr %d", ref->isAggr(), exp->isAggr());
 
+  std::set<Node*> &stmtsNodes = *(this->stmtsNodes);
   if (ref->isAggr()) {
     for (int i = 0; i < ref->getAggrNum(); i++) {
       if (exp->getFlip(i)) {
@@ -1813,8 +1813,8 @@ void Context::visitWhen(PNode* when) {
   whenTrace.pop_back();
 }
 
-void saveWhenTree() {
-  for (Node* node : stmtsNodes) {
+void Context::saveWhenTree() {
+  for (Node* node : *stmtsNodes) {
     if (node->valTree) {
       if (!node->isArray() && node->assignTree.size() > 0 && countEmptyWhen(node->valTree) == 1) { // TODO: check if countEmptyWhen = 0
         fillEmptyWhen(node->valTree, node->assignTree.back()->getRoot());
@@ -1852,7 +1852,7 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5
     | Skip info { $$ = NULL; }
 */
 void Context::visitStmt(PNode* stmt) {
-  stmtsNodes.clear();
+  stmtsNodes->clear();
   switch (stmt->type) {
     case P_WIRE_DEF: visitWireDef(stmt); break;
     case P_REG_DEF: visitRegDef(stmt, P_REG_DEF); break;
@@ -1932,6 +1932,7 @@ graph* AST2Graph(PNode* root) {
   c.whenTrace = new WhenBlockInfo;
   c.allSignals = new SignalInfo;
   c.allDummy = new DummyInfo;
+  c.stmtsNodes = new std::set<Node*>;
 
   PNode* topModule = NULL;
 
@@ -1946,6 +1947,7 @@ graph* AST2Graph(PNode* root) {
   delete moduleMap;
   delete c.path;
   delete c.whenTrace;
+  delete c.stmtsNodes;
 
 /* infer memory port */
 
