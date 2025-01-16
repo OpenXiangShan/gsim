@@ -5,6 +5,8 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
+#include <mutex>
+
 class graph {
   FILE* genHeaderStart(std::string headerFile);
   FILE* genSrcStart(std::string name);
@@ -74,8 +76,11 @@ class graph {
   int nodeNum = 0;
   int subStepNum = -1;
   int updateRegNum = -1;
+  std::mutex addRegMutex;
   void addReg(Node* reg) {
+    addRegMutex.lock();
     regsrc.push_back(reg);
+    addRegMutex.unlock();
   }
   void detectLoop();
   void topoSort();

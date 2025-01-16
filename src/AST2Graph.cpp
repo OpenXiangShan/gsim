@@ -7,6 +7,12 @@
 #include <stack>
 #include <map>
 #include <utility>
+#include <future>
+#include <mutex>
+#include <condition_variable>
+
+#undef NR_THREAD
+#define NR_THREAD 5
 
 /* check the node type and children num */
 #define TYPE_CHECK(node, min, max,...) typeCheck(node, (const int[]){__VA_ARGS__}, sizeof((const int[]){__VA_ARGS__}) / sizeof(int), min, max)
@@ -26,6 +32,8 @@ private:
   std::stack<std::string> path;
 
 public:
+  ModulePath() {}
+  ModulePath(ModulePath &p) : path(p.path) {}
   std::string cwd() {
     Assert(!path.empty(), "path is empty");
     return path.top();
@@ -125,6 +133,12 @@ void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
 /* map between module name and module pnode*/
 static std::map<std::string, PNode*> *moduleMap;
+static int instRemainCnt;
+static std::mutex instRemainCntMutex;
+static std::condition_variable instRemainCntCV;
+
+static std::mutex allSignalsMutex;
+static std::mutex allDummyMutex;
 
 void InstCounter::visitModule(PNode* module) {
   cnt ++;
@@ -172,46 +186,76 @@ static inline Node* allocNode(NodeType type = NODE_OTHERS, std::string name = ""
 
 void Context::addSignal(std::string s, Node* n) {
   SignalInfo &allSignals = *(this->allSignals);
-  Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
   DummyInfo &allDummy = *(this->allDummy);
+  allDummyMutex.lock();
   Assert(allDummy.find(s) == allDummy.end(), "Signal %s is already in allDummy\n", s.c_str());
+  allDummyMutex.unlock();
+
+  allSignalsMutex.lock();
+  Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
   allSignals[s] = n;
+  allSignalsMutex.unlock();
+
   n->whenDepth = whenTrace->size();
   // printf("add signal %s\n", s.c_str());
 }
 
 Node* Context::getSignal(std::string s) {
   SignalInfo &allSignals = *(this->allSignals);
+  allSignalsMutex.lock();
   Assert(allSignals.find(s) != allSignals.end(), "Signal %s is not in allSignals\n", s.c_str());
-  return allSignals[s];  
+  Node *n = allSignals[s];
+  allSignalsMutex.unlock();
+  return n;
 }
 
 bool Context::nameExist(std::string str) {
   SignalInfo &allSignals = *(this->allSignals);
-  return allSignals.find(str) != allSignals.end();
+  allSignalsMutex.lock();
+  bool isExist = allSignals.find(str) != allSignals.end();
+  allSignalsMutex.unlock();
+  return isExist;
 }
 
 void Context::addDummy(std::string s, AggrParentNode* n) {
   SignalInfo &allSignals = *(this->allSignals);
   DummyInfo &allDummy = *(this->allDummy);
+  allSignalsMutex.lock();
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
+  allSignalsMutex.unlock();
+
+  allDummyMutex.lock();
   Assert(allDummy.find(s) == allDummy.end(), "Node %s is already in allDummy\n", s.c_str());
   allDummy[s] = n;
+  allDummyMutex.unlock();
   // printf("add dummy %s\n", s.c_str());
 }
 
 AggrParentNode* Context::getDummy(std::string s) {
   DummyInfo &allDummy = *(this->allDummy);
+  allDummyMutex.lock();
   Assert(allDummy.find(s) != allDummy.end(), "Node %s is not in allDummy\n", s.c_str());
-  return allDummy[s];
+  AggrParentNode *n = allDummy[s];
+  allDummyMutex.unlock();
+  return n;
 }
 
 bool Context::isAggr(std::string s) {
   DummyInfo &allDummy = *(this->allDummy);
-  if (allDummy.find(s) != allDummy.end()) return true;
+  allDummyMutex.lock();
+  bool found = (allDummy.find(s) != allDummy.end());
+  allDummyMutex.unlock();
+  return found; //if (found) return true;
+
+#if 0
   SignalInfo &allSignals = *(this->allSignals);
-  if (allSignals.find(s) != allSignals.end()) return false;
+  allSignalsMutex.lock();
+  found = (allSignals.find(s) != allSignals.end());
+  allSignalsMutex.unlock();
+  if (found) return false;
+
   Assert(0, "%s is not added\n", s.c_str());
+#endif
 }
 
 static inline std::string replacePrefix(std::string oldPrefix, std::string newPrefix, std::string str) {
@@ -428,12 +472,11 @@ ASTExpTree* Context::allocIndex(PNode* expr) {
 */
 ASTExpTree* Context::visitReference(PNode* expr) {
   TYPE_CHECK(expr, 0, INT32_MAX, P_REF);
-  DummyInfo &allDummy = *(this->allDummy);
   std::string name = path->abspath(SEP_MODULE, expr->name);
 
   for (int i = 0; i < expr->getChildNum(); i ++) {
     if (expr->getChild(i)->type == P_REF_DOT) {
-      name += (allDummy.find(name) == allDummy.end() ? SEP_MODULE : SEP_AGGR) + expr->getChild(i)->name;
+      name += (isAggr(name) ? SEP_AGGR : SEP_MODULE) + expr->getChild(i)->name;
     }
   }
   ASTExpTree* ret = nullptr;
@@ -581,18 +624,48 @@ ASTExpTree* Context::visitExpr(PNode* expr) {
   }
   return ret;
 }
+
+typedef struct TaskRecord {
+  Context *c;
+  PNode *stmts;
+  int id;
+} TaskRecord;
+
+static std::vector<TaskRecord> *taskQueue;
+static std::mutex taskMutex;
+static std::condition_variable taskCV;
+
+void visitFunc(int tid) {
+  while (true) {
+    std::unique_lock lk(taskMutex);
+    taskCV.wait(lk, []{ return !taskQueue->empty(); });
+    auto e = taskQueue->back();
+    taskQueue->pop_back();
+    lk.unlock();
+    taskCV.notify_one();
+
+    if (e.id == -1) { return; }
+
+    e.c->visitStmts(e.stmts);
+
+    delete e.c->path;
+    delete e.c->memoryMap;
+    delete e.c->whenTrace;
+    delete e.c->stmtsNodes;
+
+    std::unique_lock lk2(instRemainCntMutex);
+    instRemainCntCV.wait(lk2, []{ return true; });
+    instRemainCnt --;
+    lk2.unlock();
+    instRemainCntCV.notify_one();
+  }
+}
+
 /*
 module: Module ALLID ':' info INDENT ports statements DEDENT { $$ = newNode(P_MOD, synlineno(), $4, $2, 2, $6, $7); }
 */
 void Context::visitModule(PNode* module, bool isTop) {
   TYPE_CHECK(module, 2, 2, P_MOD);
-  MemoryInfo *memoryMapSave = memoryMap;
-  memoryMap = new MemoryInfo;
-
-  // temp fix for wrong whenDepth
-  bool useNewWhenBlockInfo = (whenTrace->size() == 0);
-  WhenBlockInfo *whenTraceSave = whenTrace;
-  if (useNewWhenBlockInfo) whenTrace = new WhenBlockInfo;
 
   // printf("visit module %s\n", module->name.c_str());
 
@@ -615,14 +688,29 @@ void Context::visitModule(PNode* module, bool isTop) {
     }
   }
 
-  visitStmts(module->getChild(1));
-  // printf("leave module %s\n", module->name.c_str());
+  static int moduleId = 0;
+  TaskRecord e;
+  e.c = new Context;
+  e.c->g = g;                        // used globally
+  e.c->path = new ModulePath(*path); // inherit
+  e.c->memoryMap = new MemoryInfo;   // new one
+  // temp fix for wrong whenDepth
+  e.c->whenTrace = (whenTrace->size() == 0 ? new WhenBlockInfo :
+                                             new WhenBlockInfo(*whenTrace));
+  e.c->allSignals = allSignals;   // used globally
+  e.c->allDummy = allDummy;       // used globally
+  e.c->stmtsNodes = new std::set<Node*>;  // new one
+  e.stmts = module->getChild(1);
 
-  delete memoryMap;
-  if (useNewWhenBlockInfo) delete whenTrace;
-  memoryMap = memoryMapSave;
-  whenTrace = whenTraceSave;
+  e.id = moduleId ++;
+
+  std::unique_lock lk(taskMutex);
+  taskCV.wait(lk, []{ return true; });
+  taskQueue->push_back(e);
+  lk.unlock();
+  taskCV.notify_one();
 }
+
 /*
 extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$ = newNode(P_EXTMOD, synlineno(), $4, $2, 1, $6); $$->appendChildList($8);}
 */
@@ -1988,7 +2076,38 @@ graph* AST2Graph(PNode* root) {
   instRemainCnt = cnt->cnt;
   Log("Total instances = %d", cnt->cnt);
 
+  taskQueue = new std::vector<TaskRecord>;
+
+  // create threads
+  std::future<void> *threads = new std::future<void> [NR_THREAD];
+  for (int i = 0; i < NR_THREAD; i ++) {
+    threads[i] = async(std::launch::async, visitFunc, i);
+  }
+
   c.visitModule(topModule, true);
+
+  // wait for finish
+  std::unique_lock lk(instRemainCntMutex);
+  instRemainCntCV.wait(lk, []{ return instRemainCnt == 0; });
+  lk.unlock();
+  instRemainCntCV.notify_one();
+
+  std::unique_lock lk2(taskMutex);
+  taskCV.wait(lk2, []{ return true; });
+  for (int i = 0; i < NR_THREAD; i ++) {
+    taskQueue->push_back(TaskRecord{nullptr, nullptr, -1}); // exit flags
+  }
+  lk2.unlock();
+  taskCV.notify_one();
+
+  for (int i = 0; i < NR_THREAD; i ++) {
+    printf("[Parser] waiting for thread %d/%d...\n", i, NR_THREAD - 1);
+    threads[i].get();
+  }
+  assert(taskQueue->empty());
+
+  delete taskQueue;
+
   delete moduleMap;
   delete c.path;
   delete c.whenTrace;
