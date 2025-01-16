@@ -110,11 +110,50 @@ typedef struct Context {
   bool isAggr(std::string s);
 } Context;
 
+class InstCounter {
+public:
+  int cnt = 0;
+  void visitModule(PNode* module);
+  void visitStmts(PNode* stmts);
+  void visitStmt(PNode* stmt);
+  void visitInst(PNode* inst);
+  void visitWhen(PNode* when);
+};
+
 int p_stoi(const char* str);
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
 /* map between module name and module pnode*/
 static std::map<std::string, PNode*> *moduleMap;
+
+void InstCounter::visitModule(PNode* module) {
+  cnt ++;
+  visitStmts(module->getChild(1));
+}
+
+void InstCounter::visitStmts(PNode* stmts) {
+  for (int i = 0; i < stmts->getChildNum(); i ++) {
+    visitStmt(stmts->getChild(i));
+  }
+}
+
+void InstCounter::visitStmt(PNode* stmt) {
+  if (stmt->type == P_INST) { visitInst(stmt); }
+  else if (stmt->type == P_WHEN) { visitWhen(stmt); }
+}
+
+void InstCounter::visitInst(PNode* inst) {
+  auto iterator = moduleMap->find(inst->getExtra(0));
+  Assert(inst->getExtraNum() >= 1 && iterator != moduleMap->end(),
+               "Module %s is not defined!\n", inst->getExtra(0).c_str());
+  PNode* module = iterator->second;
+  if (module->type == P_MOD) visitModule(module);
+}
+
+void InstCounter::visitWhen(PNode* when) {
+  visitStmts(when->getChild(1));
+  visitStmts(when->getChild(2));
+}
 
 static inline void typeCheck(PNode* node, const int expect[], int size, int minChildNum, int maxChildNum) {
   const int* expectEnd = expect + size;
@@ -1943,6 +1982,12 @@ graph* AST2Graph(PNode* root) {
     moduleMap->emplace(module->name, module);
   }
   Assert(topModule, "Top module can not be NULL\n");
+
+  InstCounter *cnt = new InstCounter;
+  cnt->visitModule(topModule);
+  instRemainCnt = cnt->cnt;
+  Log("Total instances = %d", cnt->cnt);
+
   c.visitModule(topModule, true);
   delete moduleMap;
   delete c.path;
