@@ -118,7 +118,7 @@ binary_point:
     | "<<" INT ">>"   { TODO(); }
     ;
 type_ground: Clock              { $$ = new PNode(P_Clock, synlineno()); }
-    | Reset                     { $$ = new PNode(P_INT_TYPE, synlineno()); $$->setWidth(1); $$->setSign(0);}
+    | Reset                     { $$ = new PNode(P_RESET, synlineno()); $$->setWidth(1); $$->setSign(0);}
     | AsyReset                  { $$ = new PNode(P_ASYRESET, synlineno()); $$->setWidth(1); $$->setSign(0);}
     | IntType width             { $$ = newNode(P_INT_TYPE, synlineno(), $1, 0); $$->setWidth($2); $$->setSign($1[0] == 'S'); }
     | ProbeType '<' IntType '>' { $$ = newNode(P_INT_TYPE, synlineno(), $3, 0); $$->setWidth(-1); $$->setSign($3[0] == 'S'); }

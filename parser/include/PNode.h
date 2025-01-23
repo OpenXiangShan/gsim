@@ -61,6 +61,7 @@ enum PNodeType{
   P_AG_FIELDS,
   P_Clock,
   P_ASYRESET,
+  P_RESET,
   P_INT_TYPE,
   P_PROBE,
   P_EXPR_INT_NOINIT,

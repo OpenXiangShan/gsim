@@ -202,7 +202,7 @@ type_ground: Clock    { $$ = new PNode(P_Clock, synlineno()); }
 update width/sign/dimension/aggrtype
 */
 TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType) {
-  TYPE_CHECK(ptype, 0, INT32_MAX, P_AG_FIELDS, P_AG_ARRAY, P_Clock, P_INT_TYPE, P_ASYRESET);
+  TYPE_CHECK(ptype, 0, INT32_MAX, P_AG_FIELDS, P_AG_ARRAY, P_Clock, P_INT_TYPE, P_ASYRESET, P_RESET);
   TypeInfo* info = NULL;
   switch (ptype->type) {
     case P_Clock:
@@ -214,6 +214,10 @@ TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType) {
       info = new TypeInfo();
       info->set_sign(ptype->sign); info->set_width(ptype->width);
       info->set_reset(UINTRESET);
+      break;
+    case P_RESET:
+      info = new TypeInfo();
+      info->set_sign(false); info->set_width(1);
       break;
     case P_ASYRESET:
       info = new TypeInfo();
@@ -585,7 +589,8 @@ void visitWireDef(graph* g, PNode* wire) {
 statement: Reg ALLID ':' type ',' expr(1) RegWith INDENT RegReset '(' expr ',' expr ')' info DEDENT { $$ = newNode(P_REG_DEF, $4->lineno, $15, $2, 4, $4, $6, $11, $13); }
 expr(1) must be clock
 */
-void visitRegDef(graph* g, PNode* reg, PNodeType t) {
+void visitRegDef(graph* g, PNode* reg, PNodeType type) {
+  TYPE_CHECK(reg, 2, 4, P_REG_DEF, P_REG_RESET_DEF);
 
   ASTExpTree* clkExp = visitExpr(g, reg->getChild(1));
   Assert(!clkExp->isAggr() && clkExp->getExpRoot()->getNode(), "unsupported clock in lineno %d", reg->lineno);
@@ -611,7 +616,7 @@ void visitRegDef(graph* g, PNode* reg, PNodeType t) {
     src->bindReg(dst);
     src->clock = dst->clock = clockNode;
 
-    if (t == P_REG_RESET_DEF) continue;
+    if (type == P_REG_RESET_DEF) continue;
 
     // Fake reset
     auto* cond = new ENode(OP_INT);
@@ -626,8 +631,7 @@ void visitRegDef(graph* g, PNode* reg, PNodeType t) {
   
   prefix_pop();
 
-  if (t == P_REG_DEF)
-    return ;
+  if (type == P_REG_DEF) return;
   
   ASTExpTree* resetCond = visitExpr(g, reg->getChild(2));
   ASTExpTree* resetVal = visitExpr(g, reg->getChild(3));
