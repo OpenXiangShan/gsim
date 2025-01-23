@@ -624,7 +624,7 @@ void graph::nodeDisplay(FILE* fp, Node* member) {
     if (member->width > BASIC_WIDTH) {
       fprintf(fp, "%s.displayn();\n", nameIdx.c_str());
     } else if (member->width > 128) {
-      fprintf(fp, "printf(\"%%lx|%%lx%%lx|%%lx \", (uint64_t)(%s >> 192), (uint64_t)(%s >> 128) (uint64_t)(%s >> 64), (uint64_t)(%s));", nameIdx.c_str(), nameIdx.c_str(), nameIdx.c_str(), nameIdx.c_str());
+      fprintf(fp, "printf(\"%%lx|%%lx%%lx|%%lx \", (uint64_t)(%s >> 192), (uint64_t)(%s >> 128), (uint64_t)(%s >> 64), (uint64_t)(%s));", nameIdx.c_str(), nameIdx.c_str(), nameIdx.c_str(), nameIdx.c_str());
     } else if (member->width > 64) {
       fprintf(fp, "printf(\"%%lx|%%lx \", (uint64_t)(%s >> 64), (uint64_t)(%s));", nameIdx.c_str(), nameIdx.c_str());
     } else {
