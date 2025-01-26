@@ -43,6 +43,10 @@ ResetType ENode::inferReset() {
     case OP_ASASYNCRESET:
       reset = ASYRESET;
       break;
+    case OP_BITS:
+    case OP_OR:
+      reset = UINTRESET;
+      break;
     case OP_ASCLOCK:
     default:
       printf("opType %d\n", opType);
