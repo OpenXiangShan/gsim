@@ -91,6 +91,11 @@ std::string legalCppCons(std::string str) {
   return format("UINT_CONCAT%d(%s)", concatNum, ret.c_str());
 }
 
+static std::string addBracket(std::string str) {
+  if (str.length() > 0 && str[0] == '(') return str;
+  return "(" + str + ")";
+}
+
 static std::string getConsStr(mpz_t& val) {
   std::string str = mpz_get_str(NULL, 16, val);
   return legalCppCons(str);
@@ -461,7 +466,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       if (getChild(1) && ChildInfo(1, directUpdate)) trueStr += ASSIGN_LABLE;
       if (getChild(2) && ChildInfo(2, directUpdate)) falseStr += ASSIGN_LABLE;
     }
-    ret->valStr = format("if(%s) { %s } else { %s }", condStr.c_str(), trueStr.c_str(), falseStr.c_str());
+    ret->valStr = format("if %s { %s } else { %s }", addBracket(condStr).c_str(), trueStr.c_str(), falseStr.c_str());
     ret->opNum = -1;
     ret->type = TYPE_STMT;
     ret->directUpdate = false;
@@ -1556,7 +1561,7 @@ valInfo* ENode::instsInvalid(Node* node, std::string lvalue, bool isRoot) {
 valInfo* ENode::instsPrintf() {
   valInfo* ret = computeInfo;
   ret->status = VAL_FINISH;
-  std::string printfInst = "if(" + ChildInfo(0, valStr) +  ") { printf(" + strVal;
+  std::string printfInst = format("if %s { printf(%s", addBracket(ChildInfo(0, valStr)).c_str(), strVal.c_str());
   for (int i = 1; i < getChildNum(); i ++) {
     printfInst += ", " + ChildInfo(i, valStr);
   }
@@ -1572,7 +1577,7 @@ valInfo* ENode::instsPrintf() {
 valInfo* ENode::instsExit() {
   valInfo* ret = computeInfo;
   ret->status = VAL_FINISH;
-  std::string exitInst = "if(" + ChildInfo(0, valStr) +  ") { exit(" + strVal + "); }";
+  std::string exitInst = format("if %s { exit(%s); }", addBracket(ChildInfo(0, valStr)).c_str(), strVal.c_str());
   if (ChildInfo(0, status) != VAL_CONSTANT || mpz_cmp_ui(ChildInfo(0, consVal), 0) != 0) {
     ret->insts.push_back(exitInst);
   }
@@ -1625,8 +1630,7 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
   } else {
     ret = format("%s = %s;", lvalue.c_str(), resetVal->valStr.c_str());
   }
-
-  computeInfo->valStr = format("if(%s) { %s %s }", ChildInfo(0, valStr).c_str(), ret.c_str(), ASSIGN_LABLE.c_str());
+  computeInfo->valStr = format("if %s { %s %s }", addBracket(ChildInfo(0, valStr)).c_str(), ret.c_str(), ASSIGN_LABLE.c_str());
   computeInfo->fullyUpdated = false;
   computeInfo->opNum = -1;
   computeInfo->type = TYPE_STMT;
