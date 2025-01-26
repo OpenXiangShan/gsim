@@ -27,6 +27,7 @@ class graph {
   void saveDiffRegs(FILE* fp);
   void genResetAll(FILE* fp);
   void genReset(FILE* fp, SuperNode* super, bool isUIntReset);
+  void genResetDecl(FILE* fp);
   std::string saveOldVal(FILE* fp, Node* node);
   void removeNodesNoConnect(NodeStatus status);
   void reconnectSuper();

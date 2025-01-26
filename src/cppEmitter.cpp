@@ -13,6 +13,8 @@
 #define ACTIVE_WIDTH 8
 #define NODE_PER_SUBFUNC 400
 
+#define RESET_PER_FUNC 400
+
 #define ENABLE_ACTIVATOR false
 
 #ifdef DIFFTEST_PER_SIG
@@ -35,8 +37,10 @@ static std::set<Node*> definedNode;
 static std::map<int, SuperNode*> cppId2Super;
 static std::set<int> alwaysActive;
 extern std::set<std::pair<int, int>> allMask;
+static std::vector<std::string> resetFuncs;
 extern int maxConcatNum;
 bool nameExist(std::string str);
+static int resetFuncNum = 0;
 
 static bool isAlwaysActive(int cppId) {
   return alwaysActive.find(cppId) != alwaysActive.end();
@@ -762,14 +766,22 @@ void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
       fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
     }
   }
-  for (size_t i = 0; i < super->member.size(); i ++) {
-    for (std::string str : isUIntReset ? super->member[i]->resetInsts : super->member[i]->insts) {
-      str = strReplace(str, ASSIGN_LABLE, "");
-      str = strReplace(str, format("if(%s)", resetName.c_str()), "");
-      if (super->resetNode->type == NODE_REG_SRC)
-        fprintf(fp, "%s\n", strReplace(str, "(" + super->resetNode->name + ")", "(" + RESET_NAME(super->resetNode) + ")").c_str());
-      else fprintf(fp, "%s\n", str.c_str());
+  int resetNum = (super->member.size() + RESET_PER_FUNC - 1) / RESET_PER_FUNC;
+  size_t idx = 0;
+  for (int i = 0; i < resetNum; i ++, resetFuncNum ++) {
+    fprintf(fp, "subReset%d();\n", resetFuncNum);
+    std::string resetFuncStr = format("void S%s::subReset%d(){\n", name.c_str(), resetFuncNum);
+    for (int j = 0; j < RESET_PER_FUNC && idx < super->member.size(); j ++, idx ++) {
+      for (std::string str : isUIntReset ? super->member[idx]->resetInsts : super->member[idx]->insts) {
+        str = strReplace(str, ASSIGN_LABLE, "");
+        str = strReplace(str, format("if(%s)", resetName.c_str()), "");
+        if (super->resetNode->type == NODE_REG_SRC)
+          resetFuncStr += strReplace(str, "(" + super->resetNode->name + ")", "(" + RESET_NAME(super->resetNode) + ")") + "\n";
+        else resetFuncStr += str + "\n";
+      }
     }
+    resetFuncStr += "}\n";
+    resetFuncs.push_back(resetFuncStr);
   }
   fprintf(fp, "}\n");
 }
@@ -790,6 +802,13 @@ void graph::genResetAll(FILE* fp) {
     genReset(fp, super, true);
   }
   fprintf(fp, "}\n");
+  for (std::string str : resetFuncs) fprintf(fp, "%s", str.c_str());
+}
+
+void graph::genResetDecl(FILE* fp) {
+  for (int i = 0; i < resetFuncNum; i ++) {
+    fprintf(fp, "void subReset%d();\n", i);
+  }
 }
 
 void graph::saveDiffRegs(FILE* fp) {
@@ -922,6 +941,7 @@ void graph::cppEmitter() {
   /* main evaluation loop (step)*/
   genActivate(src);
   genResetAll(src);
+  genResetDecl(header);
   saveDiffRegs(src);
   genStep(src);
   
