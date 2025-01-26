@@ -76,7 +76,7 @@ EVENT_DRIVEN ?= 0
 
 
 CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror \
-	-DDST_NAME=\"$(NAME)\" -DEVENT_DRIVEN=$(EVENT_DRIVEN) -DSUPER_BOUND=$(SUPER_BOUND) --std=c++20
+	-DDST_NAME=\"$(NAME)\" -DEVENT_DRIVEN=$(EVENT_DRIVEN) -DSUPER_BOUND=$(SUPER_BOUND) --std=c++17
 CXX = clang++
 CCACHE := ccache
 TARGET = GraphEmu

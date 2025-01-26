@@ -11,7 +11,7 @@ void ExpTree::replace(Node* oldNode, ENode* newENode) {
   std::stack<std::tuple<ENode*, ENode*, int>> s;
   s.push(std::make_tuple(getRoot(), nullptr, -1));
   if (getlval()) {
-    for (int i = 0; i < getlval()->getChildNum(); i ++) s.push(std::make_tuple(getlval()->getChild(i), getlval(), i));
+    for (size_t i = 0; i < getlval()->getChildNum(); i ++) s.push(std::make_tuple(getlval()->getChild(i), getlval(), i));
   }
 
   while(!s.empty()) {
@@ -24,7 +24,7 @@ void ExpTree::replace(Node* oldNode, ENode* newENode) {
       else setRoot(newENode);
     }
 
-    for (int i = 0; i < top->getChildNum(); i ++) {
+    for (size_t i = 0; i < top->getChildNum(); i ++) {
       ENode* enode = top->getChild(i);
       if (!enode) continue;
       s.push(std::make_tuple(enode, top, i));

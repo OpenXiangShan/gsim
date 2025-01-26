@@ -80,7 +80,7 @@ void graph::replicationOpt() {
     for (Node* member : super->member) {
       int op = member->repOpCount();
       int threadHold = super->member.size() == 1 ? 3 : 0;
-      if (mustNodes.find(member) != mustNodes.end() || op < 0 || op * member->next.size() >= threadHold || !member->anyExtEdge()) {
+      if (mustNodes.find(member) != mustNodes.end() || op < 0 || op * (int)member->next.size() >= threadHold || !member->anyExtEdge()) {
         opNum[member] = -1; // mark node is valid
       } else {
         opNum[member] = op; // mark node is replicated

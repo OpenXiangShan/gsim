@@ -34,7 +34,7 @@ void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes) {
         allNodes.insert(prevNode);
       }
     }
-    for (int i = 0; i < top->getChildNum(); i ++) {
+    for (size_t i = 0; i < top->getChildNum(); i ++) {
       if (top->getChild(i)) s.push(top->getChild(i));
     }
   }

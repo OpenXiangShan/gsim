@@ -10,7 +10,7 @@ void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
 
 void graph::mergeAsyncReset() {
   std::map<Node*, SuperNode*> resetMap;
-  for (int i = 0; i < sortedSuper.size(); i++) {
+  for (size_t i = 0; i < sortedSuper.size(); i++) {
     for (Node* member: sortedSuper[i]->member) {
       if (member->type != NODE_REG_SRC || member->reset != ASYRESET) continue;
       if (member->assignTree.size() != 1) continue;

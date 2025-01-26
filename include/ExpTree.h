@@ -177,6 +177,10 @@ private:
   valInfo* consExit();
   valInfo* consPrint();
   /* used in usedBits */
+  size_t checkChildIdx(size_t idx) {
+    Assert(getChildNum() > idx, "idx %ld is out of bound [0, %ld)", idx, getChildNum());
+    return idx;
+  }
 
 public:
   Node* nodePtr = nullptr;   // leafNodes: point to a real node; internals: nullptr
@@ -202,32 +206,15 @@ public:
     nodePtr = _node;
     id = counter ++;
   }
-  void setNode(Node* node) {
-    nodePtr = node;
-  }
-  void addChild(ENode* node) { // node can be empty (only for when)
-    child.push_back(node);
-  }
-  int getChildNum() {
-    return child.size();
-  }
-  void setChild(int idx, ENode* node) {
-    Assert(getChildNum() > idx, "idx %d is out of bound [0, %d)", idx, getChildNum());
-    child[idx] = node;
-  }
-  ENode* getChild(int idx) {
-    Assert(getChildNum() > idx, "idx %d is out of bound [0, %d)", idx, getChildNum());
-    return child[idx];
-  }
-  void addVal(int val) {
-    values.push_back(val);
-  }
-  void setOP(OPType type) {
-    opType = type;
-  }
-  Node* getNode() {
-    return nodePtr;
-  }
+  void setNode(Node* node) { nodePtr = node; }
+  // node can be empty (only for when)
+  void addChild(ENode* node) { child.push_back(node); }
+  size_t getChildNum() { return child.size(); }
+  void setChild(size_t idx, ENode* node) { child[checkChildIdx(idx)] = node; }
+  ENode* getChild(size_t idx) { return child[checkChildIdx(idx)]; }
+  void addVal(int val) { values.push_back(val); }
+  void setOP(OPType type) { opType = type; }
+  Node* getNode() { return nodePtr; }
   void setWidth(int _width, bool _sign) {
     width = _width;
     sign = _sign;

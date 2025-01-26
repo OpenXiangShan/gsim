@@ -63,7 +63,7 @@ void ExpTree::replace(std::map<Node*, ENode*>& aliasMap, bool isArray) {
   while (!s.empty()) {
     ENode* top = s.top();
     s.pop();
-    for (int i = 0; i < top->getChildNum(); i ++) {
+    for (size_t i = 0; i < top->getChildNum(); i ++) {
       if (!top->getChild(i)) continue;
       s.push(top->getChild(i));
       if (!top->getChild(i)->getNode()) continue;

@@ -69,7 +69,7 @@ ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index, Node* node) {
     ENode* parent = std::get<1>(top);
     int top_idx = std::get<2>(top);
     s.pop();
-    for (int i = 0; i < top_enode->getChildNum(); i ++) {
+    for (size_t i = 0; i < top_enode->getChildNum(); i ++) {
       if (!top_enode->getChild(i)) continue;
     }
     if (top_enode->getNode()) {
@@ -240,9 +240,10 @@ void distributeTree(Node* node, ExpTree* tree) {
       /* compute index for all array operands in tree */
       std::vector<int> subIdx(node->dimension.size() - tree->getlval()->getChildNum());
       int tmp = idx;
-      for (int i = node->dimension.size() - 1; i >= tree->getlval()->getChildNum(); i --) {
+      for (size_t i = node->dimension.size() - 1; i >= tree->getlval()->getChildNum(); i --) {
         subIdx[i - tree->getlval()->getChildNum()] = tmp % node->dimension[i];
         tmp /= node->dimension[i];
+        if (i == 0) break;
       }
 
       ExpTree* newTree = dupTreeWithIdx(tree, subIdx, node);
@@ -264,7 +265,7 @@ void splitAssignMent(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees)
   for (int idx = 0; idx < range; idx ++) {
     std::vector<int> subIdx(node->dimension.size() - tree->getlval()->getChildNum());
     int tmp = idx;
-    for (int i = node->dimension.size() - 1; i >= tree->getlval()->getChildNum(); i --) {
+    for (size_t i = node->dimension.size() - 1; i >= tree->getlval()->getChildNum(); i --) {
       subIdx[i - tree->getlval()->getChildNum()] = tmp % node->dimension[i];
       tmp /= node->dimension[i];
     }
@@ -284,7 +285,7 @@ void ExpTree::updateWithSplittedArray(Node* node, Node* array) {
     ENode* top_parent = std::get<1>(top_tuple);
     int top_idx = std::get<2>(top_tuple);
     if (!top_enode->nodePtr || top_enode->nodePtr != array) {
-      for (int i = 0; i < top_enode->getChildNum(); i ++) {
+      for (size_t i = 0; i < top_enode->getChildNum(); i ++) {
         if (top_enode->getChild(i)) s.push(std::make_tuple(top_enode->getChild(i), top_enode, top_idx < 0 ? top_idx : i));
       }
       continue;
@@ -358,7 +359,7 @@ void graph::splitArrayNode(Node* node) {
   for (ExpTree* tree : node->assignTree) distributeTree(node, tree);
   for (ExpTree* tree : node->arrayVal) distributeTree(node, tree);
   if (node->updateTree || node->resetTree) {
-    for (int idx = 0; idx < node->arrayEntryNum(); idx ++) {
+    for (size_t idx = 0; idx < node->arrayEntryNum(); idx ++) {
       /* compute index for all array operands in tree */
       std::vector<int> subIdx(node->dimension.size());
       int tmp = idx;
@@ -547,7 +548,7 @@ bool nextVarConnect(Node* node) {
         std::tie(beg, end) = top->getIdx(node);
         if (beg < 0) return true;
       }
-      for (int i = 0; i < top->getChildNum(); i ++) {
+      for (size_t i = 0; i < top->getChildNum(); i ++) {
         if (top->getChild(i)) s.push(std::make_pair(top->getChild(i), anyMux || (top->opType == OP_MUX)));
       }
     }

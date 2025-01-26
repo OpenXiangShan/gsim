@@ -41,7 +41,7 @@ void ExpTree::matchWidth(int width) {
   while (!s.empty()) {
     ENode* top = s.top();
     s.pop();
-    for (int i = top->opType == OP_STMT ? 0 : 1; i < top->getChildNum(); i ++) {
+    for (size_t i = top->opType == OP_STMT ? 0 : 1; i < top->getChildNum(); i ++) {
       ENode* child = top->getChild(i);
       if (child) {
         if (child->opType == OP_WHEN || child->opType == OP_STMT || child->opType == OP_RESET) {

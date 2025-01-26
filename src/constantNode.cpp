@@ -164,7 +164,7 @@ valInfo* ENode::consGroup(Node* node, bool isLvalue) {
   bool isStart = true;
   mpz_t sameConsVal;
   mpz_init(sameConsVal);
-  for (int i = 0; i < getChildNum(); i++) {
+  for (size_t i = 0; i < getChildNum(); i++) {
     if (ChildCons(i, status) != VAL_CONSTANT) {
       isSameConstant = false;
       break;
@@ -184,7 +184,7 @@ valInfo* ENode::consGroup(Node* node, bool isLvalue) {
     mpz_set(ret->consVal, sameConsVal);
     ret->updateConsVal();
   }
-  for (int i = 0; i < getChildNum(); i ++) ret->memberInfo.push_back(consEMap[getChild(i)]);
+  for (size_t i = 0; i < getChildNum(); i ++) ret->memberInfo.push_back(consEMap[getChild(i)]);
   return ret;
 }
 
