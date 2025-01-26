@@ -84,14 +84,14 @@ void graph::traversal() {
 }
 
 void SuperNode::display() {
-   printf("----super %d(type=%d)----:\n", id, superType);
+   printf("----super %d(type=%d, nodeNum %ld order %d)----:\n", id, superType, member.size(), order);
     for (Node* node : member) {
       node->display();
     }
 }
 
 void Node::display() {
-  printf("node %s[width %d sign %d status %d type %d]:\n", name.c_str(), width, sign, status, type);
+  printf("node %s[width %d sign %d status %d type %d super %d]:\n", name.c_str(), width, sign, status, type, super->id);
   for (size_t i = 0; i < assignTree.size(); i ++) {
     printf("[assign] %ld\n", i);
     assignTree[i]->display();
@@ -109,7 +109,7 @@ void Node::display() {
     printf("[resetTree]:\n");
     resetTree->display();
   }
-#if 0
+#if 1
   for (Node* nextNode : next) {
     printf("    next %p %s\n", nextNode, nextNode->name.c_str());
   }

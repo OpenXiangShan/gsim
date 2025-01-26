@@ -104,6 +104,11 @@ void graph::replicationOpt() {
     for (auto iter : nextSuper) {
       SuperNode* super = iter.first;
       if (super == node->super) continue;
+      bool anyValid = false;
+      for (Node* node : iter.second) {
+        if (node->status == VALID_NODE) anyValid = true;
+      }
+      if (!anyValid) continue;
       std::string dupName = format("%s$DUP_%d", node->name.c_str(), repIdx ++);
       Node* repNode = node->dup(node->type, dupName);
       for (Node* prev : node->prev) prev->next.insert(repNode);

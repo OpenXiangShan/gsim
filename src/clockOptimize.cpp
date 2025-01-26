@@ -94,7 +94,9 @@ void Node::setConstantZero(int w) {
   if (w > 0) computeInfo->width = w;
   else computeInfo->width = width;
   computeInfo->setConstantByStr("0");
+#if NODE_EXPR_OPT
   status = CONSTANT_NODE;
+#endif
 }
 
 /* clock alias & clock constant analysis */

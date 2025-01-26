@@ -133,7 +133,7 @@ void countOps(graph* g) {
   size_t totalOps = 0;
   for (SuperNode* super : g->sortedSuper) {
     for (Node* node : super->member) {
-      totalOps += countOpsInNode(node);
+      totalOps += countOpsInNode(node);;
     }
   }
   printf("totalOps %ld (total128 %ld) arithOp %ld (arith128 %ld) bitOp %ld (bit128 %ld) muxOp %ld (mux128 %ld) logiOp %ld (logi128 %ld) convertOp %ld (convert128 %ld) cmpOp %ld (cmp128 %ld) shiftOp %ld (shift128 %ld) readMem %ld reset %ld \n",
@@ -143,4 +143,18 @@ void countOps(graph* g) {
 void graph::perfAnalysis() {
   countAllNodeNum(this);
   countOps(this);
+}
+
+void graph::countIR() {
+  size_t nodeNum = 0;
+  size_t edgeNum = 0;
+  size_t regNum = 0;
+  for (SuperNode* super : sortedSuper) {
+    nodeNum += super->member.size();
+    for (Node* node : super->member) {
+      edgeNum += node->next.size();
+      if (node->type == NODE_REG_DST) regNum += 1;
+    }
+  }
+  printf("nodeNum %ld edgeNum = %ld regNum %ld\n", nodeNum, edgeNum, regNum);
 }

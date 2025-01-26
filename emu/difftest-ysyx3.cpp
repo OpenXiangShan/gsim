@@ -150,6 +150,10 @@ int main(int argc, char** argv) {
 #ifdef PERF
   FILE* activeFp = fopen(ACTIVE_FILE, "w");
 #endif
+  size_t nodeNum = 0;
+  for (size_t i = 0; i < sizeof(mod->nodeNum) / sizeof(mod->nodeNum[0]); i ++) {
+    nodeNum += mod->nodeNum[i];
+  }
   clock_t start = clock();
   while(!dut_end) {
 #ifdef VERILATOR
@@ -159,23 +163,26 @@ int main(int argc, char** argv) {
     ref->step();
 #endif
     cycles ++;
+    // if (cpu)
 #if (!defined(GSIM) && defined(VERILATOR)) || (defined(GSIM) && !defined(VERILATOR))
-    if(cycles % 10000000 == 0 && cycles <= 600000000) {
+    if(cycles % 1000000 == 0 && cycles <= 600000000) {
       clock_t dur = clock() - start;
       fprintf(stderr, "cycles %d (%d ms, %d per sec) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur);
 #ifdef PERF
       size_t totalActives = 0;
       size_t validActives = 0;
+      size_t nodeActives = 0;
       for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
         totalActives += mod->activeTimes[i];
         validActives += mod->validActive[i];
+        nodeActives += mod->nodeNum[i] * mod->activeTimes[i];
       }
-      printf("totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
-          totalActives, totalActives / cycles, validActives, validActives / cycles);
+      printf("nodeNum %ld totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld nodeActive %ld\n",
+          nodeNum, totalActives, totalActives / cycles, validActives, validActives / cycles, nodeActives);
       fprintf(activeFp, "totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
           totalActives, totalActives / cycles, validActives, validActives / cycles);
       for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
-        fprintf(activeFp, "%ld: activeTimes %ld validActive %ld\n", i, mod->activeTimes[i], mod->validActive[i]);
+        fprintf(activeFp, "%ld %s : activeTimes %ld validActive %ld\n", i, mod->activeName[i].c_str(), mod->activeTimes[i], mod->validActive[i]);
       }
       if (cycles == 50000000) return 0;
 #endif

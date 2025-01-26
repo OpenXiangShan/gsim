@@ -68,7 +68,25 @@ void Node::addReset() {
   if (resetType == ZERO_RESET) {
     /* do nothing */
   } else if (resetType == UINTRESET) {
-
+#if !(NODE_DUP_OPT)
+    ENode* regTop = new ENode(OP_WHEN);
+    regTop->addChild(resetCond->getRoot());
+    regTop->addChild(resetVal->getRoot());
+    if (getDst()->assignTree.size() != 0) {
+      regTop->addChild(getDst()->assignTree.back()->getRoot());
+      getDst()->assignTree.back()->setRoot(regTop);
+    } else {
+      regTop->addChild(nullptr);
+      getDst()->assignTree.push_back(new ExpTree(regTop, this->getDst()));
+    }
+    for (ExpTree* tree : getDst()->arrayVal) {
+      ENode* arrayWhenTop = new ENode(OP_WHEN);
+      arrayWhenTop->addChild(resetCond->getRoot());
+      arrayWhenTop->addChild(nullptr);
+      arrayWhenTop->addChild(tree->getRoot());
+      tree->setRoot(arrayWhenTop);
+    }
+#endif
   } else if (resetType == ASYRESET) {
     ENode* regTop = new ENode(OP_RESET);
     regTop->addChild(resetCond->getRoot());
@@ -78,6 +96,25 @@ void Node::addReset() {
       regTop->addChild(nullptr);
     assignTree.clear();
     assignTree.push_back(new ExpTree(regTop, this));
+#if !(NODE_DUP_OPT)
+    regTop = new ENode(OP_WHEN);
+    regTop->addChild(resetCond->getRoot());
+    regTop->addChild(resetVal->getRoot());
+    if (getDst()->assignTree.size() != 0) {
+      regTop->addChild(getDst()->assignTree.back()->getRoot());
+      getDst()->assignTree.back()->setRoot(regTop);
+    } else {
+      regTop->addChild(nullptr);
+      getDst()->assignTree.push_back(new ExpTree(regTop, this->getDst()));
+    }
+    for (ExpTree* tree : getDst()->arrayVal) {
+      ENode* arrayWhenTop = new ENode(OP_WHEN);
+      arrayWhenTop->addChild(resetCond->getRoot());
+      arrayWhenTop->addChild(nullptr);
+      arrayWhenTop->addChild(tree->getRoot());
+      tree->setRoot(arrayWhenTop);
+    }
+#endif
   } else {
     Panic();
   }

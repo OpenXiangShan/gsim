@@ -19,7 +19,7 @@ class graph {
   void genNodeStepEnd(FILE* fp, SuperNode* node);
   void genNodeInit(FILE* fp, Node* node);
   void genMemInit(FILE* fp, Node* node);
-  void nodeDisplay(FILE* fp, SuperNode* super);
+  void nodeDisplay(FILE* fp, Node* member);
   void genMemRead(FILE* fp);
   void genActivate(FILE* fp);
   void genUpdateRegister(FILE* fp);
@@ -100,7 +100,9 @@ class graph {
   void exprOpt();
   void patternDetect();
   void graphPartition();
+  void MFFCPartition();
   void dump(std::string FileName);
+  void countIR();
 };
 
 #endif

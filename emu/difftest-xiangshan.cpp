@@ -9,6 +9,7 @@
 #include <fstream>
 #include <set>
 #include <csignal>
+#include <chrono>
 
 #if defined(GSIM)
 #include <SimTop.h>
@@ -153,8 +154,13 @@ int main(int argc, char** argv) {
     dut_end = true;
   });
   uint64_t cycles = 0;
-  clock_t start = clock();
-  clock_t prevTime = start;
+  size_t nodeNum = 0;
+  for (size_t i = 0; i < sizeof(mod->nodeNum) / sizeof(mod->nodeNum[0]); i ++) {
+    nodeNum += mod->nodeNum[i];
+  }
+  auto start = std::chrono::system_clock::now();
+  auto prevTime = start;
+  // clock_t prevTime = start;
 #ifdef PERF
   FILE* activeFp = fopen(ACTIVE_FILE, "w");
 #endif
@@ -175,28 +181,29 @@ int main(int argc, char** argv) {
 #endif
     cycles ++;
     if(cycles % 100000 == 0 && cycles <= max_cycles) {
-      clock_t now = clock();
-      clock_t dur = now - start;
-      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec / current %ld ) \n", cycles, dur * 1000 / CLOCKS_PER_SEC, cycles * CLOCKS_PER_SEC / dur, 100000 * CLOCKS_PER_SEC / (now - prevTime));
+      auto now = std::chrono::system_clock::now();
+      auto dur = now - start;
+      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec / current %ld ) \n", cycles,
+            dur.count(), cycles * 1000 / dur.count(), 100000 * 1000 / (now - prevTime).count());
       prevTime = now;
 #ifdef PERF
       fprintf(activeFp, "cycles: %ld\n", cycles);
       size_t totalActives = 0;
       size_t validActives = 0;
+      size_t nodeActives = 0;
       for (size_t i = 0; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
         totalActives += mod->activeTimes[i];
         validActives += mod->validActive[i];
+        nodeActives += mod->nodeNum[i] * mod->activeTimes[i];
       }
-      printf("totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
-          totalActives, totalActives / cycles, validActives, validActives / cycles);
+      printf("nodeNum %ld totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld nodeActive %ld\n",
+          nodeNum, totalActives, totalActives / cycles, validActives, validActives / cycles, nodeActives);
       fprintf(activeFp, "totalActives %ld activePerCycle %ld totalValid %ld validPerCycle %ld\n",
           totalActives, totalActives / cycles, validActives, validActives / cycles);
       for (size_t i = 1; i < sizeof(mod->activeTimes) / sizeof(mod->activeTimes[0]); i ++) {
-        fprintf(activeFp, "%ld: nodeNum %d activeTimes %ld validActive %ld\n", i, mod->nodeNum[i], mod->activeTimes[i], mod->validActive[i]);
-        for (auto iter : mod->activator[i]) {
-          fprintf(activeFp, "    %ld: times %ld\n", iter.first, iter.second);
-        }
+        fprintf(activeFp, "%ld : activeTimes %ld validActive %ld\n", i, mod->activeTimes[i], mod->validActive[i]);
       }
+      return 0;
       if (cycles == 500000) return 0;
 #endif
       if (cycles == max_cycles) return 0;
@@ -220,7 +227,6 @@ int main(int argc, char** argv) {
     }
 #endif
     if(dut_end) {
-      clock_t dur = clock() - start;
     }
   }
 }

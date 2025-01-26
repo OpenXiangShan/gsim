@@ -435,6 +435,9 @@ public:
   bool operator != (int b) {
     return u256_1 != 0 || u256_0 != b;;
   }
+  bool operator > (int b) {
+    return u256_1 > 0 || u256_0 > b;
+  }
   uint512_t operator << (int shiftNum) {
     uint512_t ret;
 #if SUPPORT_U256
@@ -495,6 +498,9 @@ public:
   uint256_t operator & (uint256_t a) {
     return u256_0 & a;
   }
+  uint512_t operator | (uint8_t a) {
+    return *this | (uint32_t)a;
+  }
   uint512_t operator | (uint32_t a) {
     uint512_t ret;
     ret.u256_1 = u256_1;
@@ -553,6 +559,7 @@ public:
   uint512_t tail(int n);
   uint128_t bits128(int hi, int lo);
   uint256_t bits256(int hi, int lo);
+  uint512_t __attribute__ ((noinline)) bits512(int hi, int lo);
   uint512_t flip();
   void display() {
     printf("%lx %lx %lx %lx %lx %lx %lx %lx",
@@ -816,6 +823,10 @@ public:
     for (int i = 1; i < dataNum ; i++) data[i] = 0;
     data[0] = val;
   }
+  wide_t(uint32_t val) {
+    for (int i = 1; i < dataNum ; i++) data[i] = 0;
+    data[0] = val;
+  }
   wide_t(long val) {
     for (int i = 1; i < dataNum; i++) data[i] = 0;
     data[0] = val;
@@ -926,9 +937,26 @@ public:
     }
     return ret;
   }
+  wide_t<_dataNum> operator | (uint8_t a) {
+    wide_t<_dataNum> ret = *this;
+    ret.data[0] |= a;
+    return ret;
+  }
+  wide_t<_dataNum> operator | (int a) {
+    wide_t<_dataNum> ret = *this;
+    ret.data[0] |= a;
+    return ret;
+  }
   wide_t<_dataNum> operator | (uint64_t a) {
     wide_t<_dataNum> ret = *this;
     ret.data[0] |= a;
+    return ret;
+  }
+  wide_t<_dataNum> operator | (uint128_t a) {
+    static_assert(_dataNum > 8, "width is not enough");
+    wide_t<_dataNum> ret = *this;
+    ret.data[0] = data[0] | (uint64_t)(a); // TODO: optimize using pointer
+    ret.data[1] = data[1] | (uint64_t)(a >> 64);
     return ret;
   }
   wide_t<_dataNum> operator | (uint512_t a) {
@@ -1093,6 +1121,16 @@ public:
       offset += segWidth;
       idx ++;
     }
+    return ret;
+  }
+  wide_t<_dataNum> __attribute__ ((noinline)) bits(int hi, int lo) {
+    wide_t<_dataNum> ret = *this;
+    /* clear high */
+    int lshiftBits = _dataNum * 64 - hi - 1;
+    int rshiftBits = lshiftBits + lo;
+    if(lshiftBits == 0) ret = *this;
+    else ret = *this << lshiftBits;
+    if (rshiftBits != 0) ret = ret >> rshiftBits;
     return ret;
   }
   void display() {

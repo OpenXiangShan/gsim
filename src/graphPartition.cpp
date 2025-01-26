@@ -8,7 +8,7 @@
 #include <map>
 #include <tuple>
 
-#define SUPER_BOUND 35
+// #define SUPER_BOUND 35
 
 void graph::resort() {
   std::map<SuperNode*, int>times;
@@ -41,8 +41,10 @@ void graph::resort() {
 
 // coarsen phase
 void graph::graphCoarsen() {
+#if NODE_DUP_OPT
   mergeAsyncReset();
   mergeUIntReset();
+#endif
   // mergeSublings();
   mergeOut1();
   mergeIn1();

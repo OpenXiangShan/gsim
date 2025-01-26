@@ -102,10 +102,11 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
           "} \n")
         elif mod_width > 256:
           self.dstfp.writelines( \
-          "if(display || (" + modName + ") != (" + refName + ")){\n" + \
+          "if(display || (" + modName + " != " + refName + ")){\n" + \
           "  ret = true;\n" + \
-          modName + ".display();\n" + \
-          refName + ".display();\n" + \
+          "  std::cout << std::hex <<\"" + line[2] + ": \\n\"; \n" +  \
+          modName + ".displayn();\n" + \
+          refName + ".displayn();\n" + \
           "} \n")
 
     self.srcfp.close()

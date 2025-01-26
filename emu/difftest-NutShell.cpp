@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
       printf("%c", mod->get_io_uart_out_ch());
       fflush(stdout);
     }
-    dut_end = mod->soc$nutcore$_dataBuffer_T_ctrl_isNutCoreTrap;
+    // dut_end = mod->soc$nutcore$_dataBuffer_T_ctrl_isNutCoreTrap;
 #endif
 #if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
     bool isDiff = checkSignals(false);
@@ -198,7 +198,7 @@ int main(int argc, char** argv) {
     }
 #endif
 #if (defined (VERILATOR))
-  dut_end = ref->rootp->SimTop__DOT__soc__DOT__nutcore__DOT__dataBuffer_0_ctrl_isNutCoreTrap;
+  // dut_end = ref->rootp->SimTop__DOT__soc__DOT__nutcore__DOT__dataBuffer_0_ctrl_isNutCoreTrap;
 #endif
     if(dut_end) {
       clock_t dur = clock() - start;

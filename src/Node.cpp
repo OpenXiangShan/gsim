@@ -196,7 +196,11 @@ void Node::addUpdateTree() {
     ENode* whenNode = new ENode(OP_RESET);
     whenNode->addChild(resetCond->getRoot());
     whenNode->addChild(resetVal->getRoot());
+// #if NODE_DUP_OPT
     resetTree = new ExpTree(whenNode, this);
+// #else
+    // dst->assignTree.push_back(new ExpTree(whenNode, this));
+// #endif
   }
 }
 

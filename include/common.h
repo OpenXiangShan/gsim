@@ -24,8 +24,13 @@
 // #define MEM_CHECK
 // #define PERF
 // #define EMU_LOG
-// #define LOG_START 0
-// #define LOG_END 0
+#define LOG_START 0
+#define LOG_END 20
+
+#define MULTI_ACTIVE_CHECK false
+#define NODE_EXPR_OPT false
+#define NODE_DUP_OPT false
+#define DUPLICATE_OPT false
 
 #define LENGTH(a) (sizeof(a) / sizeof(a[0]))
 
@@ -48,9 +53,7 @@
             (width <= 64 ? "uint64_t" : \
             (width <= 128 ? "uint128_t" : \
             (width <= 256 ? "uint256_t" : \
-            (width <= 512 ? "uint512_t" : \
-            (width <= 1024 ? "uint1024_t" : \
-            (width <= 2048 ? "uint2048_t" : format("wide_t<%d>", (width + 63) / 64))))))))))
+            (width <= 512 ? "uint512_t" : format("wide_t<%d>", (width + 63) / 64))))))))
 
 #define widthSType(width) \
   std::string(width <= 8 ? "int8_t" : \
@@ -59,9 +62,7 @@
             (width <= 64 ? "int64_t" : \
             (width <= 128 ? "int128_t" : \
             (width <= 256 ? "int256_t" : \
-            (width <= 512 ? "int512_t" : \
-            (width <= 1024 ? "int1024_t" : \
-            (width <= 2048 ? "int2048_t" : "UNIMPLEMENTED")))))))))
+            (width <= 512 ? "int512_t" : "UNIMPLEMENTED")))))))
 
 #define widthBits(width) \
         (width <= 8 ? 8 : \
@@ -70,10 +71,9 @@
         (width <= 64 ? 64 : \
         (width <= 128 ? 128 : \
         (width <= 256 ? 256 : \
-        (width <= 512 ? 512 : \
-        (width <= 1024 ? 1024 : \
-        (width <= 2048 ? 2048 : (width + 63) / 64 * 64)))))))))
+        (width <= 512 ? 512 :  (width + 63) / 64 * 64)))))))
 
+// #define BASIC_WIDTH 128
 #define BASIC_WIDTH 256
 #define MAX_UINT_WIDTH 2048
 #define BASIC_TYPE __uint128_t

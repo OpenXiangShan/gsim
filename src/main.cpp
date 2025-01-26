@@ -98,40 +98,57 @@ int main(int argc, char** argv) {
   FUNC_TIMER(inferAllWidth());
 
   FUNC_WRAPPER(g->topoSort(), "TopoSort");
+  g->countIR();
 
+#if NODE_EXPR_OPT
   FUNC_WRAPPER(g->clockOptimize(), "ClockOptimize");
-
+#if DUPLICATE_OPT
   FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
-
+#endif
   FUNC_WRAPPER(g->exprOpt(), "ExprOpt");
 
-  FUNC_TIMER(g->usedBits());
+  // FUNC_TIMER(g->usedBits());
 
-  FUNC_TIMER(g->splitNodes());
+#endif
 
+  // FUNC_TIMER(g->splitNodes());
+#if DUPLICATE_OPT
   FUNC_TIMER(g->removeDeadNodes());
+#endif
 
+#if NODE_EXPR_OPT
   FUNC_WRAPPER(g->constantAnalysis(), "ConstantAnalysis");
-
+#if DUPLICATE_OPT
   FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
-
+#endif
+#endif
+#if DUPLICATE_OPT
   FUNC_WRAPPER(g->aliasAnalysis(), "AliasAnalysis");
+#endif
 
+
+#if NODE_EXPR_OPT
   FUNC_WRAPPER(g->patternDetect(), "PatternDetect");
+#endif
 
+#if NODE_DUP_OPT
   FUNC_WRAPPER(g->commonExpr(), "CommonExpr");
-
+#endif
+#if DUPLICATE_OPT
   FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
-
+#endif
+// g->traversal();
   // FUNC_WRAPPER(g->mergeNodes(), "MergeNodes");
-  FUNC_WRAPPER(g->graphPartition(), "graphPartition");
-
-  FUNC_WRAPPER(g->replicationOpt(), "Replication");
-
+  //  FUNC_WRAPPER(g->graphPartition(), "graphPartition");
+// g->traversal();
+  // FUNC_WRAPPER(g->replicationOpt(), "Replication");
+// g->traversal();
   FUNC_WRAPPER(g->mergeRegister(), "MergeRegister");
 
   FUNC_WRAPPER(g->constructRegs(), "ConstructRegs");
- 
+
+  FUNC_TIMER(g->perfAnalysis());
+
   FUNC_TIMER(g->instsGenerator());
 
   FUNC_WRAPPER(g->cppEmitter(), "Final");

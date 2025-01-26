@@ -6,6 +6,7 @@
 #include "common.h"
 #include <stack>
 #include <map>
+#include <string>
 #include <utility>
 
 /* check the node type and children num */
@@ -1279,7 +1280,7 @@ void visitWhenConnect(graph* g, PNode* connect) {
 */
 void visitWhenPrintf(graph* g, PNode* print) {
   TYPE_CHECK(print, 3, 3, P_PRINTF);
-  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, print->name));
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, "PRINTF_" + std::to_string(print->lineno)));
   ASTExpTree* exp = visitExpr(g, print->getChild(1));
 
   ENode* expRoot = exp->getExpRoot();

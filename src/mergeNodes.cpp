@@ -203,11 +203,11 @@ void graph::mergeNear() {
 void graph::mergeNodes() {
   size_t totalSuper = sortedSuper.size();
   size_t phaseSuper = sortedSuper.size();
-
+#if NODE_DUP_OPT
   mergeAsyncReset();
   mergeUIntReset();
   printf("[mergeNodes-reset] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
-
+#endif
   phaseSuper = sortedSuper.size();
   mergeOut1();
   printf("[mergeNodes-out1] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());

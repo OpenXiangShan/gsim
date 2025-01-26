@@ -829,15 +829,15 @@ valInfo* Node::computeConstantArray() {
       }
     }
 
-    if (type == NODE_REG_DST && getSrc()->assignTree.size() == 0) {
-      for (int i = 0; i < num; i ++) {
-        if (ret->memberInfo[i] && ret->memberInfo[i]->sameConstant) {
-          ret->memberInfo[i]->status = VAL_CONSTANT;
-          mpz_set(ret->memberInfo[i]->consVal, ret->memberInfo[i]->assignmentCons);
-          ret->memberInfo[i]->updateConsVal();
-        }
-      }
-    }
+    // if (type == NODE_REG_DST && getSrc()->assignTree.size() == 0) {
+    //   for (int i = 0; i < num; i ++) {
+    //     if (ret->memberInfo[i] && ret->memberInfo[i]->sameConstant) {
+    //       ret->memberInfo[i]->status = VAL_CONSTANT;
+    //       mpz_set(ret->memberInfo[i]->consVal, ret->memberInfo[i]->assignmentCons);
+    //       ret->memberInfo[i]->updateConsVal();
+    //     }
+    //   }
+    // }
 
     mpz_t sameConsVal;
     mpz_init(sameConsVal);
@@ -972,6 +972,7 @@ valInfo* Node::computeConstant() {
   if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) ret->setConstantByStr("0");
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
+    printf("constant %s = 0x", name.c_str()); mpz_out_str(stdout, 16, ret->consVal); printf("\n");
     if (type == NODE_REG_DST) {
       if ((getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, consMap[getSrc()]->consVal) == 0)) && cons_resetConsEq(ret, getSrc())) {
         getSrc()->status = CONSTANT_NODE;
@@ -1004,21 +1005,21 @@ valInfo* Node::computeConstant() {
       }
       recomputeAllNodes();
     }
-  } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant &&
-    (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(consMap[getSrc()]->consVal, ret->assignmentCons) == 0))
-    && cons_resetConsEq(ret, getSrc())) {
-    ret->status = VAL_CONSTANT;
-    mpz_set(ret->consVal, ret->assignmentCons);
-    ret->updateConsVal();
-    status = CONSTANT_NODE;
-    getSrc()->status = CONSTANT_NODE;
-    consMap[getSrc()] = ret;
-    for (Node* next : (regSplit ? getSrc() : this)->next) {
-      if (consMap.find(next) != consMap.end()) {
-        addRecompute(next);
-      }
-    }
-    recomputeAllNodes();
+  // } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant &&
+  //   (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(consMap[getSrc()]->consVal, ret->assignmentCons) == 0))
+  //   && cons_resetConsEq(ret, getSrc())) {
+  //   ret->status = VAL_CONSTANT;
+  //   mpz_set(ret->consVal, ret->assignmentCons);
+  //   ret->updateConsVal();
+  //   status = CONSTANT_NODE;
+  //   getSrc()->status = CONSTANT_NODE;
+  //   consMap[getSrc()] = ret;
+  //   for (Node* next : (regSplit ? getSrc() : this)->next) {
+  //     if (consMap.find(next) != consMap.end()) {
+  //       addRecompute(next);
+  //     }
+  //   }
+  //   recomputeAllNodes();
   }
   ret->width = width;
   ret->sign = sign;
@@ -1154,7 +1155,7 @@ void graph::constantAnalysis() {
       n->computeConstant();
     }
   }
-  constantMemory();
+//  constantMemory();
 
   /* remove constant nodes */
   int consNum = 0;
@@ -1164,6 +1165,7 @@ void graph::constantAnalysis() {
           consNum ++;
           member->computeInfo = consMap[member];
           member->computeInfo->updateConsVal();
+          // printf("constant %s(%d) = 0x%s\n", member->name.c_str(), member->width, mpz_get_str(NULL, 16, member->computeInfo->consVal));
       }
     }
   }
