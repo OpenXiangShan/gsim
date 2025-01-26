@@ -1753,7 +1753,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
         int shiftBits = widthBits(width) - computeInfo->width;
         computeInfo->valStr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
       } else if (sign) {
-        computeInfo->valStr = format("%s%s", Cast(width, true).c_str(), computeInfo->valStr.c_str());
+        computeInfo->valStr = format("(%s%s)", Cast(width, true).c_str(), computeInfo->valStr.c_str());
       }
     } else if (!IS_INVALID_LVALUE(lvalue)) { // info->width > BASIC_WIDTH
       if (computeInfo->width > width) {
