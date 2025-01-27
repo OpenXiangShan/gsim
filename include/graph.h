@@ -70,7 +70,6 @@ class graph {
   std::set<Node*> splittedArray;
   std::vector<std::string> extDecl;
   std::string name;
-  int maxTmp = 0;
   int nodeNum = 0;
   int subStepNum = -1;
   int updateRegNum = -1;
