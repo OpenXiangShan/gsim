@@ -20,9 +20,7 @@
 #define ChildInfo(id, name) getChild(id)->computeInfo->name
 
 #define newLocalTmp() ("TMP$" + std::to_string((*localTmpNum) ++))
-#define newMpzTmp() ("MPZ_TMP$" + std::to_string((*mpzTmpNum) ++))
 static int *localTmpNum = nullptr;
-static int *mpzTmpNum = nullptr;
 
 #define INVALID_LVALUE "INVALID_STR"
 #define IS_INVALID_LVALUE(name) (name == INVALID_LVALUE)
@@ -33,18 +31,16 @@ void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 std::string idx2Str(Node* node, int idx, int dim);
 static void recomputeAllNodes();
 
-static std::stack<std::pair<int*, int*>> tmpStack;
-
-std::set<std::pair<int, int>> allMask;
-
 static int stmtDepth = 0;
 int maxConcatNum = 0;
+
+static std::stack<int*> tmpStack;
 static void tmp_push() {
-  tmpStack.push(std::make_pair(localTmpNum, mpzTmpNum));
+  tmpStack.push(localTmpNum);
 }
 
 static void tmp_pop() {
-  std::tie(localTmpNum, mpzTmpNum) = tmpStack.top();
+  localTmpNum = tmpStack.top();
   tmpStack.pop();
 }
 
@@ -123,17 +119,12 @@ static std::string upperCast(int width1, int width2, bool sign) {
 }
 
 static std::string bitMask(int width) {
-  Assert(width > 0, "invalid width %d", width);
-  if (width <= BASIC_WIDTH) {
-    std::string ret = std::string(width/4, 'f');
-    const char* headTable[] = {"", "1", "3", "7"};
-    ret = headTable[width % 4] + ret;
-    ret = legalCppCons(ret);
-    return ret;
-  } else {
-    allMask.insert(std::make_pair(width-1, 0));
-    return format("UINT_MASK_%d_%d", width - 1, 0);
-  }
+  Assert(width > 0 && width <= BASIC_WIDTH, "invalid width %d", width);
+  std::string ret = std::string(width/4, 'f');
+  const char* headTable[] = {"", "1", "3", "7"};
+  ret = headTable[width % 4] + ret;
+  ret = legalCppCons(ret);
+  return ret;
 }
 
 static std::string rangeMask(int hi, int lo) {
@@ -1864,8 +1855,7 @@ valInfo* Node::compute() {
   }
   tmp_push();
   localTmpNum = &super->localTmpNum;
-  mpzTmpNum = &super->mpzTmpNum;
-  MUX_DEBUG(printf("compute %s lcoalTmp %d mpzTmp %d\n", name.c_str(), *localTmpNum, *mpzTmpNum));
+  MUX_DEBUG(printf("compute %s lcoalTmp %d\n", name.c_str(), *localTmpNum));
   MUX_DEBUG(display());
 
   if (isArray()) {
@@ -2353,8 +2343,6 @@ void graph::instsGenerator() {
       reg->resetInsts.insert(reg->resetInsts.end(), newInsts.begin(), newInsts.end());
     }
   }
-
-  for (SuperNode* super : sortedSuper) maxTmp = MAX(maxTmp, super->mpzTmpNum);
 
   for (Node* n: s_array) srcUpdateDst(n);
 
