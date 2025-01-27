@@ -23,7 +23,7 @@ ifeq ($(dutName),ysyx3)
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
 	mainargs = ready-to-run/bin/bbl-hello.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
-	TEST_FILE = ready-to-run/$(NAME)
+	TEST_FILE = ready-to-run/ysyx3-chirrtl/$(NAME)
 	SUPER_BOUND ?= 20
 else ifeq ($(dutName),NutShell)
 	NAME ?= SimTop
