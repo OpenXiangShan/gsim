@@ -4,28 +4,17 @@
 class clockVal {
 public:
   Node* node = nullptr;
-  mpz_t val;
+  int val = 0;
   bool isInvalid = false;
-  clockVal(Node* n) {
-    node = n;
-  }
-  clockVal(mpz_t& mpz_val) {
-    mpz_init(val);
-    mpz_set(val, mpz_val);
-  }
-  clockVal(std::string s) {
-    mpz_init(val);
-    mpz_set_str(val, s.c_str(), 16);
-  }
-  clockVal() {
-    isInvalid = true;
-  }
+  clockVal(Node* n) { node = n; }
+  clockVal(int v) { val = v; }
+  clockVal() { isInvalid = true; }
 };
 
 std::map<Node*, clockVal*> clockMap;
 
 clockVal* ENode::clockCompute() {
-  if (width == 0) return new clockVal("0");
+  if (width == 0) return new clockVal(0);
   if (nodePtr) {
     if (clockMap.find(nodePtr) != clockMap.end()) return clockMap[nodePtr];
     else return nodePtr->clockCompute();
@@ -55,10 +44,10 @@ clockVal* ENode::clockCompute() {
       ret->isInvalid = true;
       break;
     case OP_INT:
-      ret = new clockVal("0");
+      ret = new clockVal(0);
       break;
     case OP_EQ:
-      ret = new clockVal("0");
+      ret = new clockVal(0);
       printf("Warning: A clock signal driven by the == operator is detected. "
              "It is not supported now and treated as a constant clock signal. "
              "This may cause wrong result during simulation.\n");
@@ -80,7 +69,7 @@ clockVal* Node::clockCompute() {
   if (assignTree.size() != 0) {
     clockMap[this] = assignTree[0]->getRoot()->clockCompute();
   } else {
-    clockMap[this] = new clockVal("0");
+    clockMap[this] = new clockVal(0);
     printf("Warning: An external clock signal is detected. "
            "It is not supported now and treated as a constant clock signal. "
            "This may cause wrong result during simulation.\n");
