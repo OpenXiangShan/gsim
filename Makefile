@@ -190,13 +190,11 @@ compile: $(SPLIT_CPP_DIR)/$(NAME)0.cpp
 EMU_BUILD_DIR = $(WORK_DIR)/emu
 EMU_BIN = $(WORK_DIR)/S$(NAME)
 
-EMU_LIB_DIR = emu/lib
-EMU_MAIN_SRCS = emu/emu.cpp $(shell find $(EMU_LIB_DIR) -name "*.cpp")
+EMU_MAIN_SRCS = emu/emu.cpp
 EMU_GEN_SRCS = $(shell find $(SPLIT_CPP_DIR) -name "*.cpp" 2> /dev/null)
 EMU_SRCS = $(EMU_MAIN_SRCS) $(EMU_GEN_SRCS)
 
-EMU_INC_DIR = $(GEN_CPP_DIR) $(EMU_LIB_DIR)
-EMU_CFLAGS := -O3 -MMD $(addprefix -I, $(abspath $(EMU_INC_DIR))) $(EMU_CFLAGS) # allow to overwrite -O3
+EMU_CFLAGS := -O3 -MMD $(addprefix -I, $(abspath $(GEN_CPP_DIR))) $(EMU_CFLAGS) # allow to overwrite -O3
 EMU_CFLAGS += $(MODE_FLAGS) $(CFLAGS_DUT) -Wno-parentheses-equality
 EMU_CFLAGS += -fbracket-depth=2048
 #EMU_CFLAGS += -fsanitize=address -fsanitize-address-use-after-scope
@@ -206,7 +204,7 @@ EMU_CFLAGS += -fbracket-depth=2048
 $(foreach x, $(EMU_SRCS), $(eval \
 	$(call CXX_TEMPLATE, $(EMU_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(EMU_CFLAGS), EMU_OBJS,)))
 
-$(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS) -lgmp))
+$(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS)))
 
 run-emu: $(EMU_BIN)
 	$(TIME) $^ $(mainargs)
@@ -234,7 +232,7 @@ VERI_BIN = $(WORK_DIR)/V$(NAME)
 VERI_GEN_MK = $(VERI_BUILD_DIR)/V$(NAME).mk
 
 VERI_CFLAGS = $(call escape_quote,$(EMU_CFLAGS) $(CFLAGS_REF))
-VERI_LDFLAGS = -O3 -lgmp
+VERI_LDFLAGS = -O3
 VERI_VFLAGS = --top $(NAME) -O3 -Wno-lint -j 8 --cc --exe +define+RANDOMIZE_GARBAGE_ASSIGN --max-num-width 1048576 --compiler clang
 VERI_VFLAGS += -Mdir $(VERI_BUILD_DIR) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)"
 #VERI_VFLAGS += --trace-fst
