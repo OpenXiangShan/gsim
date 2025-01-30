@@ -216,9 +216,20 @@ FILE* graph::genHeaderStart() {
   includeLib(header, "iomanip", true);
   includeLib(header, "cstring", true);
   includeLib(header, "map", true);
-  includeLib(header, "functions.h", false);
-  includeLib(header, "uint.h", false);
   newLine(header);
+
+  fprintf(header, "#define Assert(cond, ...) do {"
+                     "if (!(cond)) {"
+                       "fprintf(stderr, \"\\33[1;31m\");"
+                       "fprintf(stderr, __VA_ARGS__);"
+                       "fprintf(stderr, \"\\33[0m\\n\");"
+                       "assert(cond);"
+                     "}"
+                   "} while (0)\n");
+
+  fprintf(header, "#ifndef __BITINT_MAXWIDTH__ // defined by clang\n");
+  fprintf(header, "#error Please compile with clang 16 or above\n");
+  fprintf(header, "#endif\n");
 
   fprintf(header, "#define likely(x) __builtin_expect(!!(x), 1)\n");
   fprintf(header, "#define unlikely(x) __builtin_expect(!!(x), 0)\n");
