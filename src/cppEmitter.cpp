@@ -780,7 +780,7 @@ void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
     for (int j = 0; j < RESET_PER_FUNC && idx < super->member.size(); j ++, idx ++) {
       for (std::string str : isUIntReset ? super->member[idx]->resetInsts : super->member[idx]->insts) {
         str = strReplace(str, ASSIGN_LABLE, "");
-        str = strReplace(str, format("if(%s)", resetName.c_str()), "");
+        str = strReplace(str, format("if (%s)", resetName.c_str()), "");
         if (super->resetNode->type == NODE_REG_SRC)
           resetFuncStr += strReplace(str, "(" + super->resetNode->name + ")", "(" + RESET_NAME(super->resetNode) + ")") + "\n";
         else resetFuncStr += str + "\n";
