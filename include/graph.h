@@ -10,8 +10,8 @@ class graph {
   FILE* genSrcStart();
   void genNodeDef(FILE* fp, Node* node);
   void genNodeInsts(FILE* fp, Node* node, std::string flagName);
-  void genInterfaceInput(FILE* fp, Node* input);
-  void genInterfaceOutput(FILE* fp, Node* output);
+  void genInterfaceInput(FILE* header, FILE *src, std::string &nameSpace, Node* input);
+  void genInterfaceOutput(FILE* header, FILE *src, std::string &nameSpace, Node* output);
   void genStep(FILE* fp);
   void genHeaderEnd(FILE* fp);
   void genSrcEnd(FILE* fp);

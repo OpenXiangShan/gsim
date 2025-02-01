@@ -171,10 +171,6 @@ static std::string arrayPrevName (std::string name) {
 }
 #endif
 
-static void inline declStep(FILE* fp) {
-  fprintf(fp, "void step();\n");
-}
-
 void graph::genNodeInit(FILE* fp, Node* node) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
@@ -194,9 +190,9 @@ void graph::genNodeInit(FILE* fp, Node* node) {
         break;
       default:
         if (node->isArray()) {
-          fprintf(fp, "memset(%s, 0, sizeof(%s));\n", node->name.c_str(), node->name.c_str());
+          fprintf(fp, "  memset(%s, 0, sizeof(%s));\n", node->name.c_str(), node->name.c_str());
         } else {
-          fprintf(fp, "%s = 0;\n", node->name.c_str());
+          fprintf(fp, "  %s = 0;\n", node->name.c_str());
         }
     }
 #endif
@@ -245,102 +241,36 @@ FILE* graph::genHeaderStart() {
   }
   for (std::string str : extDecl) fprintf(header, "%s\n", str.c_str());
   newLine(header);
-  /* class start*/
-  fprintf(header, "class S%s {\npublic:\n", name.c_str());
-  fprintf(header, "uint64_t cycles = 0;\n");
 
-  /* constructor */
-  fprintf(header, "S%s() {\n", name.c_str());
-  fprintf(header, "activateAll();\n");
-#ifdef PERF
-  fprintf(header, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
-  #if ENABLE_ACTIVATOR
-  fprintf(header, "for (int i = 0; i < %d; i ++) activator[i] = NULL;\n", superId);
-  #endif
-for (SuperNode* super : sortedSuper) {
-  if (super->cppId >= 0) {
-    size_t num = 0;
-    for (Node* member : super->member) {
-      if (member->anyNextActive()) num ++;
-    }
-    fprintf(header, "nodeNum[%d] = %ld; // memberNum=%ld\n", super->cppId, num, super->member.size());
-  }
-}
-  fprintf(header, "for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
-#endif
-  for (SuperNode* super : sortedSuper) {
-    if (super->superType != SUPER_VALID && super->superType != SUPER_ASYNC_RESET) continue;
-    for (Node* member : super->member) {
-      genNodeInit(header, member);
-    }
-  }
-
-#if  defined (MEM_CHECK) || defined (DIFFTEST_PER_SIG)
-  for (Node* mem :memory) {
-    fprintf(header, "memset(%s, 0, sizeof(%s));\n", mem->name.c_str(), mem->name.c_str());
-  }
-#endif
-  fprintf(header, "}\n");  // end of constructor
-
-  fprintf(header, "void activateAll() {\n");
-  fprintf(header, "  for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
-  fprintf(header, "}\n");
-
-  fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
-#ifdef PERF
-  fprintf(header, "size_t activeTimes[%d];\n", superId);
-  #if ENABLE_ACTIVATOR
-  fprintf(header, "struct activatorEntry {\n"
-                  "  int cppId;\n"
-                  "  int cnt;\n"
-                  "  struct activatorEntry *next;\n"
-                  "} *activator[%d];\n", superId);
-
-  fprintf(header, "void recordActivator(int id, int cppId) {\n"
-                  "  struct activatorEntry *p = activator[id];\n"
-                  "  while (p != NULL) { if (p->cppId == cppId) break; }\n"
-                  "  if (p == NULL) {\n"
-                  "    p = (struct activatorEntry *)malloc(sizeof(*p));\n"
-                  "    p->cppId = cppId;\n"
-                  "    p->cnt = 0;\n"
-                  "    p->next = activator[id];\n"
-                  "    activator[id] = p;\n"
-                  "  }\n"
-                  "  p->cnt ++;\n"
-                  "}\n");
-  #endif
-  fprintf(header, "size_t validActive[%d];\n", superId);
-  fprintf(header, "size_t nodeNum[%d];\n", superId);
-#endif
   return header;
 }
 
-void graph::genInterfaceInput(FILE* fp, Node* input) {
+void graph::genInterfaceInput(FILE* header, FILE *src, std::string &nameSpace, Node* input) {
   /* set by string */
-  fprintf(fp, "void set_%s(%s val) {\n", input->name.c_str(), widthUType(input->width).c_str());
-  fprintf(fp, "%s = val;\n", input->name.c_str());
+  fprintf(header, "void set_%s(%s val);\n", input->name.c_str(), widthUType(input->width).c_str());
+  fprintf(src, "void %sset_%s(%s val) {\n", nameSpace.c_str(), input->name.c_str(), widthUType(input->width).c_str());
+  fprintf(src, "  %s = val;\n", input->name.c_str());
   for (std::string inst : input->insts) {
-    fprintf(fp, "%s\n", inst.c_str());
+    fprintf(src, "  %s\n", inst.c_str());
   }
   /* TODO: activate node next.size()
     activate all nodes for simplicity
   */
   /* update nodes in the same superNode */
-  fprintf(fp, "for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
-  fprintf(fp, "}\n");
+  fprintf(src, "  for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
+  fprintf(src, "}\n");
 }
 
-void graph::genInterfaceOutput(FILE* fp, Node* output) {
+void graph::genInterfaceOutput(FILE* header, FILE *src, std::string &nameSpace, Node* output) {
   /* TODO: fix constant output which is not exists in sortedsuper */
   if (std::find(sortedSuper.begin(), sortedSuper.end(), output->super) == sortedSuper.end()) return;
-  fprintf(fp, "%s get_%s() {\n", widthUType(output->width).c_str(), output->name.c_str());
-  if (output->status == CONSTANT_NODE) fprintf(fp, "return %s;\n", output->computeInfo->valStr.c_str());
-  else fprintf(fp, "return %s;\n", output->computeInfo->valStr.c_str());
-  fprintf(fp, "}\n");
+  fprintf(header, "%s get_%s();\n", widthUType(output->width).c_str(), output->name.c_str());
+  fprintf(src, "%s %sget_%s() {\n", widthUType(output->width).c_str(), nameSpace.c_str(), output->name.c_str());
+  fprintf(src, "  return %s;\n", output->computeInfo->valStr.c_str());
+  fprintf(src, "}\n");
 }
 
 void graph::genHeaderEnd(FILE* fp) {
-
   fprintf(fp, "};\n");
   fprintf(fp, "#endif\n");
 }
@@ -912,8 +842,32 @@ void graph::cppEmitter() {
     }
   }
 
+  std::string nameSpace = format("S%s::", name.c_str());
+
   FILE* header = genHeaderStart();
   FILE* src = genSrcStart();
+
+#if defined(PERF) && ENABLE_ACTIVATOR
+  fprintf(header, "struct activatorEntry {\n"
+                  "  int cppId;\n"
+                  "  int cnt;\n"
+                  "  struct activatorEntry *next;\n"
+                  "};\n");
+#endif
+
+  /* class start*/
+  fprintf(header, "class S%s {\npublic:\n", name.c_str());
+  fprintf(header, "uint64_t cycles = 0;\n");
+  fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
+#ifdef PERF
+  fprintf(header, "size_t activeTimes[%d];\n", superId);
+  fprintf(header, "size_t validActive[%d];\n", superId);
+  fprintf(header, "size_t nodeNum[%d];\n", superId);
+#if ENABLE_ACTIVATOR
+  fprintf(header, "struct activatorEntry *activator[%d];\n", superId);
+#endif
+#endif
+
   // header: node definition; src: node evaluation
 #ifdef DIFFTEST_PER_SIG
   sigFile = fopen((OutputDir + "/" + name + "_sigs.txt").c_str(), "w");
@@ -930,11 +884,10 @@ void graph::cppEmitter() {
   }
   /* memory definition */
   for (Node* mem : memory) genNodeDef(header, mem);
-   /* input/output interface */
-  for (Node* node : input) genInterfaceInput(header, node);
-  for (Node* node : output) genInterfaceOutput(header, node);
-  /* declare step functions */
-  declStep(header);
+
+  /* declare functions */
+  fprintf(header, "S%s();\n", name.c_str()); // constructor
+  fprintf(header, "void step();\n");
 #ifdef EMU_LOG
   for (int i = 0; i < displayNum; i ++) {
     fprintf(header, "void display%d();\n", i);
@@ -944,10 +897,70 @@ void graph::cppEmitter() {
     fprintf(header, "void subStep%d();\n", i);
   }
 
+  fprintf(header, "void activateAll();\n");
   fprintf(header, "void resetAll();\n");
 
+#if defined(PERF) && ENABLE_ACTIVATOR
+  fprintf(header, "void recordActivator(int id, int cppId);\n");
+#endif
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
   fprintf(header, "void saveDiffRegs();\n");
+#endif
+
+  /* constructor */
+  fprintf(src, "%sS%s() {\n", nameSpace.c_str(), name.c_str());
+  fprintf(src, "  activateAll();\n");
+#ifdef PERF
+  fprintf(src, "  for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
+#if ENABLE_ACTIVATOR
+  fprintf(src, "  for (int i = 0; i < %d; i ++) activator[i] = NULL;\n", superId);
+#endif
+  for (SuperNode* super : sortedSuper) {
+    if (super->cppId >= 0) {
+      size_t num = 0;
+      for (Node* member : super->member) {
+        if (member->anyNextActive()) num ++;
+      }
+      fprintf(src, "  nodeNum[%d] = %ld; // memberNum=%ld\n", super->cppId, num, super->member.size());
+    }
+  }
+  fprintf(src, "  for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
+#endif
+  for (SuperNode* super : sortedSuper) {
+    if (super->superType != SUPER_VALID && super->superType != SUPER_ASYNC_RESET) continue;
+    for (Node* member : super->member) {
+      genNodeInit(src, member);
+    }
+  }
+
+#if  defined (MEM_CHECK) || defined (DIFFTEST_PER_SIG)
+  for (Node* mem :memory) {
+    fprintf(src, "  memset(%s, 0, sizeof(%s));\n", mem->name.c_str(), mem->name.c_str());
+  }
+#endif
+  fprintf(src, "}\n");  // end of constructor
+
+  fprintf(src, "void %sactivateAll() {\n", nameSpace.c_str());
+  fprintf(src, "  for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
+  fprintf(src, "}\n");
+
+  /* input/output interface */
+  for (Node* node : input) genInterfaceInput(header, src, nameSpace, node);
+  for (Node* node : output) genInterfaceOutput(header, src, nameSpace, node);
+
+#if defined(PERF) && ENABLE_ACTIVATOR
+  fprintf(src, "void %srecordActivator(int id, int cppId) {\n"
+               "  struct activatorEntry *p = activator[id];\n"
+               "  while (p != NULL) { if (p->cppId == cppId) break; }\n"
+               "  if (p == NULL) {\n"
+               "    p = (struct activatorEntry *)malloc(sizeof(*p));\n"
+               "    p->cppId = cppId;\n"
+               "    p->cnt = 0;\n"
+               "    p->next = activator[id];\n"
+               "    activator[id] = p;\n"
+               "  }\n"
+               "  p->cnt ++;\n"
+               "}\n", nameSpace.c_str());
 #endif
 
   /* main evaluation loop (step)*/
