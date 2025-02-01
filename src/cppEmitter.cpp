@@ -208,14 +208,14 @@ FILE* graph::genHeaderStart() {
 
   fprintf(header, "#ifndef %s_H\n#define %s_H\n", name.c_str(), name.c_str());
   /* include all libs */
-  includeLib(header, "iostream", true);
-  includeLib(header, "vector", true);
+  includeLib(header, "stdint.h", true);
+  includeLib(header, "stdio.h", true);
+  includeLib(header, "string.h", true);
+  includeLib(header, "stdlib.h", true);
   includeLib(header, "assert.h", true);
-  includeLib(header, "cstdint", true);
-  includeLib(header, "ctime", true);
-  includeLib(header, "iomanip", true);
-  includeLib(header, "cstring", true);
-  includeLib(header, "map", true);
+#if defined(PERF) && ENABLE_ACTIVATOR
+  includeLib(header, "sys/queue.h", true);
+#endif
   newLine(header);
 
   fprintf(header, "#define Assert(cond, ...) do {"
@@ -248,15 +248,14 @@ FILE* graph::genHeaderStart() {
   /* class start*/
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
   fprintf(header, "uint64_t cycles = 0;\n");
-  /* constrcutor */
-  fprintf(header, "S%s() {\ninit();\n}", name.c_str());
-  /*initialization */
-  fprintf(header, "void init() {\n");
+
+  /* constructor */
+  fprintf(header, "S%s() {\n", name.c_str());
   fprintf(header, "activateAll();\n");
 #ifdef PERF
   fprintf(header, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
   #if ENABLE_ACTIVATOR
-  fprintf(header, "for (int i = 0; i < %d; i ++) activator[i] = std::map<int, int>();\n", superId);
+  fprintf(header, "for (int i = 0; i < %d; i ++) activator[i] = NULL;\n", superId);
   #endif
 for (SuperNode* super : sortedSuper) {
   if (super->cppId >= 0) {
@@ -281,17 +280,34 @@ for (SuperNode* super : sortedSuper) {
     fprintf(header, "memset(%s, 0, sizeof(%s));\n", mem->name.c_str(), mem->name.c_str());
   }
 #endif
-  fprintf(header, "}\n");
+  fprintf(header, "}\n");  // end of constructor
 
   fprintf(header, "void activateAll() {\n");
-  fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
+  fprintf(header, "  for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
   fprintf(header, "}\n");
 
   fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
   #if ENABLE_ACTIVATOR
-  fprintf(header, "std::map<int, int>activator[%d];\n", superId);
+  fprintf(header, "struct activatorEntry {\n"
+                  "  int cppId;\n"
+                  "  int cnt;\n"
+                  "  struct activatorEntry *next;\n"
+                  "} *activator[%d];\n", superId);
+
+  fprintf(header, "void recordActivator(int id, int cppId) {\n"
+                  "  struct activatorEntry *p = activator[id];\n"
+                  "  while (p != NULL) { if (p->cppId == cppId) break; }\n"
+                  "  if (p == NULL) {\n"
+                  "    p = (struct activatorEntry *)malloc(sizeof(*p));\n"
+                  "    p->cppId = cppId;\n"
+                  "    p->cnt = 0;\n"
+                  "    p->next = activator[id];\n"
+                  "    activator[id] = p;\n"
+                  "  }\n"
+                  "  p->cnt ++;\n"
+                  "}\n");
   #endif
   fprintf(header, "size_t validActive[%d];\n", superId);
   fprintf(header, "size_t nodeNum[%d];\n", superId);
@@ -519,8 +535,7 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   #ifdef PERF
     #if ENABLE_ACTIVATOR
     for (int id : nextNodeId) {
-      fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\nactivator[%d][%d] ++;\n",
-                  id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
+      fprintf(fp, "recordActivator(%d, %d);\n", id, node->super->cppId);
     }
     #endif
     if (inStep) fprintf(fp, "isActivateValid = true;\n");
@@ -540,8 +555,7 @@ static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bo
 #ifdef PERF
   #if ENABLE_ACTIVATOR
   for (int id : activateId) {
-    fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\n activator[%d][%d] ++;\n",
-                id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
+    fprintf(fp, "recordActivator(%d, %d);\n", id, node->super->cppId);
   }
   #endif
   if (inStep) fprintf(fp, "isActivateValid = true;\n");
