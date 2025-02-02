@@ -1182,7 +1182,7 @@ valInfo* ENode::instsPad(Node* node, std::string lvalue, bool isRoot) {
   /* no operation for UInt variable */
   if (!sign || (width <= ChildInfo(0, width))) {
     for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
-    if (ChildInfo(0, opNum) >= 0 && widthBits(ChildInfo(0, width)) < width) {
+    if (ChildInfo(0, opNum) >= 0 && (int)widthBits(ChildInfo(0, width)) < width) {
       computeInfo->valStr = format("((%s)%s)", widthUType(width).c_str(), ChildInfo(0, valStr).c_str());
       computeInfo->opNum = ChildInfo(0, opNum) + 1;
     } else {
@@ -1693,7 +1693,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
           computeInfo->valStr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
         computeInfo->opNum = 1;
         computeInfo->width = width;
-      } else if (sign && (nodePtr->nodeIsRoot && computeInfo->width < widthBits(width))) {
+      } else if (sign && (nodePtr->nodeIsRoot && computeInfo->width < (int)widthBits(width))) {
         int shiftBits = widthBits(width) - computeInfo->width;
         computeInfo->valStr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
       } else if (sign) {
