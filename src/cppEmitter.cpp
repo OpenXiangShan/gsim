@@ -971,13 +971,11 @@ void graph::computeSync() {
   for (SuperNode* super : sortedSuper) {
     if (super->cppId < 0) continue;
     std::vector<int> maxCppId(THREAD_NUM, -1);
-    printf("visiting %d thread %d order %d\n", super->cppId, super->threadId, super->order);
     for (SuperNode* prev : super->prev) {
       if (prev->threadId == super->threadId) continue;
       if (prev->cppId < 0) continue;
       if (prev->order > super->order) continue;
       if (prev->cppId <= lastSync[prev->threadId]) continue;
-      printf("  prev %d thread %d order %d\n", prev->cppId, prev->threadId, prev->order);
       maxCppId[prev->threadId] = std::max(maxCppId[prev->threadId], prev->cppId);
     }
     bool needSync = false;
@@ -996,7 +994,6 @@ void graph::computeSync() {
           lastSync[i] = maxCppId[i];
         }
       }
-      printf("sync %d\n", info->id);
     }
   }
 }
