@@ -10,7 +10,7 @@ class SigFilter():
     self.numPerFile = 10000
     self.fileIdx = 0
     self.varNum = 0
-    self.dstFileName = "obj/" + name + "/" + name + "_checkSig"
+    self.dstFileName = "build/obj/" + name + "/" + name + "_checkSig"
 
   def closeDstFile(self):
     if self.dstfp is not None:
@@ -45,7 +45,11 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
       if match:
         line = line.strip(" ;\n")
         line = re.split(' |\[|;', line)
-        width = line[-1]
+        width = -1
+        for idx in range(len(line)):
+          if line[idx] == "width" and line[idx + 1] == "=":
+            width = line[idx + 2]
+            break
         all_sigs[line[1]] = int(width)
     self.newDstFile()
 
@@ -59,6 +63,7 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
         matchName = line[3]
       else:
         matchName = line[3][:index]
+
       if matchName in all_sigs:
         if mod_width != all_sigs[matchName]:
           continue
@@ -124,4 +129,4 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
 
 if __name__ == "__main__":
   sigFilter = SigFilter(sys.argv[1])
-  sigFilter.filter("obj/" + sys.argv[1] + "_sigs.txt", "emu/obj_" + sys.argv[2] + "/top_ref.h")
+  sigFilter.filter("build/obj/" + sys.argv[1] + "_sigs.txt", "emu/obj_" + sys.argv[2] + "/top_ref.h")
