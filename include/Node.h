@@ -160,8 +160,8 @@ class Node {
   bool nodeIsRoot = false;
 
 /* used in cppEmitter */
-  std::set<int> nextActiveId;
-  std::set<int> nextNeedActivate;
+  std::set<std::pair<int, int>> nextActiveId; // superId and threadId
+  std::set<std::pair<int, int>> nextNeedActivate;
 
   std::vector<std::string> insts;
   std::vector<std::string> resetInsts;
@@ -286,7 +286,7 @@ class Node {
   bool needActivate();
   bool anyNextActive();
   void updateActivate();
-  void updateNeedActivate(std::set<int>& alwaysActive);
+  void updateNeedActivate(std::set<std::pair<int, int>>& alwaysActive);
   void removeConnection();
   void allocArrayVal();
   Node* clockAlias();
@@ -327,6 +327,7 @@ public:
   int id;
   int order;
   int cppId = -1;
+  int threadId = -1;
   SuperType superType = SUPER_VALID;
   Node* resetNode = nullptr;
   int localTmpNum = 0;

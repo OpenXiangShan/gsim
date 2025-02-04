@@ -31,20 +31,41 @@ static int displayNum = 0;
 #define ACTIVE_COMMENT(active) std::get<1>(active)
 #define ACTIVE_UNIQUE(active) std::get<2>(active)
 
-static int superId = 0;
-static int activeFlagNum = 0;
+static int activeFlagNum[THREAD_NUM];
 static std::set<Node*> definedNode;
-static std::map<int, SuperNode*> cppId2Super;
-static std::set<int> alwaysActive;
+static std::map<std::pair<int, int>, SuperNode*> cppId2Super;
+static std::set<std::pair<int, int>> alwaysActive;
 extern std::set<std::pair<int, int>> allMask;
+std::vector<int> validSupers(THREAD_NUM, 0);
 static std::vector<std::string> resetFuncs;
 extern int maxConcatNum;
 bool nameExist(std::string str);
 static int resetFuncNum = 0;
 extern std::string OutputDir;
 
-static bool isAlwaysActive(int cppId) {
-  return alwaysActive.find(cppId) != alwaysActive.end();
+typedef std::pair<int, int> cppIdInfo;
+
+class SyncInfo {
+  static int counter;
+public:
+  int id;
+  int count;
+  std::vector<cppIdInfo> waitCppId;
+  cppIdInfo wakeCppId;
+  SyncInfo() {
+    id = counter ++;
+  }
+};
+int SyncInfo::counter = 1;
+static std::map<cppIdInfo, SyncInfo*> cppId2SyncWait;
+static std::map<cppIdInfo, SyncInfo*> cppId2SyncWake;
+
+SuperNode* cppId2SuperNode(int cppId, int threadId) {
+  return cppId2Super[std::make_pair(cppId, threadId)];
+}
+
+static bool isAlwaysActive(int cppId, int threadId) {
+  return alwaysActive.find(std::make_pair(cppId, threadId)) != alwaysActive.end();
 }
 
 std::pair<int, int> cppId2flagIdx(int cppId) {
@@ -68,7 +89,7 @@ std::pair<int, uint64_t>clearIdxMask(int cppId) {
   else mask = (~mask) & (((uint64_t)1 << ACTIVE_WIDTH) - 1);
   return std::make_pair(id, mask);
 }
-
+#if 0
 ActiveType activeSet2bitMap(std::set<int>& activeId, std::map<uint64_t, ActiveType>& bitMapInfo, int curId) {
   uint64_t ret = 0;
   std::string comment = "";
@@ -111,16 +132,16 @@ ActiveType activeSet2bitMap(std::set<int>& activeId, std::map<uint64_t, ActiveTy
   }
   return std::make_tuple(ret, comment, uniqueIdx);
 }
-
-std::string updateActiveStr(int idx, uint64_t mask) {
-  if (mask <= MAX_U8) return format("activeFlags[%d] |= 0x%lx;", idx, mask);
-  if (mask <= MAX_U16) return format("*(uint16_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
-  if (mask <= MAX_U32) return format("*(uint32_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
-  return format("*(uint64_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
+#endif
+std::string updateActiveStr(int idx, uint64_t mask, int threadId) {
+  if (mask <= MAX_U8) return format("activeFlags%d[%d] |= 0x%lx;", threadId, idx, mask);
+  if (mask <= MAX_U16) return format("*(uint16_t*)&activeFlags%d[%d] |= 0x%lx;", threadId, idx, mask);
+  if (mask <= MAX_U32) return format("*(uint32_t*)&activeFlags%d[%d] |= 0x%lx;", threadId, idx, mask);
+  return format("*(uint64_t*)&activeFlags%d[%d] |= 0x%lx;", threadId, idx, mask);
 }
 
-std::string updateActiveStr(int idx, uint64_t mask, std::string& cond, int uniqueId) {
-  auto activeFlags = std::string("activeFlags[") + std::to_string(idx) + std::string("]");
+std::string updateActiveStr(int idx, uint64_t mask, std::string& cond, int uniqueId, int threadId) {
+  std::string activeFlags = format("activeFlags%d[%d]", threadId, idx);
 
   if (mask <= MAX_U8) {
     if (uniqueId >= 0) return format("%s |= %s << %d;", activeFlags.c_str(), cond.c_str(), uniqueId);
@@ -173,6 +194,7 @@ static std::string arrayPrevName (std::string name) {
 #endif
 
 static void inline declStep(FILE* fp) {
+  for (int i = 0; i < THREAD_NUM; i++) fprintf(fp, "void t%d_step();\n", i);
   fprintf(fp, "void step();\n");
 }
 
@@ -217,6 +239,8 @@ FILE* graph::genHeaderStart() {
   includeLib(header, "iomanip", true);
   includeLib(header, "cstring", true);
   includeLib(header, "map", true);
+  includeLib(header, "atomic", true);
+  includeLib(header, "thread", true);
   includeLib(header, "functions.h", false);
   includeLib(header, "uint.h", false);
   newLine(header);
@@ -233,13 +257,16 @@ FILE* graph::genHeaderStart() {
     }
     fprintf(header, "#define UINT_CONCAT%d(%s) (%s)\n", num, param.c_str(), value.c_str());
   }
+  fprintf(header, "#define RELAX() asm volatile(\"rep; nop\" ::: \"memory\")\n");
+  genSyncClassDef(header);
   for (std::string str : extDecl) fprintf(header, "%s\n", str.c_str());
   newLine(header);
   /* class start*/
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
   fprintf(header, "uint64_t cycles = 0;\n");
+  fprintf(header, "bool isEven = false;\n");
   /* constrcutor */
-  fprintf(header, "S%s() {\ninit();\n}", name.c_str());
+  fprintf(header, "S%s() {\ninit();\n}\n", name.c_str());
   /*initialization */
   fprintf(header, "void init() {\n");
   fprintf(header, "activateAll();\n");
@@ -284,13 +311,15 @@ for (SuperNode* super : sortedSuper) {
   fprintf(header, "}\n");
 
   fprintf(header, "void activateAll() {\n");
-  fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
+  for (int i = 0; i < THREAD_NUM; i ++)
+    fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags%d[i] = -1;\n", activeFlagNum[i], i);
   fprintf(header, "}\n");
 
   /* mpz variable used for intermidia values */
   for (int i = 0; i < maxTmp; i ++) fprintf(header, "mpz_t MPZ_TMP$%d;\n", i);
   for (auto range : allMask) fprintf(header, "mpz_t MPZ_MASK$%d_%d;\n", range.first, range.second);
-  fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
+  for (int i = 0; i < THREAD_NUM; i ++)
+    fprintf(header, "uint%d_t activeFlags%d[%d];\n", ACTIVE_WIDTH, i, activeFlagNum[i]); // or super.size() if id == idx
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
   #if ENABLE_ACTIVATOR
@@ -313,15 +342,8 @@ void graph::genInterfaceInput(FILE* fp, Node* input) {
     activate all nodes for simplicity
   */
   /* update nodes in the same superNode */
-  std::set<int> allNext;
-  for (Node* next : input->next) {
-    if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
-  }
-  std::map<uint64_t, ActiveType> bitMapInfo;
-  activeSet2bitMap(allNext, bitMapInfo, -1);
-  for (auto iter : bitMapInfo) {
-    fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
-  }
+  for (int i = 0; i < THREAD_NUM; i ++)
+    fprintf(fp, "for (int i = 0; i < %d; i ++) activeFlags%d[i] = -1;\n", activeFlagNum[i], i);
   fprintf(fp, "}\n");
 }
 
@@ -449,16 +471,16 @@ void graph::genDiffSig(FILE* fp, Node* node) {
 void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
-  if (node->type == NODE_OTHERS && !node->anyNextActive() && !node->isArray()) return;
+  if (node->type == NODE_OTHERS && !node->anyNextActive() && !node->isArray() && !node->isReset()) return;
 #if defined(GSIM_DIFF) || defined(VERILATOR_DIFF)
   genDiffSig(fp, node);
 #endif
   if (definedNode.find(node) != definedNode.end()) return;
   definedNode.insert(node);
   fprintf(fp, "%s %s", widthUType(node->width).c_str(), node->name.c_str());
-  if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", node->depth);
+  if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", upperPower2(node->depth));
   for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
-  fprintf(fp, "; // width = %d, lineno = %d\n", node->width, node->lineno);
+  fprintf(fp, "; // width = %d lineno = %d thread = %d\n", node->width, node->lineno, node->super ? node->super->threadId : -1);
   /* save reset registers */
   if (node->isReset() && node->type == NODE_REG_SRC) {
     Assert(!node->isArray() && node->width <= BASIC_WIDTH, "%s is treated as reset (isArray: %d width: %d)", node->name.c_str(), node->isArray(), node->width);
@@ -491,7 +513,7 @@ std::string graph::saveOldVal(FILE* fp, Node* node) {
   return ret;
 }
 
-static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName) {
+static void activateNext(FILE* fp, Node* node, std::set<std::pair<int, int>>& nextNodeId, std::string oldName, bool inStep, std::string flagName) {
   std::string nodeName = node->name;
   auto condName = std::string("cond_") + nodeName;
   bool opt{false};
@@ -502,8 +524,12 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   if (node->isAsyncReset()) {
     fprintf(fp, "if (%s || (%s != %s)) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
   } else {
+#if 0
     curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
     opt = ((ACTIVE_MASK(curMask) != 0) + bitMapInfo.size()) <= 3;
+#else
+    // opt = nextNodeId.size() <= 3; // avoid concurrency bug
+#endif
     if (opt) {
       if (node->width == 1) fprintf(fp, "bool %s = %s ^ %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
       else fprintf(fp, "bool %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
@@ -519,14 +545,21 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
     fprintf(fp, "activateAll();\n");
     fprintf(fp, "%s = -1;\n", flagName.c_str());
   } else {
+#if 0
     if (ACTIVE_MASK(curMask) != 0) {
       if (opt) fprintf(fp, "%s |= -(uint%d_t)%s & 0x%lx; // %s\n", flagName.c_str(), ACTIVE_WIDTH, condName.c_str() ,ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
       else fprintf(fp, "%s |= 0x%lx; // %s\n", flagName.c_str(), ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
     }
     for (auto iter : bitMapInfo) {
-      auto str = opt ? updateActiveStr(iter.first, ACTIVE_MASK(iter.second), condName, ACTIVE_UNIQUE(iter.second)) : updateActiveStr(iter.first, ACTIVE_MASK(iter.second));
+      auto str = opt ? updateActiveStr(iter.first, ACTIVE_MASK(iter.second), condName, ACTIVE_UNIQUE(iter.second), node->super->threadId) : updateActiveStr(iter.first, ACTIVE_MASK(iter.second), node->super->threadId);
       fprintf(fp, "%s // %s\n", str.c_str(), ACTIVE_COMMENT(iter.second).c_str());
     }
+#else
+    for (auto id : nextNodeId) {
+      if (opt) fprintf(fp, "activeFlags%d[%d] |= %s;\n", id.second, id.first, condName.c_str());
+      else fprintf(fp, "activeFlags%d[%d] = 1;\n", id.second, id.first);
+    }
+#endif
   #ifdef PERF
     #if ENABLE_ACTIVATOR
     for (int id : nextNodeId) {
@@ -540,14 +573,20 @@ static void activateNext(FILE* fp, Node* node, std::set<int>& nextNodeId, std::s
   if (!opt) fprintf(fp, "}\n");
 }
 
-static void activateUncondNext(FILE* fp, Node* node, std::set<int>activateId, bool inStep, std::string flagName) {
+static void activateUncondNext(FILE* fp, Node* node, std::set<std::pair<int, int>>activateId, bool inStep, std::string flagName) {
   if (!node->fullyUpdated) fprintf(fp, "if (%s) {\n", ASSIGN_INDI(node).c_str());
+#if 0
   std::map<uint64_t, ActiveType> bitMapInfo;
   auto curMask = activeSet2bitMap(activateId, bitMapInfo, node->super->cppId);
   if (ACTIVE_MASK(curMask) != 0) fprintf(fp, "%s |= 0x%lx; // %s\n", flagName.c_str(), ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
   for (auto iter : bitMapInfo) {
-    fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+    fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second), node->super->threadId).c_str(), ACTIVE_COMMENT(iter.second).c_str());
   }
+#else
+  for (auto id : activateId) {
+    fprintf(fp, "activeFlags%d[%d] = 1;\n", id.second, id.first);
+  }
+#endif
 #ifdef PERF
   #if ENABLE_ACTIVATOR
   for (int id : activateId) {
@@ -564,7 +603,7 @@ void graph::genNodeInsts(FILE* fp, Node* node, std::string flagName) {
   std::string oldnode;
   if (node->insts.size()) {
     /* local variables */
-    if (node->status == VALID_NODE && node->type == NODE_OTHERS && !node->anyNextActive() && !node->isArray()) {
+    if (node->status == VALID_NODE && node->type == NODE_OTHERS && !node->anyNextActive() && !node->isArray() && !node->isReset()) {
       fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), node->name.c_str());
     }
     if (node->isArray() && !node->fullyUpdated && node->anyNextActive()) fprintf(fp, "bool %s = false;\n", ASSIGN_INDI(node).c_str());
@@ -590,15 +629,21 @@ void graph::genNodeInsts(FILE* fp, Node* node, std::string flagName) {
       indiStr = format("\n%s = true;\n", ASSIGN_INDI(node).c_str());
     } else if (node->type == NODE_WRITER) { // activate all readers
       indiStr += "\n";
-      std::set<int> allReaderId;
+      std::set<std::pair<int, int>> allReaderId;
       for (Node* port : node->parent->member) {
-        if (port->type == NODE_READER && (port->status == VALID_NODE || port->status == MERGED_NODE)) allReaderId.insert(port->super->cppId);
+        if (port->type == NODE_READER && (port->status == VALID_NODE || port->status == MERGED_NODE)) allReaderId.insert(std::make_pair(port->super->cppId, port->super->threadId));
       }
+#if 0
       std::map<uint64_t, ActiveType> bitMapInfo;
       activeSet2bitMap(allReaderId, bitMapInfo, -1);
       for (auto iter : bitMapInfo) {
-        indiStr += format("%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+        indiStr += format("%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second), node->super->threadId).c_str(), ACTIVE_COMMENT(iter.second).c_str());
       }
+#else
+    for (auto id : allReaderId) {
+      fprintf(fp, "activeFlags%d[%d] = 1;\n", id.second, id.first);
+    }
+#endif
     }
     for (std::string inst : newInsts) {
       fprintf(fp, "%s\n", strReplace(inst, ASSIGN_LABLE, indiStr).c_str());
@@ -610,8 +655,13 @@ void graph::genNodeInsts(FILE* fp, Node* node, std::string flagName) {
 }
 
 void graph::genNodeStepStart(FILE* fp, SuperNode* node, uint64_t mask, int idx, std::string flagName) {
+  cppIdInfo info = cppIdInfo(node->cppId, node->threadId);
+  if (cppId2SyncWake.find(info) != cppId2SyncWake.end()) {
+    // fprintf(fp, "printf(\"thread %d wait %d cycles %%ld\\n\", cycles);\n", node->threadId, cppId2SyncWake[info]->id);
+    fprintf(fp, "sync%d.waitUntil(isEven);\n", cppId2SyncWake[info]->id);
+  }
   nodeNum ++;
-  if (!isAlwaysActive(node->cppId)) fprintf(fp, "if(unlikely(%s & 0x%lx)) { // id=%d\n", flagName.c_str(), mask, idx);
+  if (!isAlwaysActive(node->cppId, node->threadId)) fprintf(fp, "if(unlikely(%s)) { // id=%d\n", flagName.c_str(), idx);
   int id;
   uint64_t newMask;
   std::tie(id, newMask) = clearIdxMask(node->cppId);
@@ -676,16 +726,20 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
 #ifdef PERF
   fprintf(fp, "validActive[%d] += isActivateValid;\n", node->cppId);
 #endif
-
-  if(!isAlwaysActive(node->cppId)) fprintf(fp, "}\n");
+  if(!isAlwaysActive(node->cppId, node->threadId)) fprintf(fp, "}\n");
+  cppIdInfo info = cppIdInfo(node->cppId, node->threadId);
+  if (cppId2SyncWait.find(info) != cppId2SyncWait.end()) {
+    // fprintf(fp, "printf(\"thread %d signal %d cycles %%ld\\n\", cycles);\n", node->threadId, cppId2SyncWait[info]->id);
+    fprintf(fp, "sync%d.signal(isEven);\n", cppId2SyncWait[info]->id);
+  }
 }
 
-void graph::genActivate(FILE* fp) {
+void graph::genActivate(FILE* fp, int threadId) {
   int idx = 0;
-  for (int i = 0; i < subStepNum; i ++) {
-    fprintf(fp, "void S%s::subStep%d(){\n", name.c_str(), i);
+  for (int funcIdx = 0; funcIdx < subStepNum[threadId]; funcIdx ++) {
+    fprintf(fp, "void S%s::t%d_subStep%d(){\n", name.c_str(), threadId, funcIdx);
     bool prevActiveWhole = false;
-    for (int i = 0; i < NODE_PER_SUBFUNC && idx < superId; i ++, idx ++) {
+    for (int i = 0; i < NODE_PER_SUBFUNC && idx < validSupers[threadId]; i ++, idx ++) {
       int id;
       uint64_t mask;
       std::tie(id, mask) = setIdxMask(idx);
@@ -694,18 +748,18 @@ void graph::genActivate(FILE* fp) {
         if (prevActiveWhole) {
           fprintf(fp, "}\n");
         }
-        prevActiveWhole = true;
-        for (int j = 0; j < ACTIVE_WIDTH && idx + j < superId; j ++) {
-          if (isAlwaysActive(idx + j)) prevActiveWhole = false;
+        // prevActiveWhole = true;  // check active-bit one by one
+        for (int j = 0; j < ACTIVE_WIDTH && idx + j < validSupers[threadId]; j ++) {
+          if (isAlwaysActive(idx + j, threadId)) prevActiveWhole = false;
         }
         if (prevActiveWhole) {
-          fprintf(fp, "if(unlikely(activeFlags[%d] != 0)) {\n", id);
-          fprintf(fp, "uint%d_t oldFlag = activeFlags[%d];\n", ACTIVE_WIDTH, id);
-          fprintf(fp, "activeFlags[%d] = 0;\n", id);
+          fprintf(fp, "if(unlikely(activeFlags%d[%d] != 0)) {\n", threadId, id);
+          fprintf(fp, "uint%d_t oldFlag = activeFlags%d[%d];\n", ACTIVE_WIDTH, threadId, id);
+          fprintf(fp, "activeFlags%d[%d] = 0;\n", threadId, id);
         }
       }
-      SuperNode* super = cppId2Super[idx];
-      std::string flagName = prevActiveWhole ? "oldFlag" : format("activeFlags[%d]", id);
+      SuperNode* super = cppId2SuperNode(idx, threadId);
+      std::string flagName = prevActiveWhole ? "oldFlag" : format("activeFlags%d[%d]", threadId, idx);
       genNodeStepStart(fp, super, mask, idx, flagName);
       if (super->superType == SUPER_EXTMOD) {
         /* save old EXT_OUT*/
@@ -754,26 +808,32 @@ void graph::genActivate(FILE* fp) {
 void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
   std::string resetName = super->resetNode->type == NODE_REG_SRC ? RESET_NAME(super->resetNode).c_str() : super->resetNode->name.c_str();
   fprintf(fp, "if(unlikely(%s)) {\n", resetName.c_str());
-  std::set<int> allNext;
+  std::set<std::pair<int, int>> allNext;
   for (size_t i = 0; i < super->member.size(); i ++) {
     Node* node = super->member[i];
     for (Node* next : node->next) {
-      if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
+      if (next->super->cppId >= 0) allNext.insert(std::make_pair(next->super->cppId, next->super->threadId));
     }
     if (!node->regSplit) {
-      if (node->getDst()->super->cppId >= 0) allNext.insert(node->getDst()->super->cppId);
+      if (node->getDst()->super->cppId >= 0) allNext.insert(std::make_pair(node->getDst()->super->cppId, node->getDst()->super->threadId));
     } else {
-      if (node->getSrc()->regUpdate->super->cppId >= 0) allNext.insert(node->regUpdate->super->cppId);
+      if (node->getSrc()->regUpdate->super->cppId >= 0) allNext.insert(std::make_pair(node->regUpdate->super->cppId, node->regUpdate->super->threadId));
     }
   }
 
   if (allNext.size() > 100) fprintf(fp, "activateAll();\n");
   else {
+#if 0
     std::map<uint64_t, ActiveType> bitMapInfo;
     activeSet2bitMap(allNext, bitMapInfo, -1);
     for (auto iter : bitMapInfo) {
-      fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+      fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second), super->threadId).c_str(), ACTIVE_COMMENT(iter.second).c_str());
     }
+#else
+    for (auto id : allNext) {
+      fprintf(fp, "activeFlags%d[%d] = 1;\n", id.second, id.first);
+    }
+#endif
   }
   int resetNum = (super->member.size() + RESET_PER_FUNC - 1) / RESET_PER_FUNC;
   size_t idx = 0;
@@ -796,21 +856,23 @@ void graph::genReset(FILE* fp, SuperNode* super, bool isUIntReset) {
 }
 
 void graph::genResetAll(FILE* fp) {
-  fprintf(fp, "void S%s::resetAll(){\n", name.c_str());
-  for (SuperNode* super : sortedSuper) {
-    if (super->superType == SUPER_ASYNC_RESET) {
-      Assert(super->resetNode->isAsyncReset(), "invalid reset");
-      genReset(fp, super, false);
+  for (int i = 0; i < THREAD_NUM; i ++) {
+     fprintf(fp, "void S%s::t%d_resetAll(){\n", name.c_str(), i);
+    for (SuperNode* super : parallelSuper[i]) {
+      if (super->superType == SUPER_ASYNC_RESET) {
+        Assert(super->resetNode->isAsyncReset(), "invalid reset");
+        genReset(fp, super, false);
+      }
     }
-  }
-  for (SuperNode* super : uintReset) {
-    if (super->resetNode->status == CONSTANT_NODE) {
-      Assert(mpz_sgn(super->resetNode->computeInfo->consVal) == 0, "reset %s is always true", super->resetNode->name.c_str());
-      continue;
+    for (SuperNode* super : uintReset[i]) {
+      if (super->resetNode->status == CONSTANT_NODE) {
+        Assert(mpz_sgn(super->resetNode->computeInfo->consVal) == 0, "reset %s is always true", super->resetNode->name.c_str());
+        continue;
+      }
+      genReset(fp, super, true);
     }
-    genReset(fp, super, true);
+    fprintf(fp, "}\n");
   }
-  fprintf(fp, "}\n");
   for (std::string str : resetFuncs) fprintf(fp, "%s", str.c_str());
 }
 
@@ -847,8 +909,8 @@ void graph::saveDiffRegs(FILE* fp) {
 #endif
 }
 
-void graph::genStep(FILE* fp) {
-  fprintf(fp, "void S%s::step() {\n", name.c_str());
+void graph::genThreadStep(FILE* fp, int threadId) {
+  fprintf(fp, "void S%s::t%d_step() {\n", name.c_str(), threadId);
 
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
@@ -860,11 +922,26 @@ void graph::genStep(FILE* fp) {
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
   fprintf(fp, "saveDiffRegs();\n");
 #endif
-  for (int i = 0; i < subStepNum; i ++) {
-    fprintf(fp, "subStep%d();\n", i);
+  for (int i = 0; i < subStepNum[threadId]; i ++) {
+    fprintf(fp, "t%d_subStep%d();\n", threadId, i);
   }
 
-  fprintf(fp, "resetAll();\n");
+  fprintf(fp, "t%d_resetAll();\n", threadId);
+  fprintf(fp, "}\n");
+}
+
+void graph::genStep(FILE* fp) {
+  fprintf(fp, "void S%s::step() {\n", name.c_str());
+  if (THREAD_NUM <= 1) {
+    fprintf(fp, "t0_step();\n");
+  } else {
+    for (int i = 0; i < THREAD_NUM; i ++) {
+      fprintf(fp, "std::thread thread%d(&S%s::t%d_step, this);\n", i, name.c_str(), i);
+    }
+    for (int i = 0; i < THREAD_NUM; i ++)
+      fprintf(fp, "thread%d.join();\n", i);
+    fprintf(fp, "isEven = !isEven;\n");
+  }
   fprintf(fp, "cycles ++;\n");
   fprintf(fp, "}\n");
 }
@@ -880,13 +957,82 @@ bool SuperNode::instsEmpty() {
   return true;
 }
 
+void graph::computeSync() {
+  if (THREAD_NUM <= 1) return;
+  for (int i = 0; i < THREAD_NUM; i ++) {
+    for (SuperNode* super : parallelSuper[i]) {
+      printf("thread %d super %d thread %d\n", i, super->cppId, super->threadId);
+    }
+  }
+  std::vector<int> lastSync(THREAD_NUM, -1);
+  for (SuperNode* super : sortedSuper) {
+    if (super->cppId < 0) continue;
+    std::vector<int> maxCppId(THREAD_NUM, -1);
+    printf("visiting %d thread %d order %d\n", super->cppId, super->threadId, super->order);
+    for (SuperNode* prev : super->prev) {
+      if (prev->threadId == super->threadId) continue;
+      if (prev->cppId < 0) continue;
+      if (prev->order > super->order) continue;
+      if (prev->cppId <= lastSync[prev->threadId]) continue;
+      printf("  prev %d thread %d order %d\n", prev->cppId, prev->threadId, prev->order);
+      maxCppId[prev->threadId] = std::max(maxCppId[prev->threadId], prev->cppId);
+    }
+    bool needSync = false;
+    for (int i = 0; i < THREAD_NUM; i ++) {
+      if (i == super->threadId) continue;
+      if (maxCppId[i] >= 0) needSync = true;
+    }
+    if (needSync) {
+      SyncInfo* info = new SyncInfo;
+      info->wakeCppId = cppIdInfo(super->cppId, super->threadId);
+      cppId2SyncWake[cppIdInfo(super->cppId, super->threadId)] = info;
+      for (int i = 0; i < THREAD_NUM; i ++) {
+        if (maxCppId[i] >= 0) {
+          info->waitCppId.push_back(cppIdInfo(maxCppId[i], i));
+          cppId2SyncWait[cppIdInfo(maxCppId[i], i)] = info;
+          lastSync[i] = maxCppId[i];
+        }
+      }
+      printf("sync %d\n", info->id);
+    }
+  }
+}
+
+void graph::genSyncClassDef(FILE* fp) {
+  fprintf(fp,
+"class SSync{\n\
+  std::atomic<uint32_t> flag;\n\
+public:\n\
+  SSync() {\n\
+  flag.store(0, std::memory_order_release);\n\
+  }\n\
+  void waitUntil(bool isEven) {\n\
+    int target = isEven ? 0 : 1;\n\
+    while (flag.load(std::memory_order_acquire) != target) RELAX();\n\
+  }\n\
+  void signal(bool isEven) {\n\
+    if (isEven) flag.fetch_sub(1, std::memory_order_release);\n\
+    else flag.fetch_add(1, std::memory_order_release);\n\
+  }\n\
+};\n");
+}
+
+void graph::genSyncDef(FILE* fp) {
+  for (auto iter: cppId2SyncWake) {
+    SyncInfo* info = iter.second;
+    fprintf(fp, "SSync sync%d;\n", info->id);
+  }
+}
+
 void graph::cppEmitter() {
+  orderAllNodes();
   for (SuperNode* super : sortedSuper) {
     if (!super->instsEmpty() || super->superType == SUPER_EXTMOD) {
-      super->cppId = superId ++;
-      cppId2Super[super->cppId] = super;
+      Assert(super->threadId >= 0 && super->threadId < THREAD_NUM, "invalid threadId %d in super %d", super->threadId, super->id);
+      super->cppId = validSupers[super->threadId] ++;
+      cppId2Super[cppIdInfo(super->cppId, super->threadId)] = super;
       if (super->superType == SUPER_EXTMOD) {
-        alwaysActive.insert(super->cppId);
+        alwaysActive.insert(std::make_pair(super->cppId, super->threadId));
       }
 #if 0
       if (super->member.size() == 1 && super->member[0]->ops < 1) {
@@ -896,9 +1042,12 @@ void graph::cppEmitter() {
 #endif
     }
   }
-  activeFlagNum = (superId + ACTIVE_WIDTH - 1) / ACTIVE_WIDTH;
-  subStepNum = (superId + NODE_PER_SUBFUNC - 1) / NODE_PER_SUBFUNC;
-  updateRegNum = (regsrc.size() + NODE_PER_SUBFUNC - 1) / NODE_PER_SUBFUNC;
+  computeSync();
+  for (int i = 0; i < THREAD_NUM; i ++) {
+    activeFlagNum[i] = validSupers[i];
+    subStepNum[i] = (validSupers[i] + NODE_PER_SUBFUNC - 1) / NODE_PER_SUBFUNC;
+
+  }
 
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
@@ -927,6 +1076,8 @@ void graph::cppEmitter() {
   }
   /* memory definition */
   for (Node* mem : memory) genNodeDef(header, mem);
+  /* sync */
+  genSyncDef(header);
    /* input/output interface */
   for (Node* node : input) genInterfaceInput(header, node);
   for (Node* node : output) genInterfaceOutput(header, node);
@@ -937,21 +1088,24 @@ void graph::cppEmitter() {
     fprintf(header, "void display%d();\n", i);
   }
 #endif
-  for (int i = 0; i < subStepNum; i ++) {
-    fprintf(header, "void subStep%d();\n", i);
+  for (int i = 0; i < THREAD_NUM; i ++) {
+    for (int j = 0; j < subStepNum[i]; j ++) {
+      fprintf(header, "void t%d_subStep%d();\n", i, j);
+    }
+    fprintf(header, "void t%d_resetAll();\n", i);
   }
 
-  fprintf(header, "void resetAll();\n");
 
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
   fprintf(header, "void saveDiffRegs();\n");
 #endif
 
   /* main evaluation loop (step)*/
-  genActivate(src);
+  for (int i = 0; i < THREAD_NUM; i ++) genActivate(src, i);
   genResetAll(src);
   genResetDecl(header);
   saveDiffRegs(src);
+  for (int i = 0; i < THREAD_NUM; i ++) genThreadStep(src, i);
   genStep(src);
   
   genHeaderEnd(header);
@@ -963,5 +1117,4 @@ void graph::cppEmitter() {
   fclose(sigFile);
 #endif
   printf("[cppEmitter] define %ld nodes %d superNodes\n", definedNode.size(), superId);
-  std::cout << "[cppEmitter] finish writing to " + OutputDir + "/" + name + ".[cpp|h]" << std::endl;
 }

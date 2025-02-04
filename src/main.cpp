@@ -153,9 +153,10 @@ int main(int argc, char** argv) {
   FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
 
   // FUNC_WRAPPER(g->mergeNodes(), "MergeNodes");
+  FUNC_TIMER(g->parallelPartition());
   FUNC_WRAPPER(g->graphPartition(), "graphPartition");
 
-  FUNC_WRAPPER(g->replicationOpt(), "Replication");
+  // FUNC_WRAPPER(g->replicationOpt(), "Replication");
 
   FUNC_WRAPPER(g->mergeRegister(), "MergeRegister");
 

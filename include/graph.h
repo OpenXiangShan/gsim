@@ -4,6 +4,7 @@
 
 #ifndef GRAPH_H
 #define GRAPH_H
+#include "common.h"
 
 class graph {
   FILE* genHeaderStart();
@@ -12,6 +13,7 @@ class graph {
   void genNodeInsts(FILE* fp, Node* node, std::string flagName);
   void genInterfaceInput(FILE* fp, Node* input);
   void genInterfaceOutput(FILE* fp, Node* output);
+  void genThreadStep(FILE* fp, int threadId);
   void genStep(FILE* fp);
   void genHeaderEnd(FILE* fp);
   void genSrcEnd(FILE* fp);
@@ -21,13 +23,16 @@ class graph {
   void genMemInit(FILE* fp, Node* node);
   void nodeDisplay(FILE* fp, Node* member);
   void genMemRead(FILE* fp);
-  void genActivate(FILE* fp);
+  void genActivate(FILE* fp, int threadId);
   void genUpdateRegister(FILE* fp);
   void genMemWrite(FILE* fp);
   void saveDiffRegs(FILE* fp);
   void genResetAll(FILE* fp);
   void genReset(FILE* fp, SuperNode* super, bool isUIntReset);
   void genResetDecl(FILE* fp);
+  void genSyncClassDef(FILE* fp);
+  void genSyncDef(FILE* fp);
+  void computeSync();
   std::string saveOldVal(FILE* fp, Node* node);
   void removeNodesNoConnect(NodeStatus status);
   void reconnectSuper();
@@ -52,6 +57,7 @@ class graph {
   void graphRefine();
   void resort();
   void detectSortedSuperLoop();
+  void distrSuperThread(SuperNode* super, int threadId);
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;
@@ -66,13 +72,15 @@ class graph {
   std::vector<SuperNode*> supersrc;
   /* used after toposort */
   std::vector<SuperNode*> sortedSuper;
-  std::vector<SuperNode*> uintReset;
+  std::vector<std::vector<SuperNode*>> uintReset;
   std::set<Node*> splittedArray;
   std::vector<std::string> extDecl;
   std::string name;
+/* parallel */
+  std::vector<std::vector<SuperNode*>> parallelSuper;
   int maxTmp = 0;
   int nodeNum = 0;
-  int subStepNum = -1;
+  int subStepNum[THREAD_NUM];
   int updateRegNum = -1;
   void addReg(Node* reg) {
     regsrc.push_back(reg);
@@ -108,6 +116,11 @@ class graph {
   void inferAllWidth();
   void dump(std::string FileName);
   void depthPerf();
+  void parallelPartition();
+  graph() {
+    parallelSuper = std::vector<std::vector<SuperNode*>>(THREAD_NUM);
+    uintReset = std::vector<std::vector<SuperNode*>>(THREAD_NUM);
+  }
 };
 
 #endif

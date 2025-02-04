@@ -29,6 +29,8 @@
 // #define LOG_START 0
 // #define LOG_END 0
 
+#define THREAD_NUM 2
+
 #define LENGTH(a) (sizeof(a) / sizeof(a[0]))
 
 #define _STR(a) # a
@@ -111,7 +113,7 @@
   } while(0)
 
 
-#define ACTIVATE_ALL 0xff
+#define ACTIVATE_ALL -1
 
 class TypeInfo;
 class PNode;

@@ -140,12 +140,13 @@ void graph::constructRegs() {
       nodeUpdate->regNext = node;
       nodeUpdate->assignTree.push_back(node->updateTree);
       SuperNode* dstSuper = node->getDst()->super;
-      if (dstSuper2updateSuper.find(dstSuper) != dstSuper2updateSuper.end()) {
+      if (dstSuper2updateSuper.find(dstSuper) != dstSuper2updateSuper.end()) { // TODO: why use this
         nodeUpdate->super = dstSuper2updateSuper[dstSuper];
         dstSuper2updateSuper[dstSuper]->member.push_back(nodeUpdate);
       } else {
         nodeUpdate->super = new SuperNode(nodeUpdate);
         nodeUpdate->super->superType = SUPER_UPDATE_REG;
+        nodeUpdate->super->threadId = node->super->threadId;
         sortedSuper.push_back(nodeUpdate->super);
         dstSuper2updateSuper[dstSuper] = nodeUpdate->super;
       }

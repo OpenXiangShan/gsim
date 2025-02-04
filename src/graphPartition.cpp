@@ -376,7 +376,7 @@ void graph::graphPartition() {
 
 /* initial partition */
   phaseSuper = sortedSuper.size();
-  graphInitPartition();
+  // graphInitPartition();
   orderAllNodes();
   printf("[InitPartition] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
 /* refine & uncoarsen phase */

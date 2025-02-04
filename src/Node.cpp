@@ -209,26 +209,25 @@ bool Node::needActivate() {
 }
 
 void Node::updateActivate() {
-  if (isReset()) nextActiveId.insert(ACTIVATE_ALL);
   for (Node* nextNode : next) {
     if (nextNode->super != super) {
       if (nextNode->super->cppId != -1)
-        nextActiveId.insert(nextNode->super->cppId);
+        nextActiveId.insert(std::make_pair(nextNode->super->cppId, nextNode->super->threadId));
     } else if (super->findIndex(this) >= super->findIndex(nextNode)) {
       if (super->cppId != -1)
-        nextActiveId.insert(super->cppId);
+        nextActiveId.insert(std::make_pair(super->cppId, super->threadId));
     }
   }
   if (type == NODE_REG_DST && !regSplit) {
     for (Node* nextNode : getSrc()->next) {
       if (nextNode->super->cppId != -1)
-        nextActiveId.insert(nextNode->super->cppId);
+        nextActiveId.insert(std::make_pair(nextNode->super->cppId, nextNode->super->threadId));
     }
   }
 }
 
-void Node::updateNeedActivate(std::set<int>& alwaysActive) {
-  for (int id : nextActiveId) {
+void Node::updateNeedActivate(std::set<std::pair<int, int>>& alwaysActive) {
+  for (auto id : nextActiveId) {
     if (alwaysActive.find(id) == alwaysActive.end()) {
       nextNeedActivate.insert(id);
     }

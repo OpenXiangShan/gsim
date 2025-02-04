@@ -109,7 +109,15 @@ void graph::traversal() {
 }
 
 void SuperNode::display() {
-   printf("----super %d(type=%d)----:\n", id, superType);
+   printf("----super %d(type=%d, nodeNum=%ld, thread=%d)----:\n", id, superType, member.size(), threadId);
+#if 0
+  for (SuperNode* nextNode : next) {
+    printf("    next super %d\n", nextNode->id);
+  }
+  for (SuperNode* prevNode : prev) {
+    printf("    prev super %d\n", prevNode->id);
+  }
+#endif
     for (Node* node : member) {
       node->display();
     }
@@ -139,10 +147,10 @@ void Node::display() {
   }
 #if 0
   for (Node* nextNode : next) {
-    printf("    next %p %s\n", nextNode, nextNode->name.c_str());
+    printf("    next %p %s super %d\n", nextNode, nextNode->name.c_str(), nextNode->super->id);
   }
   for (Node* prevNode : prev) {
-    printf("    prev %p %s\n", prevNode, prevNode->name.c_str());
+    printf("    prev %p %s super %d\n", prevNode, prevNode->name.c_str(), prevNode->super->id);
   }
 #endif
 }

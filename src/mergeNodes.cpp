@@ -9,36 +9,39 @@
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
 
 void graph::mergeAsyncReset() {
-  std::map<Node*, SuperNode*> resetMap;
-  for (size_t i = 0; i < sortedSuper.size(); i++) {
-    for (Node* member: sortedSuper[i]->member) {
-      if (member->type != NODE_REG_SRC || member->reset != ASYRESET) continue;
-      if (member->assignTree.size() != 1) continue;
-      Assert(member->assignTree[0]->getRoot()->opType == OP_RESET, "reset not found %s", member->name.c_str());
-      std::set<Node*> resetNoeds;
-      getENodeRelyNodes(member->assignTree[0]->getRoot()->getChild(0), resetNoeds);
-      Assert(resetNoeds.size() == 1, "multiple reset %s", member->name.c_str());
-      bool resetConstant = true;
-      for (Node* prev : member->prev) {
-        if (resetNoeds.find(prev) == resetNoeds.end() && prev->status != CONSTANT_NODE) resetConstant = false;
-      }
-      if (!resetConstant) continue;
-      /* if resetVal is constant (using prev.size() == 1, TODO: optimize) */
-      if (member->super->member.size() != 1) member->super->display();
-      Assert(member->super->member.size() == 1, "super already merged %s id %d (size = %ld)", member->name.c_str(), member->super->id, member->super->member.size());
-      Node* resetNode = *(resetNoeds.begin());
-      resetNode->setAsyncReset();
-      SuperNode* resetSuper;
-      if (resetMap.find(resetNode) == resetMap.end()) {
-        resetSuper = member->super;
-        resetSuper->superType = SUPER_ASYNC_RESET;
-        resetSuper->resetNode = resetNode;
-        resetMap[resetNode] = resetSuper;
-      } else {
-        resetSuper = resetMap[resetNode];
-        member->super = resetSuper;
-        resetSuper->member.push_back(member);
-        sortedSuper[i]->member.clear();
+  for (int threadId = 0; threadId < THREAD_NUM; threadId ++) {
+    std::map<Node*, SuperNode*> resetMap;
+    for (size_t i = 0; i < parallelSuper[threadId].size(); i++) {
+      SuperNode* super = parallelSuper[threadId][i];
+      for (Node* member: super->member) {
+        if (member->type != NODE_REG_SRC || member->reset != ASYRESET) continue;
+        if (member->assignTree.size() != 1) continue;
+        Assert(member->assignTree[0]->getRoot()->opType == OP_RESET, "reset not found %s", member->name.c_str());
+        std::set<Node*> resetNoeds;
+        getENodeRelyNodes(member->assignTree[0]->getRoot()->getChild(0), resetNoeds);
+        Assert(resetNoeds.size() == 1, "multiple reset %s", member->name.c_str());
+        bool resetConstant = true;
+        for (Node* prev : member->prev) {
+          if (resetNoeds.find(prev) == resetNoeds.end() && prev->status != CONSTANT_NODE) resetConstant = false;
+        }
+        if (!resetConstant) continue;
+        /* if resetVal is constant (using prev.size() == 1, TODO: optimize) */
+        if (member->super->member.size() != 1) member->super->display();
+        Assert(member->super->member.size() == 1, "super already merged %s id %d (size = %ld)", member->name.c_str(), member->super->id, member->super->member.size());
+        Node* resetNode = *(resetNoeds.begin());
+        resetNode->setAsyncReset();
+        SuperNode* resetSuper;
+        if (resetMap.find(resetNode) == resetMap.end()) {
+          resetSuper = member->super;
+          resetSuper->superType = SUPER_ASYNC_RESET;
+          resetSuper->resetNode = resetNode;
+          resetMap[resetNode] = resetSuper;
+        } else {
+          resetSuper = resetMap[resetNode];
+          member->super = resetSuper;
+          resetSuper->member.push_back(member);
+          super->member.clear();
+        }
       }
     }
   }
@@ -47,7 +50,7 @@ void graph::mergeAsyncReset() {
 }
 
 void graph::mergeUIntReset() {
-  std::map<Node*, SuperNode*> resetSuper;
+  std::map<Node*, std::vector<SuperNode*>> resetSuper;
   for (Node* reg : regsrc) {
     if (reg->reset != UINTRESET) continue;
     std::set<Node*> prev;
@@ -61,15 +64,19 @@ void graph::mergeUIntReset() {
     Assert(prev.size() == 1, "multiple prevReset %s", reg->name.c_str());
     Node* prevNode = *prev.begin();
     SuperNode* prevSuper;
+    int threadId = reg->super->threadId;
     if (resetSuper.find(prevNode) == resetSuper.end()) {
+      resetSuper[prevNode] = std::vector<SuperNode*>(THREAD_NUM, nullptr);
+    }
+    if (!resetSuper[prevNode][threadId]) {
       prevSuper = new SuperNode();
       prevSuper->superType = SUPER_UINT_RESET;
-      resetSuper[prevNode] = prevSuper;
-      uintReset.push_back(prevSuper);
+      resetSuper[prevNode][threadId] = prevSuper;
+      uintReset[threadId].push_back(prevSuper);
       prevSuper->resetNode = prevNode;
       prevNode->setUIntReset();
     } else {
-      prevSuper = resetSuper[prevNode];
+      prevSuper = resetSuper[prevNode][threadId];
     }
     prevSuper->member.push_back(reg);
   }
@@ -78,29 +85,32 @@ void graph::mergeUIntReset() {
   merge nodes with out-degree=1 to their successors
 */
 void graph::mergeOut1() {
-  for (int i = sortedSuper.size() - 1; i >= 0; i --) {
-    SuperNode* super = sortedSuper[i];
-    /* do not merge superNodes that contains reg src */
-    if (super->superType != SUPER_VALID) continue;
-    if (super->next.size() == 1) {
-      SuperNode* nextSuper = *(super->next.begin());
-      if (nextSuper->superType != SUPER_VALID) continue;
-      if (nextSuper->member.size() > MAX_NODES_PER_SUPER) continue;
-      for (Node* member : super->member) member->super = nextSuper;
-      /* move members in super to next super*/
-      for (Node* member : super->member) {
-        member->super = nextSuper;
-      }
+  for (int threadId = 0; threadId < THREAD_NUM; threadId ++) {
+    for (int i = parallelSuper[threadId].size() - 1; i >= 0; i --) {
+      SuperNode* super = parallelSuper[threadId][i];
+      /* do not merge superNodes that contains reg src */
+      if (super->superType != SUPER_VALID) continue;
+      if (super->next.size() == 1) {
+        SuperNode* nextSuper = *(super->next.begin());
+        if (super->threadId != nextSuper->threadId) continue; // TOOD: why in this case
+        if (nextSuper->superType != SUPER_VALID) continue;
+        if (nextSuper->member.size() > MAX_NODES_PER_SUPER) continue;
+        for (Node* member : super->member) member->super = nextSuper;
+        /* move members in super to next super*/
+        for (Node* member : super->member) {
+          member->super = nextSuper;
+        }
 
-      nextSuper->member.insert(nextSuper->member.begin(), super->member.begin(), super->member.end());
-      /* update connection */
-      nextSuper->prev.erase(super);
-      nextSuper->prev.insert(super->prev.begin(), super->prev.end());
-      for (SuperNode* prevSuper : super->prev) {
-        prevSuper->next.erase(super);
-        prevSuper->next.insert(nextSuper);
+        nextSuper->member.insert(nextSuper->member.begin(), super->member.begin(), super->member.end());
+        /* update connection */
+        nextSuper->prev.erase(super);
+        nextSuper->prev.insert(super->prev.begin(), super->prev.end());
+        for (SuperNode* prevSuper : super->prev) {
+          prevSuper->next.erase(super);
+          prevSuper->next.insert(nextSuper);
+        }
+        super->member.clear();
       }
-      super->member.clear();
     }
   }
   removeEmptySuper();
@@ -110,30 +120,31 @@ void graph::mergeOut1() {
   merge nodes with in-degree=1 to their preceding nodes
 */
 void graph::mergeIn1() {
-  for (size_t i = 0; i < sortedSuper.size(); i ++) {
-    SuperNode* super = sortedSuper[i];
-    if (super->superType != SUPER_VALID) continue;
-    if (super->prev.size() == 1) {
-      SuperNode* prevSuper = *(super->prev.begin());
-      if (prevSuper->superType != SUPER_VALID) continue;
-      if (prevSuper->member.size() > MAX_NODES_PER_SUPER) continue;
-      /* move members in super to prev super */
-      for (Node* member : super->member) member->super = prevSuper;
-      Assert(prevSuper->member.size() != 0, "empty prevSuper %d", prevSuper->id);
-      prevSuper->member.insert(prevSuper->member.end(), super->member.begin(), super->member.end());
-      /* update connection */
-      prevSuper->next.erase(super);
-      prevSuper->next.insert(super->next.begin(), super->next.end());
-      for (SuperNode* nextSuper : super->next) {
-        nextSuper->prev.erase(super);
-        nextSuper->prev.insert(prevSuper);
+  for (int threadId = 0; threadId < THREAD_NUM; threadId ++) {
+    for (size_t i = 0; i < parallelSuper[threadId].size(); i ++) {
+      SuperNode* super = parallelSuper[threadId][i];
+      if (super->superType != SUPER_VALID) continue;
+      if (super->prev.size() == 1) {
+        SuperNode* prevSuper = *(super->prev.begin());
+        if (super->threadId != prevSuper->threadId) continue;
+        if (prevSuper->superType != SUPER_VALID) continue;
+        if (prevSuper->member.size() > MAX_NODES_PER_SUPER) continue;
+        /* move members in super to prev super */
+        for (Node* member : super->member) member->super = prevSuper;
+        Assert(prevSuper->member.size() != 0, "empty prevSuper %d", prevSuper->id);
+        prevSuper->member.insert(prevSuper->member.end(), super->member.begin(), super->member.end());
+        /* update connection */
+        prevSuper->next.erase(super);
+        prevSuper->next.insert(super->next.begin(), super->next.end());
+        for (SuperNode* nextSuper : super->next) {
+          nextSuper->prev.erase(super);
+          nextSuper->prev.insert(prevSuper);
+        }
+        super->member.clear();
       }
-      super->member.clear();
     }
   }
-
   removeEmptySuper();
-  // reconnectSuper();
 }
 
 uint64_t prevHash(SuperNode* super) {
@@ -163,7 +174,7 @@ void graph::mergeSublings() {
     for (SuperNode* super : iter.second) {
       bool find = false;
       for (SuperNode* checkSuper : uniquePrev) {
-        if (prevEq(checkSuper, super)) { // merge or replace
+        if (checkSuper->threadId == super->threadId && prevEq(checkSuper, super)) { // merge or replace
           find = true;
           if (checkSuper->member.size() < MAX_SUBLINGS) {
             for (Node* member : super->member) member->super = checkSuper;

@@ -53,4 +53,10 @@ void graph::removeEmptySuper() {
     std::remove_if(sortedSuper.begin(), sortedSuper.end(), [](const SuperNode* super) {return (super->superType == SUPER_VALID || super->superType == SUPER_UPDATE_REG) && super->member.size() == 0; }),
     sortedSuper.end()
   );
+  for (int i = 0; i < THREAD_NUM; i ++) {
+    parallelSuper[i].erase(
+      std::remove_if(parallelSuper[i].begin(), parallelSuper[i].end(), [](const SuperNode* super) {return (super->superType == SUPER_VALID || super->superType == SUPER_UPDATE_REG) && super->member.size() == 0; }),
+      parallelSuper[i].end()
+    );
+  }
 }
