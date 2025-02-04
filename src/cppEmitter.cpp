@@ -661,7 +661,10 @@ void graph::genNodeStepStart(FILE* fp, SuperNode* node, uint64_t mask, int idx, 
     fprintf(fp, "sync%d.waitUntil(isEven);\n", cppId2SyncWake[info]->id);
   }
   nodeNum ++;
-  if (!isAlwaysActive(node->cppId, node->threadId)) fprintf(fp, "if(unlikely(%s)) { // id=%d\n", flagName.c_str(), idx);
+  if (!isAlwaysActive(node->cppId, node->threadId)) {
+    fprintf(fp, "if(unlikely(%s)) { // id=%d\n", flagName.c_str(), idx);
+    fprintf(fp, "%s = 0;\n", flagName.c_str());
+  }
   int id;
   uint64_t newMask;
   std::tie(id, newMask) = clearIdxMask(node->cppId);
