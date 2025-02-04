@@ -1002,12 +1002,14 @@ void graph::genSyncClassDef(FILE* fp) {
   fprintf(fp,
 "class SSync{\n\
   std::atomic<uint32_t> flag;\n\
+  int times;\n\
 public:\n\
-  SSync() {\n\
+  SSync(int _) {\n\
   flag.store(0, std::memory_order_release);\n\
+  times = _;\n\
   }\n\
   void waitUntil(bool isEven) {\n\
-    int target = isEven ? 0 : 1;\n\
+    int target = isEven ? 0 : times;\n\
     while (flag.load(std::memory_order_acquire) != target) RELAX();\n\
   }\n\
   void signal(bool isEven) {\n\
@@ -1020,7 +1022,7 @@ public:\n\
 void graph::genSyncDef(FILE* fp) {
   for (auto iter: cppId2SyncWake) {
     SyncInfo* info = iter.second;
-    fprintf(fp, "SSync sync%d;\n", info->id);
+    fprintf(fp, "SSync sync%d = SSync(1);\n", info->id);
   }
 }
 
