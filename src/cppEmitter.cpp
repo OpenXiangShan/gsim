@@ -57,7 +57,7 @@ public:
   }
 };
 int SyncInfo::counter = 1;
-static std::map<cppIdInfo, SyncInfo*> cppId2SyncWait;
+static std::map<cppIdInfo, std::vector<SyncInfo*>> cppId2SyncWait;
 static std::map<cppIdInfo, SyncInfo*> cppId2SyncWake;
 
 SuperNode* cppId2SuperNode(int cppId, int threadId) {
@@ -662,7 +662,7 @@ void graph::genNodeStepStart(FILE* fp, SuperNode* node, uint64_t mask, int idx, 
   }
   nodeNum ++;
   if (!isAlwaysActive(node->cppId, node->threadId)) {
-    fprintf(fp, "if(unlikely(%s)) { // id=%d\n", flagName.c_str(), idx);
+    fprintf(fp, "if(unlikely(%s)) { // id=%d thread=%d\n", flagName.c_str(), idx, node->threadId);
     fprintf(fp, "%s = 0;\n", flagName.c_str());
   }
   int id;
@@ -732,8 +732,10 @@ void graph::genNodeStepEnd(FILE* fp, SuperNode* node) {
   if(!isAlwaysActive(node->cppId, node->threadId)) fprintf(fp, "}\n");
   cppIdInfo info = cppIdInfo(node->cppId, node->threadId);
   if (cppId2SyncWait.find(info) != cppId2SyncWait.end()) {
-    // fprintf(fp, "printf(\"thread %d signal %d cycles %%ld\\n\", cycles);\n", node->threadId, cppId2SyncWait[info]->id);
-    fprintf(fp, "sync%d.signal(isEven);\n", cppId2SyncWait[info]->id);
+    for (SyncInfo* sync : cppId2SyncWait[info]) {
+      // fprintf(fp, "printf(\"thread %d signal %d cycles %%ld\\n\", cycles);\n", node->threadId, sync->id);
+      fprintf(fp, "sync%d.signal(isEven);\n", sync->id);
+    }
   }
 }
 
@@ -967,7 +969,7 @@ void graph::computeSync() {
       printf("thread %d super %d thread %d\n", i, super->cppId, super->threadId);
     }
   }
-  std::vector<int> lastSync(THREAD_NUM, -1);
+  std::vector<std::vector<int>> lastSync(THREAD_NUM, std::vector<int>(THREAD_NUM, -1));
   for (SuperNode* super : sortedSuper) {
     if (super->cppId < 0) continue;
     std::vector<int> maxCppId(THREAD_NUM, -1);
@@ -975,9 +977,19 @@ void graph::computeSync() {
       if (prev->threadId == super->threadId) continue;
       if (prev->cppId < 0) continue;
       if (prev->order > super->order) continue;
-      if (prev->cppId <= lastSync[prev->threadId]) continue;
+      if (prev->cppId <= lastSync[super->threadId][prev->threadId]) continue;
       maxCppId[prev->threadId] = std::max(maxCppId[prev->threadId], prev->cppId);
     }
+    if (super->superType == SUPER_UPDATE_REG) {
+      for (SuperNode* next : super->next) {
+        if (next->threadId == super->threadId) continue;
+        if (next->cppId < 0) continue;
+        if (next->order > super->order) continue;
+        if (next->cppId <= lastSync[super->threadId][next->threadId]) continue;
+        maxCppId[next->threadId] = std::max(maxCppId[next->threadId], next->cppId);
+      }
+    }
+
     bool needSync = false;
     for (int i = 0; i < THREAD_NUM; i ++) {
       if (i == super->threadId) continue;
@@ -990,8 +1002,8 @@ void graph::computeSync() {
       for (int i = 0; i < THREAD_NUM; i ++) {
         if (maxCppId[i] >= 0) {
           info->waitCppId.push_back(cppIdInfo(maxCppId[i], i));
-          cppId2SyncWait[cppIdInfo(maxCppId[i], i)] = info;
-          lastSync[i] = maxCppId[i];
+          cppId2SyncWait[cppIdInfo(maxCppId[i], i)].push_back(info);
+          lastSync[super->threadId][i] = maxCppId[i];
         }
       }
     }
@@ -1022,7 +1034,7 @@ public:\n\
 void graph::genSyncDef(FILE* fp) {
   for (auto iter: cppId2SyncWake) {
     SyncInfo* info = iter.second;
-    fprintf(fp, "SSync sync%d = SSync(1);\n", info->id);
+    fprintf(fp, "SSync sync%d = SSync(%ld);\n", info->id, info->waitCppId.size());
   }
 }
 
