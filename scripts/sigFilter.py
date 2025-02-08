@@ -11,7 +11,7 @@ class SigFilter():
     self.numPerFile = 10000
     self.fileIdx = 0
     self.varNum = 0
-    self.dstFileName = "build/obj/" + name + "/" + name + "_checkSig"
+    self.dstFileName = sys.argv[1] + "/" + name + "-split/" + name + "_checkSig"
 
   def closeDstFile(self):
     if self.dstfp is not None:
@@ -104,5 +104,5 @@ class SigFilter():
 
 
 if __name__ == "__main__":
-  sigFilter = SigFilter(sys.argv[1])
-  sigFilter.filter("build/obj/" + sys.argv[1] + "_sigs.txt", "obj_dir/V" + sys.argv[1] + "___024root.h")
+  sigFilter = SigFilter(sys.argv[2])
+  sigFilter.filter(sys.argv[1] + "/" + sys.argv[2] + "_sigs.txt", "obj_dir/V" + sys.argv[2] + "___024root.h")
