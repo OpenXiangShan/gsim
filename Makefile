@@ -107,7 +107,7 @@ EMU_LDFLAGS  ?=
 
 VERI_INC_DIR = $(GEN_CPP_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME) --max-num-width 1048576 --compiler clang # --trace-fst
-VERI_CFLAGS = $(addprefix -I../, $(VERI_INC_DIR)) $(MODE_FLAGS) -fbracket-depth=2048 -Wno-parentheses-equality
+VERI_CFLAGS = -O3 $(addprefix -I../, $(VERI_INC_DIR)) $(MODE_FLAGS) -fbracket-depth=2048 -Wno-parentheses-equality
 VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\" -DDUTNAME=\\\"$(dutName)\\\"
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
@@ -142,8 +142,6 @@ else ifeq ($(MODE), 1)
 	MODE_FLAGS += -DVERILATOR
 	target ?= ./obj_dir/V$(NAME)
 	VERI_CSRCS = $(EMU_DIFFTEST)
-	VERI_CFLAGS += -O3
-	OPT_FAST += -O3
 else ifeq ($(MODE), 2)
 	MODE_FLAGS += -DGSIM -DVERILATOR
 	CXXFLAGS += -DDIFFTEST_PER_SIG -DVERILATOR_DIFF
@@ -210,7 +208,7 @@ $(GSIM_TARGET): $(VERI_OBJS)
 
 ./obj_dir/V$(NAME): $(VERI_CSRCS) $(VERI_VSRCS) Makefile
 	verilator $(VERI_VFLAGS) +define+RANDOMIZE_GARBAGE_ASSIGN -O3 -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
-	make -s OPT_FAST="$(OPT_FAST)" CXX=clang -j 15 -C ./obj_dir -f V$(NAME).mk V$(NAME)
+	make -s OPT_FAST="-O3" CXX=clang -j 15 -C ./obj_dir -f V$(NAME).mk V$(NAME)
 
 build-emu: $(target)
 
