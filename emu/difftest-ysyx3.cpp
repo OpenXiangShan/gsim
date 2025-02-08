@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
 #endif
 #ifdef VERILATOR
   ref = new REF_NAME();
-  memcpy(&ref->rootp->newtop__DOT__mem__DOT__ram, program, program_sz);
+  memcpy(&ref->rootp->newtop__DOT__mem__DOT__ram_ext__DOT__Memory, program, program_sz);
   ref_reset();
 #endif
 #ifdef GSIM_DIFF
