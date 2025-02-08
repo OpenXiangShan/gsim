@@ -23,49 +23,49 @@ ifeq ($(dutName),ysyx3)
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
 	mainargs = ready-to-run/bin/bbl-hello.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
-	TEST_FILE = ready-to-run/ysyx3-chirrtl/$(NAME)
+	TEST_FILE = $(NAME)-ysyx3
 	SUPER_BOUND ?= 20
 else ifeq ($(dutName),NutShell)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
 	mainargs = ready-to-run/bin/linux-NutShell.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
-	TEST_FILE = ready-to-run/$(NAME)-nutshell
+	TEST_FILE = $(NAME)-nutshell
 	SUPER_BOUND ?= 20
 else ifeq ($(dutName),rocket)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-rocketchip.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
-	TEST_FILE = ready-to-run/rocket-chirrtl/$(NAME)
+	TEST_FILE = $(NAME)-rocket
 	SUPER_BOUND ?= 20
 else ifeq ($(dutName),boom)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
-	TEST_FILE = ready-to-run/large-boom-chirrtl/$(NAME)-LargeBoom
+	TEST_FILE = $(NAME)-LargeBoom
 	SUPER_BOUND ?= 35
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
 	mainargs = ready-to-run/bin/bbl-test1.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
-	TEST_FILE = ready-to-run/small-boom-chirrtl/$(NAME)-SmallBoom
+	TEST_FILE = $(NAME)-SmallBoom
 	SUPER_BOUND ?= 35
 else ifeq ($(dutName),xiangshan)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
 	mainargs = ready-to-run/bin/linux-xiangshan.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
-	TEST_FILE = ready-to-run/$(NAME)-xiangshan
+	TEST_FILE = $(NAME)-xiangshan
 	SUPER_BOUND ?= 35
 else ifeq ($(dutName),xiangshan-default)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
 	mainargs = ready-to-run/bin/linux-xiangshan.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
-	TEST_FILE = ready-to-run/$(NAME)-xiangshan-default
+	TEST_FILE = $(NAME)-xiangshan-default
 	SUPER_BOUND ?= 35
 endif
 
@@ -81,7 +81,7 @@ CXX = clang++
 CCACHE := ccache
 TARGET = GraphEmu
 
-FIRRTL_FILE = $(TEST_FILE).fir
+FIRRTL_FILE = ready-to-run/$(TEST_FILE).fir
 
 EMU_DIR = emu
 EMU_SRC = $(EMU_DIR)/emu.cpp $(shell find $(EMU_SRC_DIR) -name "*.cpp")
@@ -109,8 +109,8 @@ VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME) --max-num-wid
 VERI_CFLAGS = $(addprefix -I../, $(VERI_INC_DIR)) $(MODE_FLAGS) -fbracket-depth=2048 -Wno-parentheses-equality
 VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\" -DDUTNAME=\\\"$(dutName)\\\"
 VERI_LDFLAGS = -O3 -lgmp
-VERI_VSRCS = $(TEST_FILE).sv
-VERI_VSRCS += $(addprefix ready-to-run/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v DifftestMemInitializer.v)
+VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
+VERI_VSRCS += $(addprefix ready-to-run/difftest/blockbox/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v DifftestMemInitializer.v)
 VERI_CSRCS = $(GSIM_CXXFILES) $(shell find $(EMU_SRC_DIR) -name "*.cpp") $(shell find $(OBJ_DIR)/$(NAME) -name "*.cpp")
 VERI_HEADER = $(OBJ_DIR)/$(NAME).h
 VERI_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(VERI_CSRCS:.cpp=.o))
