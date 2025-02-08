@@ -16,6 +16,7 @@ INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 OBJ_DIR = $(BUILD_DIR)/obj
 GEN_CPP_DIR = $(OBJ_DIR)/$(TEST_FILE)
 SPLIT_CPP_DIR = $(GEN_CPP_DIR)/$(NAME)-split
+GSIM_FLAGS = --dir $(GEN_CPP_DIR)
 
 dutName ?= boom
 
@@ -25,49 +26,49 @@ ifeq ($(dutName),ysyx3)
 	mainargs = ready-to-run/bin/bbl-hello.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-ysyx3
-	SUPER_BOUND ?= 20
+	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),NutShell)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
 	mainargs = ready-to-run/bin/linux-NutShell.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-nutshell
-	SUPER_BOUND ?= 20
+	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),rocket)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-rocketchip.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-rocket
-	SUPER_BOUND ?= 20
+	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),boom)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-LargeBoom
-	SUPER_BOUND ?= 35
+	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
 	mainargs = ready-to-run/bin/bbl-test1.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-SmallBoom
-	SUPER_BOUND ?= 35
+	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),xiangshan)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
 	mainargs = ready-to-run/bin/linux-xiangshan.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan
-	SUPER_BOUND ?= 35
+	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),xiangshan-default)
 	NAME ?= SimTop
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
 	mainargs = ready-to-run/bin/linux-xiangshan.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan-default
-	SUPER_BOUND ?= 35
+	GSIM_FLAGS += --supernode-max-size=35
 endif
 
 MODE ?= 0
@@ -76,8 +77,7 @@ DIFF_VERSION ?= 2024_1_14
 EVENT_DRIVEN ?= 0
 
 
-CXXFLAGS = -ggdb -O3 $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror \
-	-DSUPER_BOUND=$(SUPER_BOUND) --std=c++17
+CXXFLAGS = -ggdb -O3 $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror --std=c++17
 CXX = clang++
 CCACHE := ccache
 TARGET = GraphEmu
@@ -175,7 +175,7 @@ makedir:
 
 compile: $(TARGET)
 	mkdir -p $(GEN_CPP_DIR)
-	$(GSIM_BUILD_DIR)/$(TARGET) --dir $(GEN_CPP_DIR) $(FIRRTL_FILE)
+	$(GSIM_BUILD_DIR)/$(TARGET) $(GSIM_FLAGS) $(FIRRTL_FILE)
 	-rm -rf $(SPLIT_CPP_DIR)
 	mkdir -p $(SPLIT_CPP_DIR)
 	$(SIG_COMMAND)

@@ -33,6 +33,7 @@ void inferAllWidth();
 
 static bool EnableDumpGraph{false};
 std::string OutputDir = ".";
+int SuperNodeMaxSize = 35;
 
 static void printUsage(const char* ProgName) {
   std::cout << "Usage: " << ProgName << " [options] <input file>\n"
@@ -40,6 +41,7 @@ static void printUsage(const char* ProgName) {
             << "  -h, --help           Display this help message and exit.\n"
             << "      --dump           Enable dumping of the graph.\n"
             << "      --dir=[dir]      Specify the output directory.\n"
+            << "      --supernode-max-size=[num]   Specify the maximum size of a superNode.\n"
             ;
 }
 
@@ -53,6 +55,7 @@ static char* parseCommandLine(int argc, char** argv) {
       {"help", no_argument, nullptr, 'h'},
       {"dump", no_argument, nullptr, 'd'},
       {"dir", required_argument, nullptr, 0},
+      {"supernode-max-size", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -63,6 +66,7 @@ static char* parseCommandLine(int argc, char** argv) {
       case 0: switch (option_index) {
                 case 1: EnableDumpGraph = true; break;
                 case 2: OutputDir = optarg; break;
+                case 3: sscanf(optarg, "%d", &SuperNodeMaxSize); break;
                 case 0:
                 default: printUsage(argv[0]); exit(EXIT_SUCCESS);
               }

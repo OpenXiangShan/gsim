@@ -59,6 +59,8 @@ void graph::graphCoarsen() {
 // initial partition
 
 void graph::graphInitPartition() {
+  extern int SuperNodeMaxSize;
+  printf("[graphPartition] Setting the maximum size of a superNode to %d\n", SuperNodeMaxSize);
   /*
   Kernighan’s algorithm: new part start at x
   * cost：C(x) = sum(i<x<=j)(cij)
@@ -89,7 +91,7 @@ void graph::graphInitPartition() {
     // printf("T[%ld] = %d size %ld\n", i, T[i], sortedSuper[i]->member.size());
     size_t nextBound = i + 1;
     size_t accuCost = sortedSuper[i]->member.size();
-    for (; nextBound < sortedSuper.size() && accuCost + sortedSuper[nextBound]->member.size() <= SUPER_BOUND; nextBound ++) {
+    for (; nextBound < sortedSuper.size() && accuCost + sortedSuper[nextBound]->member.size() <= SuperNodeMaxSize; nextBound ++) {
       accuCost += sortedSuper[nextBound]->member.size();
     }
     /* update T[i + 1] to T[nextBound] that jmp at i */
