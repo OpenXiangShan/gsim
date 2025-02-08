@@ -30,7 +30,7 @@ else ifeq ($(dutName),NutShell)
 	EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
 	mainargs = ready-to-run/bin/linux-NutShell.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
-	TEST_FILE = ready-to-run/$(NAME)
+	TEST_FILE = ready-to-run/$(NAME)-nutshell
 	SUPER_BOUND ?= 20
 else ifeq ($(dutName),rocket)
 	NAME ?= TestHarness
