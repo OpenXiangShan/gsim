@@ -563,12 +563,12 @@ valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
       if (lshiftBits == 0 || ChildInfo(0, status) == VAL_CONSTANT)
         lstr = format("%s%s", Cast(ChildInfo(0, width), sign).c_str(), lstr.c_str());
       else
-        lstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(0, width), true).c_str(), lstr.c_str(), lshiftBits, lshiftBits);
+        lstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(0, width), false).c_str(), lstr.c_str(), lshiftBits, lshiftBits);
       int rshiftBits = widthBits(width) - ChildInfo(1, width);
       if(rshiftBits == 0 || ChildInfo(1, status) == VAL_CONSTANT)
         rstr = format("%s%s", Cast(ChildInfo(1, width), sign).c_str(), rstr.c_str());
       else
-        rstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(1, width), true).c_str(), rstr.c_str(), rshiftBits, rshiftBits);
+        rstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(1, width), false).c_str(), rstr.c_str(), rshiftBits, rshiftBits);
     }
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " + " + rstr + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
@@ -597,12 +597,12 @@ valInfo* ENode::instsSub(Node* node, std::string lvalue, bool isRoot) {
       if (lshiftBits == 0 || ChildInfo(0, status) == VAL_CONSTANT)
         lstr = format("%s%s", Cast(ChildInfo(0, width), sign).c_str(), lstr.c_str());
       else
-        lstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(0, width), true).c_str(), lstr.c_str(), lshiftBits, lshiftBits);
+        lstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(0, width), false).c_str(), lstr.c_str(), lshiftBits, lshiftBits);
       int rshiftBits = widthBits(width) - ChildInfo(1, width);
       if (rshiftBits == 0 || ChildInfo(1, status) == VAL_CONSTANT)
         rstr = format("%s%s", Cast(ChildInfo(1, width), sign).c_str(), rstr.c_str());
       else
-        rstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(1, width), true).c_str(), rstr.c_str(), rshiftBits, rshiftBits);
+        rstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(1, width), false).c_str(), rstr.c_str(), rshiftBits, rshiftBits);
     }
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " - " + rstr + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
@@ -1023,7 +1023,7 @@ valInfo* ENode::instsAsSInt(Node* node, std::string lvalue, bool isRoot) {
       if (shiftBits == 0)
         ret->valStr = format("(%s%s)", Cast(width, true).c_str(), ChildInfo(0, valStr).c_str(), shiftBits, shiftBits);
       else
-        ret->valStr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(width, true).c_str(), ChildInfo(0, valStr).c_str(), shiftBits, shiftBits);
+        ret->valStr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(width, false).c_str(), ChildInfo(0, valStr).c_str(), shiftBits, shiftBits);
     }
     ret->opNum = ChildInfo(0, opNum) + 1;
   }
@@ -1688,14 +1688,14 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
         int extendedWidth = widthBits(width);
         int shiftBits = extendedWidth - computeInfo->width;
         if (extendedWidth != width)
-          computeInfo->valStr = format("((%s(%s%s << %d) >> %d) & %s)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits, bitMask(width).c_str());
+          computeInfo->valStr = format("((%s(%s%s << %d) >> %d) & %s)", Cast(width, true).c_str(), Cast(computeInfo->width, false).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits, bitMask(width).c_str());
         else
-          computeInfo->valStr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
+          computeInfo->valStr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, false).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
         computeInfo->opNum = 1;
         computeInfo->width = width;
       } else if (sign && (nodePtr->nodeIsRoot && computeInfo->width < (int)widthBits(width))) {
         int shiftBits = widthBits(width) - computeInfo->width;
-        computeInfo->valStr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, true).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
+        computeInfo->valStr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(computeInfo->width, false).c_str(), computeInfo->valStr.c_str(), shiftBits, shiftBits);
       } else if (sign) {
         computeInfo->valStr = format("(%s%s)", Cast(width, true).c_str(), computeInfo->valStr.c_str());
       }
