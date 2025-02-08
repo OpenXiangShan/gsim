@@ -14,7 +14,8 @@ LLVM_PROFDATA := llvm-profdata
 INCLUDE_DIR = include $(PARSER_BUILD) $(PARSER_DIR)/include
 
 OBJ_DIR = $(BUILD_DIR)/obj
-$(shell mkdir -p $(OBJ_DIR))
+GEN_CPP_DIR = $(OBJ_DIR)/$(TEST_FILE)
+SPLIT_CPP_DIR = $(GEN_CPP_DIR)/$(NAME)-split
 
 dutName ?= boom
 
@@ -75,8 +76,8 @@ DIFF_VERSION ?= 2024_1_14
 EVENT_DRIVEN ?= 0
 
 
-CXXFLAGS = -ggdb -O3 -DOBJ_DIR=\"$(OBJ_DIR)\" $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror \
-	-DDST_NAME=\"$(NAME)\" -DEVENT_DRIVEN=$(EVENT_DRIVEN) -DSUPER_BOUND=$(SUPER_BOUND) --std=c++17
+CXXFLAGS = -ggdb -O3 $(addprefix -I,$(INCLUDE_DIR)) -Wall -Werror \
+	-DSUPER_BOUND=$(SUPER_BOUND) --std=c++17
 CXX = clang++
 CCACHE := ccache
 TARGET = GraphEmu
@@ -104,15 +105,15 @@ GSIM_CXXFILES ?= $(EMU_DIFFTEST)
 GSIM_CXXFLAGS ?= $(MODE_FLAGS) -DDUTNAME=\"$(dutName)\"
 GSIM_LDFLAGS  ?=
 
-VERI_INC_DIR = $(OBJ_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
+VERI_INC_DIR = $(GEN_CPP_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME) --max-num-width 1048576 --compiler clang # --trace-fst
 VERI_CFLAGS = $(addprefix -I../, $(VERI_INC_DIR)) $(MODE_FLAGS) -fbracket-depth=2048 -Wno-parentheses-equality
 VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\" -DDUTNAME=\\\"$(dutName)\\\"
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
 VERI_VSRCS += $(addprefix ready-to-run/difftest/blockbox/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v DifftestMemInitializer.v)
-VERI_CSRCS = $(GSIM_CXXFILES) $(shell find $(EMU_SRC_DIR) -name "*.cpp") $(shell find $(OBJ_DIR)/$(NAME) -name "*.cpp")
-VERI_HEADER = $(OBJ_DIR)/$(NAME).h
+VERI_CSRCS = $(GSIM_CXXFILES) $(shell find $(EMU_SRC_DIR) -name "*.cpp") $(shell find $(SPLIT_CPP_DIR) -name "*.cpp")
+VERI_HEADER = $(GEN_CPP_DIR)/$(NAME).h
 VERI_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(VERI_CSRCS:.cpp=.o))
 
 REF_GSIM_DIR = $(EMU_DIR)/obj_$(DIFF_VERSION)
@@ -173,11 +174,12 @@ makedir:
 	mkdir -p build/gsim build/emu
 
 compile: $(TARGET)
-	$(GSIM_BUILD_DIR)/$(TARGET) $(FIRRTL_FILE)
-	-rm -rf $(OBJ_DIR)/$(NAME)
-	mkdir -p $(OBJ_DIR)/$(NAME)
+	mkdir -p $(GEN_CPP_DIR)
+	$(GSIM_BUILD_DIR)/$(TARGET) --dir $(GEN_CPP_DIR) $(FIRRTL_FILE)
+	-rm -rf $(SPLIT_CPP_DIR)
+	mkdir -p $(SPLIT_CPP_DIR)
 	$(SIG_COMMAND)
-	python ./scripts/partition.py $(OBJ_DIR)/$(NAME).cpp $(OBJ_DIR)/$(NAME)
+	python ./scripts/partition.py $(GEN_CPP_DIR)/$(NAME).cpp $(SPLIT_CPP_DIR)
 
 clean:
 	rm -rf obj parser/build obj_dir build

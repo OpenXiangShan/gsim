@@ -32,12 +32,15 @@ void inferAllWidth();
 #define FUNC_WRAPPER(func, name) FUNC_WRAPPER_INTERNAL(func, name, true)
 
 static bool EnableDumpGraph{false};
+std::string OutputDir = ".";
 
 static void printUsage(const char* ProgName) {
   std::cout << "Usage: " << ProgName << " [options] <input file>\n"
             << "Options:\n"
             << "  -h, --help           Display this help message and exit.\n"
-            << "      --dump           Enable dumping of the graph.\n";
+            << "      --dump           Enable dumping of the graph.\n"
+            << "      --dir=[dir]      Specify the output directory.\n"
+            ;
 }
 
 static char* parseCommandLine(int argc, char** argv) {
@@ -49,12 +52,21 @@ static char* parseCommandLine(int argc, char** argv) {
   const struct option Table[] = {
       {"help", no_argument, nullptr, 'h'},
       {"dump", no_argument, nullptr, 'd'},
+      {"dir", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
   int Option{0};
-  while ((Option = getopt_long(argc, argv, "-h", Table, nullptr)) != -1) {
+  int option_index;
+  while ((Option = getopt_long(argc, argv, "-h", Table, &option_index)) != -1) {
     switch (Option) {
+      case 0: switch (option_index) {
+                case 1: EnableDumpGraph = true; break;
+                case 2: OutputDir = optarg; break;
+                case 0:
+                default: printUsage(argv[0]); exit(EXIT_SUCCESS);
+              }
+              break;
       case 1: return optarg; // InputFileName
       case 'd': EnableDumpGraph = true; break;
       default: {

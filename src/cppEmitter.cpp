@@ -41,6 +41,7 @@ static std::vector<std::string> resetFuncs;
 extern int maxConcatNum;
 bool nameExist(std::string str);
 static int resetFuncNum = 0;
+extern std::string OutputDir;
 
 static bool isAlwaysActive(int cppId) {
   return alwaysActive.find(cppId) != alwaysActive.end();
@@ -203,10 +204,10 @@ void graph::genNodeInit(FILE* fp, Node* node) {
   for (std::string inst : node->initInsts) fprintf(fp, "%s\n", strReplace(inst, ASSIGN_LABLE, "").c_str());
 }
 
-FILE* graph::genHeaderStart(std::string headerFile) {
-  FILE* header = std::fopen((std::string(OBJ_DIR) + "/" + headerFile + ".h").c_str(), "w");
+FILE* graph::genHeaderStart() {
+  FILE* header = std::fopen((OutputDir + "/" + name + ".h").c_str(), "w");
 
-  fprintf(header, "#ifndef %s_H\n#define %s_H\n", headerFile.c_str(), headerFile.c_str());
+  fprintf(header, "#ifndef %s_H\n#define %s_H\n", name.c_str(), name.c_str());
   /* include all libs */
   includeLib(header, "iostream", true);
   includeLib(header, "vector", true);
@@ -457,8 +458,8 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   }
 }
 
-FILE* graph::genSrcStart(std::string name) {
-  FILE* src = std::fopen((std::string(OBJ_DIR) + "/" + name + ".cpp").c_str(), "w");
+FILE* graph::genSrcStart() {
+  FILE* src = std::fopen((OutputDir + "/" + name + ".cpp").c_str(), "w");
   includeLib(src, name + ".h", false);
 
   return src;
@@ -900,11 +901,11 @@ void graph::cppEmitter() {
     }
   }
 
-  FILE* header = genHeaderStart(name);
-  FILE* src = genSrcStart(name);
+  FILE* header = genHeaderStart();
+  FILE* src = genSrcStart();
   // header: node definition; src: node evaluation
 #ifdef DIFFTEST_PER_SIG
-  sigFile = fopen((std::string(OBJ_DIR) + "/" + name + "_sigs.txt").c_str(), "w");
+  sigFile = fopen((OutputDir + "/" + name + "_sigs.txt").c_str(), "w");
 #endif
 
   for (SuperNode* super : sortedSuper) {
@@ -954,4 +955,5 @@ void graph::cppEmitter() {
   fclose(sigFile);
 #endif
   printf("[cppEmitter] define %ld nodes %d superNodes\n", definedNode.size(), superId);
+  std::cout << "[cppEmitter] finish writing to " + OutputDir + "/" + name + ".[cpp|h]" << std::endl;
 }
