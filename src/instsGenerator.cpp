@@ -557,23 +557,33 @@ valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
   } else {
     std::string lstr = ChildInfo(0, valStr);
     std::string rstr = ChildInfo(1, valStr);
+    int resWidth = width;
     if (sign) { // signed extension
-      int width = MAX(ChildInfo(0, width), ChildInfo(1, width));
+      int width = MAX(resWidth, MAX(ChildInfo(0, width), ChildInfo(1, width)));
+      assert(ChildInfo(0, sign));
+      assert(ChildInfo(1, sign));
+
       int lshiftBits = widthBits(width) - ChildInfo(0, width);
       if (lshiftBits == 0 || ChildInfo(0, status) == VAL_CONSTANT)
-        lstr = format("%s%s", Cast(ChildInfo(0, width), sign).c_str(), lstr.c_str());
+        lstr = format("%s%s%s", Cast(width, false).c_str(), Cast(ChildInfo(0, width), true).c_str(), lstr.c_str());
       else
-        lstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(0, width), false).c_str(), lstr.c_str(), lshiftBits, lshiftBits);
+        lstr = format("%s(%s(%s%s << %d) >> %d)", Cast(width, false).c_str(), Cast(width, true).c_str(), Cast(width, false).c_str(), lstr.c_str(), lshiftBits, lshiftBits);
+
       int rshiftBits = widthBits(width) - ChildInfo(1, width);
       if(rshiftBits == 0 || ChildInfo(1, status) == VAL_CONSTANT)
-        rstr = format("%s%s", Cast(ChildInfo(1, width), sign).c_str(), rstr.c_str());
+        rstr = format("%s%s%s", Cast(width, false).c_str(), Cast(ChildInfo(1, width), true).c_str(), rstr.c_str());
       else
-        rstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(1, width), false).c_str(), rstr.c_str(), rshiftBits, rshiftBits);
+        rstr = format("(%s(%s(%s%s << %d) >> %d))", Cast(width, false).c_str(), Cast(width, true).c_str(), Cast(width, false).c_str(), rstr.c_str(), rshiftBits, rshiftBits);
     }
-    ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " + " + rstr + ")";
+
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-    if (!sign && width <= MAX(ChildInfo(0, width), ChildInfo(1, width))) {
-      ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+    if (sign) {
+      ret->valStr = "(" + lstr + " + " + rstr + ")";
+    } else {
+      ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " + " + rstr + ")";
+      if (width <= MAX(ChildInfo(0, width), ChildInfo(1, width))) {
+        ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
+      }
     }
   }
   return ret;
