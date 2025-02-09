@@ -9,11 +9,18 @@ std::map<Node*, clockVal*> resetMap;
 ResetType Node::inferReset() {
   if (reset != UNCERTAIN) return reset;
   if (assignTree.size() > 1) TODO();
-  if (assignTree.size() == 1) {
-    assignTree[0]->getRoot()->inferReset();
-    reset = assignTree[0]->getRoot()->reset;
+  if (!isArray()) {
+    reset = assignTree.back()->getRoot()->inferReset();
   } else {
-    reset = UINTRESET;
+    if (assignTree.size() != 0) TODO();
+    for (ExpTree* tree : arrayVal) {
+      ResetType newReset = tree->getRoot()->inferReset();
+      if (reset == UNCERTAIN) reset = newReset;
+      else if (reset != tree->getRoot()->reset) {
+        printf("reset %d %d\n", reset, tree->getRoot()->reset);
+        Panic();
+      }
+    }
   }
   return reset;
 }
