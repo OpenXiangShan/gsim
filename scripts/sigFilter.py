@@ -21,7 +21,7 @@ class SigFilter():
   def newDstFile(self):
     self.closeDstFile()
     self.dstfp = open(self.dstFileName + str(self.fileIdx) + ".cpp", "w")
-    self.dstfp.writelines("#include <iostream>\n#include <gmp.h>\n#include <" + self.name + ".h>\n#include \"V" + self.name + "__Syms.h\"\n")
+    self.dstfp.writelines("#include <iostream>\n#include <" + self.name + ".h>\n#include \"V" + self.name + "__Syms.h\"\n")
     self.dstfp.writelines("bool checkSig" + str(self.fileIdx) + "(bool display, V" + self.name + "* ref, S" + self.name + "* mod) {\n")
     self.dstfp.writelines("bool ret = false;\n")
     self.fileIdx += 1
@@ -35,6 +35,58 @@ class SigFilter():
     while data[startIdx-1] != '*':
       startIdx -= 1
     return int(data[startIdx : endIdx]) + 1
+
+  def genDiffCode(self, modName, refName, line, mod_width, ref_width):
+    refUName = line[3] + "_u"
+    if mod_width > 128:
+      num = int((ref_width + 31) / 32)
+      self.dstfp.writelines("unsigned _BitInt(" + str(num*32) + ") " + refUName + " = " + refName + "[" + str(num-1) +"U];\n")
+      for i in range(num - 1, 0, -1):
+        self.dstfp.writelines(refUName + " = (" + refUName + " << 32) + " + refName + "[" + str(i-1) + "U];\n")
+
+    refName128 = ""
+    if ref_width > 64:
+      num = int((ref_width + 31) / 32)
+      bits = num * 32
+      utype = "unsigned _BitInt(" + str(bits) + ")"
+      for i in range(num):
+        refName128 = refName128 + (" | " if i != 0 else "") + "((" + utype + ")" + refName + "[" + str(i) + "] << " + str(i * 32) + ")"
+      refName = refName.lstrip("ref->rootp->") + "_" + str(bits)
+      self.dstfp.writelines(utype + " " + refName + " = " + refName128 + ";\n")
+    mask = (hex((1 << mod_width) - 1) + "u" if mod_width <= 64 else
+            "((unsigned _BitInt(" + str(mod_width) + "))0 - 1)")
+    self.dstfp.writelines("if( display || (((" + modName + " ^ " + refName + ") & " + mask + ") != 0)) {\n" + \
+                          "  ret = true;\n" + \
+                          "  std::cout << std::hex << \"" + line[2] + ": \" ")
+    num = int((mod_width + 63) / 64)
+    for i in range(num - 1, -1, -1):
+      self.dstfp.writelines(" << (uint64_t)(" + modName + " >> " + str(i * 64) + ") << '_'")
+    self.dstfp.writelines(" << \"  \" ")
+    num = int((ref_width + 63) / 64)
+    for i in range(num - 1, -1, -1):
+      self.dstfp.writelines(" << (uint64_t)(" + refName + " >> " + str(i * 64) + ") << '_'")
+    self.dstfp.writelines(" << std::endl;\n" + "} \n")
+
+  def genDiffCode2(self, modName, refName, line, width):
+    # This code is simpler, but it does not work with clang 16.
+    # clang 16 can not correctly handle pointer of _BitInt like:
+    #     *(_BitInt(28) *)a
+    # It should work with clang 19.
+    utype = "unsigned _BitInt(" + str(width) + ")"
+    modNameLocal = line[3] + "_dut"
+    refNameLocal = line[3] + "_ref"
+    self.dstfp.writelines(utype + " " + modNameLocal + " = " + "*(" + utype + "*)(&(" + modName + "));\n")
+    self.dstfp.writelines(utype + " " + refNameLocal + " = " + "*(" + utype + "*)(&(" + refName + "));\n")
+    self.dstfp.writelines("if (display || (" + modNameLocal + " != " + refNameLocal + ")) {\n" + \
+                          "  ret = true;\n" + \
+                          "  std::cout << std::hex <<\"" + line[2] + ": \" ")
+    num = int((width + 63) / 64)
+    for i in range(num - 1, -1, -1):
+      self.dstfp.writelines(" << (uint64_t)(" + modNameLocal + " >> " + str(i * 64) + ")")
+    self.dstfp.writelines(" << \"  \" ")
+    for i in range(num - 1, -1, -1):
+      self.dstfp.writelines(" << (uint64_t)(" + refNameLocal + " >> " + str(i * 64) + ")")
+    self.dstfp.writelines(" << std::endl;\n" + "} \n")
 
   def filter(self, srcFile, refFile):
     self.srcfp = open(srcFile, "r")
@@ -62,31 +114,12 @@ class SigFilter():
         ref_width = all_sigs[line[3]]
         refName = "ref->rootp->" + line[3]
         modName = "mod->" + line[2]
-        refUName = line[3] + "_u"
-        if mod_width > 256:
-          continue
-        if mod_width > 128 and mod_width <= 256:
-          num = int((ref_width + 31) / 32)
-          self.dstfp.writelines("uint256_t " + refUName + " = " + refName + "[" + str(num-1) +"U];\n")
-          for i in range(num - 1, 0, -1):
-            self.dstfp.writelines(refUName + " = (" + refUName + " << 32) + " + refName + "[" + str(i-1) + "U];\n")
+        assert(mod_width <= ref_width), "width(" + line[2] + ") = " + str(mod_width) + ", width(" + line[3] + ") = " + str(ref_width)
+        width = mod_width
 
-        refName128 = ""
-        if ref_width > 64:
-          num = int((ref_width + 31) / 32)
-          for i in range(min(8, num)):
-            refName128 = refName128 + (" | " if i != 0 else "") + "((uint256_t)" + refName + "[" + str(i) + "] << " + str(i * 32) + ")"
-          refName = refName.lstrip("ref->rootp->") + "_128"
-          self.dstfp.writelines("uint256_t " + refName + " = " + refName128 + ";\n")
-        # mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((uint256_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
-        mask = "((uint256_t)0 - 1)" if (mod_width == 256) else "(((uint256_t)1 << " + str(mod_width) + ") - 1)"
-        self.dstfp.writelines( \
-        "if(display || (" + modName + " & " + mask + ") != (" + refName + "&" + mask + ")){\n" + \
-        "  ret = true;\n" + \
-        "  std::cout << std::hex <<\"" + line[2] + ": \" << +" +  \
-        (modName if mod_width <= 64 else "(uint64_t)(" + modName + " >> 64) << " + "(uint64_t)" + modName) + " << \"  \" << +" + \
-          (refName if ref_width <= 64 else "(uint64_t)(" + refName + " >> 64) << " + "(uint64_t)" + refName) + "<< std::endl;\n" + \
-        "} \n")
+        self.genDiffCode(modName, refName, line, mod_width, ref_width)
+        #self.genDiffCode2(modName, refName, line, width)
+
     # self.dstfp.writelines("return ret;\n")
     self.srcfp.close()
     self.reffp.close()
