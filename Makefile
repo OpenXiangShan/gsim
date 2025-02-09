@@ -22,49 +22,42 @@ dutName ?= boom
 
 ifeq ($(dutName),ysyx3)
 	NAME ?= newtop
-	EMU_DIFFTEST = $(EMU_DIR)/difftest-ysyx3.cpp
 	mainargs = ready-to-run/bin/bbl-hello.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-ysyx3
 	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),NutShell)
 	NAME ?= SimTop
-	EMU_DIFFTEST = $(EMU_DIR)/difftest-NutShell.cpp
 	mainargs = ready-to-run/bin/linux-NutShell.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-nutshell
 	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),rocket)
 	NAME ?= TestHarness
-	EMU_DIFFTEST = $(EMU_DIR)/difftest-rocketchip.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-rocket
 	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),boom)
 	NAME ?= TestHarness
-	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
 	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-LargeBoom
 	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
-	EMU_DIFFTEST = $(EMU_DIR)/difftest-boom.cpp
-	mainargs = ready-to-run/bin/bbl-test1.bin
+	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-SmallBoom
 	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),xiangshan)
 	NAME ?= SimTop
-	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
 	mainargs = ready-to-run/bin/linux-xiangshan.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan
 	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),xiangshan-default)
 	NAME ?= SimTop
-	EMU_DIFFTEST = $(EMU_DIR)/difftest-xiangshan.cpp
 	mainargs = ready-to-run/bin/linux-xiangshan.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan-default
@@ -85,7 +78,7 @@ GSIM_BIN = $(GSIM_BUILD_DIR)/gsim
 FIRRTL_FILE = ready-to-run/$(TEST_FILE).fir
 
 EMU_DIR = emu
-EMU_SRC = $(EMU_DIR)/emu.cpp $(shell find $(EMU_SRC_DIR) -name "*.cpp")
+EMU_SRC = $(EMU_DIR)/emu.cpp
 EMU_TARGET = emu_test
 EMU_SRC_DIR = emu-src
 
@@ -101,14 +94,21 @@ HEADERS := $(foreach x, $(INCLUDE_DIR), $(wildcard $(addprefix $(x)/*,.h)))
 ifdef GSIM_TARGET
 target = $(GSIM_TARGET)
 endif
-EMU_CXXFILES ?= $(EMU_DIFFTEST)
-EMU_CXXFLAGS ?= $(MODE_FLAGS) -DDUTNAME=\"$(dutName)\"
+EMU_CXXFILES ?= $(EMU_SRC)
+EMU_CXXFLAGS ?= $(MODE_FLAGS)
 EMU_LDFLAGS  ?=
+
+CFLAGS_DUT = -DDUT_NAME=S$(NAME) -DDUT_HEADER=\"$(NAME).h\" -D__DUT_$(shell echo $(dutName) | tr - _)__
+CFLAGS_REF = -DREF_NAME=V$(NAME) -DREF_HEADER=\"V$(NAME)__Syms.h\"
+
+define replace_quote
+	$(subst \",\\\",$(1))
+endef
 
 VERI_INC_DIR = $(GEN_CPP_DIR) $(EMU_DIR)/include include $(EMU_SRC_DIR)
 VERI_VFLAGS = --exe $(addprefix -I, $(VERI_INC_DIR)) --top $(NAME) --max-num-width 1048576 --compiler clang # --trace-fst
 VERI_CFLAGS = -O3 $(addprefix -I../, $(VERI_INC_DIR)) $(MODE_FLAGS) -fbracket-depth=2048 -Wno-parentheses-equality
-VERI_CFLAGS += -DMOD_NAME=S$(NAME) -DREF_NAME=V$(NAME) -DHEADER=\\\"V$(NAME)__Syms.h\\\" -DDUTNAME=\\\"$(dutName)\\\"
+VERI_CFLAGS += $(call replace_quote,$(CFLAGS_DUT)) $(call replace_quote,$(CFLAGS_REF))
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
 VERI_VSRCS += $(addprefix ready-to-run/difftest/blockbox/, SdCard.v TransExcep.v UpdateCsrs.v UpdateRegs.v InstFinish.v DifftestMemInitializer.v)
@@ -120,8 +120,8 @@ REF_GSIM_DIR = $(EMU_DIR)/obj_$(DIFF_VERSION)
 REF_GSIM_SRCS = $(shell find $(REF_GSIM_DIR)/splitted -name "*.cpp")
 REF_GSIM_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(REF_GSIM_SRCS:.cpp=.o))
 
-EMU_CFLAGS = $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) -DMOD_NAME=S$(NAME) -DMOD_HEADER=\"$(NAME).h\" -fbracket-depth=2048 \
-			-Wno-parentheses-equality -DDUTNAME=\"$(dutName)\"# -pg #-ggdb
+EMU_CFLAGS = $(addprefix -I, $(VERI_INC_DIR)) $(MODE_FLAGS) $(CFLAGS_DUT) -fbracket-depth=2048 \
+			-Wno-parentheses-equality # -pg #-ggdb
 
 OPT_FAST =
 
@@ -141,7 +141,7 @@ else ifeq ($(MODE),0)
 else ifeq ($(MODE), 1)
 	MODE_FLAGS += -DVERILATOR
 	target ?= ./obj_dir/V$(NAME)
-	VERI_CSRCS = $(EMU_DIFFTEST)
+	VERI_CSRCS = $(EMU_SRC)
 else ifeq ($(MODE), 2)
 	MODE_FLAGS += -DGSIM -DVERILATOR
 	CXXFLAGS += -DDIFFTEST_PER_SIG -DVERILATOR_DIFF
