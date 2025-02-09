@@ -59,6 +59,7 @@ BUILD_DIR ?= build
 WORK_DIR = $(BUILD_DIR)/$(TEST_FILE)
 CXX = clang++
 CCACHE = ccache
+SHELL := /bin/bash
 
 CFLAGS_DUT = -DDUT_NAME=S$(NAME) -DDUT_HEADER=\"$(NAME).h\" -D__DUT_$(shell echo $(dutName) | tr - _)__
 
@@ -166,7 +167,7 @@ SPLIT_CPP_DIR = $(GEN_CPP_DIR)/split
 
 $(GEN_CPP_DIR)/$(NAME).cpp: $(GSIM_BIN) $(FIRRTL_FILE)
 	@mkdir -p $(@D)
-	$(GSIM_BIN) $(GSIM_FLAGS) --dir $(@D) $(FIRRTL_FILE)
+	set -o pipefail && /bin/time $(GSIM_BIN) $(GSIM_FLAGS) --dir $(@D) $(FIRRTL_FILE) | tee $(BUILD_DIR)/gsim.log
 
 $(SPLIT_CPP_DIR)/$(NAME)0.cpp: $(GEN_CPP_DIR)/$(NAME).cpp
 	-rm -rf $(@D)
