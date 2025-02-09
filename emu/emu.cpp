@@ -8,6 +8,9 @@
 #include <fstream>
 #include <csignal>
 #include <chrono>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #if defined(__DUT_ysyx3__)
 #define DUT_MEMORY mem$ram
@@ -118,9 +121,9 @@ void ref_hook(REF_NAME *ref) {
 REF_NAME* ref;
 #endif
 
-#define MAX_PROGRAM_SIZE 0x8000000
-static uint8_t program[MAX_PROGRAM_SIZE];
 static int program_sz = 0;
+static int program_fd = 0;
+static void *program = NULL;
 static bool dut_end = false;
 
 template <typename T>
@@ -137,25 +140,25 @@ std::vector<size_t> sort_indexes(const std::vector<T> &v) {
   return idx;
 }
 
-void load_program(char* filename) {
-  memset(&program, 0, sizeof(program));
-  if (!filename) {
-    printf("No input program\n");
-    return;
-  }
+static void load_program(const char *filename) {
+  assert(filename != NULL);
+  program_fd = open(filename, O_RDONLY);
+  assert(program_fd != -1);
 
-  FILE* fp = fopen(filename, "rb");
-  assert(fp);
+  struct stat s;
+  int ret = fstat(program_fd, &s);
+  assert(ret == 0);
+  program_sz = s.st_size;
 
-  fseek(fp, 0, SEEK_END);
-  program_sz = ftell(fp);
-  assert(program_sz < MAX_PROGRAM_SIZE);
+  program = mmap(NULL, program_sz, PROT_READ, MAP_PRIVATE, program_fd, 0);
+  assert(program != (void *)-1);
 
-  fseek(fp, 0, SEEK_SET);
-  int ret = fread(program, program_sz, 1, fp);
-  assert(ret == 1);
   printf("load program size: 0x%x\n", program_sz);
-  return;
+}
+
+static void close_program() {
+  munmap(program, program_sz);
+  close(program_fd);
 }
 
 #ifdef GSIM
@@ -203,6 +206,8 @@ int main(int argc, char** argv) {
   memcpy(&ref->DUT_MEMORY, program, program_sz);
   ref_reset();
 #endif
+  close_program();
+
   std::cout << "start testing.....\n";
   std::signal(SIGINT, [](int){ dut_end = true; });
   std::signal(SIGTERM, [](int){ dut_end = true; });
