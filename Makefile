@@ -208,7 +208,7 @@ $(GSIM_TARGET): $(VERI_OBJS)
 
 ./obj_dir/V$(NAME): $(VERI_CSRCS) $(VERI_VSRCS) Makefile
 	verilator $(VERI_VFLAGS) +define+RANDOMIZE_GARBAGE_ASSIGN -O3 -Wno-lint -j 8 --cc $(VERI_VSRCS) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)" $(VERI_CSRCS)
-	make -s OPT_FAST="-O3" CXX=clang -j 15 -C ./obj_dir -f V$(NAME).mk V$(NAME)
+	$(MAKE) OPT_FAST="-O3" CXX=clang -C ./obj_dir -f V$(NAME).mk
 
 build-emu: $(target)
 
