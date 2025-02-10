@@ -38,14 +38,43 @@
 #define CYCLE_MSG_STEP 10000000
 #elif defined(__DUT_xiangshan__) || defined(__DUT_xiangshan_default__)
 #define DUT_MEMORY memory$ram$rdata_mem$mem
-#define REF_MEMORY SimTop__DOT__memory__DOT__ram__DOT__rdata_mem__DOT__mem
+#define REF_MEMORY SimTop__DOT__memory__DOT__ram__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 500000
-#ifdef __DUT_xiangshan__
-#define CYCLE_MAX_SIM  6400000
+#ifdef __DUT_xiangshan_default__
+#define CYCLE_MAX_SIM  10000000
 #else
-#define CYCLE_MAX_SIM  3100000
+#define CYCLE_MAX_SIM  20000000
 #endif
 #define CYCLE_MSG_STEP 100000
+
+// unused blackbox
+void imsic_csr_top(uint8_t _0, uint8_t _1, uint16_t _2, uint8_t _3, uint8_t _4, uint16_t _5, uint8_t _6, uint8_t _7, uint8_t _8, uint8_t _9, uint8_t _10, uint8_t _11, uint64_t _12, uint8_t& _13, uint64_t& _14, uint8_t& _15, uint8_t& _16, uint32_t& _17, uint32_t& _18, uint32_t& _19) {
+  _13 = 0;
+  _15 = 0;
+  _16 = 0; // o_irq
+  _17 = 0;
+  _18 = 0;
+  _19 = 0;
+}
+
+// unused blackbox
+void SimJTAG(uint8_t _0, uint8_t& _1, uint8_t& _2, uint8_t& _3, uint8_t _4, uint8_t _5, uint8_t _6, uint8_t _7, uint32_t& _8) {
+  _1 = 1; // TRSTn
+  _2 = 0; // TMS
+  _3 = 0; // TDI
+  _8 = 0;
+}
+
+// unused blackbox
+void FlashHelper(uint8_t en, uint32_t addr, uint64_t &data) {
+  data = 0;
+}
+
+// unused blackbox
+void SDCardHelper(uint8_t setAddr, uint32_t addr, uint8_t ren, uint32_t& data) {
+  data = 0;
+}
+
 #else
 #error Unsupport DUT = DUT_NAME
 #endif

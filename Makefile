@@ -39,15 +39,15 @@ else ifeq ($(dutName),small-boom)
 	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),xiangshan)
 	NAME ?= SimTop
-	mainargs = ready-to-run/bin/linux-xiangshan.bin
+	mainargs = ready-to-run/bin/linux-xiangshan-202501.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
-	TEST_FILE = $(NAME)-xiangshan-minimal-202403
+	TEST_FILE = $(NAME)-xiangshan-minimal-202501-20957846
 	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),xiangshan-default)
 	NAME ?= SimTop
-	mainargs = ready-to-run/bin/linux-xiangshan.bin
+	mainargs = ready-to-run/bin/linux-xiangshan-202501.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
-	TEST_FILE = $(NAME)-xiangshan-default
+	TEST_FILE = $(NAME)-xiangshan-default-202501-20957846
 	GSIM_FLAGS += --supernode-max-size=35
 endif
 
@@ -313,6 +313,10 @@ diff:
 	$(MAKE) MODE=2 compile
 	$(MAKE) MODE=2 difftest
 
+unzip:
+	cd ready-to-run && tar xvjf xiangshan.tar.bz2
+	cd ready-to-run/difftest && tar xvjf xiangshan.tar.bz2
+
 perf: $(target)
 	sudo perf record -e branch-instructions,branch-misses,cache-misses,\
 	cache-references,instructions,L1-dcache-load-misses,L1-dcache-loads,\
@@ -332,4 +336,4 @@ gendoc:
 format-obj:
 	@clang-format -i --style=file obj/$(NAME).cpp
 
-.PHONY: clean run diff perf count gendoc format-obj
+.PHONY: clean run diff unzip perf count gendoc format-obj
