@@ -127,8 +127,11 @@ GSIM_BUILD_DIR = $(BUILD_DIR)/gsim
 GSIM_BIN = $(GSIM_BUILD_DIR)/gsim
 
 PARSER_DIR = parser
+LEXICAL_NAME = lexical
+SYNTAX_NAME = syntax
 PARSER_BUILD_DIR = $(GSIM_BUILD_DIR)/$(PARSER_DIR)
-PARSER_GEN_SRCS = $(foreach x, lexical syntax, $(PARSER_BUILD_DIR)/$(x).cc)
+PARSER_GEN_SRCS = $(foreach x, $(LEXICAL_NAME) $(SYNTAX_NAME), $(PARSER_BUILD_DIR)/$(x).cc)
+PARSER_GEN_HEADER = $(PARSER_BUILD_DIR)/$(SYNTAX_NAME).hh
 GSIM_SRCS = $(foreach x, src $(PARSER_DIR), $(wildcard $(x)/*.cpp))
 
 GSIM_INC_DIR = include $(PARSER_DIR)/include $(PARSER_BUILD_DIR)
@@ -146,11 +149,13 @@ $(PARSER_BUILD_DIR)/%.cc: $(PARSER_DIR)/%.l
 	@mkdir -p $(@D)
 	flex -Cf -o $@ $<
 
+$(PARSER_GEN_HEADER): $(PARSER_BUILD_DIR)/$(SYNTAX_NAME).cc
+
 $(foreach x, $(PARSER_GEN_SRCS), $(eval \
-	$(call CXX_TEMPLATE, $(PARSER_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(CXXFLAGS), GSIM_OBJS,)))
+	$(call CXX_TEMPLATE, $(PARSER_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(CXXFLAGS), GSIM_OBJS, $(PARSER_GEN_HEADER))))
 
 $(foreach x, $(GSIM_SRCS), $(eval \
-	$(call CXX_TEMPLATE, $(GSIM_BUILD_DIR)/$(basename $(x)).o, $(x), $(CXXFLAGS), GSIM_OBJS, $(PARSER_GEN_SRCS))))
+	$(call CXX_TEMPLATE, $(GSIM_BUILD_DIR)/$(basename $(x)).o, $(x), $(CXXFLAGS), GSIM_OBJS, $(PARSER_GEN_HEADER))))
 
 $(eval $(call LD_TEMPLATE, $(GSIM_BIN), $(GSIM_OBJS), $(CXXFLAGS) -lgmp))
 
