@@ -6,8 +6,8 @@
 #define GRAPH_H
 
 class graph {
-  FILE* genHeaderStart(std::string headerFile);
-  FILE* genSrcStart(std::string name);
+  FILE* genHeaderStart();
+  FILE* genSrcStart();
   void genNodeDef(FILE* fp, Node* node);
   void genNodeInsts(FILE* fp, Node* node, std::string flagName);
   void genInterfaceInput(FILE* fp, Node* input);

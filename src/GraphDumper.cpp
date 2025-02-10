@@ -60,6 +60,7 @@ void GraphDumper::dump(const SuperNode* N) {
 }
 
 void graph::dump(std::string FileName) {
-  std::ofstream ofs{std::string{OBJ_DIR} + "/" + this->name + "_" + FileName + ".dot"};
+  extern std::string OutputDir;
+  std::ofstream ofs{OutputDir + "/" + this->name + "_" + FileName + ".dot"};
   GraphDumper(ofs).dump(this);
 }
