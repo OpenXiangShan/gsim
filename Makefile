@@ -59,7 +59,10 @@ BUILD_DIR ?= build
 WORK_DIR = $(BUILD_DIR)/$(TEST_FILE)
 CXX = clang++
 CCACHE = ccache
+
 SHELL := /bin/bash
+TIME = /usr/bin/time
+LOG_FILE = $(WORK_DIR)/$(TEST_FILE).log
 
 CFLAGS_DUT = -DDUT_NAME=S$(NAME) -DDUT_HEADER=\"$(NAME).h\" -D__DUT_$(shell echo $(dutName) | tr - _)__
 
@@ -156,8 +159,12 @@ $(foreach x, $(GSIM_SRCS), $(eval \
 
 $(eval $(call LD_TEMPLATE, $(GSIM_BIN), $(GSIM_OBJS), $(CXXFLAGS) -lgmp))
 
+build-gsim: $(GSIM_BIN)
+
 # Dependency
 -include $(GSIM_OBJS:.o=.d)
+
+.PHONY: build-gsim
 
 ##############################################
 ### Running GSIM to generate cpp model
@@ -169,7 +176,7 @@ SPLIT_CPP_DIR = $(GEN_CPP_DIR)/split
 
 $(GEN_CPP_DIR)/$(NAME).cpp: $(GSIM_BIN) $(FIRRTL_FILE)
 	@mkdir -p $(@D)
-	set -o pipefail && /bin/time $(GSIM_BIN) $(GSIM_FLAGS) --dir $(@D) $(FIRRTL_FILE) | tee $(BUILD_DIR)/gsim.log
+	set -o pipefail && $(TIME) $(GSIM_BIN) $(GSIM_FLAGS) --dir $(@D) $(FIRRTL_FILE) | tee $(BUILD_DIR)/gsim.log
 
 $(SPLIT_CPP_DIR)/$(NAME)0.cpp: $(GEN_CPP_DIR)/$(NAME).cpp
 	-rm -rf $(@D)
@@ -207,7 +214,7 @@ $(foreach x, $(EMU_SRCS), $(eval \
 $(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS) -lgmp))
 
 run-emu: $(EMU_BIN)
-	$^ $(mainargs)
+	$(TIME) $^ $(mainargs)
 
 clean-emu:
 	-rm -rf $(EMU_BUILD_DIR) $(EMU_BIN)
@@ -245,13 +252,13 @@ $(VERI_GEN_MK): $(VERI_VSRCS) $(EMU_GEN_SRCS) | $(EMU_MAIN_SRCS)
 	verilator $(VERI_VFLAGS) $(abspath $^ $|)
 
 $(VERI_BIN): | $(VERI_GEN_MK)
-	$(MAKE) OPT_FAST="-O3" CXX=clang++ -s -C $(VERI_BUILD_DIR) -f $(abspath $|)
+	$(TIME) $(MAKE) OPT_FAST="-O3" CXX=clang++ -s -C $(VERI_BUILD_DIR) -f $(abspath $|)
 	ln -sf $(abspath $(VERI_BUILD_DIR)/V$(NAME)) $@
 
 compile-veri: $(VERI_GEN_MK)
 
 run-veri: $(VERI_BIN)
-	$^ $(mainargs)
+	$(TIME) $^ $(mainargs)
 
 .PHONY: compile-veri run-veri $(VERI_BIN)
 
@@ -309,10 +316,14 @@ run:
 	$(MAKE) MODE=0 compile
 	$(MAKE) MODE=0 difftest
 
-diff:
+diff-internal:
 	$(MAKE) MODE=2 compile-veri
 	$(MAKE) MODE=2 compile
 	$(MAKE) MODE=2 difftest
+
+diff:
+	mkdir -p $(dir $(LOG_FILE))
+	set -o pipefail && $(TIME) $(MAKE) diff-internal 2>&1 | tee $(LOG_FILE)
 
 unzip:
 	cd ready-to-run && tar xvjf xiangshan.tar.bz2
@@ -337,4 +348,4 @@ gendoc:
 format-obj:
 	@clang-format -i --style=file obj/$(NAME).cpp
 
-.PHONY: clean run diff unzip perf count gendoc format-obj
+.PHONY: clean run diff-internal diff unzip perf count gendoc format-obj
