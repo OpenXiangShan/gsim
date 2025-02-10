@@ -79,7 +79,7 @@ class SigFilter():
           refName = refName.lstrip("ref->rootp->") + "_128"
           self.dstfp.writelines("uint256_t " + refName + " = " + refName128 + ";\n")
         # mask = hex((1 << mod_width) - 1) if mod_width <= 64 else "((uint256_t)" + hex((1 << (mod_width - 64))-1) + "<< 64 | " + hex((1 << 64)-1) + ")"
-        mask = "(((uint256_t)1 << " + str(mod_width) + ") - 1)"
+        mask = "((uint256_t)0 - 1)" if (mod_width == 256) else "(((uint256_t)1 << " + str(mod_width) + ") - 1)"
         self.dstfp.writelines( \
         "if(display || (" + modName + " & " + mask + ") != (" + refName + "&" + mask + ")){\n" + \
         "  ret = true;\n" + \
