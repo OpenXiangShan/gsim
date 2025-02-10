@@ -311,7 +311,7 @@ run:
 	$(MAKE) MODE=0 difftest
 
 diff:
-	$(MAKE) MODE=1 compile-veri
+	$(MAKE) MODE=2 compile-veri
 	$(MAKE) MODE=2 compile
 	$(MAKE) MODE=2 difftest
 
