@@ -261,11 +261,12 @@ int main(int argc, char** argv) {
 #if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
     bool isDiff = checkSignals(false);
     if(isDiff) {
-      std::cout << "all Sigs:\n -----------------\n";
+      printf("all Sigs:\n -----------------\n");
       checkSignals(true);
-      std::cout << "Failed after " << cycles << " cycles\nALL diffs: mode -- ref\n";
+      printf("ALL diffs: dut -- ref\n");
+      printf("Failed after %ld cycles\n", cycles);
       checkSignals(false);
-      return 0;
+      return -1;
     }
 #endif
     if (cycles % CYCLE_MSG_STEP == 0 && cycles <= CYCLE_MAX_SIM) {
