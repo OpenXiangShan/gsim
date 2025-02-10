@@ -12,30 +12,28 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#define CYCLE_STEP_PERCENT 1
+
 #if defined(__DUT_ysyx3__)
 #define DUT_MEMORY mem$ram
 #define REF_MEMORY newtop__DOT__mem__DOT__ram_ext__DOT__Memory
 #define CYCLE_MAX_PERF 50000000
 #define CYCLE_MAX_SIM  600000000
-#define CYCLE_MSG_STEP 10000000
 #elif defined(__DUT_NutShell__)
 #define DUT_MEMORY mem$rdata_mem$mem
 #define REF_MEMORY SimTop__DOT__mem__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 50000000
 #define CYCLE_MAX_SIM  250000000
-#define CYCLE_MSG_STEP 10000000
 #elif defined(__DUT_rocket__)
 #define DUT_MEMORY mem$srams$mem
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 30000000
 #define CYCLE_MAX_SIM  70000000
-#define CYCLE_MSG_STEP 10000000
 #elif defined(__DUT_boom__) || defined(__DUT_small_boom__)
 #define DUT_MEMORY mem$srams$mem
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 50000000
 #define CYCLE_MAX_SIM  100000000
-#define CYCLE_MSG_STEP 10000000
 #elif defined(__DUT_xiangshan__) || defined(__DUT_xiangshan_default__)
 #define DUT_MEMORY memory$ram$rdata_mem$mem
 #define REF_MEMORY SimTop__DOT__memory__DOT__ram__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
@@ -45,7 +43,6 @@
 #else
 #define CYCLE_MAX_SIM  20000000
 #endif
-#define CYCLE_MSG_STEP 100000
 
 // unused blackbox
 void imsic_csr_top(uint8_t _0, uint8_t _1, uint16_t _2, uint8_t _3, uint8_t _4, uint16_t _5, uint8_t _6, uint8_t _7, uint8_t _8, uint8_t _9, uint8_t _10, uint8_t _11, uint64_t _12, uint8_t& _13, uint64_t& _14, uint8_t& _15, uint8_t& _16, uint32_t& _17, uint32_t& _18, uint32_t& _19) {
@@ -269,7 +266,7 @@ int main(int argc, char** argv) {
       return -1;
     }
 #endif
-    if (cycles % CYCLE_MSG_STEP == 0 && cycles <= CYCLE_MAX_SIM) {
+    if (cycles % (CYCLE_MAX_SIM / (CYCLE_STEP_PERCENT * 100)) == 0 && cycles <= CYCLE_MAX_SIM) {
       auto dur = std::chrono::system_clock::now() - start;
       auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
       fprintf(stderr, "cycles %ld (%ld ms, %ld per sec) \n", cycles, msec.count(), cycles * 1000 / msec.count());
