@@ -141,15 +141,13 @@ ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
 endif
 
-$(PARSER_BUILD_DIR)/%.cc:  $(PARSER_DIR)/%.y
+$(PARSER_BUILD_DIR)/%.cc $(PARSER_BUILD_DIR)/%.hh: $(PARSER_DIR)/%.y
 	@mkdir -p $(@D)
 	bison -v -d $< -o $@
 
 $(PARSER_BUILD_DIR)/%.cc: $(PARSER_DIR)/%.l
 	@mkdir -p $(@D)
 	flex -Cf -o $@ $<
-
-$(PARSER_GEN_HEADER): $(PARSER_BUILD_DIR)/$(SYNTAX_NAME).cc
 
 $(foreach x, $(PARSER_GEN_SRCS), $(eval \
 	$(call CXX_TEMPLATE, $(PARSER_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(CXXFLAGS), GSIM_OBJS, $(PARSER_GEN_HEADER))))
