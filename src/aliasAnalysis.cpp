@@ -87,10 +87,9 @@ A -> |         | -> E
 B -> |         | -> F
            remove   
 */
-void graph::aliasAnalysis() {
+bool graph::aliasAnalysis() {
   /* counters */
   size_t totalNodes = 0;
-  size_t aliasNum = 0;
   size_t totalSuper = sortedSuper.size();
   std::map<Node*, ENode*> aliasMap;
   for (SuperNode* super : sortedSuper) {
@@ -99,7 +98,6 @@ void graph::aliasAnalysis() {
       if (member->status != VALID_NODE) continue;
       ENode* enode = member->isAlias();
       if (!enode) continue;
-      aliasNum ++;
       Node* interNode = getLeafNode(member->isArray(), enode);//->getNode();
       ENode* aliasENode = enode;
       if (aliasMap.find(interNode) != aliasMap.end()) {
@@ -162,7 +160,8 @@ void graph::aliasAnalysis() {
   }
   removeNodes(DEAD_NODE);
 
+  size_t aliasNum = aliasMap.size();
   printf("[aliasAnalysis] remove %ld alias (%ld -> %ld)\n", aliasNum, totalNodes, totalNodes - aliasNum);
   printf("[aliasAnalysis] remove %ld superNodes (%ld -> %ld)\n", totalSuper - sortedSuper.size(), totalSuper, sortedSuper.size());
-
+  return (aliasNum > 0) || (totalSuper - sortedSuper.size() > 0);
 }

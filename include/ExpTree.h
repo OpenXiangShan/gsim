@@ -304,7 +304,7 @@ public:
     void when2mux(int width);
     void updateWithNewWidth();
     void updateNewChild(ENode* parent, ENode* child, int idx);
-    void treeOpt();
+    bool treeOpt();
     void getRelyNodes(std::set<Node*>& allNodes);
     void updateWithSplittedNode();
     void clearComponent();

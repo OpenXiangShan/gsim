@@ -57,7 +57,7 @@ int Node::repOpCount() {
   return ret;
 }
 
-void graph::replicationOpt() {
+bool graph::replicationOpt() {
   size_t optimizeNum = 0;
   size_t oldNum = countNodes();
   size_t oldSuper = sortedSuper.size();
@@ -131,4 +131,5 @@ void graph::replicationOpt() {
   removeNodes(REPLICATION_NODE);
   printf("[replication] remove %ld nodes (%ld -> %ld)\n", optimizeNum, oldNum, countNodes());
   printf("[replication] remove %ld superNodes (%ld -> %ld)\n", oldSuper - sortedSuper.size(), oldSuper, sortedSuper.size());
+  return (optimizeNum > 0) || (oldSuper - sortedSuper.size() > 0);
 }

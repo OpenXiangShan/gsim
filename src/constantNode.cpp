@@ -927,11 +927,13 @@ void graph::constantMemory() {
   mpz_init(val);
   while (1) {
     for (Node* mem : memory) {
+      if (mem->status == CONSTANT_NODE) continue;
       bool isConstant = true;
       bool isFirst = true;
       for (Node* port : mem->member) {
         if (port->type == NODE_WRITER) {
           valInfo* info = consMap[port];
+          assert(info != NULL);
           if (port->status == CONSTANT_NODE || info->sameConstant) {
             if (isFirst) {
               mpz_set(val, info->assignmentCons);
@@ -1198,7 +1200,12 @@ void ExpTree::removeConstant() {
   }
 }
 
-void graph::constantAnalysis() {
+bool graph::constantAnalysis() {
+  consMap.clear();
+  consEMap.clear();
+//  recomputeQueue.clear();
+  uniqueRecompute.clear();
+
   std::set<Node*>s;
   for (SuperNode* super : sortedSuper) {
     for (Node* n : super->member) {
@@ -1262,6 +1269,10 @@ void graph::constantAnalysis() {
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == CONSTANT_NODE) {
+        if (member->type == NODE_REG_DST) {
+          assert(consMap[member->getSrc()] != NULL);
+          assert(consMap[member] != NULL);
+        }
         if (member->type == NODE_REG_DST && (member->getSrc()->status != CONSTANT_NODE || mpz_cmp(consMap[member->getSrc()]->consVal, consMap[member]->consVal) != 0)){
           member->status = VALID_NODE;
           constantButValid.insert(member);
@@ -1279,6 +1290,7 @@ void graph::constantAnalysis() {
   for (Node* n : constantButValid) {
     n->status = CONSTANT_NODE;
   }
+  consNum -= constantButValid.size();
 
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
@@ -1291,4 +1303,5 @@ void graph::constantAnalysis() {
   size_t optimizeNodes = countNodes();
   printf("[constantNode] find %d constantNodes (total %ld)\n", consNum, optimizeNodes);
 
+  return (consNum > 0);
 }

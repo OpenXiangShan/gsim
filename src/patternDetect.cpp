@@ -48,7 +48,7 @@ bool checkPatern1(Node* node) {
   return ret;
 }
 
-void graph::patternDetect() {
+bool graph::patternDetect() {
   int num1 = 0;
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
@@ -58,4 +58,5 @@ void graph::patternDetect() {
   removeNodesNoConnect(DEAD_NODE);
   reconnectAll();
   printf("[patternDetect] find %d pattern1\n", num1);
+  return (num1 > 0);
 }

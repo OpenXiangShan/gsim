@@ -32,6 +32,7 @@ void inferAllWidth();
 #define FUNC_WRAPPER(func, name) FUNC_WRAPPER_INTERNAL(func, name, true)
 
 static bool EnableDumpGraph{false};
+static int dumpIdx = 0;
 std::string OutputDir = ".";
 int SuperNodeMaxSize = 35;
 
@@ -97,6 +98,24 @@ static char* readFile(const char *InputFileName, size_t &size, size_t &mapSize) 
   return buf;
 }
 
+static bool opt(graph *g) {
+  bool change = false;
+  FUNC_WRAPPER(change |= g->constantAnalysis(), "ConstantAnalysis");
+  FUNC_WRAPPER(change |= g->aliasAnalysis(), "AliasAnalysis");
+  FUNC_WRAPPER(change |= g->exprOpt(), "ExprOpt");
+  FUNC_WRAPPER(change |= g->patternDetect(), "PatternDetect");
+  FUNC_WRAPPER(change |= g->commonExpr(), "CommonExpr");
+  FUNC_WRAPPER(change |= g->removeDeadNodes(), "RemoveDeadNodes");
+  return change;
+}
+
+static void optUntilNoChange(graph *g) {
+  FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
+  for (int i = 1; opt(g); i ++) {
+    printf("Deisgn changed. Perform optimization for the %dth time.\n", i);
+  }
+}
+
 /**
  * @brief main function.
  *
@@ -107,7 +126,6 @@ static char* readFile(const char *InputFileName, size_t &size, size_t &mapSize) 
 int main(int argc, char** argv) {
   TIMER_START(total);
   graph* g = NULL;
-  static int dumpIdx = 0;
   const char *InputFileName = parseCommandLine(argc, argv);
 
   size_t size = 0, mapSize = 0;
@@ -130,27 +148,13 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->clockOptimize(), "ClockOptimize");
 
-  FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
-
-  FUNC_WRAPPER(g->exprOpt(), "ExprOpt");
+  optUntilNoChange(g);
 
   FUNC_TIMER(g->usedBits());
 
   FUNC_TIMER(g->splitNodes());
 
-  FUNC_TIMER(g->removeDeadNodes());
-
-  FUNC_WRAPPER(g->constantAnalysis(), "ConstantAnalysis");
-
-  FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
-
-  FUNC_WRAPPER(g->aliasAnalysis(), "AliasAnalysis");
-
-  FUNC_WRAPPER(g->patternDetect(), "PatternDetect");
-
-  FUNC_WRAPPER(g->commonExpr(), "CommonExpr");
-
-  FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
+  optUntilNoChange(g);
 
   // FUNC_WRAPPER(g->mergeNodes(), "MergeNodes");
   FUNC_WRAPPER(g->graphPartition(), "graphPartition");

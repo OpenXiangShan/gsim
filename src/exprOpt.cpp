@@ -43,6 +43,11 @@ void Node::invalidArrayOptimize() {
 
 bool checkENodeEq(ENode* enode1, ENode* enode2);
 bool subTreeEq(ENode* enode1, ENode* enode2) {
+  if (enode1 == NULL && enode2 == NULL) {
+    // TODO: opt this case
+    printf("%s,%d: opt this case\n", __FILE__, __LINE__);
+    return false;
+  }
   if (!checkENodeEq(enode1, enode2)) return false;
   for (size_t i = 0; i < enode1->getChildNum(); i ++) {
     if (!subTreeEq(enode1->getChild(i), enode2->getChild(i))) return false;
@@ -50,17 +55,19 @@ bool subTreeEq(ENode* enode1, ENode* enode2) {
   return true;
 }
 
-void ExpTree::treeOpt() {
+bool ExpTree::treeOpt() {
   std::stack<std::tuple<ENode*, ENode*, int>> s;
   s.push(std::make_tuple(getRoot(), nullptr, -1));
+  bool change = false;
 
   while(!s.empty()) {
     ENode* top, *parent;
     int idx;
     std::tie(top, parent, idx) = s.top();
     s.pop();
-    if (top->opType == OP_WHEN || top->opType == OP_MUX) {
+    if ((top->opType == OP_WHEN || top->opType == OP_MUX)) {
       if (subTreeEq(top->getChild(1), top->getChild(2))) {
+        change = true;
         if (parent) {
           parent->setChild(idx, top->getChild(1));
         } else {
@@ -71,6 +78,7 @@ void ExpTree::treeOpt() {
       }
     }
     if (top->opType == OP_ASASYNCRESET) {
+      change = true;
       if (parent) {
         parent->setChild(idx, top->getChild(0));
       } else {
@@ -81,6 +89,7 @@ void ExpTree::treeOpt() {
     }
     if (top->opType == OP_ASSINT) {
       if (top->getChild(0)->sign == top->sign && top->getChild(0)->width == top->width) {
+        change = true;
         if (parent) {
           parent->setChild(idx, top->getChild(0));
         } else {
@@ -95,13 +104,16 @@ void ExpTree::treeOpt() {
       if (top->child[i]) s.push(std::make_tuple(top->child[i], top, i));
     }
   }
+  return change;
 }
 
-void graph::exprOpt() {
+bool graph::exprOpt() {
+  bool change = false;
   for (SuperNode* super : sortedSuper) {
     if (super->superType != SUPER_VALID) continue;
     for (Node* node : super->member) {
       if (node->width == 0) {
+        change = true;
         node->assignTree.clear();
         node->arrayVal.clear();
         ENode* enodeInt = new ENode(OP_INT);
@@ -111,12 +123,13 @@ void graph::exprOpt() {
         else node->assignTree.push_back(new ExpTree(enodeInt, node));
         continue;
       }
-      for (ExpTree* tree : node->assignTree) tree->treeOpt();
-      for (ExpTree* tree : node->arrayVal) tree->treeOpt();
-      if (node->updateTree) node->updateTree->treeOpt();
-      if (node->resetTree) node->resetTree->treeOpt();
+      for (ExpTree* tree : node->assignTree) change |= tree->treeOpt();
+      for (ExpTree* tree : node->arrayVal) change |= tree->treeOpt();
+      if (node->updateTree) change |= node->updateTree->treeOpt();
+      if (node->resetTree) change |= node->resetTree->treeOpt();
     }
   }
 
   reconnectAll();
+  return change;
 }

@@ -54,7 +54,7 @@ bool anyOuterEdge(Node* node) {
   return ret;
 }
 
-void graph::removeDeadNodes() {
+bool graph::removeDeadNodes() {
   removeDeadReg();
   /* counters */
   size_t totalNodes = 0;
@@ -105,6 +105,7 @@ void graph::removeDeadNodes() {
   printf("[removeDeadNodes] remove %ld deadNodes (%ld -> %ld)\n", deadNum, totalNodes, totalNodes - deadNum);
   printf("[removeDeadNodes] remove %ld superNodes (%ld -> %ld)\n", totalSuper - sortedSuper.size(), totalSuper, sortedSuper.size());
 
+  return (deadNum > 0) || (totalSuper - sortedSuper.size() > 0);
 }
 
 void graph::removeDeadReg() {

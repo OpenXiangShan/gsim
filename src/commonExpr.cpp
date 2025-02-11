@@ -111,7 +111,13 @@ void ExpTree::replace(std::map<Node*, Node*>& aliasMap) {
 }
 
 /* TODO: check common regs */
-void graph::commonExpr() {
+bool graph::commonExpr() {
+  exprId.clear();
+  exprVisitedNodes.clear();
+  nodeId.clear();
+  realValueMap.clear();
+  aliasMap.clear();
+
   for (SuperNode* super : sortedSuper) {
     if (super->superType != SUPER_VALID) {
       for (Node* node : super->member) nodeId[node] = node->id;
@@ -209,7 +215,7 @@ void graph::commonExpr() {
   }
   removeNodes(DEAD_NODE);
 
-  printf("[commonExpr] remove %ld nodes (-> %ld)\n", aliasMap.size(), countNodes());
-
+  size_t removed = aliasMap.size();
+  printf("[commonExpr] remove %ld nodes (-> %ld)\n", removed, countNodes());
+  return (removed > 0);
 }
-
