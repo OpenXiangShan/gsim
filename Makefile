@@ -4,48 +4,42 @@
 
 dutName ?= ysyx3
 MODE ?= 0
+mainargs ?= ready-to-run/bin/linux.bin
 # uncomment this line to let this file be part of dependency of each .o file
 THIS_MAKEFILE = Makefile
 
 ifeq ($(dutName),ysyx3)
 	NAME ?= newtop
-	mainargs = ready-to-run/bin/bbl-hello.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-ysyx3
 	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),NutShell)
 	NAME ?= SimTop
-	mainargs = ready-to-run/bin/linux-NutShell.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-nutshell
 	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),rocket)
 	NAME ?= TestHarness
-	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-rocket
 	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),boom)
 	NAME ?= TestHarness
-	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-LargeBoom
 	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
-	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-SmallBoom
 	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),xiangshan)
 	NAME ?= SimTop
-	mainargs = ready-to-run/bin/linux-xiangshan-202501.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan-minimal-202501-20957846
 	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),xiangshan-default)
 	NAME ?= SimTop
-	mainargs = ready-to-run/bin/linux-xiangshan-202501.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan-default-202501-20957846
 	GSIM_FLAGS += --supernode-max-size=35
@@ -59,7 +53,10 @@ BUILD_DIR ?= build
 WORK_DIR = $(BUILD_DIR)/$(TEST_FILE)
 CXX = clang++
 CCACHE = ccache
+
 SHELL := /bin/bash
+TIME = /usr/bin/time
+LOG_FILE = $(WORK_DIR)/$(TEST_FILE).log
 
 CFLAGS_DUT = -DDUT_NAME=S$(NAME) -DDUT_HEADER=\"$(NAME).h\" -D__DUT_$(shell echo $(dutName) | tr - _)__
 
@@ -159,8 +156,12 @@ $(foreach x, $(GSIM_SRCS), $(eval \
 
 $(eval $(call LD_TEMPLATE, $(GSIM_BIN), $(GSIM_OBJS), $(CXXFLAGS) -lgmp))
 
+build-gsim: $(GSIM_BIN)
+
 # Dependency
 -include $(GSIM_OBJS:.o=.d)
+
+.PHONY: build-gsim
 
 ##############################################
 ### Running GSIM to generate cpp model
@@ -172,7 +173,7 @@ SPLIT_CPP_DIR = $(GEN_CPP_DIR)/split
 
 $(GEN_CPP_DIR)/$(NAME).cpp: $(GSIM_BIN) $(FIRRTL_FILE)
 	@mkdir -p $(@D)
-	set -o pipefail && /bin/time $(GSIM_BIN) $(GSIM_FLAGS) --dir $(@D) $(FIRRTL_FILE) | tee $(BUILD_DIR)/gsim.log
+	set -o pipefail && $(TIME) $(GSIM_BIN) $(GSIM_FLAGS) --dir $(@D) $(FIRRTL_FILE) | tee $(BUILD_DIR)/gsim.log
 
 $(SPLIT_CPP_DIR)/$(NAME)0.cpp: $(GEN_CPP_DIR)/$(NAME).cpp
 	-rm -rf $(@D)
@@ -192,8 +193,9 @@ EMU_BUILD_DIR = $(WORK_DIR)/emu
 EMU_BIN = $(WORK_DIR)/S$(NAME)
 
 EMU_LIB_DIR = emu/lib
-EMU_MAIN = emu/emu.cpp
-EMU_SRCS = $(EMU_MAIN) $(shell find $(EMU_LIB_DIR) $(SPLIT_CPP_DIR) -name "*.cpp" 2> /dev/null)
+EMU_MAIN_SRCS = emu/emu.cpp $(shell find $(EMU_LIB_DIR) -name "*.cpp")
+EMU_GEN_SRCS = $(shell find $(SPLIT_CPP_DIR) -name "*.cpp" 2> /dev/null)
+EMU_SRCS = $(EMU_MAIN_SRCS) $(EMU_GEN_SRCS)
 
 EMU_INC_DIR = $(GEN_CPP_DIR) $(EMU_LIB_DIR)
 EMU_CFLAGS := -O3 -MMD $(addprefix -I, $(abspath $(EMU_INC_DIR))) $(EMU_CFLAGS) # allow to overwrite -O3
@@ -209,7 +211,7 @@ $(foreach x, $(EMU_SRCS), $(eval \
 $(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS) -lgmp))
 
 run-emu: $(EMU_BIN)
-	$^ $(mainargs)
+	$(TIME) $^ $(mainargs)
 
 clean-emu:
 	-rm -rf $(EMU_BUILD_DIR) $(EMU_BIN)
@@ -233,7 +235,7 @@ VERI_BUILD_DIR = $(WORK_DIR)/verilator
 VERI_BIN = $(WORK_DIR)/V$(NAME)
 VERI_GEN_MK = $(VERI_BUILD_DIR)/V$(NAME).mk
 
-VERI_CFLAGS = $(call escape_quote,$(EMU_CFLAGS)) $(call escape_quote,$(CFLAGS_REF))
+VERI_CFLAGS = $(call escape_quote,$(EMU_CFLAGS) $(CFLAGS_REF))
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VFLAGS = --top $(NAME) -O3 -Wno-lint -j 8 --cc --exe +define+RANDOMIZE_GARBAGE_ASSIGN --max-num-width 1048576 --compiler clang
 VERI_VFLAGS += -Mdir $(VERI_BUILD_DIR) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)"
@@ -241,23 +243,21 @@ VERI_VFLAGS += -Mdir $(VERI_BUILD_DIR) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI
 
 VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
 VERI_VSRCS += $(shell find ready-to-run/difftest/blockbox/ -name ".v")
-VERI_CSRCS-1 = $(EMU_MAIN)
-VERI_CSRCS-2 = $(EMU_SRCS)
 
-$(VERI_GEN_MK): $(VERI_CSRCS-$(MODE)) $(VERI_VSRCS)
+$(VERI_GEN_MK): $(VERI_VSRCS) $(EMU_GEN_SRCS) | $(EMU_MAIN_SRCS)
 	@mkdir -p $(@D)
-	verilator $(VERI_VFLAGS) $(abspath $^)
+	verilator $(VERI_VFLAGS) $(abspath $^ $|)
 
-$(VERI_BIN): $(VERI_GEN_MK) $(VERI_CSRCS-$(MODE))
-	$(MAKE) OPT_FAST="-O3" CXX=clang++ -s -C $(VERI_BUILD_DIR) -f $(abspath $<)
+$(VERI_BIN): | $(VERI_GEN_MK)
+	$(TIME) $(MAKE) OPT_FAST="-O3" CXX=clang++ -s -C $(VERI_BUILD_DIR) -f $(abspath $|)
 	ln -sf $(abspath $(VERI_BUILD_DIR)/V$(NAME)) $@
 
 compile-veri: $(VERI_GEN_MK)
 
 run-veri: $(VERI_BIN)
-	$^ $(mainargs)
+	$(TIME) $^ $(mainargs)
 
-.PHONY: compile-veri run-veri
+.PHONY: compile-veri run-veri $(VERI_BIN)
 
 ##############################################
 ### Building EMU from cpp model generated by GSIM for reference
@@ -309,16 +309,25 @@ clean-pgo:
 clean:
 	-rm -rf $(BUILD_DIR)
 
-run:
+run-internal:
 	$(MAKE) MODE=0 compile
 	$(MAKE) MODE=0 difftest
 
-diff:
-	$(MAKE) MODE=1 compile-veri
+diff-internal:
+	$(MAKE) MODE=2 compile-veri
 	$(MAKE) MODE=2 compile
 	$(MAKE) MODE=2 difftest
 
-unzip:
+run:
+	mkdir -p $(dir $(LOG_FILE))
+	set -o pipefail && $(TIME) $(MAKE) run-internal 2>&1 | tee $(LOG_FILE)
+
+diff:
+	mkdir -p $(dir $(LOG_FILE))
+	set -o pipefail && $(TIME) $(MAKE) diff-internal 2>&1 | tee $(LOG_FILE)
+
+init:
+	cd ready-to-run/bin && tar xvjf linux.tar.bz2
 	cd ready-to-run && tar xvjf xiangshan.tar.bz2
 	cd ready-to-run/difftest && tar xvjf xiangshan.tar.bz2
 
@@ -341,4 +350,4 @@ gendoc:
 format-obj:
 	@clang-format -i --style=file obj/$(NAME).cpp
 
-.PHONY: clean run diff unzip perf count gendoc format-obj
+.PHONY: clean run-internal diff-internal run diff init perf count gendoc format-obj
