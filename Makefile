@@ -4,48 +4,42 @@
 
 dutName ?= ysyx3
 MODE ?= 0
+mainargs ?= ready-to-run/bin/linux.bin
 # uncomment this line to let this file be part of dependency of each .o file
 THIS_MAKEFILE = Makefile
 
 ifeq ($(dutName),ysyx3)
 	NAME ?= newtop
-	mainargs = ready-to-run/bin/bbl-hello.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-ysyx3
 	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),NutShell)
 	NAME ?= SimTop
-	mainargs = ready-to-run/bin/linux-NutShell.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-nutshell
 	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),rocket)
 	NAME ?= TestHarness
-	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-rocket
 	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),boom)
 	NAME ?= TestHarness
-	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-LargeBoom
 	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
-	mainargs = ready-to-run/bin/linux-rocket.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-SmallBoom
 	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),xiangshan)
 	NAME ?= SimTop
-	mainargs = ready-to-run/bin/linux-xiangshan-202501.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan-minimal-202501-20957846
 	GSIM_FLAGS += --supernode-max-size=35
 else ifeq ($(dutName),xiangshan-default)
 	NAME ?= SimTop
-	mainargs = ready-to-run/bin/linux-xiangshan-202501.bin
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan-default-202501-20957846
 	GSIM_FLAGS += --supernode-max-size=35
@@ -330,7 +324,8 @@ diff:
 	mkdir -p $(dir $(LOG_FILE))
 	set -o pipefail && $(TIME) $(MAKE) diff-internal 2>&1 | tee $(LOG_FILE)
 
-unzip:
+init:
+	cd ready-to-run/bin && tar xvjf linux.tar.bz2
 	cd ready-to-run && tar xvjf xiangshan.tar.bz2
 	cd ready-to-run/difftest && tar xvjf xiangshan.tar.bz2
 
@@ -353,4 +348,4 @@ gendoc:
 format-obj:
 	@clang-format -i --style=file obj/$(NAME).cpp
 
-.PHONY: clean run-internal diff-internal run diff unzip perf count gendoc format-obj
+.PHONY: clean run-internal diff-internal run diff init perf count gendoc format-obj
