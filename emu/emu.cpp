@@ -17,8 +17,8 @@
 #if defined(__DUT_ysyx3__)
 #define DUT_MEMORY mem$ram
 #define REF_MEMORY newtop__DOT__mem__DOT__ram_ext__DOT__Memory
-#define CYCLE_MAX_PERF 50000000
-#define CYCLE_MAX_SIM  600000000
+#define CYCLE_MAX_PERF 5000000
+#define CYCLE_MAX_SIM  11000000
 #elif defined(__DUT_NutShell__)
 #define DUT_MEMORY mem$rdata_mem$mem
 #define REF_MEMORY SimTop__DOT__mem__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
@@ -27,21 +27,25 @@
 #elif defined(__DUT_rocket__)
 #define DUT_MEMORY mem$srams$mem
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
-#define CYCLE_MAX_PERF 30000000
-#define CYCLE_MAX_SIM  70000000
+#define CYCLE_MAX_PERF 3000000
+#define CYCLE_MAX_SIM  4200000
 #elif defined(__DUT_boom__) || defined(__DUT_small_boom__)
 #define DUT_MEMORY mem$srams$mem
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
-#define CYCLE_MAX_PERF 50000000
-#define CYCLE_MAX_SIM  100000000
+#define CYCLE_MAX_PERF 5000000
+#ifdef __DUT_boom__
+#define CYCLE_MAX_SIM  4600000
+#else
+#define CYCLE_MAX_SIM  5400000
+#endif
 #elif defined(__DUT_xiangshan__) || defined(__DUT_xiangshan_default__)
 #define DUT_MEMORY memory$ram$rdata_mem$mem
 #define REF_MEMORY SimTop__DOT__memory__DOT__ram__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 500000
 #ifdef __DUT_xiangshan_default__
-#define CYCLE_MAX_SIM  10000000
+#define CYCLE_MAX_SIM  1900000
 #else
-#define CYCLE_MAX_SIM  20000000
+#define CYCLE_MAX_SIM  3600000
 #endif
 
 // unused blackbox
@@ -269,7 +273,8 @@ int main(int argc, char** argv) {
     if (cycles % (CYCLE_MAX_SIM / (CYCLE_STEP_PERCENT * 100)) == 0 && cycles <= CYCLE_MAX_SIM) {
       auto dur = std::chrono::system_clock::now() - start;
       auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
-      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec) \n", cycles, msec.count(), cycles * 1000 / msec.count());
+      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec) simulation process %.2lf% \n",
+          cycles, msec.count(), cycles * 1000 / msec.count(), (double)cycles * 100 / CYCLE_MAX_SIM);
 #ifdef PERF
       size_t totalActives = 0;
       size_t validActives = 0;
