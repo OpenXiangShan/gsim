@@ -1524,6 +1524,7 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
     else
       ret->valStr = format("(%s.%s(%d))", ret->valStr.c_str(), tailName(width).c_str(), width);
   }
+  ret->insts.push_back(format("if (%s >= %d) printf(\"%s out of bound [%%s, %%d]\\n\", __FILE__, __LINE__);\n", ChildInfo(0, valStr).c_str(), memory->depth, ChildInfo(0, valStr).c_str()));
   ret->opNum = 0;
   return ret;
 }
@@ -1660,8 +1661,8 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     return computeInfo;
   }
   if (opType == OP_STMT) stmtDepth ++;
-  for (ENode* childNode : child) {
-    if (childNode) childNode->compute(n, lvalue, false);
+  for (size_t i = 0; i < child.size(); i ++) {
+    if (child[i]) child[i]->compute(n, lvalue, false);
   }
   if (opType == OP_STMT) stmtDepth --;
   if (nodePtr) {
@@ -1703,8 +1704,13 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       if (child.size() != 0 && computeInfo->status == VAL_VALID) { // TODO: constant array representation
         valInfo* indexInfo = computeInfo->dup();  // TODO: no need
         computeInfo = indexInfo;
-        for (ENode* childENode : child)
+        for (size_t idx = 0; idx < child.size(); idx ++) {
+          ENode* childENode = child[idx];
           computeInfo->valStr += childENode->computeInfo->valStr;
+          if (childENode->opType == OP_INDEX) {
+            computeInfo->insts.push_back(format("if (%s >= %d) printf(\"%s out of bound\\n\");\n", childENode->getChild(0)->computeInfo->valStr.c_str(), nodePtr->dimension[idx], childENode->getChild(0)->computeInfo->valStr.c_str()));
+          }
+        }
       }
       int beg, end;
       std::tie(beg, end) = getIdx(nodePtr);
