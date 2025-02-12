@@ -173,19 +173,13 @@ build-gsim: $(GSIM_BIN)
 
 FIRRTL_FILE = ready-to-run/$(TEST_FILE).fir
 GEN_CPP_DIR = $(WORK_DIR)/model
-SPLIT_CPP_DIR = $(GEN_CPP_DIR)/split
 
-$(GEN_CPP_DIR)/$(NAME).cpp: $(GSIM_BIN) $(FIRRTL_FILE)
+$(GEN_CPP_DIR)/$(NAME)0.cpp: $(GSIM_BIN) $(FIRRTL_FILE)
 	@mkdir -p $(@D)
 	set -o pipefail && $(TIME) $(GSIM_BIN) $(GSIM_FLAGS) --dir $(@D) $(FIRRTL_FILE) | tee $(BUILD_DIR)/gsim.log
-
-$(SPLIT_CPP_DIR)/$(NAME)0.cpp: $(GEN_CPP_DIR)/$(NAME).cpp
-	-rm -rf $(@D)
-	mkdir -p $(@D)
 	$(SIG_COMMAND)
-	python ./scripts/partition.py $< $(@D)
 
-compile: $(SPLIT_CPP_DIR)/$(NAME)0.cpp
+compile: $(GEN_CPP_DIR)/$(NAME)0.cpp
 
 .PHONY: compile
 
@@ -197,7 +191,7 @@ EMU_BUILD_DIR = $(WORK_DIR)/emu
 EMU_BIN = $(WORK_DIR)/S$(NAME)
 
 EMU_MAIN_SRCS = emu/emu.cpp
-EMU_GEN_SRCS = $(shell find $(SPLIT_CPP_DIR) -name "*.cpp" 2> /dev/null)
+EMU_GEN_SRCS = $(shell find $(GEN_CPP_DIR) -name "*.cpp" 2> /dev/null)
 EMU_SRCS = $(EMU_MAIN_SRCS) $(EMU_GEN_SRCS)
 
 EMU_CFLAGS := -O3 -MMD $(addprefix -I, $(abspath $(GEN_CPP_DIR))) $(EMU_CFLAGS) # allow to overwrite -O3

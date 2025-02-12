@@ -6,29 +6,36 @@
 #define GRAPH_H
 
 class graph {
+  FILE *srcFp;
+  int srcFileIdx;
+  int srcFileBytes;
+
+  bool __emitSrc(bool canNewFile, bool alreadyEndFunc, const char *nextFuncDef, const char *fmt, ...);
+  void activateNext(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName);
+  void activateUncondNext(Node* node, std::set<int>activateId, bool inStep, std::string flagName);
+
   FILE* genHeaderStart();
-  FILE* genSrcStart();
   void genNodeDef(FILE* fp, Node* node);
-  void genNodeInsts(FILE* fp, Node* node, std::string flagName);
+  void genNodeInsts(Node* node, std::string flagName);
   void genInterfaceInput(FILE* fp, Node* input);
   void genInterfaceOutput(FILE* fp, Node* output);
-  void genStep(FILE* fp);
+  void genStep(int subStepIdxMax);
   void genHeaderEnd(FILE* fp);
-  void genSrcEnd(FILE* fp);
-  void genNodeStepStart(FILE* fp, SuperNode* node, uint64_t mask, int idx, std::string flagName);
-  void genNodeStepEnd(FILE* fp, SuperNode* node);
+  void genSrcEnd();
+  void genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string flagName);
+  void genNodeStepEnd(SuperNode* node);
   void genNodeInit(FILE* fp, Node* node);
   void genMemInit(FILE* fp, Node* node);
-  void nodeDisplay(FILE* fp, Node* member);
+  void nodeDisplay(Node* member);
   void genMemRead(FILE* fp);
-  void genActivate(FILE* fp);
+  int genActivate();
   void genUpdateRegister(FILE* fp);
   void genMemWrite(FILE* fp);
-  void saveDiffRegs(FILE* fp);
-  void genResetAll(FILE* fp);
-  void genReset(FILE* fp, SuperNode* super, bool isUIntReset);
+  void saveDiffRegs();
+  void genResetAll();
+  void genReset(SuperNode* super, bool isUIntReset);
   void genResetDecl(FILE* fp);
-  std::string saveOldVal(FILE* fp, Node* node);
+  std::string saveOldVal(Node* node);
   void removeNodesNoConnect(NodeStatus status);
   void reconnectSuper();
   void reconnectAll();
@@ -71,8 +78,6 @@ class graph {
   std::vector<std::string> extDecl;
   std::string name;
   int nodeNum = 0;
-  int subStepNum = -1;
-  int updateRegNum = -1;
   void addReg(Node* reg) {
     regsrc.push_back(reg);
   }

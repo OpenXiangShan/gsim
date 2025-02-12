@@ -11,7 +11,7 @@ class SigFilter():
     self.numPerFile = 10000
     self.fileIdx = 0
     self.varNum = 0
-    self.dstFileName = sys.argv[1] + "/model/split/" + name + "_checkSig"
+    self.dstFileName = sys.argv[1] + "/model/" + name + "_checkSig"
 
   def closeDstFile(self):
     if self.dstfp is not None:
