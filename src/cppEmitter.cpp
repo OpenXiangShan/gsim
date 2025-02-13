@@ -18,9 +18,6 @@
 #ifdef DIFFTEST_PER_SIG
 FILE* sigFile = nullptr;
 #endif
-#ifdef EMU_LOG
-static int displayNum = 0;
-#endif
 
 #define RESET_NAME(node) (node->name + "$RESET")
 #define emitFuncDecl(...) __emitSrc(true, true, NULL, __VA_ARGS__)
@@ -232,6 +229,9 @@ FILE* graph::genHeaderStart() {
 
   fprintf(header, "#define likely(x) __builtin_expect(!!(x), 1)\n");
   fprintf(header, "#define unlikely(x) __builtin_expect(!!(x), 0)\n");
+
+  fprintf(header, "\n//#define ENABLE_LOG\n");
+
   for (int num = 2; num <= maxConcatNum; num ++) {
     std::string param;
     for (int i = num; i > 0; i --) param += format(i == num ? "_%d" : ", _%d", i);
@@ -247,6 +247,7 @@ FILE* graph::genHeaderStart() {
   /* class start*/
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
   fprintf(header, "uint64_t cycles = 0;\n");
+  fprintf(header, "uint64_t LOG_START = 1, LOG_END = 0;\n");
   /* constrcutor */
   fprintf(header, "S%s() {\ninit();\n}", name.c_str());
   /*initialization */
@@ -611,11 +612,27 @@ void graph::genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::strin
 }
 
 void graph::nodeDisplay(Node* member) {
-#ifdef EMU_LOG
-    if (member->status != VALID_NODE) return;
-  emitBodyLock("if (cycles >= %d && cycles <= %d) {\n", LOG_START, LOG_END);
+#define emit_display(varname, width) \
+  do { \
+    int n = ROUNDUP(width, 64) / 64; \
+    std::string s = "printf(\"%%lx"; \
+    for (int i = n - 2; i >= 0; i --) { \
+      s += "|%%lx"; \
+    } \
+    s += "\", "; \
+    for (n --; n >= 0; n --) { \
+      s += format("(uint64_t)(%s >> %d)", varname, n * 64); \
+      if (n != 0) s += ", "; \
+    } \
+    s += ");"; \
+    emitBodyLock(s.c_str()); \
+  } while (0)
+
+  if (member->status != VALID_NODE) return;
+  emitBodyLock("#ifdef ENABLE_LOG\n");
+  emitBodyLock("if (cycles >= LOG_START && cycles <= LOG_END) {\n");
+  emitBodyLock("printf(\"%%ld %d %s: \", cycles);\n", member->super->cppId, member->name.c_str());
   if (member->dimension.size() != 0) {
-    emitBodyLock("printf(\"%%ld %d %s: \", cycles);\n", member->super->cppId, member->name.c_str());
     std::string idxStr, bracket;
     for (size_t i = 0; i < member->dimension.size(); i ++) {
       emitBodyLock("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, member->dimension[i], i);
@@ -623,42 +640,17 @@ void graph::nodeDisplay(Node* member) {
       bracket += "}\n";
     }
     std::string nameIdx = member->name + idxStr;
-    if (member->width > BASIC_WIDTH) {
-      emitBodyLock("%s.displayn();\n", nameIdx.c_str());
-    } else if (member->width > 128) {
-      emitBodyLock("printf(\"%%lx|%%lx%%lx|%%lx \", (uint64_t)(%s >> 192), (uint64_t)(%s >> 128), (uint64_t)(%s >> 64), (uint64_t)(%s));", nameIdx.c_str(), nameIdx.c_str(), nameIdx.c_str(), nameIdx.c_str());
-    } else if (member->width > 64) {
-      emitBodyLock("printf(\"%%lx|%%lx \", (uint64_t)(%s >> 64), (uint64_t)(%s));", nameIdx.c_str(), nameIdx.c_str());
-    } else {
-      emitBodyLock("printf(\"%%lx \", (uint64_t)(%s));", nameIdx.c_str());
-    }
+    emit_display(nameIdx.c_str(), member->width);
+    emitBodyLock("printf(\" \");\n");
     emitBodyLock("\n%s", bracket.c_str());
-    emitBodyLock("printf(\"\\n\");\n");
-  } else if (member->width > BASIC_WIDTH) {
-    emitBodyLock("printf(\"%%ld %d %s: \", cycles);\n", member->super->cppId, member->name.c_str());
-    emitBodyLock("%s.displayn();\n", member->name.c_str());
-    emitBodyLock("printf(\"\\n\");\n");
-  } else if (member->width > 128) {
-    if (member->anyNextActive()) {// display old value and new value
-      emitBodyLock("printf(\"%%ld %d %s %%lx|%%lx|%%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 192), (uint64_t)(%s >> 128), (uint64_t)(%s >> 64), (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str(), member->name.c_str(), member->name.c_str());
-    } else if (member->type != NODE_SPECIAL) {
-      emitBodyLock("printf(\"%%ld %d %s %%lx|%%lx|%%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 192), (uint64_t)(%s >> 128), (uint64_t)(%s >> 64), (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str(), member->name.c_str(), member->name.c_str());
-    }
-  } else if (member->width > 64) {
-    if (member->anyNextActive()) {// display old value and new value
-      emitBodyLock("printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
-    } else if (member->type != NODE_SPECIAL) {
-      emitBodyLock("printf(\"%%ld %d %s %%lx|%%lx \\n\", cycles, (uint64_t)(%s >> 64), (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str(), member->name.c_str());
-    }
   } else {
-    if (member->anyNextActive()) {// display old value and new value
-      emitBodyLock("printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str());
-    } else if (member->type != NODE_SPECIAL) {
-      emitBodyLock("printf(\"%%ld %d %s %%lx \\n\", cycles, (uint64_t)(%s));", member->super->cppId, member->name.c_str(), member->name.c_str());
+    if (member->anyNextActive() || member->type != NODE_SPECIAL) {
+      emit_display(member->name.c_str(), member->width);
     }
   }
+  emitBodyLock("printf(\"\\n\");\n");
   emitBodyLock("}\n");
-#endif
+  emitBodyLock("#endif\n");
 }
 
 void graph::genNodeStepEnd(SuperNode* node) {
@@ -949,11 +941,6 @@ void graph::cppEmitter() {
   for (Node* node : output) genInterfaceOutput(header, node);
   /* declare step functions */
   declStep(header);
-#ifdef EMU_LOG
-  for (int i = 0; i < displayNum; i ++) {
-    fprintf(header, "void display%d();\n", i);
-  }
-#endif
   fprintf(header, "void resetAll();\n");
 
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
