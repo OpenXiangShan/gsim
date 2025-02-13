@@ -133,6 +133,7 @@ std::string arrayMemberName(Node* node, std::string suffix);
 #include "util.h"
 #include "valInfo.h"
 #include "perf.h"
+#include "config.h"
 
 #define TIMER_START(name) struct timeval CONCAT(__timer_, name) = getTime();
 #define TIMER_END(name) do { \

@@ -42,7 +42,6 @@ static std::vector<std::string> resetFuncs;
 extern int maxConcatNum;
 bool nameExist(std::string str);
 static int resetFuncNum = 0;
-extern std::string OutputDir;
 
 static bool isAlwaysActive(int cppId) {
   return alwaysActive.find(cppId) != alwaysActive.end();
@@ -206,7 +205,7 @@ void graph::genNodeInit(FILE* fp, Node* node) {
 }
 
 FILE* graph::genHeaderStart() {
-  FILE* header = std::fopen((OutputDir + "/" + name + ".h").c_str(), "w");
+  FILE* header = std::fopen((globalConfig.OutputDir + "/" + name + ".h").c_str(), "w");
 
   fprintf(header, "#ifndef %s_H\n#define %s_H\n", name.c_str(), name.c_str());
   /* include all libs */
@@ -882,7 +881,7 @@ bool graph::__emitSrc(bool canNewFile, bool alreadyEndFunc, const char *nextFunc
       if (!alreadyEndFunc) fprintf(srcFp, "}"); // the end of the current function
       fclose(srcFp);
     }
-    srcFp = std::fopen(format("%s%d.cpp", (OutputDir + "/" + name).c_str(), srcFileIdx).c_str(), "w");
+    srcFp = std::fopen(format("%s%d.cpp", (globalConfig.OutputDir + "/" + name).c_str(), srcFileIdx).c_str(), "w");
     srcFileIdx ++;
     assert(srcFp != NULL);
     srcFileBytes = fprintf(srcFp, "#include \"%s.h\"\n", name.c_str());
@@ -933,7 +932,7 @@ void graph::cppEmitter() {
   FILE* header = genHeaderStart();
   // header: node definition; src: node evaluation
 #ifdef DIFFTEST_PER_SIG
-  sigFile = fopen((OutputDir + "/" + name + "_sigs.txt").c_str(), "w");
+  sigFile = fopen((globalConfig.OutputDir + "/" + name + "_sigs.txt").c_str(), "w");
 #endif
 
   for (SuperNode* super : sortedSuper) {
@@ -980,5 +979,5 @@ void graph::cppEmitter() {
   fclose(sigFile);
 #endif
   printf("[cppEmitter] define %ld nodes %d superNodes\n", definedNode.size(), superId);
-  std::cout << "[cppEmitter] finish writing " << srcFileIdx << " cpp files to " + OutputDir + "/" << std::endl;
+  std::cout << "[cppEmitter] finish writing " << srcFileIdx << " cpp files to " + globalConfig.OutputDir + "/" << std::endl;
 }
