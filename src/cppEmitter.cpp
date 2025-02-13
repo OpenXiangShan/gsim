@@ -11,8 +11,6 @@
 #include <utility>
 
 #define ACTIVE_WIDTH 8
-
-#define MAX_KBYTE_PER_CPP 256
 #define RESET_PER_FUNC 400
 
 #define ENABLE_ACTIVATOR false
@@ -876,7 +874,7 @@ bool SuperNode::instsEmpty() {
 
 bool graph::__emitSrc(bool canNewFile, bool alreadyEndFunc, const char *nextFuncDef, const char *fmt, ...) {
   bool newFile = false;
-  if (srcFp == NULL || (srcFileBytes > (MAX_KBYTE_PER_CPP * 1024) && canNewFile)) {
+  if (srcFp == NULL || (srcFileBytes > (globalConfig.cppMaxSizeKB * 1024) && canNewFile)) {
     if (srcFp != NULL) {
       if (!alreadyEndFunc) fprintf(srcFp, "}"); // the end of the current function
       fclose(srcFp);

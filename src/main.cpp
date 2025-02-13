@@ -23,6 +23,7 @@ Config::Config() {
   EnableDumpGraph = false;
   OutputDir = ".";
   SuperNodeMaxSize = 35;
+  cppMaxSizeKB = -1;
 }
 Config globalConfig;
 
@@ -42,10 +43,11 @@ Config globalConfig;
 static void printUsage(const char* ProgName) {
   std::cout << "Usage: " << ProgName << " [options] <input file>\n"
             << "Options:\n"
-            << "  -h, --help           Display this help message and exit.\n"
-            << "      --dump           Enable dumping of the graph.\n"
-            << "      --dir=[dir]      Specify the output directory.\n"
+            << "  -h, --help                       Display this help message and exit.\n"
+            << "      --dump                       Enable dumping of the graph.\n"
+            << "      --dir=[dir]                  Specify the output directory.\n"
             << "      --supernode-max-size=[num]   Specify the maximum size of a superNode.\n"
+            << "      --cpp-max-size-KB=[num]      Specify the maximum size (approximate) of a generated C++ file.\n"
             ;
 }
 
@@ -60,6 +62,7 @@ static char* parseCommandLine(int argc, char** argv) {
       {"dump", no_argument, nullptr, 'd'},
       {"dir", required_argument, nullptr, 0},
       {"supernode-max-size", required_argument, nullptr, 0},
+      {"cpp-max-size-KB", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -71,6 +74,7 @@ static char* parseCommandLine(int argc, char** argv) {
                 case 1: globalConfig.EnableDumpGraph = true; break;
                 case 2: globalConfig.OutputDir = optarg; break;
                 case 3: sscanf(optarg, "%d", &globalConfig.SuperNodeMaxSize); break;
+                case 4: sscanf(optarg, "%d", &globalConfig.cppMaxSizeKB); break;
                 case 0:
                 default: printUsage(argv[0]); exit(EXIT_SUCCESS);
               }
