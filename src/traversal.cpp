@@ -89,7 +89,8 @@ void ExpTree::display() {
       continue;
     }
     printf("%s(%d %s %p) %s %s [width=%d, sign=%d, type=%s, lineno=%d]", std::string(depth * 2, ' ').c_str(), top->opType,
-           OP2Name[top->opType], top, (top->nodePtr) ? top->nodePtr->name.c_str() : "", top->strVal.c_str(), top->width,
+           OP2Name[top->opType], top, (top->nodePtr) ? top->nodePtr->name.c_str() : (top->opType == OP_READ_MEM || top->opType == OP_WRITE_MEM ? top->memoryNode->name.c_str() : ""),
+           top->strVal.c_str(), top->width,
            top->sign, (top->nodePtr) ? NodeType2Name[top->nodePtr->type] : NodeType2Name[NODE_INVALID], top->nodePtr ? top->nodePtr->lineno : -1);
     for (int val : top->values) printf(" %d", val);
     printf("\n");
