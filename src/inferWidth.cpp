@@ -257,6 +257,14 @@ void graph::inferAllWidth() {
       }
     }
   };
+  auto addRecompute = [&uniqueNodes, &fixedWidth, &reinferNodes](Node* node) {
+    if (uniqueNodes.find(node) == uniqueNodes.end()) {
+      node->clearWidth();
+      if (fixedWidth.find(node) == fixedWidth.end()) node->width = -1;
+      reinferNodes.push(node);
+      uniqueNodes.insert(node);
+    }
+  };
 
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) {
@@ -284,6 +292,15 @@ void graph::inferAllWidth() {
         uniqueNodes.insert(node->getSrc());
         node->getSrc()->width = node->width;
         addRecomputeNext(node->getSrc());
+      }
+    }
+
+    if (node->type == NODE_WRITER && node->width > node->parent->width) {
+      node->parent->width = node->width;
+      for (Node* port : node->parent->member) {
+        if (port->type == NODE_READER) {
+          addRecompute(port);
+        }
       }
     }
     if (reinferNodes.empty()) { // re-checking reset tree, the resetVal may be inferred after registers
