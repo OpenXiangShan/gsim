@@ -313,7 +313,15 @@ void graph::genInterfaceInput(FILE* fp, Node* input) {
     activate all nodes for simplicity
   */
   /* update nodes in the same superNode */
-  fprintf(fp, "for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
+  std::set<int> allNext;
+  for (Node* next : input->next) {
+    if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
+  }
+  std::map<uint64_t, ActiveType> bitMapInfo;
+  activeSet2bitMap(allNext, bitMapInfo, -1);
+  for (auto iter : bitMapInfo) {
+    fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+  }
   fprintf(fp, "}\n");
 }
 
