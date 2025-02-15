@@ -243,8 +243,9 @@ VERI_VFLAGS += -Mdir $(VERI_BUILD_DIR) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI
 
 VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
 VERI_VSRCS += $(shell find ready-to-run/difftest/blockbox/ -name ".v")
+VERI_CSRCS-2 = $(EMU_GEN_SRCS)
 
-$(VERI_GEN_MK): $(VERI_VSRCS) $(EMU_GEN_SRCS) | $(EMU_MAIN_SRCS)
+$(VERI_GEN_MK): $(VERI_VSRCS) $(VERI_CSRCS-$(MODE)) | $(EMU_MAIN_SRCS)
 	@mkdir -p $(@D)
 	verilator $(VERI_VFLAGS) $(abspath $^ $|)
 
