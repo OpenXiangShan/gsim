@@ -246,9 +246,10 @@ FILE* graph::genHeaderStart() {
 void graph::genInterfaceInput(Node* input) {
   /* set by string */
   emitFuncDecl("void S%s::set_%s(%s val) {\n", name.c_str(), input->name.c_str(), widthUType(input->width).c_str());
-  emitBodyLock("  %s = val;\n", input->name.c_str());
+  emitBodyLock("  if (%s != val) { \n", input->name.c_str());
+  emitBodyLock("    %s = val;\n", input->name.c_str());
   for (std::string inst : input->insts) {
-    emitBodyLock("  %s\n", inst.c_str());
+    emitBodyLock("    %s\n", inst.c_str());
   }
   /* update nodes in the same superNode */
   std::set<int> allNext;
@@ -258,9 +259,10 @@ void graph::genInterfaceInput(Node* input) {
   std::map<uint64_t, ActiveType> bitMapInfo;
   activeSet2bitMap(allNext, bitMapInfo, -1);
   for (auto iter : bitMapInfo) {
-    emitBodyLock("  %s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+    emitBodyLock("    %s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
   }
-  emitBodyLock("}\n");
+  emitBodyLock("  }\n"
+               "}\n");
 }
 
 void graph::genInterfaceOutput(Node* output) {
