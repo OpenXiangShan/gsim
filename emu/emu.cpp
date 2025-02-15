@@ -273,7 +273,7 @@ int main(int argc, char** argv) {
     if (cycles % (CYCLE_MAX_SIM / (CYCLE_STEP_PERCENT * 100)) == 0 && cycles <= CYCLE_MAX_SIM) {
       auto dur = std::chrono::system_clock::now() - start;
       auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
-      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec) simulation process %.2lf% \n",
+      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec) simulation process %.2lf%% \n",
           cycles, msec.count(), cycles * 1000 / msec.count(), (double)cycles * 100 / CYCLE_MAX_SIM);
 #ifdef PERF
       size_t totalActives = 0;
