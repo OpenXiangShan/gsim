@@ -167,11 +167,7 @@ static std::string arrayPrevName (std::string name) {
 }
 #endif
 
-static void inline declStep(FILE* fp) {
-  fprintf(fp, "void step();\n");
-}
-
-void graph::genNodeInit(FILE* fp, Node* node) {
+void graph::genNodeInit(Node* node) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
 
@@ -190,13 +186,13 @@ void graph::genNodeInit(FILE* fp, Node* node) {
         break;
       default:
         if (node->isArray()) {
-          fprintf(fp, "memset(%s, 0, sizeof(%s));\n", node->name.c_str(), node->name.c_str());
+          emitBodyLock("  memset(%s, 0, sizeof(%s));\n", node->name.c_str(), node->name.c_str());
         } else {
-          fprintf(fp, "%s = 0;\n", node->name.c_str());
+          emitBodyLock("  %s = 0;\n", node->name.c_str());
         }
     }
 #endif
-  for (std::string inst : node->initInsts) fprintf(fp, "%s\n", strReplace(inst, ASSIGN_LABLE, "").c_str());
+  for (std::string inst : node->initInsts) emitBodyLock("  %s\n", strReplace(inst, ASSIGN_LABLE, "").c_str());
 }
 
 FILE* graph::genHeaderStart() {
@@ -244,71 +240,16 @@ FILE* graph::genHeaderStart() {
   }
   for (std::string str : extDecl) fprintf(header, "%s\n", str.c_str());
   newLine(header);
-  /* class start*/
-  fprintf(header, "class S%s {\npublic:\n", name.c_str());
-  fprintf(header, "uint64_t cycles = 0;\n");
-  fprintf(header, "uint64_t LOG_START = 1, LOG_END = 0;\n");
-  /* constrcutor */
-  fprintf(header, "S%s() {\ninit();\n}", name.c_str());
-  /*initialization */
-  fprintf(header, "void init() {\n");
-  fprintf(header, "activateAll();\n");
-#ifdef PERF
-  fprintf(header, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
-  #if ENABLE_ACTIVATOR
-  fprintf(header, "for (int i = 0; i < %d; i ++) activator[i] = std::map<int, int>();\n", superId);
-  #endif
-for (SuperNode* super : sortedSuper) {
-  if (super->cppId >= 0) {
-    size_t num = 0;
-    for (Node* member : super->member) {
-      if (member->anyNextActive()) num ++;
-    }
-    fprintf(header, "nodeNum[%d] = %ld; // memberNum=%ld\n", super->cppId, num, super->member.size());
-  }
-}
-  fprintf(header, "for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
-#endif
-  for (SuperNode* super : sortedSuper) {
-    if (super->superType != SUPER_VALID && super->superType != SUPER_ASYNC_RESET) continue;
-    for (Node* member : super->member) {
-      genNodeInit(header, member);
-    }
-  }
-
-#if  defined (MEM_CHECK) || defined (DIFFTEST_PER_SIG)
-  for (Node* mem :memory) {
-    fprintf(header, "memset(%s, 0, sizeof(%s));\n", mem->name.c_str(), mem->name.c_str());
-  }
-#endif
-  fprintf(header, "}\n");
-
-  fprintf(header, "void activateAll() {\n");
-  fprintf(header, "for (int i = 0; i < %d; i ++) activeFlags[i] = -1;\n", activeFlagNum);
-  fprintf(header, "}\n");
-
-  fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
-#ifdef PERF
-  fprintf(header, "size_t activeTimes[%d];\n", superId);
-  #if ENABLE_ACTIVATOR
-  fprintf(header, "std::map<int, int>activator[%d];\n", superId);
-  #endif
-  fprintf(header, "size_t validActive[%d];\n", superId);
-  fprintf(header, "size_t nodeNum[%d];\n", superId);
-#endif
   return header;
 }
 
-void graph::genInterfaceInput(FILE* fp, Node* input) {
+void graph::genInterfaceInput(Node* input) {
   /* set by string */
-  fprintf(fp, "void set_%s(%s val) {\n", input->name.c_str(), widthUType(input->width).c_str());
-  fprintf(fp, "%s = val;\n", input->name.c_str());
+  emitFuncDecl("void S%s::set_%s(%s val) {\n", name.c_str(), input->name.c_str(), widthUType(input->width).c_str());
+  emitBodyLock("  %s = val;\n", input->name.c_str());
   for (std::string inst : input->insts) {
-    fprintf(fp, "%s\n", inst.c_str());
+    emitBodyLock("  %s\n", inst.c_str());
   }
-  /* TODO: activate node next.size()
-    activate all nodes for simplicity
-  */
   /* update nodes in the same superNode */
   std::set<int> allNext;
   for (Node* next : input->next) {
@@ -317,24 +258,24 @@ void graph::genInterfaceInput(FILE* fp, Node* input) {
   std::map<uint64_t, ActiveType> bitMapInfo;
   activeSet2bitMap(allNext, bitMapInfo, -1);
   for (auto iter : bitMapInfo) {
-    fprintf(fp, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+    emitBodyLock("  %s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
   }
-  fprintf(fp, "}\n");
+  emitBodyLock("}\n");
 }
 
-void graph::genInterfaceOutput(FILE* fp, Node* output) {
+void graph::genInterfaceOutput(Node* output) {
   /* TODO: fix constant output which is not exists in sortedsuper */
   if (std::find(sortedSuper.begin(), sortedSuper.end(), output->super) == sortedSuper.end()) return;
-  fprintf(fp, "%s get_%s() {\n", widthUType(output->width).c_str(), output->name.c_str());
-  if (output->status == CONSTANT_NODE) fprintf(fp, "return %s;\n", output->computeInfo->valStr.c_str());
-  else fprintf(fp, "return %s;\n", output->computeInfo->valStr.c_str());
-  fprintf(fp, "}\n");
+  emitFuncDecl("%s S%s::get_%s() {\n"
+               "  return %s;\n"
+               "}\n",
+               widthUType(output->width).c_str(), name.c_str(),
+               output->name.c_str(), output->computeInfo->valStr.c_str());
 }
 
 void graph::genHeaderEnd(FILE* fp) {
   fprintf(fp, "};\n");
   fprintf(fp, "#endif\n");
-  fclose(fp);
 }
 
 #if defined(DIFFTEST_PER_SIG) && defined(GSIM_DIFF)
@@ -461,10 +402,6 @@ void graph::genNodeDef(FILE* fp, Node* node) {
     Assert(!node->isArray() && node->width <= BASIC_WIDTH, "%s is treated as reset (isArray: %d width: %d)", node->name.c_str(), node->isArray(), node->width);
     fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), RESET_NAME(node).c_str());
   }
-}
-
-void graph::genSrcEnd() {
-  fclose(srcFp);
 }
 
 std::string graph::saveOldVal(Node* node) {
@@ -799,12 +736,6 @@ void graph::genResetAll() {
   for (std::string str : resetFuncs) emitBodyLock("%s", str.c_str());
 }
 
-void graph::genResetDecl(FILE* fp) {
-  for (int i = 0; i < resetFuncNum; i ++) {
-    fprintf(fp, "void subReset%d();\n", i);
-  }
-}
-
 void graph::saveDiffRegs() {
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
   emitFuncDecl("void S%s::saveDiffRegs(){\n", name.c_str());
@@ -920,6 +851,21 @@ void graph::cppEmitter() {
   srcFileIdx = 0;
 
   FILE* header = genHeaderStart();
+
+  /* class start*/
+  fprintf(header, "class S%s {\npublic:\n", name.c_str());
+  fprintf(header, "uint64_t cycles;\n");
+  fprintf(header, "uint64_t LOG_START, LOG_END;\n");
+  fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
+#ifdef PERF
+  fprintf(header, "size_t activeTimes[%d];\n", superId);
+#if ENABLE_ACTIVATOR
+  fprintf(header, "std::map<int, int>activator[%d];\n", superId);
+#endif
+  fprintf(header, "size_t validActive[%d];\n", superId);
+  fprintf(header, "size_t nodeNum[%d];\n", superId);
+#endif
+
   // header: node definition; src: node evaluation
 #ifdef DIFFTEST_PER_SIG
   sigFile = fopen((globalConfig.OutputDir + "/" + name + "_sigs.txt").c_str(), "w");
@@ -936,33 +882,97 @@ void graph::cppEmitter() {
   }
   /* memory definition */
   for (Node* mem : memory) genNodeDef(header, mem);
-   /* input/output interface */
-  for (Node* node : input) genInterfaceInput(header, node);
-  for (Node* node : output) genInterfaceOutput(header, node);
-  /* declare step functions */
-  declStep(header);
-  fprintf(header, "void resetAll();\n");
 
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-  fprintf(header, "void saveDiffRegs();\n");
+  /* constrcutor */
+  fprintf(header, "S%s();\n", name.c_str());
+  emitFuncDecl("S%s::S%s() {\n"
+               "  cycles = 0;\n"
+               "  LOG_START = 1;\n"
+               "  LOG_END = 0;\n"
+               "  init();\n"
+               "}\n", name.c_str(), name.c_str());
+
+  /* initialization */
+  fprintf(header, "void init();\n");
+  emitFuncDecl("void S%s::init() {\n", name.c_str());
+  emitBodyLock("  activateAll();\n");
+#ifdef PERF
+  emitBodyLock("  for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
+  #if ENABLE_ACTIVATOR
+  emitBodyLock("  for (int i = 0; i < %d; i ++) activator[i] = std::map<int, int>();\n", superId);
+  #endif
+  for (SuperNode* super : sortedSuper) {
+    if (super->cppId >= 0) {
+      size_t num = 0;
+      for (Node* member : super->member) {
+        if (member->anyNextActive()) num ++;
+      }
+      emitBodyLock("  nodeNum[%d] = %ld; // memberNum=%ld\n", super->cppId, num, super->member.size());
+    }
+  }
+  emitBodyLock("  for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
 #endif
+  for (SuperNode* super : sortedSuper) {
+    if (super->superType != SUPER_VALID && super->superType != SUPER_ASYNC_RESET) continue;
+    for (Node* member : super->member) {
+      genNodeInit(member);
+    }
+  }
 
-  /* main evaluation loop (step)*/
+#if  defined (MEM_CHECK) || defined (DIFFTEST_PER_SIG)
+  for (Node* mem :memory) {
+    emitBodyLock("memset(%s, 0, sizeof(%s));\n", mem->name.c_str(), mem->name.c_str());
+  }
+#endif
+  emitBodyLock("}\n");
+
+  /* activation all nodes for reset */
+  fprintf(header, "void activateAll();\n");
+  emitFuncDecl("void S%s::activateAll() {\n"
+               "  memset(activeFlags, 0xff, sizeof(activeFlags));\n"
+               "}\n", name.c_str());
+
+   /* input/output interface */
+  for (Node* node : input) {
+    fprintf(header, "void set_%s(%s val);\n", node->name.c_str(), widthUType(node->width).c_str());
+    genInterfaceInput(node);
+  }
+  for (Node* node : output) {
+    fprintf(header, "%s get_%s();\n", widthUType(node->width).c_str(), node->name.c_str());
+    genInterfaceOutput(node);
+  }
+
+  /* reset functions */
+  fprintf(header, "void resetAll();\n");
+  genResetAll();
+  for (int i = 0; i < resetFuncNum; i ++) {
+    fprintf(header, "void subReset%d();\n", i);
+  }
+
+  /* main evaluation loop (step) */
   int subStepIdxMax = genActivate();
   for (int i = 0; i <= subStepIdxMax; i ++) {
     fprintf(header, "void subStep%d();\n", i);
   }
 
-  genResetAll();
-  genResetDecl(header);
-  saveDiffRegs();
+  /* step wrapper */
+  fprintf(header, "void step();\n");
   genStep(subStepIdxMax);
-  
-  genHeaderEnd(header);
-  genSrcEnd();
+
+#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
+  fprintf(header, "void saveDiffRegs();\n");
+#endif
+  saveDiffRegs();
+
+  /* end of file */
+  fprintf(header, "};\n"
+                  "#endif\n");
+  fclose(header);
+  fclose(srcFp);
 #ifdef DIFFTEST_PER_SIG
   fclose(sigFile);
 #endif
+
   printf("[cppEmitter] define %ld nodes %d superNodes\n", definedNode.size(), superId);
   std::cout << "[cppEmitter] finish writing " << srcFileIdx << " cpp files to " + globalConfig.OutputDir + "/" << std::endl;
 }
