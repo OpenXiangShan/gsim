@@ -1556,7 +1556,15 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, size_t depth) {
     }
   } else {
     if (maxDepth == depth) {
-      TODO();
+      if (valTree->getRoot()->opType == OP_STMT) {
+        valTree->getRoot()->addChild(newRoot);
+      } else {
+        ENode* stmt = nullptr;
+        stmt = new ENode(OP_STMT);
+        stmt->addChild(valTree->getRoot());
+        stmt->addChild(newRoot);
+        valTree->setRoot(stmt);
+      }
     } else {
       ENode* stmt = nullptr;
       if (oldRoot->opType == OP_STMT) {
