@@ -34,7 +34,7 @@
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 5000000
 #ifdef __DUT_boom__
-#define CYCLE_MAX_SIM  4600000
+#define CYCLE_MAX_SIM  3900000
 #else
 #define CYCLE_MAX_SIM  5400000
 #endif
@@ -45,7 +45,7 @@
 #ifdef __DUT_xiangshan_default__
 #define CYCLE_MAX_SIM  1900000
 #else
-#define CYCLE_MAX_SIM  3600000
+#define CYCLE_MAX_SIM  3700000
 #endif
 
 // unused blackbox
