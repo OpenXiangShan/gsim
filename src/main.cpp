@@ -19,29 +19,35 @@ void preorder_traversal(PNode* root);
 graph* AST2Graph(PNode* root);
 void inferAllWidth();
 
+Config::Config() {
+  EnableDumpGraph = false;
+  OutputDir = ".";
+  SuperNodeMaxSize = 35;
+  cppMaxSizeKB = -1;
+}
+Config globalConfig;
+
+
 #define FUNC_WRAPPER_INTERNAL(func, name, dumpCond) \
   do { \
     struct timeval start = getTime(); \
     func; \
     struct timeval end = getTime(); \
     showTime("{" #func "}", start, end); \
-    if (dumpCond && EnableDumpGraph) g->dump(std::to_string(dumpIdx ++) + name); \
+    if (dumpCond && globalConfig.EnableDumpGraph) g->dump(std::to_string(dumpIdx ++) + name); \
   } while(0)
 
 #define FUNC_TIMER(func)         FUNC_WRAPPER_INTERNAL(func, "", false)
 #define FUNC_WRAPPER(func, name) FUNC_WRAPPER_INTERNAL(func, name, true)
 
-static bool EnableDumpGraph{false};
-std::string OutputDir = ".";
-int SuperNodeMaxSize = 35;
-
 static void printUsage(const char* ProgName) {
   std::cout << "Usage: " << ProgName << " [options] <input file>\n"
             << "Options:\n"
-            << "  -h, --help           Display this help message and exit.\n"
-            << "      --dump           Enable dumping of the graph.\n"
-            << "      --dir=[dir]      Specify the output directory.\n"
+            << "  -h, --help                       Display this help message and exit.\n"
+            << "      --dump                       Enable dumping of the graph.\n"
+            << "      --dir=[dir]                  Specify the output directory.\n"
             << "      --supernode-max-size=[num]   Specify the maximum size of a superNode.\n"
+            << "      --cpp-max-size-KB=[num]      Specify the maximum size (approximate) of a generated C++ file.\n"
             ;
 }
 
@@ -56,6 +62,7 @@ static char* parseCommandLine(int argc, char** argv) {
       {"dump", no_argument, nullptr, 'd'},
       {"dir", required_argument, nullptr, 0},
       {"supernode-max-size", required_argument, nullptr, 0},
+      {"cpp-max-size-KB", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -64,15 +71,16 @@ static char* parseCommandLine(int argc, char** argv) {
   while ((Option = getopt_long(argc, argv, "-h", Table, &option_index)) != -1) {
     switch (Option) {
       case 0: switch (option_index) {
-                case 1: EnableDumpGraph = true; break;
-                case 2: OutputDir = optarg; break;
-                case 3: sscanf(optarg, "%d", &SuperNodeMaxSize); break;
+                case 1: globalConfig.EnableDumpGraph = true; break;
+                case 2: globalConfig.OutputDir = optarg; break;
+                case 3: sscanf(optarg, "%d", &globalConfig.SuperNodeMaxSize); break;
+                case 4: sscanf(optarg, "%d", &globalConfig.cppMaxSizeKB); break;
                 case 0:
                 default: printUsage(argv[0]); exit(EXIT_SUCCESS);
               }
               break;
       case 1: return optarg; // InputFileName
-      case 'd': EnableDumpGraph = true; break;
+      case 'd': globalConfig.EnableDumpGraph = true; break;
       default: {
         printUsage(argv[0]);
         exit(EXIT_SUCCESS);

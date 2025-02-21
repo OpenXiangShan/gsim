@@ -330,7 +330,6 @@ public:
   SuperType superType = SUPER_VALID;
   Node* resetNode = nullptr;
   int localTmpNum = 0;
-  int mpzTmpNum = 0;
   SuperNode() {
     id = counter ++;
   }
