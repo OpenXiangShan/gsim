@@ -34,7 +34,7 @@
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 5000000
 #ifdef __DUT_boom__
-#define CYCLE_MAX_SIM  4600000
+#define CYCLE_MAX_SIM  3900000
 #else
 #define CYCLE_MAX_SIM  5400000
 #endif
@@ -45,7 +45,7 @@
 #ifdef __DUT_xiangshan_default__
 #define CYCLE_MAX_SIM  1900000
 #else
-#define CYCLE_MAX_SIM  3600000
+#define CYCLE_MAX_SIM  3700000
 #endif
 
 // unused blackbox
@@ -273,7 +273,7 @@ int main(int argc, char** argv) {
     if (cycles % (CYCLE_MAX_SIM / (CYCLE_STEP_PERCENT * 100)) == 0 && cycles <= CYCLE_MAX_SIM) {
       auto dur = std::chrono::system_clock::now() - start;
       auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
-      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec) simulation process %.2lf% \n",
+      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec) simulation process %.2lf%% \n",
           cycles, msec.count(), cycles * 1000 / msec.count(), (double)cycles * 100 / CYCLE_MAX_SIM);
 #ifdef PERF
       size_t totalActives = 0;

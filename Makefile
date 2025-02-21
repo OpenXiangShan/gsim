@@ -28,21 +28,25 @@ else ifeq ($(dutName),boom)
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-LargeBoom
 	GSIM_FLAGS += --supernode-max-size=35
+	VERI_THREADS = --threads 5
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-SmallBoom
 	GSIM_FLAGS += --supernode-max-size=35
+	VERI_THREADS = --threads 5
 else ifeq ($(dutName),xiangshan)
 	NAME ?= SimTop
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan-minimal-202501-20957846
 	GSIM_FLAGS += --supernode-max-size=35
+	VERI_THREADS = --threads 16
 else ifeq ($(dutName),xiangshan-default)
 	NAME ?= SimTop
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan-default-202501-20957846
 	GSIM_FLAGS += --supernode-max-size=35
+	VERI_THREADS = --threads 16
 endif
 
 ##############################################
@@ -239,12 +243,14 @@ VERI_CFLAGS = $(call escape_quote,$(EMU_CFLAGS) $(CFLAGS_REF))
 VERI_LDFLAGS = -O3 -lgmp
 VERI_VFLAGS = --top $(NAME) -O3 -Wno-lint -j 8 --cc --exe +define+RANDOMIZE_GARBAGE_ASSIGN --max-num-width 1048576 --compiler clang
 VERI_VFLAGS += -Mdir $(VERI_BUILD_DIR) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)"
+VERI_VFLAGS += $(VERI_THREADS)
 #VERI_VFLAGS += --trace-fst
 
 VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
 VERI_VSRCS += $(shell find ready-to-run/difftest/blockbox/ -name ".v")
+VERI_CSRCS-2 = $(EMU_GEN_SRCS)
 
-$(VERI_GEN_MK): $(VERI_VSRCS) $(EMU_GEN_SRCS) | $(EMU_MAIN_SRCS)
+$(VERI_GEN_MK): $(VERI_VSRCS) $(VERI_CSRCS-$(MODE)) | $(EMU_MAIN_SRCS)
 	@mkdir -p $(@D)
 	verilator $(VERI_VFLAGS) $(abspath $^ $|)
 
