@@ -14,7 +14,7 @@ Generate high-firrtl from chirrtl (using [firrtl](https://github.com/chipsallian
 
     $./firrtl/utils/bin/firrtl -i SimTop.fir -X high -o SimTop.hi.fir
 
-Compile high-firttl to C++
+Compile high-firrtl to C++
 
     $ make compile MODE=0
 
