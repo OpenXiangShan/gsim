@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <string>
 #include "common.h"
+#include <stack>
 /* detect and optimize some specific patterns */
 /* behind constantAnalysis */
 Node* getLeafNode(bool isArray, ENode* enode);
@@ -27,20 +28,48 @@ static bool isBitsOne(ENode* enode) {
 // else return nullptr
 static ENode* isBitAndOne(ENode* enode) {
   if (enode->opType != OP_AND || enode->getChild(1)->opType != OP_INT) {
-    // printf("---isBitAndOne  if1 failed---\n");
     return nullptr;
   }
   auto value = firStrBase(enode->getChild(1)->strVal);
   if (value.second != "1") {
-    // printf("---isBitAndOne  if2 failed--- value.second == %s\n", value.second.c_str());
     return nullptr;
   }
   if (!enode->getChild(0)) {
-    // printf("---isBitAndOne  if3 failed---\n");
     return nullptr;
   }
   return enode->getChild(0);
 }
+
+/* pattern 4:
+  node expr_lo = cat(expr_A, expr_B) 
+  node expr_hi = cat(expr_C, expr_D) 
+  node _expr_T = cat(expr_hi, expr_lo) 
+  node expr = orr(_expr_T) 
+  optimize:
+  expr = ( orr(expr_A) | orr(expr_B) | orr(expr_C) | orr(expr_D) )
+*/
+bool checkNestedCat(ENode* enode, std::vector<ENode*>& leafNodes, bool hasCat) {
+  if (enode->opType == OP_EMPTY && enode->nodePtr) {
+    Node* refNode = enode->nodePtr;
+    if (refNode->assignTree.size() == 1) {
+      return checkNestedCat(refNode->assignTree[0]->getRoot(), leafNodes, hasCat);
+    }
+    return false;
+  }
+  if (enode->opType == OP_CAT) {
+    if (!enode->getChild(0) || !enode->getChild(1)) {
+      return false;
+    }
+    hasCat = true;
+    return checkNestedCat(enode->getChild(0), leafNodes, hasCat) && checkNestedCat(enode->getChild(1), leafNodes, hasCat);
+  }
+  if (enode->opType == OP_BITS && hasCat) {
+    leafNodes.push_back(enode);
+    return true;
+  }
+  return false;
+}
+
 // (1 << expr) 
 bool checkPattern1(Node* node) {
   if (node->isArray() || node->type != NODE_OTHERS || node->assignTree.size() != 1) return false;
@@ -70,34 +99,25 @@ bool checkPattern1(Node* node) {
 // ((1<<expr) & 1) 
 bool checkPattern2(Node* node) {
   if (node->isArray() || node->type != NODE_OTHERS || node->assignTree.size() != 1) {
-    // printf("---checkPattern2  if1 failed---\n");
     return false;
   }
   ENode* root = node->assignTree[0]->getRoot();
   ENode* bitAndNode = isBitAndOne(root);
 
-  // ExpTree* tree = new ExpTree(bitAndNode, new ENode(node));
-  // printf("---checkPattern2  bitAndNode tree---\n");
-  // tree->display();
+
   // if (pattern == (A & 1)) bitAndNode is A
   if (!bitAndNode) {
-    // printf("---checkPattern2  if2 failed---\n");
     return false;
   }
-  // if A == (1 << expr), shiftNode is expr
-  // printf("bitAndNode: (opType=OP_DSHL) == %d\n, (child0 opType=OP_INT) == %d  child0 value second == %s\n", 
-  //   bitAndNode->opType == OP_DSHL, bitAndNode->getChild(0)->opType == OP_INT, firStrBase(bitAndNode->getChild(0)->strVal).second.c_str());
+  
   ENode* shiftNode = nullptr;
   if (bitAndNode->opType == OP_DSHL && bitAndNode->getChild(0)->opType == OP_INT && firStrBase(bitAndNode->getChild(0)->strVal).second == "1") {
     shiftNode = bitAndNode->getChild(1);
   } else {
     shiftNode = nullptr;
   }
-  // ExpTree* tree2 = new ExpTree(shiftNode, new ENode(node));
-  // printf("---checkPattern2  shiftNode tree---\n");
-  // tree2->display();
+
   if (!shiftNode) {
-    // printf("---checkPattern2  if3 failed---\n");
     return false;
   }
   return true;
@@ -122,155 +142,110 @@ bool checkPattern3(Node *node) {
   return true;
 }
 
-void testCheckPattern2() {
-  // Test case 1: Valid pattern (1 << 5) & 0x1
-  // both "1" maybe 0h1 or 0b1 or 0o1 or 1
-  {
-    Node* testNode = new Node();
-    testNode->type = NODE_OTHERS;
-    testNode->width = 1;
-    
-    ENode* exprNode = new ENode(OP_INT);
-    exprNode->strVal = "5";
-    exprNode->width = 32;
-    
-    ENode* shiftNode = new ENode(OP_DSHL);
-    shiftNode->width = 32;
-    ENode* oneNode = new ENode(OP_INT);
-    oneNode->strVal = "1";
-    oneNode->width = 32;
-    shiftNode->addChild(oneNode);
-    shiftNode->addChild(exprNode);
-    
-    ENode* andNode = new ENode(OP_AND);
-    andNode->width = 1;
-    andNode->addChild(shiftNode);
-    ENode* maskNode = new ENode(OP_INT);
-    maskNode->strVal = "0h1";
-    maskNode->width = 32;
-    andNode->addChild(maskNode);
-    
-    ExpTree* tree = new ExpTree(andNode, new ENode(testNode));
-    testNode->assignTree.push_back(tree);
-    
-    bool result = checkPattern2(testNode);
-    Assert(result == true, "testCheckPattern2 case1 failed");
-    
-    delete testNode;
+/* orr (expr), expr = cat(expr_A, expr_B)
+ * orr(cat(expr_A, expr_B))
+ * maybe recursive
+ */
+bool checkPattern4(Node* node) {
+  if (node->isArray() || node->type != NODE_OTHERS || node->assignTree.size() != 1) {
+    return false;
   }
+  ENode* root = node->assignTree[0]->getRoot();
+  if (root->opType != OP_ORR) {
+    return false;
+  }
+  std::vector<ENode*> leafNodes;
+  if (!root->getChild(0)) {
+    return false; // never happen
+  }
+  bool res = checkNestedCat(root->getChild(0), leafNodes, false);
+  if (res && leafNodes.size() > 1) {
+    ENode* newRoot = new ENode(OP_OR);
+    newRoot->width = root->width;
+    newRoot->sign = root->sign;
+    for (ENode* leaf : leafNodes) {
+      ENode* orr = new ENode(OP_ORR);
+      orr->width = 1;
+      orr->addChild(leaf->dup());
+      newRoot->addChild(orr);
+    }
+    printf("p4 tree before optimize:\n");
+    root->display();
+    ExpTree* newTree = new ExpTree(newRoot, new ENode(node));
+    node->assignTree.clear();
+    node->assignTree.push_back(newTree);
+    printf("p4 tree after optimize:\n");
+    newTree->display();
+  }
+  return res;
+}
 
-  // Test case 2: Invalid pattern - not AND operation
-  {
-    Node* testNode = new Node();
-    testNode->type = NODE_OTHERS;
-    testNode->width = 1;
-    
-    ENode* exprNode = new ENode(OP_INT);
-    exprNode->strVal = "5";
-    exprNode->width = 32;
-    
-    ENode* shiftNode = new ENode(OP_DSHL);
-    shiftNode->width = 32;
-    ENode* oneNode = new ENode(OP_INT);
-    oneNode->strVal = "1";
-    oneNode->width = 32;
-    shiftNode->addChild(oneNode);
-    shiftNode->addChild(exprNode);
-    
-    // Using OR instead of AND
-    ENode* orNode = new ENode(OP_OR);
-    orNode->width = 1;
-    orNode->addChild(shiftNode);
-    ENode* maskNode = new ENode(OP_INT);
-    maskNode->strVal = "1";
-    maskNode->width = 1;
-    orNode->addChild(maskNode);
-    
-    ExpTree* tree = new ExpTree(orNode, new ENode(testNode));
-    testNode->assignTree.push_back(tree);
-    
-    bool result = checkPattern2(testNode);
-    Assert(result == false, "testCheckPattern2 case2 failed");
-    
-    delete testNode;
-  }
+void testCheckPattern4() {
+  Node *node = new Node();
+  node->type = NODE_OTHERS;
+  node->assignTree.push_back(new ExpTree(new ENode(OP_ORR)));
+  ENode *orr = node->assignTree[0]->getRoot();
+  orr->addChild(new ENode(OP_CAT));
+  ENode* cat = orr->getChild(0);
+  ENode* bits1 = new ENode(OP_BITS);
+  bits1->width = 2;
+  bits1->addVal(0);
+  bits1->addVal(1);
+  cat->addChild(bits1);
+  ENode* bits2 = new ENode(OP_BITS);
+  bits2->width = 2;
+  bits2->addVal(0);
+  bits2->addVal(1);
+  cat->addChild(bits2);
+  Assert(checkPattern4(node), "testCheckPattern4 case 1 failed");
 
-  // Test case 3: Invalid pattern - mask is not 1
-  {
-    Node* testNode = new Node();
-    testNode->type = NODE_OTHERS;
-    testNode->width = 1;
-    
-    ENode* exprNode = new ENode(OP_INT);
-    exprNode->strVal = "5";
-    exprNode->width = 32;
-    
-    ENode* shiftNode = new ENode(OP_DSHL);
-    shiftNode->width = 32;
-    ENode* oneNode = new ENode(OP_INT);
-    oneNode->strVal = "1";
-    oneNode->width = 32;
-    shiftNode->addChild(oneNode);
-    shiftNode->addChild(exprNode);
-    
-    ENode* andNode = new ENode(OP_AND);
-    andNode->width = 1;
-    andNode->addChild(shiftNode);
-    ENode* maskNode = new ENode(OP_INT);
-    maskNode->strVal = "2";  // Invalid mask value
-    maskNode->width = 1;
-    andNode->addChild(maskNode);
-    
-    ExpTree* tree = new ExpTree(andNode, new ENode(testNode));
-    testNode->assignTree.push_back(tree);
-    
-    bool result = checkPattern2(testNode);
-    Assert(result == false, "testCheckPattern2 case3 failed");
-    
-    delete testNode;
-  }
+  // Test case for pattern: node B = cat(C, D); node A = orr(B);
+  Node *nodeB = new Node();
+  nodeB->type = NODE_OTHERS;
+  nodeB->assignTree.push_back(new ExpTree(new ENode(OP_CAT)));
+  ENode *catB = nodeB->assignTree[0]->getRoot();
+  
+  // Add children C and D to cat node
+  ENode* enodeC = new ENode(OP_BITS);
+  enodeC->width = 2;
+  enodeC->addVal(0);
+  enodeC->addVal(1);
+  catB->addChild(enodeC);
+  
+  ENode* enodeD = new ENode(OP_BITS); 
+  enodeD->width = 2;
+  enodeD->addVal(0);
+  enodeD->addVal(1);
+  catB->addChild(enodeD);
 
-  // Test case 4: Invalid pattern - shift value is not 1
-  {
-    Node* testNode = new Node();
-    testNode->type = NODE_OTHERS;
-    testNode->width = 1;
-    
-    ENode* exprNode = new ENode(OP_INT);
-    exprNode->strVal = "5";
-    exprNode->width = 32;
-    
-    ENode* shiftNode = new ENode(OP_DSHL);
-    shiftNode->width = 32;
-    ENode* oneNode = new ENode(OP_INT);
-    oneNode->strVal = "2";  // Invalid shift value
-    oneNode->width = 32;
-    shiftNode->addChild(oneNode);
-    shiftNode->addChild(exprNode);
-    
-    ENode* andNode = new ENode(OP_AND);
-    andNode->width = 1;
-    andNode->addChild(shiftNode);
-    ENode* maskNode = new ENode(OP_INT);
-    maskNode->strVal = "1";
-    maskNode->width = 1;
-    andNode->addChild(maskNode);
-    
-    ExpTree* tree = new ExpTree(andNode, new ENode(testNode));
-    testNode->assignTree.push_back(tree);
-    
-    bool result = checkPattern2(testNode);
-    Assert(result == false, "testCheckPattern2 case4 failed");
-    
-    delete testNode;
-  }
+  // Create node A with orr operation
+  Node *nodeA = new Node();
+  nodeA->type = NODE_OTHERS;
+  nodeA->assignTree.push_back(new ExpTree(new ENode(OP_ORR)));
+  ENode *orrA = nodeA->assignTree[0]->getRoot();
+  
+  // Link orr to node B
+  ENode *refB = new ENode(OP_EMPTY);
+  refB->nodePtr = nodeB;
+  orrA->addChild(refB);
+
+  Assert(checkPattern4(nodeA), "testCheckPattern4 case 2 failed");
 }
 
 void graph::patternDetect() {
-  testCheckPattern2();
   int num1 = 0;
   int num2 = 0;
   int num3 = 0;
+  int num4 = 0;
+
+  //testCheckPattern4();
+
+  // check pattern4
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      num4 += checkPattern4(member);
+    }
+  }
 
   // check pattern3
   for (SuperNode* super : sortedSuper) {
@@ -287,7 +262,7 @@ void graph::patternDetect() {
   }
 
 
-  // check pattern1
+  // check pattern1, and optimize
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       num1 += checkPattern1(member);
@@ -295,7 +270,7 @@ void graph::patternDetect() {
   }
   removeNodesNoConnect(DEAD_NODE);
   reconnectAll();
-  printf("[patternDetect] find %d pattern1, %d pattern2((1<<expr) & 1), %d pattern3(A & 1)\n", num1, num2, num3);
+  printf("[patternDetect] find %d pattern1, %d pattern2((1<<expr) & 1), %d pattern3(A & 1) %d pattern4(orr(cat(expr)))\n", num1, num2, num3, num4);
 }
 
 
