@@ -1022,6 +1022,7 @@ valInfo* Node::computeConstant() {
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
     if (type == NODE_REG_DST) {
+      getSrc()->computeConstant();
       if ((getSrc()->assignTree.size() == 0 ||
           (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, consMap[getSrc()]->consVal) == 0) ||
           (consMap[getSrc()]->sameConstant && mpz_cmp(ret->consVal, consMap[getSrc()]->assignmentCons) == 0))

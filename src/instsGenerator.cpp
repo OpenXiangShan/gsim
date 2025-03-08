@@ -1882,18 +1882,18 @@ valInfo* Node::compute() {
       Node* port = parent;
       if (port->type == NODE_READER) {
         if (this == port->get_member(READER_EN)) {
-          port->get_member(READER_DATA)->setConstantZero();
-          port->get_member(READER_ADDR)->setConstantZero();
+          port->get_member(READER_DATA)->setConstantInfoZero();
+          port->get_member(READER_ADDR)->setConstantInfoZero();
           for (Node* next : port->get_member(READER_DATA)->next) {
             if (next->computeInfo) addRecompute(next);
           }
         }
       } else if (port->type == NODE_WRITER) {
         if (this == port->get_member(WRITER_EN) || this == port->get_member(WRITER_MASK)) {
-          port->get_member(WRITER_ADDR)->setConstantZero();
-          port->get_member(WRITER_DATA)->setConstantZero();
-          if (this != port->get_member(WRITER_EN)) port->get_member(WRITER_EN)->setConstantZero();
-          if (this != port->get_member(WRITER_MASK)) port->get_member(WRITER_MASK)->setConstantZero();
+          port->get_member(WRITER_ADDR)->setConstantInfoZero();
+          port->get_member(WRITER_DATA)->setConstantInfoZero();
+          if (this != port->get_member(WRITER_EN)) port->get_member(WRITER_EN)->setConstantInfoZero();
+          if (this != port->get_member(WRITER_MASK)) port->get_member(WRITER_MASK)->setConstantInfoZero();
         }
       }
       needRecompute = true;

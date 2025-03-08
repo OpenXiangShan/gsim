@@ -136,8 +136,6 @@ int main(int argc, char** argv) {
 
   FUNC_TIMER(g->inferAllWidth());
 
-  FUNC_WRAPPER(g->clockOptimize(), "ClockOptimize");
-
   FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
 
   FUNC_WRAPPER(g->exprOpt(), "ExprOpt");

@@ -102,6 +102,10 @@
 
 #define ACTIVATE_ALL 0xff
 
+#ifndef CLOCK_GATE_NAME
+#define CLOCK_GATE_NAME "ClockGate"
+#endif
+
 class TypeInfo;
 class PNode;
 class Node;
