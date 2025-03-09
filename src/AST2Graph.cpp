@@ -527,39 +527,64 @@ extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$
 void visitExtModule(graph* g, PNode* module) {
   TYPE_CHECK(module, 1, 1, P_EXTMOD);
 
-  Node* extNode = allocNode(NODE_EXT, module->name, module->lineno);
-  extNode->extraInfo = module->getExtra(0);
-  addSignal(extNode->name, extNode);
-  PNode* ports = module->getChild(0);
-  for (int i = 0; i < ports->getChildNum(); i ++) {
-    TypeInfo* portInfo = visitPort(g, ports->getChild(i), P_EXTMOD);
-    for (auto entry : portInfo->aggrMember) {
-      if (entry.first->isClock) {
-        if (!extNode->clock) extNode->clock = entry.first;
-        else entry.first->type = NODE_OTHERS;
-      } else extNode->add_member(entry.first);
-      addSignal(entry.first->name, entry.first);
+  if (module->getExtra(0) == CLOCK_GATE_NAME) { // ClockGate
+    PNode* ports = module->getChild(0);
+    Assert(ports->getChildNum() == 4, "invalid childNum %d for clock gate", ports->getChildNum());
+    Assert(ports->getChild(0)->name == "TE" && ports->getChild(1)->name == "E" && ports->getChild(2)->name == "CK" && ports->getChild(3)->name == "Q", "invalid clockgate ports");
+    auto addGatePort = [&](std::string name, bool isClock) {
+      Node* node = allocNode(NODE_OTHERS, prefixName(SEP_MODULE, name), module->lineno);
+      node->width = 1; node->sign = false; node->isClock = isClock;
+      addSignal(node->name, node);
+      return node;
+    };
+    Node* Q = addGatePort("Q", true);
+    Node* CK = addGatePort("CK", true);
+    Node* E = addGatePort("E", false);
+    Node* TE = addGatePort("TE", false);
+    TE->width = 1; TE->sign = false; TE->isClock = false;
+    ENode* gateAnd = new ENode(OP_AND);
+    ENode* gateOr = new ENode(OP_OR);
+    gateOr->addChild(new ENode(E));
+    gateOr->addChild(new ENode(TE));
+    gateAnd->addChild(new ENode(CK));
+    gateAnd->addChild(gateOr);
+    Q->valTree = new ExpTree(gateAnd, Q);
+  } else {
+    Node* extNode = allocNode(NODE_EXT, module->name, module->lineno);
+    extNode->extraInfo = module->getExtra(0);
+    addSignal(extNode->name, extNode);
+    PNode* ports = module->getChild(0);
+    for (int i = 0; i < ports->getChildNum(); i ++) {
+      TypeInfo* portInfo = visitPort(g, ports->getChild(i), P_EXTMOD);
+      for (auto entry : portInfo->aggrMember) {
+        if (entry.first->isClock) {
+          if (!extNode->clock) extNode->clock = entry.first;
+          else entry.first->type = NODE_OTHERS;
+        } else extNode->add_member(entry.first);
+        addSignal(entry.first->name, entry.first);
+      }
+      for (AggrParentNode* dummy : portInfo->aggrParent) {
+        addDummy(dummy->name, dummy);
+      }
     }
-    for (AggrParentNode* dummy : portInfo->aggrParent) {
-      addDummy(dummy->name, dummy);
+    /* construct valTree for every output and NODE_EXT */
+    /* in -> ext */
+    ENode* funcENode = new ENode(OP_EXT_FUNC);
+    for (Node* node : extNode->member) {
+      if (node->type == NODE_EXT_OUT) continue;
+      ENode* inENode = new ENode(node);
+      funcENode->addChild(inENode);
+    }
+    extNode->valTree = new ExpTree(funcENode, extNode);
+    /* ext -> out */
+    for (Node* node : extNode->member) {
+      if (node->type == NODE_EXT_IN) continue;
+      ENode* outFuncENode = new ENode(OP_EXT_FUNC);
+      outFuncENode->addChild(new ENode(extNode));
+      node->valTree = new ExpTree(outFuncENode, node);
     }
   }
-  /* construct valTree for every output and NODE_EXT */
-  /* in -> ext */
-  ENode* funcENode = new ENode(OP_EXT_FUNC);
-  for (Node* node : extNode->member) {
-    if (node->type == NODE_EXT_OUT) continue;
-    ENode* inENode = new ENode(node);
-    funcENode->addChild(inENode);
-  }
-  extNode->valTree = new ExpTree(funcENode, extNode);
-  /* ext -> out */
-  for (Node* node : extNode->member) {
-    if (node->type == NODE_EXT_IN) continue;
-    ENode* outFuncENode = new ENode(OP_EXT_FUNC);
-    outFuncENode->addChild(new ENode(extNode));
-    node->valTree = new ExpTree(outFuncENode, node);
-  }
+
 }
 
 /*
@@ -2033,7 +2058,7 @@ graph* AST2Graph(PNode* root) {
     reg->addReset();
     reg->addUpdateTree();
   }
-
+  g->clockOptimize(allSignals);
 
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     it->second->invalidArrayOptimize();

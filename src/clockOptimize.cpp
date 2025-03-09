@@ -6,6 +6,7 @@ public:
   Node* node = nullptr;
   int val = 0;
   bool isInvalid = false;
+  ENode* gateENode = nullptr; // ClockGate
   clockVal(Node* n) { node = n; }
   clockVal(int v) { val = v; }
   clockVal() { isInvalid = true; }
@@ -53,6 +54,19 @@ clockVal* ENode::clockCompute() {
              "This may cause wrong result during simulation.\n");
       display();
       break;
+    case OP_OR:
+      ret = new clockVal();
+      ret->gateENode = this;
+      break;
+    case OP_AND:
+      childVal = getChild(0)->clockCompute(); // first child
+      ret = getChild(1)->clockCompute(); // second child
+      if (childVal->node && ret->gateENode) {
+        ret->node = childVal->node;
+      } else if (childVal->gateENode && ret->node) {
+        ret->gateENode = ret->gateENode;
+      } else Panic();
+      break;
     default:
       Assert(0, "invalid op %d", opType);
   }
@@ -61,7 +75,7 @@ clockVal* ENode::clockCompute() {
 
 clockVal* Node::clockCompute() {
   if (clockMap.find(this) != clockMap.end()) return clockMap[this];
-  if (type == NODE_INP) {
+  if (type == NODE_INP || type == NODE_REG_SRC) {
     clockMap[this] = new clockVal(this);
     return clockMap[this];
   }
@@ -88,6 +102,14 @@ Node* Node::clockAlias() {
 }
 
 void Node::setConstantZero(int w) {
+  ENode* enode = new ENode(OP_INT);
+  enode->width = w;
+  enode->strVal = "0";
+  assignTree.clear();
+  arrayVal.clear();
+  assignTree.push_back(new ExpTree(enode, this));
+}
+void Node::setConstantInfoZero(int w) {
   computeInfo = new valInfo();
   if (w > 0) computeInfo->width = w;
   else computeInfo->width = width;
@@ -96,86 +118,98 @@ void Node::setConstantZero(int w) {
 }
 
 /* clock alias & clock constant analysis */
-void graph::clockOptimize() {
-  for (SuperNode* super : sortedSuper) {
-    for (Node* node : super->member) {
-      if (!node->isClock) continue;
-      Assert(!node->isArray(), "clock %s is array", node->name.c_str());
-      if (node->type == NODE_INP) clockMap[node] = new clockVal(node);
-      else {
-        node->clockCompute();
-      }
-    }
+void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
+  for (auto iter : allSignals) {
+    Node* node = iter.second;
+    if (!node->isClock) continue;
+    Assert(!node->isArray(), "clock %s is array", node->name.c_str());
+    if (node->type == NODE_INP) clockMap[node] = new clockVal(node);
+    else node->clockCompute();
   }
-  for (SuperNode* super : sortedSuper) {
-    for (Node* node : super->member) {
-      if (node->type == NODE_REG_DST) {
-        Assert(clockMap.find(node->clock) != clockMap.end(), "%s: clock %s(%p) not found", node->name.c_str(), node->clock->name.c_str(), node->clock);
-        clockVal* val = clockMap[node->clock];
-        if (val->node) {
-          if (node->clock->type != NODE_INP) {
-            ENode* clockENode = new ENode(val->node);
-            clockENode->width = val->node->width;
-            node->clock->assignTree[0]->setRoot(clockENode);
-          }
-        } else {
-          node->setConstantZero(node->width);
-          node->regNext->setConstantZero(node->regNext->width);
+
+  for (auto iter : allSignals) {
+    Node* node = iter.second;
+    if (node->type == NODE_REG_DST) {
+      Assert(clockMap.find(node->clock) != clockMap.end(), "%s: clock %s(%p) not found", node->name.c_str(), node->clock->name.c_str(), node->clock);
+      clockVal* val = clockMap[node->clock];
+      Assert(!val->gateENode || val->node, "invalid clock %s %d", node->clock->name.c_str(), node->clock->lineno);
+      if (val->gateENode) {
+        ENode* gate = new ENode(OP_WHEN);
+        gate->width = node->width;
+        gate->sign = node->sign;
+        ENode* cond = val->gateENode->dup();
+        gate->addChild(cond);
+        gate->addChild(nullptr);
+        gate->addChild(nullptr);
+        for (ExpTree* tree : node->assignTree) {
+          ENode* gateDup = gate->dup();
+          gateDup->setChild(1, tree->getRoot());
+          tree->setRoot(gateDup);
         }
-      } else if (node->type == NODE_EXT && node->clock) {
-        clockVal* val = clockMap[node->clock];
-        if (val->node) {
+        for (ExpTree* tree : node->arrayVal) {
+          ENode* gateDup = gate->dup();
+          gateDup->setChild(1, tree->getRoot());
+          tree->setRoot(gateDup);
+        }
+      } else if (val->node) {
+        if (node->clock->type != NODE_INP) {
           ENode* clockENode = new ENode(val->node);
           clockENode->width = val->node->width;
           node->clock->assignTree[0]->setRoot(clockENode);
-        } else {
-          for (Node* member : node->member)
-            member->setConstantZero(member->width);
         }
       } else {
-        clockVal* val = nullptr;
-        Node* clockMember = nullptr;
-        if (node->type == NODE_READER || node->type == NODE_WRITER || node->type == NODE_READWRITER) {
-          Assert(clockMap.find(node->clock) != clockMap.end(), "%s: clock %s not found", node->name.c_str(), node->clock->name.c_str());
-          val = clockMap[node->clock];
-          clockMember = node->clock;
-        }
-        if (val) {
-          if (val->node) {
-            ENode* clockENode = new ENode(val->node);
-            clockENode->width = val->node->width;
-            clockMember->assignTree[0]->setRoot(clockENode);
-          } else {
-            for (Node* member : node->member)
-              member->setConstantZero(member->width);
+        node->setConstantZero(0);
+        node->regNext->setConstantZero(0);
+      }
+    } else if (node->type == NODE_EXT && node->clock) {
+      clockVal* val = clockMap[node->clock];
+      if (val->node) {
+        ENode* clockENode = new ENode(val->node);
+        clockENode->width = val->node->width;
+        node->clock->assignTree[0]->setRoot(clockENode);
+      } else {
+        for (Node* member : node->member)
+          member->setConstantZero(0);
+      }
+    } else if (node->type == NODE_READER || node->type == NODE_WRITER || node->type == NODE_READWRITER) {
+      clockVal* val = nullptr;
+      Node* clockMember = nullptr;
+      if (node->type == NODE_READER || node->type == NODE_WRITER || node->type == NODE_READWRITER) {
+        Assert(clockMap.find(node->clock) != clockMap.end(), "%s: clock %s not found", node->name.c_str(), node->clock->name.c_str());
+        val = clockMap[node->clock];
+        clockMember = node->clock;
+      }
+      if (val) {
+        Assert(!val->gateENode || val->node, "invalid clock %s %d", node->clock->name.c_str(), node->clock->lineno);
+        if (val->gateENode) {
+          if (node->type == NODE_WRITER) {
+            ENode* gate = new ENode(OP_WHEN);
+            gate->width = node->width;
+            gate->sign = node->sign;
+            ENode* cond = val->gateENode->dup();
+            gate->addChild(cond);
+            gate->addChild(nullptr);
+            gate->addChild(nullptr);
+            for (ExpTree* tree : node->assignTree) {
+              ENode* gateDup = gate->dup();
+              gateDup->setChild(1, tree->getRoot());
+              tree->setRoot(gateDup);
+            }
+            for (ExpTree* tree : node->arrayVal) {
+              ENode* gateDup = gate->dup();
+              gateDup->setChild(1, tree->getRoot());
+              tree->setRoot(gateDup);
+            }
           }
+        } else if (val->node) {
+          ENode* clockENode = new ENode(val->node);
+          clockENode->width = val->node->width;
+          clockMember->assignTree[0]->setRoot(clockENode);
+        } else {
+          for (Node* member : node->member)
+            member->setConstantZero(0);
         }
       }
     }
   }
-  for (SuperNode* super : sortedSuper) {
-    for (Node* node : super->member) {
-      if (!node->isClock) continue;
-      for (Node* prev : node->prev) prev->next.erase(node);
-      for (Node* next : node->next) next->prev.erase(node);
-    }
-  }
-  input.erase(
-    std::remove_if(input.begin(), input.end(), [](const Node* n){ return n->isClock; }),
-      input.end()
-  );
-  /* remove all clock nodes */
-  for (SuperNode* super : sortedSuper) {
-    super->member.erase(
-      std::remove_if(super->member.begin(), super->member.end(), [](const Node* n){ return n->isClock; }),
-      super->member.end()
-    );
-  }
-  /* remove empty superNodes */
-  sortedSuper.erase(
-    std::remove_if(sortedSuper.begin(), sortedSuper.end(), [](const SuperNode* sn) { return sn->member.size() == 0; }),
-    sortedSuper.end()
-  );
-
-  reconnectSuper();
 }
