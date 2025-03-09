@@ -10,8 +10,8 @@
 
 /* check the node type and children num */
 #define TYPE_CHECK(node, min, max,...) typeCheck(node, (const int[]){__VA_ARGS__}, sizeof((const int[]){__VA_ARGS__}) / sizeof(int), min, max)
-#define SEP_MODULE "$" // seperator for module
-#define SEP_AGGR "$$"
+#define SEP_MODULE globalConfig.sep_module.c_str() // seperator for module
+#define SEP_AGGR   globalConfig.sep_aggr.c_str()
 
 #define MOD_IN(module) ((module == P_EXTMOD) ? NODE_EXT_IN : (module == P_MOD ? NODE_OTHERS : NODE_INP))
 #define MOD_OUT(module) ((module == P_EXTMOD) ? NODE_EXT_OUT : (module == P_MOD ? NODE_OTHERS : NODE_OUT))

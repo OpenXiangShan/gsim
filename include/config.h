@@ -6,6 +6,8 @@ struct Config {
   std::string OutputDir;
   int SuperNodeMaxSize;
   uint32_t cppMaxSizeKB;
+  std::string sep_module;
+  std::string sep_aggr;
   Config();
 };
 
