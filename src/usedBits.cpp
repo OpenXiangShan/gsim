@@ -210,7 +210,7 @@ void graph::usedBits() {
       for (Node* mem : memory) {
         int usedBit = 0;
         for (Node* port : mem->member) {
-          if (port->type == NODE_READER) {
+          if (port->type == NODE_READER || port->type == NODE_READWRITER) {
             usedBit = MAX(port->usedBit, usedBit);
           }
         }

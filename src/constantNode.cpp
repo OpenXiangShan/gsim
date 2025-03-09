@@ -930,7 +930,7 @@ void graph::constantMemory() {
       bool isConstant = true;
       bool isFirst = true;
       for (Node* port : mem->member) {
-        if (port->type == NODE_WRITER) {
+        if (port->type == NODE_WRITER || port->type == NODE_READWRITER) {
           valInfo* info = consMap[port];
           if (port->status == CONSTANT_NODE || info->sameConstant) {
             if (isFirst) {

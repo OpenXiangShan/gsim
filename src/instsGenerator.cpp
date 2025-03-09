@@ -1464,7 +1464,7 @@ valInfo* ENode::instsGroup(Node* node, std::string lvalue, bool isRoot) {
 
 valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
-  Assert(node->type == NODE_READER, "invalid type %d", node->type);
+  Assert(node->type == NODE_READER || node->type == NODE_READWRITER, "invalid type %d", node->type);
   Node* memory = memoryNode;
   ret->valStr = memory->name + "[" + ChildInfo(0, valStr) + "]";
   for (size_t i = 0; i < memory->dimension.size(); i ++) {
@@ -1480,7 +1480,7 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
 
 valInfo* ENode::instsWriteMem(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
-  Assert(node->type == NODE_WRITER, "invalid type %d", node->type);
+  Assert(node->type == NODE_WRITER || node->type == NODE_READWRITER, "invalid type %d", node->type);
   Node* memory = memoryNode;
 
   std::string indexStr;

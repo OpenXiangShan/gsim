@@ -104,7 +104,7 @@ class Node {
   }
 
   std::string name;  // concat the module name in order (member in structure / temp variable)
-  std::string extraInfo;
+  std::string extraInfo; // ruw for memory
   int id = -1;
   NodeType type;
   int width = -1;
@@ -212,6 +212,7 @@ class Node {
     return member[idx];
   }
   void set_writer() {
+    if (type == NODE_READWRITER) return;
     Assert(type == NODE_WRITER || type == NODE_INFER, "invalid type %d\n", type);
     type = NODE_WRITER;
   }

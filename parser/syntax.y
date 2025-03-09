@@ -61,14 +61,14 @@ static char* emptyStr = NULL;
 %token Firrtl Version INDENT DEDENT
 %token RightArrow "=>"
 %token Leftarrow "<-"
-%token DataType Depth ReadLatency WriteLatency ReadUnderwrite Reader Writer Readwriter Write Read Infer Mport
+%token DataType Depth ReadLatency WriteLatency ReadUnderwrite Reader Writer Readwriter Write Read Infer Rdwr Mport
 /* internal node */
 %type <intVal> width
 %type <plist> cir_mods mem_compulsory mem_optional fields params
 %type <plist> mem_reader mem_writer mem_readwriter
 %type <pnode> module extmodule ports statements port type statement when_else memory param exprs
 %type <pnode> mem_datatype mem_depth mem_rlatency mem_wlatency mem_ruw
-%type <pnode> chirrtl_memory chirrtl_memory_datatype chirrtl_memory_ruw chirrtl_memory_port
+%type <pnode> chirrtl_memory chirrtl_memory_datatype chirrtl_memory_port
 %type <pnode> reference expr primop_2expr primop_1expr primop_1expr1int primop_1expr2int
 %type <pnode> field type_aggregate type_ground circuit
 %type <strVal> info ALLID ext_defname
@@ -201,17 +201,16 @@ memory: Mem ALLID ':' info INDENT mem_compulsory mem_optional mem_ruw DEDENT { $
 /* CHIRRTL Memory */
 chirrtl_memory_datatype: type { $$ = newNode(P_DATATYPE, synlineno(), NULL, 1, $1); }
                        ;
-chirrtl_memory_ruw: Ruw { $$ = newNode(P_RUW, synlineno(), $1, 0); }
-                  ;
 
-chirrtl_memory : SMem ALLID ':' chirrtl_memory_datatype ',' chirrtl_memory_ruw info { $$ = newNode(P_SEQ_MEMORY , synlineno(), /*info*/$7, /*name*/$2, 2, /* DataType */ $4, /* Ruw */ $6); }
-               | SMem ALLID ':' chirrtl_memory_datatype info                        { $$ = newNode(P_SEQ_MEMORY , synlineno(), /*info*/$5, /*name*/$2, 1, /* DataType */ $4); }
-               | CMem ALLID ':' chirrtl_memory_datatype info                        { $$ = newNode(P_COMB_MEMORY, synlineno(), /*info*/$5, /*name*/$2, 1, /* DataType */ $4              ); }
+chirrtl_memory : SMem ALLID ':' chirrtl_memory_datatype Ruw info            { $$ = newNode(P_SEQ_MEMORY , synlineno(), /*info*/$6, /*name*/$2, 1, /* DataType */ $4); $$->appendExtraInfo($5); }
+               | SMem ALLID ':' chirrtl_memory_datatype info                { $$ = newNode(P_SEQ_MEMORY , synlineno(), /*info*/$5, /*name*/$2, 1, /* DataType */ $4); }
+               | CMem ALLID ':' chirrtl_memory_datatype info                { $$ = newNode(P_COMB_MEMORY, synlineno(), /*info*/$5, /*name*/$2, 1, /* DataType */ $4); }
                ;
 
-chirrtl_memory_port: Write Mport ALLID '=' ALLID '[' expr ']' ',' ALLID info { $$ = newNode(P_WRITE, synlineno(), /* Info */ $11, /* Name */ $3, 2, /* Addr */ $7); $$->appendExtraInfo(/* MemName */$5); $$->appendExtraInfo(/* clock */$10); }
-                   | Read  Mport ALLID '=' ALLID '[' expr ']' ',' ALLID info { $$ = newNode(P_READ , synlineno(), /* Info */ $11, /* Name */ $3, 2, /* Addr */ $7); $$->appendExtraInfo(/* MemName */$5); $$->appendExtraInfo(/* clock */$10); }
-                   | Infer Mport ALLID '=' ALLID '[' expr ']' ',' ALLID info { $$ = newNode(P_INFER, synlineno(), /* Info */ $11, /* Name */ $3, 2, /* Addr */ $7); $$->appendExtraInfo(/* MemName */$5); $$->appendExtraInfo(/* clock */$10); }
+chirrtl_memory_port: Write Mport ALLID '=' ALLID '[' expr ']' ',' expr info { $$ = newNode(P_WRITE, synlineno(), /* Info */ $11, /* Name */ $3, 2, /* Addr */ $7, /* clock */ $10); $$->appendExtraInfo(/* MemName */$5); }
+                   | Read  Mport ALLID '=' ALLID '[' expr ']' ',' expr info { $$ = newNode(P_READ , synlineno(), /* Info */ $11, /* Name */ $3, 2, /* Addr */ $7, /* clock */ $10); $$->appendExtraInfo(/* MemName */$5); }
+                   | Infer Mport ALLID '=' ALLID '[' expr ']' ',' expr info { $$ = newNode(P_INFER, synlineno(), /* Info */ $11, /* Name */ $3, 2, /* Addr */ $7, /* clock */ $10); $$->appendExtraInfo(/* MemName */$5); }
+                   | Rdwr Mport ALLID '=' ALLID '[' expr ']' ',' expr info { $$ = newNode(P_READWRITER, synlineno(), /* Info */ $11, /* Name */ $3, 2, /* Addr */ $7, /* clock */ $10); $$->appendExtraInfo(/* MemName */$5); }
                    ;
 
 /* statements */
