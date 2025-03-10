@@ -357,7 +357,6 @@ void graph::splitArrayNode(Node* node) {
   }
   /* distribute arrayVal */
   for (ExpTree* tree : node->assignTree) distributeTree(node, tree);
-  for (ExpTree* tree : node->arrayVal) distributeTree(node, tree);
   if (node->updateTree || node->resetTree) {
     for (size_t idx = 0; idx < node->arrayEntryNum(); idx ++) {
       /* compute index for all array operands in tree */
@@ -398,7 +397,6 @@ void graph::splitArrayNode(Node* node) {
   }
   for (Node* n : checkNodes) {
     for (ExpTree* tree : n->assignTree) tree->updateWithSplittedArray(n, node);
-    for (ExpTree* tree : n->arrayVal) tree->updateWithSplittedArray(n, node);
     if (n->updateTree) n->updateTree->updateWithSplittedArray(n, node);
     if (n->resetTree) n->resetTree->updateWithSplittedArray(n, node);
   }
@@ -533,8 +531,7 @@ Node* Node::arrayMemberNode(int idx) {
 bool nextVarConnect(Node* node) {
   for (Node* next : node->next) {
     std::stack<std::pair<ENode*, bool>> s;
-    for (ExpTree* tree : next->assignTree) s.push(std::make_pair(tree->getRoot(), false));
-    for (ExpTree* tree : next->arrayVal) {
+    for (ExpTree* tree : next->assignTree) {
       s.push(std::make_pair(tree->getRoot(), false));
       s.push(std::make_pair(tree->getlval(), false));
     }
@@ -576,10 +573,7 @@ void graph::checkNodeSplit(Node* node) {
     std::tie(beg, end) = tree->getlval()->getIdx(treeNode);
     if (beg < 0 || (beg != end && !prevSplitted)) anyVarIdx = true;
   }
-  for (ExpTree* tree : treeNode->arrayVal) {
-    std::tie(beg, end) = tree->getlval()->getIdx(treeNode);
-    if (beg < 0 || (beg != end&& !prevSplitted)) anyVarIdx = true;
-  }
+
   if (!anyVarIdx && !nextVarConnect(node)) {
     node->status = DEAD_NODE;
     if (node->type == NODE_REG_SRC) node->getDst()->status = DEAD_NODE;

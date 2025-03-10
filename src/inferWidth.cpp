@@ -194,8 +194,7 @@ void Node::clearWidth() {
     Panic();
     for (Node* member : arrayMember) member->clearWidth();
   }
-  for (ExpTree* tree : assignTree) tree->getRoot()->clearWidth();
-  for (ExpTree* tree : arrayVal) {
+  for (ExpTree* tree : assignTree) {
     tree->getRoot()->clearWidth();
     tree->getlval()->clearWidth();
   }
@@ -213,7 +212,6 @@ void Node::inferWidth() {
     for (Node* member : arrayMember) member->inferWidth();
   }
   for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();
-  for (ExpTree* tree : arrayVal) tree->getRoot()->inferWidth();
   if (updateTree) updateTree->getRoot()->inferWidth();
   if (resetTree) resetTree->getRoot()->inferWidth();
 
@@ -226,18 +224,13 @@ void Node::inferWidth() {
       newSign = tree->getRoot()->sign;
       newClock |= tree->getRoot()->isClock;
     }
-    for (ExpTree* tree : arrayVal) {
-      newWidth = MAX(newWidth, tree->getRoot()->width);
-      newSign = tree->getRoot()->sign;
-      newClock |= tree->getRoot()->isClock;
-    }
     if (resetTree) newWidth = MAX(newWidth, resetTree->getRoot()->width);
     setType(newWidth, newSign);
     isClock = newClock;
   }
 
-  for (ExpTree* arrayTree : arrayVal) {
-    arrayTree->getlval()->inferWidth();
+  for (ExpTree* tree : assignTree) {
+    tree->getlval()->inferWidth();
   }
 }
 
@@ -329,7 +322,6 @@ void graph::inferAllWidth() {
 void Node::updateHeadTail() {
   std::stack<ENode*> s;
   for (ExpTree* tree : assignTree) s.push(tree->getRoot());
-  for (ExpTree* tree : arrayVal) s.push(tree->getRoot());
   if (updateTree) s.push(updateTree->getRoot());
   if (resetTree) s.push(resetTree->getRoot());
   while (!s.empty()) {

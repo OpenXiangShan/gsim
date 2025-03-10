@@ -15,9 +15,9 @@ ENode* Node::isAlias() {
       A <= B (if idx = dim[0], A.arrayval[idx] = B, otherwise A.arrayval[idx] = null ) (Done)
       A[i] <= B[i] for every i  (WIP)
     */
-    if (prev.size() == 1 && arrayVal.size() == 1 && arrayVal[0]->getlval()->getChildNum() == 0 && arrayVal[0]->getRoot()->getNode()
-        && arrayVal[0]->getRoot()->getNode()->type == NODE_OTHERS) {
-      return arrayVal[0]->getRoot();
+    if (prev.size() == 1 && assignTree.size() == 1 && assignTree[0]->getlval()->getChildNum() == 0 && assignTree[0]->getRoot()->getNode()
+        && assignTree[0]->getRoot()->getNode()->type == NODE_OTHERS) {
+      return assignTree[0]->getRoot();
     }
     return nullptr;
   }
@@ -120,9 +120,6 @@ void graph::aliasAnalysis() {
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == DEAD_NODE) continue;
-      for (ExpTree* tree : member->arrayVal) {
-        if (tree) tree->replace(aliasMap, member->isArray());
-      }
       for (ExpTree* tree : member->assignTree) tree->replace(aliasMap, member->isArray());
     }
   }

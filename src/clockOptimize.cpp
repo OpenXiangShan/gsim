@@ -140,7 +140,6 @@ void Node::setConstantZero(int w) {
   enode->width = w;
   enode->strVal = "0";
   assignTree.clear();
-  arrayVal.clear();
   assignTree.push_back(new ExpTree(enode, this));
 }
 void Node::setConstantInfoZero(int w) {
@@ -176,11 +175,6 @@ void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
         gate->addChild(nullptr);
         gate->addChild(nullptr);
         for (ExpTree* tree : node->assignTree) {
-          ENode* gateDup = gate->dup();
-          gateDup->setChild(1, tree->getRoot());
-          tree->setRoot(gateDup);
-        }
-        for (ExpTree* tree : node->arrayVal) {
           ENode* gateDup = gate->dup();
           gateDup->setChild(1, tree->getRoot());
           tree->setRoot(gateDup);
@@ -225,11 +219,6 @@ void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
             gate->addChild(nullptr);
             gate->addChild(nullptr);
             for (ExpTree* tree : node->assignTree) {
-              ENode* gateDup = gate->dup();
-              gateDup->setChild(1, tree->getRoot());
-              tree->setRoot(gateDup);
-            }
-            for (ExpTree* tree : node->arrayVal) {
               ENode* gateDup = gate->dup();
               gateDup->setChild(1, tree->getRoot());
               tree->setRoot(gateDup);

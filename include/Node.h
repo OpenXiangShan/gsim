@@ -123,7 +123,6 @@ class Node {
   ExpTree* memTree = nullptr;
   ExpTree* resetCond = nullptr;  // valid in reg_src
   ExpTree* resetVal = nullptr;   // valid in reg_src, used in AST2Graph
-  std::vector<ExpTree*> arrayVal;
   std::set<int> invalidIdx;
 
   SuperNode* super = nullptr;

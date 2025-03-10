@@ -6,16 +6,11 @@ int Node::counter = 1;
 
 void Node::updateConnect() {
   std::queue<ENode*> q;
-  for (ExpTree* tree : assignTree) q.push(tree->getRoot());
-  if (isArray()) {
-    for (ExpTree* tree : arrayVal) {
-      if (!tree) continue;
-      q.push(tree->getRoot());
-      if (tree->getlval()) {
-        for (size_t i = 0; i < tree->getlval()->getChildNum(); i ++) q.push(tree->getlval()->getChild(i));
-      }
-    }
+  for (ExpTree* tree : assignTree) {
+    q.push(tree->getRoot());
+    for (size_t i = 0; i < tree->getlval()->getChildNum(); i ++) q.push(tree->getlval()->getChild(i));
   }
+
   while (!q.empty()) {
     ENode* top = q.front();
     q.pop();
@@ -269,20 +264,20 @@ void splitTree(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees) {
 
 void Node::addArrayVal(ExpTree* val) {
   if (val->getRoot()->opType == OP_INVALID) return;
-  if (arrayVal.size() == 1 && arrayVal[0]->getRoot()->opType != OP_WHEN) {
-    ExpTree* oldTree = arrayVal[0];
-    arrayVal.clear();
+  if (assignTree.size() == 1 && assignTree[0]->getRoot()->opType != OP_WHEN) {
+    ExpTree* oldTree = assignTree[0];
+    assignTree.clear();
     std::vector<ExpTree*> newTrees;
     splitTree(this, oldTree, newTrees);
-    for (ExpTree* tree : newTrees) arrayVal.push_back(tree);
+    for (ExpTree* tree : newTrees) assignTree.push_back(tree);
   }
   if (val->getRoot()->opType == OP_WHEN) {
-    arrayVal.push_back(val);
+    assignTree.push_back(val);
   } else {
     int newBeg, newEnd;
     std::tie(newBeg, newEnd) = val->getlval()->getIdx(this);
-    if (newBeg < 0 || arrayVal.size() == 0) {
-      arrayVal.push_back(val);
+    if (newBeg < 0 || assignTree.size() == 0) {
+      assignTree.push_back(val);
       return;
     }
     std::vector<ExpTree*> newTrees;
@@ -291,18 +286,18 @@ void Node::addArrayVal(ExpTree* val) {
       int beg, end;
       std::tie(beg, end) = tree->getlval()->getIdx(this);
       int replaceIdx = -1;
-      for (size_t i = 0; i < arrayVal.size(); i ++) {
+      for (size_t i = 0; i < assignTree.size(); i ++) {
         int prevBeg, prevEnd;
-        std::tie(prevBeg, prevEnd) = arrayVal[i]->getlval()->getIdx(this);
+        std::tie(prevBeg, prevEnd) = assignTree[i]->getlval()->getIdx(this);
         if (prevBeg == beg && prevEnd == end) {
           replaceIdx = i;
           break;
         }
       }
       if (replaceIdx >= 0) {
-        arrayVal.erase(arrayVal.begin() + replaceIdx);
+        assignTree.erase(assignTree.begin() + replaceIdx);
       }
-      arrayVal.push_back(tree);
+      assignTree.push_back(tree);
     }
   }
 }

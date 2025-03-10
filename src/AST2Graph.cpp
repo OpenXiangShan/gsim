@@ -1870,13 +1870,6 @@ graph* AST2Graph(PNode* root) {
     reg->getDst()->assignTree.insert(reg->getDst()->assignTree.end(), reg->assignTree.begin(), reg->assignTree.end());
     reg->assignTree.clear();
 
-    for (ExpTree* tree : reg->getSrc()->arrayVal) {
-      if (!tree) continue;
-      Assert(tree->getlval()->nodePtr, "lvalue in %s is not node", reg->name.c_str());
-      tree->getlval()->nodePtr = reg->getDst();
-    }
-    reg->getDst()->arrayVal.insert(reg->getDst()->arrayVal.end(), reg->arrayVal.begin(), reg->arrayVal.end());
-    reg->arrayVal.clear();
     reg->addReset();
     reg->addUpdateTree();
   }
@@ -1916,7 +1909,7 @@ graph* AST2Graph(PNode* root) {
       g->supersrc.push_back(it.second->super);
     }
     if (it.second->isArray()) {
-      for (ExpTree* tree : it.second->arrayVal) {
+      for (ExpTree* tree : it.second->assignTree) {
         if(tree->isConstant()) g->halfConstantArray.insert(it.second);
       }
     }
@@ -2020,11 +2013,6 @@ void removeDummyDim(graph* g) {
     /* array with only one element */
     if (validIndex.size() == 0) {
       node->dimension.clear();
-      for (ExpTree* tree : node->arrayVal) {
-        if (tree->getRoot()->opType != OP_WHEN) node->assignTree.clear();
-        node->assignTree.push_back(tree);
-      }
-      node->arrayVal.clear();
     } else {
       node->dimension = std::vector<int>(validDim);
     }
@@ -2032,7 +2020,6 @@ void removeDummyDim(graph* g) {
   std::set<ENode*> visited;
   for (auto iter : allSignals) {
     Node* node = iter.second;
-    for (ExpTree* tree : node->arrayVal) tree->removeDummyDim(arrayMap, visited);
     for (ExpTree* tree : node->assignTree) tree->removeDummyDim(arrayMap, visited);
   }
   for (Node* mem : g->memory) {
@@ -2082,10 +2069,6 @@ void removeDummyDim(graph* g) {
         for (ExpTree* tree : port->assignTree) {
           writer2Reg(tree);
           regSrc->assignTree.push_back(tree);
-        }
-        for (ExpTree* tree : port->arrayVal) {
-          writer2Reg(tree);
-          regSrc->arrayVal.push_back(tree);
         }
         port->assignTree.clear();
       }

@@ -43,7 +43,6 @@ uint64_t ExpTree::keyHash() {
 uint64_t Node::keyHash() {
   uint64_t ret = 0;
   for (ExpTree* tree : assignTree) ret += tree->keyHash();
-  for (ExpTree* tree : arrayVal) ret += tree->keyHash();
   return ret;
 }
 
@@ -84,12 +83,8 @@ static bool checkTreeEq(ExpTree* tree1, ExpTree* tree2) {
 
 static bool checkNodeEq (Node* node1, Node* node2) {
   if (node1->assignTree.size() != node2->assignTree.size()) return false;
-  if (node1->arrayVal.size() != node2->arrayVal.size()) return false;
   for (size_t i = 0; i < node1->assignTree.size(); i ++) {
     if (!checkTreeEq(node1->assignTree[i], node2->assignTree[i])) return false;
-  }
-  for (size_t i = 0; i < node1->arrayVal.size(); i ++) {
-    if (!checkTreeEq(node1->arrayVal[i], node2->arrayVal[i])) return false;
   }
   return true;
 }
@@ -177,9 +172,6 @@ void graph::commonExpr() {
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == DEAD_NODE) continue;
-      for (ExpTree* tree : member->arrayVal) {
-        if (tree) tree->replace(aliasMap);
-      }
       for (ExpTree* tree : member->assignTree) tree->replace(aliasMap);
       if (member->updateTree) member->updateTree->replace(aliasMap);
       if (member->resetTree) member->resetTree->replace(aliasMap);
