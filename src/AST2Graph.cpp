@@ -964,6 +964,24 @@ void visitMemory(graph* g, PNode* mem) {
 
 }
 
+static Node* allocAddrNode(graph* g, Node* port) {
+  ENode* addr_enode = port->memTree->getRoot()->getChild(0);
+  Node* addr_src = allocNode(NODE_REG_SRC, format("%s%s%s", port->name.c_str(), SEP_AGGR, "ADDR"), port->lineno);
+  g->addReg(addr_src);
+  Node* addr_dst = addr_src->dup();
+  addr_dst->type = NODE_REG_DST;
+  addr_dst->name += format("%s%s", SEP_AGGR, "NEXT");
+  addSignal(addr_src->name, addr_src);
+  addSignal(addr_dst->name, addr_dst);
+  addr_src->bindReg(addr_dst);
+  addr_src->clock = addr_dst->clock = port->clock;
+  addr_src->valTree = new ExpTree(addr_enode, addr_src);
+  ENode* resetCond = allocIntEnode(1, "0");
+  addr_src->resetCond = new ExpTree(resetCond, addr_src);
+  addr_src->resetVal = new ExpTree(new ENode(addr_src), addr_src);
+  return addr_src;
+}
+
 static Node* visitChirrtlPort(graph* g, PNode* port, int width, int depth, bool sign, std::string suffix, Node* node, ENode* addr_enode, Node* clock_node) {
   assert(port->type == P_READ || port->type == P_WRITE || port->type == P_INFER || port->type == P_READWRITER);
   // Add prefix port name
@@ -1005,23 +1023,6 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
   Assert(clock->getExpRoot()->getNode() && !clock->getExpRoot()->getNode()->isArray(), "unsupported clock in lineno %d", port->lineno);
   Node* clock_node = clock->getExpRoot()->getNode();
   std::string memName = prefixName(SEP_MODULE, port->getExtra(0));
-
- if ((port->type == P_READ || port->type == P_READWRITER) && memoryMap[memName].first[0]->rlatency == 1) {
-    Node* addr_src = allocNode(NODE_REG_SRC, format("%s%s%s%s%s", topPrefix().c_str(), SEP_MODULE, port->name.c_str(), SEP_AGGR, "IN"), port->lineno);
-    g->addReg(addr_src);
-    Node* addr_dst = addr_src->dup();
-    addr_dst->type = NODE_REG_DST;
-    addr_dst->name += format("%s%s", SEP_AGGR, "NEXT");
-    addSignal(addr_src->name, addr_src);
-    addSignal(addr_dst->name, addr_dst);
-    addr_src->bindReg(addr_dst);
-    addr_src->clock = addr_dst->clock = clock_node;
-    addr_src->valTree = new ExpTree(addr_enode, addr_src);
-    ENode* resetCond = allocIntEnode(1, "0");
-    addr_src->resetCond = new ExpTree(resetCond, addr_src);
-    addr_src->resetVal = new ExpTree(new ENode(addr_src), addr_src);
-    addr_enode = new ENode(addr_src);
-  }
 
   Assert(memoryMap.find(memName) != memoryMap.end(), "Could not find memory: %s", memName.c_str());
   std::vector<Node*> memoryMembers;
@@ -1837,6 +1838,10 @@ graph* AST2Graph(PNode* root) {
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     Node* node = it->second;
     if (node->type == NODE_INFER || node->type == NODE_READER) {
+      if (node->parent->rlatency == 1) {
+        Node* addrReg = allocAddrNode(g, node);
+        node->memTree->getRoot()->setChild(0, new ENode(addrReg));
+      }
       node->memTree->getRoot()->opType = OP_READ_MEM;
       node->valTree = node->memTree;
       node->set_reader();
@@ -1846,6 +1851,10 @@ graph* AST2Graph(PNode* root) {
       node->valTree = nullptr;
     }
     if (node->type == NODE_READWRITER) {
+      if (node->parent->rlatency == 1) {
+        Node* addrReg = allocAddrNode(g, node);
+        node->memTree->getRoot()->setChild(0, new ENode(addrReg));
+      }
       if (node->parent->extraInfo == "old") {
         node->assignTree.insert(node->assignTree.begin(), node->memTree);
       } else {
