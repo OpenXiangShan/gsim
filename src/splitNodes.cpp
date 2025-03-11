@@ -673,9 +673,7 @@ ENode* constructRootFromComponent(NodeComponent* comp) {
       else if (hiBit < element->hi) mpz_tdiv_q_2exp(realVal, element->val, element->hi - hiBit);
       else mpz_set(realVal, element->val);
 
-      enode = new ENode(OP_INT);
-      enode->strVal = mpz_get_str(nullptr, 10, realVal);
-      enode->width = hiBit + 1;
+      enode = allocIntEnode(hiBit + 1, mpz_get_str(nullptr, 10, realVal));
 
     }
     if (newRoot) {

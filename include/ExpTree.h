@@ -457,4 +457,6 @@ public:
   }
 };
 
+ENode* allocIntEnode(int width, std::string val);
+
 #endif

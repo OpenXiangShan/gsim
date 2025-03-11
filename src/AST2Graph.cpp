@@ -644,9 +644,7 @@ void visitRegDef(graph* g, PNode* reg, PNodeType type) {
     if (type == P_REG_RESET_DEF) continue;
 
     // Fake reset
-    auto* cond = new ENode(OP_INT);
-    cond->width = 1;
-    cond->strVal = "0";
+    ENode* cond = allocIntEnode(1, "0");
 
     src->resetCond = new ExpTree(cond, src);
     src->resetVal = new ExpTree(new ENode(src), src);
@@ -1019,9 +1017,7 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
     addr_src->bindReg(addr_dst);
     addr_src->clock = addr_dst->clock = clock_node;
     addr_src->valTree = new ExpTree(addr_enode, addr_src);
-    ENode* resetCond = new ENode(OP_INT);
-    resetCond->width = 1;
-    resetCond->strVal = "h0";
+    ENode* resetCond = allocIntEnode(1, "0");
     addr_src->resetCond = new ExpTree(resetCond, addr_src);
     addr_src->resetVal = new ExpTree(new ENode(addr_src), addr_src);
     addr_enode = new ENode(addr_src);
@@ -1986,9 +1982,7 @@ void ExpTree::removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::s
 }
 
 void setZeroTree(Node* node) {
-  ENode* zero = new ENode(OP_INT);
-  zero->strVal = "h0";
-  zero->width = 1;
+  ENode* zero = allocIntEnode(1, "0");
   node->assignTree.clear();
   node->assignTree.push_back(new ExpTree(zero, node));
 }
@@ -2054,9 +2048,7 @@ void removeDummyDim(graph* g) {
     addSignal(regSrc->name, regSrc);
     addSignal(regDst->name, regDst);
     regSrc->clock = regDst->clock = clock;
-    ENode* resetCond = new ENode(OP_INT);
-    resetCond->width = 1;
-    resetCond->strVal = "h0";
+    ENode* resetCond = allocIntEnode(1, "0");
     regSrc->resetCond = new ExpTree(resetCond, regSrc);
     regSrc->resetVal = new ExpTree(new ENode(regSrc), regSrc);
     /* update all ports */

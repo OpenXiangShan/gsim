@@ -1226,10 +1226,8 @@ void graph::constantAnalysis() {
     for (Node* member : super->member) {
       if (member->status == CONSTANT_NODE) {
         member->assignTree.clear();
-        ENode* enode = new ENode(OP_INT);
+        ENode* enode = allocIntEnode(member->width, mpz_get_str(NULL, 10, member->computeInfo->consVal));
         enode->computeInfo = member->computeInfo;
-        enode->width = member->width;
-        enode->strVal = mpz_get_str(NULL, 10, member->computeInfo->consVal);
         member->assignTree.push_back(new ExpTree(enode, member));
         if (member->type == NODE_SPECIAL) { // set to NODE_OTHERS to enable removeDeadNode
           member->type = NODE_OTHERS;

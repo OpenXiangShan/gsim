@@ -136,9 +136,7 @@ Node* Node::clockAlias() {
 }
 
 void Node::setConstantZero(int w) {
-  ENode* enode = new ENode(OP_INT);
-  enode->width = w;
-  enode->strVal = "0";
+  ENode* enode = allocIntEnode(w, "0");
   assignTree.clear();
   assignTree.push_back(new ExpTree(enode, this));
 }

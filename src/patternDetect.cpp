@@ -33,9 +33,7 @@ bool checkPatern1(Node* node) {
       ret = false;
       continue;
     }
-    ENode* intENode = new ENode(OP_INT);
-    intENode->strVal = std::to_string(next->assignTree[0]->getRoot()->values[0]);
-    intENode->width = shiftENode->width;
+    ENode* intENode = allocIntEnode(shiftENode->width, std::to_string(next->assignTree[0]->getRoot()->values[0]));
     ENode* eq = new ENode(OP_EQ);
     eq->width = 1;
     eq->addChild(shiftENode->dup());
