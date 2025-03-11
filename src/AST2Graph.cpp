@@ -1006,7 +1006,7 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
   Node* clock_node = clock->getExpRoot()->getNode();
   std::string memName = prefixName(SEP_MODULE, port->getExtra(0));
 
- if (port->type == P_READ && memoryMap[memName].first[0]->rlatency == 1) {
+ if ((port->type == P_READ || port->type == P_READWRITER) && memoryMap[memName].first[0]->rlatency == 1) {
     Node* addr_src = allocNode(NODE_REG_SRC, format("%s%s%s%s%s", topPrefix().c_str(), SEP_MODULE, port->name.c_str(), SEP_AGGR, "IN"), port->lineno);
     g->addReg(addr_src);
     Node* addr_dst = addr_src->dup();
