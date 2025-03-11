@@ -1430,7 +1430,7 @@ void whenConnect(graph* g, Node* node, ENode* lvalue, ENode* rvalue, PNode* conn
   }
   ExpTree* valTree = nullptr;
   ENode* whenNode;
-  size_t connectDepth = (node->type == NODE_WRITER || node->type == NODE_INFER) ? 0 :node->whenDepth;
+  size_t connectDepth = (node->type == NODE_WRITER || node->type == NODE_INFER || node->type == NODE_READWRITER) ? 0 : node->whenDepth;
   if (node->isArray()) {
     std::tie(valTree, whenNode) = growWhenTrace(nullptr, connectDepth);
   } else {
