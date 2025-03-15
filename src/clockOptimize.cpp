@@ -1,5 +1,6 @@
 #include "common.h"
 #include <map>
+#include <stack>
 
 class clockVal {
 public:
@@ -148,6 +149,25 @@ void Node::setConstantInfoZero(int w) {
   status = CONSTANT_NODE;
 }
 
+bool ExpTree::isReadTree() {
+  std::stack<ENode*> s;
+  s.push(getRoot());
+  bool isRead = false;
+  while (!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    if (top->opType == OP_READ_MEM) {
+      isRead = true;
+      break;
+    } else {
+      for (size_t i = 0; i < top->getChildNum(); i ++) {
+        if (top->getChild(i)) s.push(top->getChild(i));
+      }
+    }
+  }
+  return isRead;
+}
+
 /* clock alias & clock constant analysis */
 void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
   for (auto iter : allSignals) {
@@ -208,7 +228,7 @@ void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
       if (val) {
         Assert(!val->gateENode || val->node, "invalid clock %s %d", node->clock->name.c_str(), node->clock->lineno);
         if (val->gateENode) {
-          if (node->type == NODE_WRITER) {
+          if (node->type == NODE_WRITER || node->type == NODE_READWRITER) {
             ENode* gate = new ENode(OP_WHEN);
             gate->width = node->width;
             gate->sign = node->sign;
@@ -217,6 +237,7 @@ void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
             gate->addChild(nullptr);
             gate->addChild(nullptr);
             for (ExpTree* tree : node->assignTree) {
+              if (tree->isReadTree()) continue;
               ENode* gateDup = gate->dup();
               gateDup->setChild(1, tree->getRoot());
               tree->setRoot(gateDup);
