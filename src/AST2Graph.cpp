@@ -183,6 +183,7 @@ TypeInfo* visitFields(graph* g, PNode* fields, NodeType parentType) {
     if (!fieldInfo->isAggr()) { // The type of field is ground
       Node* fieldNode = allocNode(curType, prefixName(SEP_AGGR, field->name), fields->lineno);
       fieldNode->updateInfo(fieldInfo);
+      fieldNode->inAggr = true;
       info->add(fieldNode, field->type == P_FLIP_FIELD);
     } else { // The type of field is aggregate
       info->mergeInto(fieldInfo);
@@ -1941,6 +1942,13 @@ bool ExpTree::isConstant() {
 
 bool nameExist(std::string str) {
   return allSignals.find(str) != allSignals.end();
+}
+
+void changeName(std::string oldName, std::string newName) {
+  Assert(allSignals.find(oldName) != allSignals.end(), "signal %s not found", oldName.c_str());
+  allSignals[oldName]->name = newName;
+  allSignals[newName] = allSignals[oldName];
+  allSignals.erase(oldName);
 }
 
 void writer2Reg(ExpTree* tree) {

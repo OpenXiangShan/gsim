@@ -8,6 +8,8 @@
 #include <utility>
 
 bool nextVarConnect(Node* node);
+bool nameExist(std::string str);
+void changeName(std::string oldName, std::string newName);
 
 static std::set<Node*> fullyVisited;
 static std::set<Node*> partialVisited;
@@ -510,7 +512,12 @@ Node* Node::arrayMemberNode(int idx) {
   std::string memberName = name;
   size_t i;
   for (i = 0; i < index.size(); i ++) {
-    memberName += "__" + std::to_string(index[i]);
+    if (inAggr) memberName += "__" + std::to_string(index[i]);
+    else memberName += "_" + std::to_string(index[i]);
+  }
+
+  if (nameExist(memberName)) {
+    changeName(memberName, memberName + "_0");
   }
 
   Node* member = new Node(type);

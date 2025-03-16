@@ -150,6 +150,7 @@ class Node {
   ResetType reset = UNCERTAIN;
   AsReset asReset = EMPTY;
   bool isArrayMember = false;
+  bool inAggr = false;
 /* used for visitWhen in AST2Graph */
 
   size_t whenDepth = 0;
