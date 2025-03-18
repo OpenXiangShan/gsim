@@ -1856,10 +1856,11 @@ graph* AST2Graph(PNode* root) {
         Node* addrReg = allocAddrNode(g, node);
         node->memTree->getRoot()->setChild(0, new ENode(addrReg));
       }
-      if (node->parent->extraInfo == "old") {
-        node->assignTree.insert(node->assignTree.begin(), node->memTree);
-      } else {
+
+      if (node->parent->extraInfo == "new") {
         node->assignTree.push_back(node->memTree);
+      } else {
+        node->assignTree.insert(node->assignTree.begin(), node->memTree);
       }
     }
   }
