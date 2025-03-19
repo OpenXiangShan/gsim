@@ -51,11 +51,19 @@ void Node::updateConnect() {
 }
 
 void Node::updateDep(){
-  Node* dst = getDst();
-  for (Node* nextNode : next) {
-    if (nextNode == dst) continue;
-    nextNode->depNext.insert(dst);
-    dst->depPrev.insert(nextNode);
+  if (regSplit && regUpdate) {
+    Node* update = regUpdate;
+    for (Node* nextNode : next) {
+      nextNode->depNext.insert(update);
+      update->depPrev.insert(nextNode);
+    }
+  } else {
+    Node* dst = getDst();
+    for (Node* nextNode : next) {
+      if (nextNode == dst) continue;
+      nextNode->depNext.insert(dst);
+      dst->depPrev.insert(nextNode);
+    }
   }
 }
 
@@ -225,6 +233,12 @@ void Node::updateActivate() {
   }
   if (type == NODE_REG_DST && !regSplit) {
     for (Node* nextNode : getSrc()->next) {
+      if (nextNode->super->cppId != -1)
+        nextActiveId.insert(nextNode->super->cppId);
+    }
+  }
+  if (type == NODE_REG_UPDATE) {
+    for (Node* nextNode : regNext->next) {
       if (nextNode->super->cppId != -1)
         nextActiveId.insert(nextNode->super->cppId);
     }
