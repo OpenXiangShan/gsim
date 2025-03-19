@@ -24,6 +24,8 @@ Config::Config() {
   OutputDir = ".";
   SuperNodeMaxSize = 35;
   cppMaxSizeKB = -1;
+  sep_module = "$";
+  sep_aggr = "$$";
 }
 Config globalConfig;
 
@@ -48,6 +50,8 @@ static void printUsage(const char* ProgName) {
             << "      --dir=[dir]                  Specify the output directory.\n"
             << "      --supernode-max-size=[num]   Specify the maximum size of a superNode.\n"
             << "      --cpp-max-size-KB=[num]      Specify the maximum size (approximate) of a generated C++ file.\n"
+            << "      --sep-mod=[str]              Specify the seperator for submodule (default: $).\n"
+            << "      --sep-aggr=[str]             Specify the seperator for aggregate member (default: $$).\n"
             ;
 }
 
@@ -63,6 +67,8 @@ static char* parseCommandLine(int argc, char** argv) {
       {"dir", required_argument, nullptr, 0},
       {"supernode-max-size", required_argument, nullptr, 0},
       {"cpp-max-size-KB", required_argument, nullptr, 0},
+      {"sep-mod", required_argument, nullptr, 0},
+      {"sep-aggr", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -75,6 +81,8 @@ static char* parseCommandLine(int argc, char** argv) {
                 case 2: globalConfig.OutputDir = optarg; break;
                 case 3: sscanf(optarg, "%d", &globalConfig.SuperNodeMaxSize); break;
                 case 4: sscanf(optarg, "%d", &globalConfig.cppMaxSizeKB); break;
+                case 5: globalConfig.sep_module = optarg; break;
+                case 6: globalConfig.sep_aggr = optarg; break;
                 case 0:
                 default: printUsage(argv[0]); exit(EXIT_SUCCESS);
               }
