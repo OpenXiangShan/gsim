@@ -95,10 +95,10 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
         splittedNode->getDst()->assignTree.push_back(newTree);
       }
       splittedNode->getDst()->order = node->getDst()->order - 1;
-      splittedNode->getDst()->next.insert(node->getDst());
+      splittedNode->getDst()->addNext(node->getDst());
     }
     splittedNode->order = node->order - 1;
-    splittedNode->next.insert(node);
+    splittedNode->addNext(node);
     lo = hi + 1;
   }
   for (Node* n : splittedNodesSet[node]) n->updateConnect();
@@ -869,8 +869,7 @@ void graph::splitNodes() {
 /* update connection */
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
-      member->prev.clear();
-      member->next.clear();
+      member->clear_relation();
     }
   }
 

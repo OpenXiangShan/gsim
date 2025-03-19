@@ -3,8 +3,7 @@
 void graph::reconnectAll() {
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
-      member->prev.clear();
-      member->next.clear();
+      member->clear_relation();
     }
   }
 
@@ -13,13 +12,21 @@ void graph::reconnectAll() {
       member->updateConnect();
     }
   }
+  connectDep();
   reconnectSuper();
+}
+
+void graph::connectDep() {
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->type == NODE_REG_SRC) member->updateDep();
+    }
+  }
 }
 
 void graph::reconnectSuper() {
   for (SuperNode* super : sortedSuper) {
-    super->prev.clear();
-    super->next.clear();
+    super->clear_relation();
   }
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) member->constructSuperConnect();

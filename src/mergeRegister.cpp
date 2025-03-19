@@ -149,7 +149,7 @@ void graph::constructRegs() {
         sortedSuper.push_back(nodeUpdate->super);
         dstSuper2updateSuper[dstSuper] = nodeUpdate->super;
       }
-      nodeUpdate->next.insert(node->next.begin(), node->next.end());
+      nodeUpdate->addNext(node->next);
       nodeUpdate->isArrayMember = node->isArrayMember;
       nodeUpdate->updateConnect();
     } else {
@@ -161,7 +161,7 @@ void graph::constructRegs() {
         node->getDst()->assignTree[0] = node->updateTree;
         node->getDst()->assignTree[0]->removeSelfAssignMent(node);
       }
-      node->next.erase(node->getDst());
+      node->eraseNext(node->getDst());
       node->getDst()->updateConnect();
       node->getDst()->status = VALID_NODE;
       node->getDst()->computeInfo = nullptr;

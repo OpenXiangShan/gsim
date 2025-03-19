@@ -340,12 +340,11 @@ void graph::splitArrayNode(Node* node) {
   splittedArray.insert(node);
   node->status = DEAD_NODE;
   /* remove prev connection */
-  for (Node* prev : node->prev) prev->next.erase(node);
-  for (SuperNode* super : node->super->prev) super->next.erase(node->super);
-  for (Node* next : node->next) next->prev.erase(node);
-  for (SuperNode* super : node->super->next) super->prev.erase(node->super);
-  node->super->prev.clear();
-  node->super->next.clear();
+  for (Node* prev : node->prev) prev->eraseNext(node);
+  for (SuperNode* super : node->super->prev) super->eraseNext(node->super);
+  for (Node* next : node->next) next->erasePrev(node);
+  for (SuperNode* super : node->super->next) super->erasePrev(node->super);
+  node->super->clear_relation();
 
   for (Node* memberInSuper : node->super->member) {
     if (memberInSuper != node)
@@ -394,7 +393,7 @@ void graph::splitArrayNode(Node* node) {
   for (Node* next : node->next) {
     checkNodes.insert(next);
     if (next != node) {
-      next->prev.clear();
+      next->clearPrev();
     }
   }
   for (Node* n : checkNodes) {
@@ -408,8 +407,7 @@ void graph::splitArrayNode(Node* node) {
   }
 
   /* clear node connection */
-  node->prev.clear();
-  node->next.clear();
+  node->clear_relation();
 
   for (Node* member : node->arrayMember) member->constructSuperConnect();
   for (Node* member : node->arrayMember) {
@@ -619,6 +617,7 @@ void graph::splitOptionalArray() {
       for (size_t i = 0; i < arrayNode->arrayMember.size(); i ++) {
         regsrc.push_back(arrayNode->arrayMember[i]);
         arrayNode->arrayMember[i]->bindReg(arrayNode->getDst()->arrayMember[i]);
+        arrayNode->arrayMember[i]->updateDep();
       }
     }
     num ++;

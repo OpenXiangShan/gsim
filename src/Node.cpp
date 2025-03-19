@@ -19,8 +19,8 @@ void Node::updateConnect() {
       if (prevNode->isArray() && prevNode->arraySplitted()) {
         ArrayMemberList* list = top->getArrayMember(prevNode);
         for (Node* arrayMember : list->member) {
-          prev.insert(arrayMember);
-          arrayMember->next.insert(this);
+          addPrev(arrayMember);
+          arrayMember->addNext(this);
         }
       } else {
         prev.insert(prevNode);
@@ -35,18 +35,27 @@ void Node::updateConnect() {
     Node* memory = parent;
     for (Node* port : memory->member) {
       if (port->type == NODE_WRITER) {
-        next.insert(port);
-        port->prev.insert(this);
+        addNext(port);
+        port->addPrev(this);
       }
     }
   } else if (type == NODE_WRITER) {
     Node* memory = parent;
     for (Node* port : memory->member) {
       if (port->type == NODE_READER) {
-        prev.insert(port);
-        port->next.insert(this);
+        addPrev(port);
+        port->addNext(this);
       }
     }
+  }
+}
+
+void Node::updateDep(){
+  Node* dst = getDst();
+  for (Node* nextNode : next) {
+    if (nextNode == dst) continue;
+    nextNode->depNext.insert(dst);
+    dst->depPrev.insert(nextNode);
   }
 }
 
@@ -114,12 +123,12 @@ void Node::constructSuperConnect() {
   for (Node* n : prev) {
     Assert(n->super, "empty super for prev %s", n->name.c_str());
     if (n->super == this->super) continue;
-    super->add_prev(n->super);
+    super->connectPrev(n->super);
   }
   for (Node* n : next) {
     Assert(n->super, "empty super for next %s", n->name.c_str());
     if (n->super == this->super) continue;
-    super->add_next(n->super);
+    super->connectNext(n->super);
   }
 }
 
@@ -300,4 +309,46 @@ void Node::addArrayVal(ExpTree* val) {
       assignTree.push_back(tree);
     }
   }
+}
+
+void Node::clear_relation() {
+  prev.clear();
+  next.clear();
+  depPrev.clear();
+  depNext.clear();
+}
+
+void Node::addPrev(Node* node) {
+  prev.insert(node);
+  depPrev.insert(node);
+}
+
+void Node::addPrev(std::set<Node*>& node) {
+  prev.insert(node.begin(), node.end());
+  depPrev.insert(node.begin(), node.end());
+}
+
+void Node::erasePrev(Node* node) {
+  prev.erase(node);
+  depPrev.erase(node);
+}
+
+void Node::addNext(Node* node) {
+  next.insert(node);
+  depNext.insert(node);
+}
+
+void Node::eraseNext(Node* node) {
+  next.erase(node);
+  depNext.erase(node);
+}
+
+void Node::addNext(std::set<Node*>& node) {
+  next.insert(node.begin(), node.end());
+  depNext.insert(node.begin(), node.end());
+}
+
+void Node::clearPrev() {
+  prev.clear();
+  depPrev.clear();
 }

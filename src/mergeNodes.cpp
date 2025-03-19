@@ -14,7 +14,7 @@ bool anyPath(SuperNode* src, SuperNode* dst) {
   std::stack<SuperNode*> s;
   std::set<SuperNode*> visited;
   visited.insert(src);
-  for (SuperNode* prev : src->prev) {
+  for (SuperNode* prev : src->depPrev) {
     s.push(prev);
     visited.insert(prev);
   }
@@ -22,7 +22,7 @@ bool anyPath(SuperNode* src, SuperNode* dst) {
     SuperNode* top = s.top();
     s.pop();
     if (top == dst) return true;
-    for (SuperNode* prev : top->prev) {
+    for (SuperNode* prev : top->depPrev) {
       if (visited.find(prev) == visited.end()) {
         visited.insert(prev);
         s.push(prev);
@@ -54,31 +54,19 @@ void graph::mergeWhenNodes() {
       member->super = whenSuper;
       super->member.clear();
       /* update super connection */
-      whenSuper->next.insert(super->next.begin(), super->next.end());
+      whenSuper->addNext(super->next);
       for (SuperNode* next : super->next) {
-        next->prev.erase(super);
-        next->prev.insert(whenSuper);
+        next->erasePrev(super);
+        next->addPrev(whenSuper);
       }
-      whenSuper->prev.insert(super->prev.begin(), super->prev.end());
+      whenSuper->addPrev(super->prev);
       for (SuperNode* prev : super->prev) {
-        prev->next.erase(super);
-        prev->next.insert(whenSuper);
+        prev->eraseNext(super);
+        prev->addNext(whenSuper);
       }
     }
   }
-  /* construct special expTree and node */
-  for (auto iter : whenMap) {
-    SuperNode* whenSuper = iter.second;
-    if (whenSuper->member.size() <= 1) continue;
-    StmtTree* stmtTree = new StmtTree();
-    stmtTree->root = new StmtNode(OP_STMT_SEQ);
-    for (Node* member : whenSuper->member) {
-      for (ExpTree* tree : member->assignTree) {
-        stmtTree->mergeExpTree(tree);
-      }
-    }
-    whenSuper->stmtTree = stmtTree;
-  }
+
   size_t prevSuper = sortedSuper.size();
   removeEmptySuper();
   reconnectSuper();
@@ -173,11 +161,11 @@ void graph::mergeOut1() {
 
       nextSuper->member.insert(nextSuper->member.begin(), super->member.begin(), super->member.end());
       /* update connection */
-      nextSuper->prev.erase(super);
-      nextSuper->prev.insert(super->prev.begin(), super->prev.end());
+      nextSuper->erasePrev(super);
+      nextSuper->addPrev(super->prev);
       for (SuperNode* prevSuper : super->prev) {
-        prevSuper->next.erase(super);
-        prevSuper->next.insert(nextSuper);
+        prevSuper->eraseNext(super);
+        prevSuper->addNext(nextSuper);
       }
       super->member.clear();
     }
@@ -201,8 +189,8 @@ void graph::mergeIn1() {
       Assert(prevSuper->member.size() != 0, "empty prevSuper %d", prevSuper->id);
       prevSuper->member.insert(prevSuper->member.end(), super->member.begin(), super->member.end());
       /* update connection */
-      prevSuper->next.erase(super);
-      prevSuper->next.insert(super->next.begin(), super->next.end());
+      prevSuper->eraseNext(super);
+      prevSuper->addNext(super->next);
       for (SuperNode* nextSuper : super->next) {
         nextSuper->prev.erase(super);
         nextSuper->prev.insert(prevSuper);

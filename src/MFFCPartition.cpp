@@ -170,17 +170,16 @@ void graph::mergeEssentSmallSubling(size_t maxSize, double sim) {
       super->member.clear();
       /* update connect */
       for (SuperNode* prev : super->prev) {
-        prev->next.erase(super);
-        prev->next.insert(select);
-        select->prev.insert(prev);
+        prev->eraseNext(super);
+        prev->addNext(select);
+        select->addPrev(prev);
       }
       for (SuperNode* next : super->next) {
-        next->prev.erase(super);
-        next->prev.insert(select);
-        select->next.insert(next);
+        next->erasePrev(super);
+        next->addPrev(select);
+        select->addNext(next);
       }
-      super->prev.clear();
-      super->next.clear();
+      super->clear_relation();
     }
 
   }

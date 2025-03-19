@@ -174,7 +174,9 @@ int main(int argc, char** argv) {
   FUNC_WRAPPER(g->mergeRegister(), "MergeRegister");
 
   FUNC_WRAPPER(g->constructRegs(), "ConstructRegs");
- 
+
+  FUNC_TIMER(g->generateStmtTree());
+
   FUNC_TIMER(g->instsGenerator());
 
   FUNC_WRAPPER(g->cppEmitter(), "Final");

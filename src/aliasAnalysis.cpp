@@ -145,20 +145,8 @@ void graph::aliasAnalysis() {
       }
     }
   }
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      member->prev.clear();
-      member->next.clear();
-    }
-  }
   removeNodesNoConnect(DEAD_NODE);
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      member->updateConnect();
-    }
-  }
-  removeNodes(DEAD_NODE);
-
+  reconnectAll();
   printf("[aliasAnalysis] remove %ld alias (%ld -> %ld)\n", aliasNum, totalNodes, totalNodes - aliasNum);
   printf("[aliasAnalysis] remove %ld superNodes (%ld -> %ld)\n", totalSuper - sortedSuper.size(), totalSuper, sortedSuper.size());
 

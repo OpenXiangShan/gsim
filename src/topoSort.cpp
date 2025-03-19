@@ -25,15 +25,15 @@ void graph::topoSort() {
     sortedSuper.push_back(top);
 #ifdef ORDERED_TOPO_SORT
     std::vector<SuperNode*> sortedNext;
-    sortedNext.insert(sortedNext.end(), top->next.begin(), top->next.end());
+    sortedNext.insert(sortedNext.end(), top->depNext.begin(), top->depNext.end());
     std::sort(sortedNext.begin(), sortedNext.end(), [](SuperNode* a, SuperNode* b) {return a->id < b->id;});
     for (SuperNode* next : sortedNext) {
 #else
-    for (SuperNode* next : top->next) {
+    for (SuperNode* next : top->depNext) {
 #endif
       if (times.find(next) == times.end()) times[next] = 0;
       times[next] ++;
-      if (times[next] == (int)next->prev.size()) {
+      if (times[next] == (int)next->depPrev.size()) {
         if (dstNode.find(next) != dstNode.end()) potentialRegs.push_back(next);
         else s.push(next);
       }

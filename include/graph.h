@@ -35,6 +35,7 @@ class graph {
   void genResetAll();
   void genReset(SuperNode* super, bool isUIntReset);
   void genResetDecl(FILE* fp);
+  void genSuperEval(SuperNode* super, std::string flagName);
   std::string saveOldVal(Node* node);
   void removeNodesNoConnect(NodeStatus status);
   void reconnectSuper();
@@ -113,6 +114,8 @@ class graph {
   void inferAllWidth();
   void dump(std::string FileName);
   void depthPerf();
+  void generateStmtTree();
+  void connectDep();
 };
 
 #endif
