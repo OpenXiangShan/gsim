@@ -356,7 +356,7 @@ void graph::generateStmtTree() {
           ENode* lvalue = tree->getlval()->dup();
           lvalue->nodePtr = node->getDst();
           ExpTree* dstTree = new ExpTree(tree->getRoot(), lvalue);
-          super->stmtTree->mergeExpTree(dstTree, prevPath, nodePath, node);
+          super->stmtTree->mergeExpTree(dstTree, prevPath, nodePath, nullptr);
         }
       }
       allPath[node] = nodePath;
