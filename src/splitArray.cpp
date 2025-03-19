@@ -14,43 +14,6 @@ void changeName(std::string oldName, std::string newName);
 static std::set<Node*> fullyVisited;
 static std::set<Node*> partialVisited;
 
-void partialDfs(std::set<Node*>&loop) {
-  enum nodeState{NOT_VISIT = 0, EXPANDED, VISITED};
-  std::map<Node*, nodeState> state;
-  for (Node* node : partialVisited) {
-    state[node] = NOT_VISIT;
-  }
-  std::stack<Node*>s;
-  for (Node* node : partialVisited) {
-    if (state[node] == VISITED) continue;
-    s.push(node);
-    while (!s.empty()) {
-      Node* top = s.top();
-      if (state[top] == NOT_VISIT) {
-        state[top] = EXPANDED;
-        for (Node* next : top->next) {
-          if (partialVisited.find(next) == partialVisited.end()) continue;
-          if (next == top) Panic();
-          if (state[next] == NOT_VISIT) s.push(next);
-          else if (state[next] == EXPANDED) {
-            while(!s.empty()) {
-              Node* nodeInLoop = s.top();
-              s.pop();
-              if (state[nodeInLoop] == EXPANDED) loop.insert(nodeInLoop);
-              if (nodeInLoop == next) break;
-            }
-            return;
-          }
-        }
-      } else if (state[top] == EXPANDED) {
-        state[top] = VISITED;
-        s.pop();
-      }
-
-    }
-  }
-}
-
 ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index, Node* node) {
   ENode* lvalue = tree->getlval()->dup();
   for (int idx : index) {
