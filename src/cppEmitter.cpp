@@ -684,35 +684,35 @@ void graph::genNodeStepEnd(SuperNode* node) {
   if(!isAlwaysActive(node->cppId)) emitBodyLock("}\n");
 }
 
-void replaceAssignBeg(SuperNode* super, Node* n, std::string str) {
+void replaceAssignBeg(std::string& inst, Node* n, std::string str) {
   size_t pos;
-  while ((pos = super->inst.find(ASSIGN_BEG(n))) != std::string::npos) {
-    super->inst.replace(pos, ASSIGN_BEG(n).length(), str);
+  while ((pos = inst.find(ASSIGN_BEG(n))) != std::string::npos) {
+    inst.replace(pos, ASSIGN_BEG(n).length(), str);
   }
 }
 
-void replaceAssignEnd(SuperNode* super, Node* n, std::string str) {
+void replaceAssignEnd(std::string& inst, Node* n, std::string str) {
   size_t pos;
-  while ((pos = super->inst.find(ASSIGN_END(n))) != std::string::npos) {
-    super->inst.replace(pos, ASSIGN_END(n).length(), str);
+  while ((pos = inst.find(ASSIGN_END(n))) != std::string::npos) {
+    inst.replace(pos, ASSIGN_END(n).length(), str)
   }
 }
 
-void saveAssignBeg(SuperNode* super, Node* n) {
+void saveAssignBeg(std::string& inst, Node* n) {
   if (n->needActivate() && !n->isArray() && n->type != NODE_WRITER) {
     std::string saveStr = format("%s %s = %s;\n", widthUType(n->width).c_str(), oldName(n).c_str(), n->name.c_str());
-    replaceAssignBeg(super, n, saveStr);
+    replaceAssignBeg(inst, n, saveStr);
   } else {
-    replaceAssignBeg(super, n, "");
+    replaceAssignBeg(inst, n, "");
   }
 }
 
-void activateAssignEnd(SuperNode* super, Node* n, std::string flagName) {
+void activateAssignEnd(std::string& inst, Node* n, std::string flagName) {
   std::string activateStr;
   if (!n->needActivate()) ;
   else if(!n->isArray() && n->type != NODE_WRITER) activateStr = activateNextStr(n, n->nextNeedActivate, oldName(n), true, flagName);
   else activateStr = activateUncondNextStr(n, n->nextNeedActivate, true, flagName);
-  replaceAssignEnd(super, n, activateStr);
+  replaceAssignEnd(inst, n, activateStr);
 }
 
 void graph::genSuperEval(SuperNode* super, std::string flagName) {
@@ -730,14 +730,15 @@ void graph::genSuperEval(SuperNode* super, std::string flagName) {
       else activateNext(super->member[i], super->member[i]->nextActiveId, oldName(super->member[i]), false, flagName);
     }
   } else {
+    std::string inst = super->inst;
     for (Node* n : super->member) {
       size_t pos;
-      if ((pos = super->inst.find(ASSIGN_BEG(n))) != std::string::npos) { // any assignment
+      if ((pos = inst.find(ASSIGN_BEG(n))) != std::string::npos) { // any assignment
         if (n->status == VALID_NODE && n->type == NODE_OTHERS && !n->anyNextActive() && !n->isArray()) {
           emitBodyLock("%s %s;\n", widthUType(n->width).c_str(), n->name.c_str());
           /* remove assignIndi */
-          replaceAssignBeg(super, n, "");
-          replaceAssignEnd(super, n, "");
+          replaceAssignBeg(inst, n, "");
+          replaceAssignEnd(inst, n, "");
         } else {
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
         if (n->type == NODE_REG_SRC) {
@@ -754,12 +755,12 @@ void graph::genSuperEval(SuperNode* super, std::string flagName) {
           } else emitBodyLock("%s$prev = %s;\n", n->name.c_str(), n->name.c_str());
         }
 #endif
-          saveAssignBeg(super, n);
-          activateAssignEnd(super, n, flagName);
+          saveAssignBeg(inst, n);
+          activateAssignEnd(inst, n, flagName);
         }
       }
     }
-    emitBodyLock("%s\n", super->inst.c_str());
+    emitBodyLock("%s\n", inst.c_str());
     for (Node* n : super->member) nodeDisplay(n);
   }
 }
@@ -838,7 +839,12 @@ void graph::genReset(SuperNode* super, bool isUIntReset) {
       }
     }
   } else {
-    resetFuncStr += super->inst;
+    std::string inst = super->inst;
+    for (Node* n : super->member) {
+      replaceAssignBeg(inst, n, "");
+      replaceAssignEnd(inst, n, "");
+    }
+    resetFuncStr += inst;
    }
   resetFuncStr += "}\n";
   resetFuncs.push_back(resetFuncStr);
