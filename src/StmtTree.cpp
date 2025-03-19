@@ -158,10 +158,15 @@ void prevOrderPath(Node* node, std::vector<int>& prevPath, std::map<Node*, std::
   }
 }
 
-void getCommonPath(std::vector<int>& path1, std::vector<int>& path2) { // TODO: enode must match
-  int commonNum = 0;
-  for (; commonNum < MIN(path1.size(), path2.size()); commonNum ++) {
+void getCommonPath(std::vector<int>& path1, ExpTree* referTree, std::vector<int>& path2, ExpTree* newTree) {
+  int commonNum = 1;
+  ENode* referRoot = referTree->getRoot();
+  ENode* newRoot = newTree->getRoot();
+  for (; commonNum < MIN(path1.size(), path2.size()) && referRoot->opType == OP_WHEN && newRoot->opType == OP_WHEN; commonNum ++) {
     if (path1[commonNum] != path2[commonNum]) break;
+    if (!checkENodeEq(referRoot->getChild(0), newRoot->getChild(0))) break;
+    referRoot = referRoot->getChild(path1[commonNum]);
+    newRoot = newRoot->getChild(path2[commonNum]);
   }
   path1.resize(commonNum);
 }
@@ -188,7 +193,7 @@ void getRelyPath(std::vector<int>&path, Node* node, ExpTree* tree) { // get the 
           path = currentPath;
           isFirst = false;
         } else {
-          getCommonPath(path, currentPath);
+          getCommonPath(path, tree, currentPath, tree);
         }
         enodeStatus[top] = VISITED;
         s.pop();
@@ -256,6 +261,7 @@ void growWhenPathFromNext(Node* node) {
   std::set<ExpTree*> usedTrees;
   std::vector<int> path;
   bool isFirst = true;
+  ExpTree* referTree = nullptr;
   for (Node* next : node->next) {
     for (ExpTree* tree : next->assignTree) {
       std::vector<int> currentPath;
@@ -265,7 +271,8 @@ void growWhenPathFromNext(Node* node) {
         if (isFirst) {
           path = currentPath;
           isFirst = false;
-        } else getCommonPath(path, currentPath);
+          referTree = tree;
+        } else getCommonPath(path, referTree, currentPath, tree);
       }
     }
   }
