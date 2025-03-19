@@ -129,6 +129,7 @@ std::string arrayMemberName(Node* node, std::string suffix);
 #include "Node.h"
 #include "PNode.h"
 #include "ExpTree.h"
+#include "StmtTree.h"
 #include "graph.h"
 #include "util.h"
 #include "valInfo.h"

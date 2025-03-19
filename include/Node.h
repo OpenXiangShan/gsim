@@ -9,6 +9,7 @@
 std::string format(const char *fmt, ...);
 
 class NodeComponent;
+class StmtTree;
 
 enum NodeType{
   NODE_INVALID,
@@ -326,6 +327,7 @@ public:
   std::set<SuperNode*> prev;
   std::set<SuperNode*> next;
   std::vector<Node*> member; // The order of member is neccessary
+  StmtTree* stmtTree = nullptr;
   int id;
   int order;
   int cppId = -1;

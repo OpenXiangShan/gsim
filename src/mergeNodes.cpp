@@ -1,12 +1,90 @@
 
 #include <cstdio>
 #include <vector>
+#include <stack>
+#include <set>
 #include "common.h"
 #define MAX_NODES_PER_SUPER 7000
 #define MAX_SUBLINGS 30
 #define MAX_NEAR_NUM 50
 
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
+
+bool anyPath(SuperNode* src, SuperNode* dst) {
+  std::stack<SuperNode*> s;
+  std::set<SuperNode*> visited;
+  visited.insert(src);
+  for (SuperNode* prev : src->prev) {
+    s.push(prev);
+    visited.insert(prev);
+  }
+  while (!s.empty()) {
+    SuperNode* top = s.top();
+    s.pop();
+    if (top == dst) return true;
+    for (SuperNode* prev : top->prev) {
+      if (visited.find(prev) == visited.end()) {
+        visited.insert(prev);
+        s.push(prev);
+      }
+    }
+  }
+  return false;
+}
+
+void graph::mergeWhenNodes() {
+/* each superNode contain one node */
+  std::map<Node*, SuperNode*> whenMap;
+  for (SuperNode* super : sortedSuper) {
+    Assert(super->member.size() <= 1, "invalid super size %ld", super->member.size());
+    for (Node* member : super->member) {
+      if (member->isArray() || member->assignTree.size() != 1) continue;
+      if (member->assignTree[0]->getRoot()->opType != OP_WHEN) continue;
+      Node* whenNode = member->assignTree[0]->getRoot()->getChild(0)->getNode();
+      if (!whenNode) continue; // TODO: expr can also be optimized
+      /* exists and no loop */
+      if (whenMap.find(whenNode) == whenMap.end()) {
+        whenMap[whenNode] = super;
+        continue;
+      }
+      SuperNode* whenSuper = whenMap[whenNode];
+      if (anyPath(super, whenSuper)) continue;
+      /* merge member to whenSuper */
+      whenSuper->member.push_back(member);
+      member->super = whenSuper;
+      super->member.clear();
+      /* update super connection */
+      whenSuper->next.insert(super->next.begin(), super->next.end());
+      for (SuperNode* next : super->next) {
+        next->prev.erase(super);
+        next->prev.insert(whenSuper);
+      }
+      whenSuper->prev.insert(super->prev.begin(), super->prev.end());
+      for (SuperNode* prev : super->prev) {
+        prev->next.erase(super);
+        prev->next.insert(whenSuper);
+      }
+    }
+  }
+  /* construct special expTree and node */
+  for (auto iter : whenMap) {
+    SuperNode* whenSuper = iter.second;
+    if (whenSuper->member.size() <= 1) continue;
+    StmtTree* stmtTree = new StmtTree();
+    stmtTree->root = new StmtNode(OP_STMT_SEQ);
+    for (Node* member : whenSuper->member) {
+      for (ExpTree* tree : member->assignTree) {
+        stmtTree->mergeExpTree(tree);
+      }
+    }
+    whenSuper->stmtTree = stmtTree;
+  }
+  size_t prevSuper = sortedSuper.size();
+  removeEmptySuper();
+  reconnectSuper();
+  detectSortedSuperLoop();
+  printf("[mergeNodes-when] remove %ld superNodes (%ld -> %ld)\n", prevSuper - sortedSuper.size(), prevSuper, sortedSuper.size());
+}
 
 void graph::mergeAsyncReset() {
   std::map<Node*, SuperNode*> resetMap;
@@ -15,6 +93,7 @@ void graph::mergeAsyncReset() {
       if (member->type != NODE_REG_SRC || member->reset != ASYRESET) continue;
       if (member->assignTree.size() != 1) continue;
       Assert(member->assignTree[0]->getRoot()->opType == OP_RESET, "reset not found %s", member->name.c_str());
+      Assert(sortedSuper[i]->member.size() == 1, "multiple member %s", member->name.c_str());
       std::set<Node*> resetNoeds;
       getENodeRelyNodes(member->assignTree[0]->getRoot()->getChild(0), resetNoeds);
       Assert(resetNoeds.size() == 1, "multiple reset %s", member->name.c_str());

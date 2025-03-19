@@ -74,6 +74,10 @@ enum OPType {
   OP_SEXT,
 /* extmodule / dipc */
   OP_EXT_FUNC,
+/* aggregate when node */
+  OP_STMT_SEQ,
+  OP_STMT_WHEN,
+  OP_STMT_NODE
 };
 
 class ENode {

@@ -58,7 +58,8 @@ static std::map<OPType, const char*> OP2Name = {
   {OP_INDEX, "index"}, {OP_WHEN, "when"}, {OP_PRINTF, "printf"}, {OP_ASSERT, "assert"}, {OP_INT, "int"},
   {OP_READ_MEM, "readMem"}, {OP_WRITE_MEM, "writeMem"}, {OP_INFER_MEM, "inferMem"},
   {OP_RESET, "reset"}, {OP_STMT, "stmts"}, {OP_SEXT, "sext"}, {OP_BITS_NOSHIFT, "bits_noshift"},
-  {OP_GROUP, "group"}, {OP_EXIT, "exit"}, {OP_EXT_FUNC, "ext_func"}
+  {OP_GROUP, "group"}, {OP_EXIT, "exit"}, {OP_EXT_FUNC, "ext_func"},
+  {OP_STMT_SEQ, "stmt_seq"}, {OP_STMT_WHEN, "stmt_when"}, {OP_STMT_NODE, "stmt_node"}
 };
 
 static std::map<NodeType, const char*> NodeType2Name = {
@@ -79,6 +80,33 @@ void ExpTree::display(int depth) {
   if (getRoot()) getRoot()->display(depth);
 }
 
+void StmtTree::display() {
+  if (!root) return;
+  std::stack<std::pair<StmtNode*, int>> s;
+  s.push(std::make_pair(root, 1));
+  while (!s.empty()) {
+    StmtNode* top;
+    int depth;
+    std::tie(top, depth) = s.top();
+    s.pop();
+    if (!top) {
+      printf("%s(EMPTY)\n",std::string(depth * 2, ' ').c_str());
+      continue;
+    }
+    printf("%s(%d %s) childNum %ld\n", std::string(depth * 2, ' ').c_str(), top->type,
+           OP2Name[top->type], top->child.size()
+          );
+    if (top->type == OP_STMT_NODE) {
+      if (top->isENode) top->enode->display(depth + 1);
+      else top->tree->display(depth + 1);
+    }
+    for (int i = top->child.size() - 1; i >= 0; i --) {
+      StmtNode* child = top->child[i];
+      s.push(std::make_pair(child, depth + 1));
+    }
+  }
+}
+
 /* traverse graph */
 void graph::traversal() {
   for (SuperNode* super : sortedSuper) {
@@ -87,10 +115,16 @@ void graph::traversal() {
 }
 
 void SuperNode::display() {
-   printf("----super %d(type=%d)----:\n", id, superType);
-    for (Node* node : member) {
-      node->display();
-    }
+  printf("----super %d(type=%d)----:\n", id, superType);
+  for (Node* node : member) {
+    node->display();
+  }
+  printf("----super %d(type=%d)----:\n", id, superType);
+  if (stmtTree) stmtTree->display();
+  printf("     [nodes] \n");
+  for (Node* node : member) {
+    node->display();
+  }
 }
 
 
