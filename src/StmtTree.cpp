@@ -4,9 +4,28 @@
 bool checkENodeEq(ENode* enode1, ENode* enode2);
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
 
+bool checkCondENodeSame(ENode* enode1, ENode* enode2) {
+  if (!enode1 && !enode2) return true;
+  if (!enode1 || !enode2) return false;
+  if (enode1->opType != enode2->opType) return false;
+  if (enode1->width != enode2->width || enode1->sign != enode2->sign) return false;
+  if (enode1->child.size() != enode2->child.size()) return false;
+  if (enode1->opType == OP_INT && enode1->strVal != enode2->strVal) return false;
+  if (enode1->values.size() != enode2->values.size()) return false;
+  if ((!enode1->getNode() && enode2->getNode()) || (enode1->getNode() && !enode2->getNode())) return false;
+  if (enode1->getNode() && enode2->getNode() && enode1->getNode() != enode2->getNode()) return false;
+  for (size_t i = 0; i < enode1->values.size(); i ++) {
+    if (enode1->values[i] != enode2->values[i]) return false;
+  }
+  for (size_t i = 0; i < enode1->child.size(); i ++) {
+    if (!checkCondENodeSame(enode1->child[i], enode2->child[i])) return false;
+  }
+  return true;
+}
+
 bool checkCondEq(StmtNode* stmtNode, ENode* enode) {
   if ((enode->opType == OP_WHEN || enode->opType == OP_RESET) && stmtNode->type == OP_STMT_WHEN) {
-    if (stmtNode->child[0]->isENode && checkENodeEq(enode->getChild(0), stmtNode->getChild(0)->enode)) {
+    if (stmtNode->child[0]->isENode && checkCondENodeSame(enode->getChild(0), stmtNode->getChild(0)->enode)) {
       return true;
     }
   }
@@ -164,7 +183,7 @@ void getCommonPath(std::vector<int>& path1, ExpTree* referTree, std::vector<int>
   ENode* newRoot = newTree->getRoot();
   for (; commonNum < MIN(path1.size(), path2.size()) && referRoot->opType == OP_WHEN && newRoot->opType == OP_WHEN; commonNum ++) {
     if (path1[commonNum] != path2[commonNum]) break;
-    if (!checkENodeEq(referRoot->getChild(0), newRoot->getChild(0))) break;
+     if (!checkCondENodeSame(referRoot->getChild(0), newRoot->getChild(0))) break;
     referRoot = referRoot->getChild(path1[commonNum]);
     newRoot = newRoot->getChild(path2[commonNum]);
   }
