@@ -1967,7 +1967,7 @@ valInfo* StmtNode::compute() {
           if (rinfo->valStr != linfo->valStr) {
             ret->valStr += ASSIGN_BEG(belong);
             if (isSubArray(linfo->valStr, node)) {
-              ret->valStr += arrayCopy(linfo->valStr, node, rinfo, countArrayIndex(linfo->valStr) - 1);
+              ret->valStr += arrayCopy(linfo->valStr, node, rinfo);
             } else {
               ret->valStr += format("%s = %s;\n", linfo->valStr.c_str(), rinfo->valStr.c_str());
             }
