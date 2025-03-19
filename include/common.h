@@ -22,7 +22,6 @@
 #include <cstdarg>
 
 #define NR_THREAD 10
-// #define MEM_CHECK
 #define ORDERED_TOPO_SORT
 // #define PERF
 

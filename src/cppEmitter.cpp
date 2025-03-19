@@ -170,29 +170,10 @@ static std::string arrayPrevName (std::string name) {
 void graph::genNodeInit(Node* node) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
-
-#if  defined (MEM_CHECK) || defined (DIFFTEST_PER_SIG)
-    static std::set<Node*> initNodes;
-    if (initNodes.find(node) != initNodes.end()) return;
-    if (node->type == NODE_OTHERS && !node->anyNextActive() && !node->isArray()) return;
-    initNodes.insert(node);
-    switch (node->type) {
-      case NODE_INVALID:
-      case NODE_SPECIAL:
-      case NODE_READER:
-      case NODE_WRITER:
-      case NODE_READWRITER:
-      case NODE_MEMORY:
-        break;
-      default:
-        if (node->isArray()) {
-          emitBodyLock("  memset(%s, 0, sizeof(%s));\n", node->name.c_str(), node->name.c_str());
-        } else {
-          emitBodyLock("  %s = 0;\n", node->name.c_str());
-        }
-    }
-#endif
-  for (std::string inst : node->initInsts) emitBodyLock("  %s\n", strReplace(inst, ASSIGN_LABLE, "").c_str());
+  for (std::string inst : node->initInsts) {
+    if (inst.find("= 0x0;") != std::string::npos) continue; // already set to 0 with memset
+    emitBodyLock("  %s\n", strReplace(inst, ASSIGN_LABLE, "").c_str());
+  }
 }
 
 FILE* graph::genHeaderStart() {
@@ -853,6 +834,9 @@ void graph::cppEmitter() {
   srcFileIdx = 0;
 
   FILE* header = genHeaderStart();
+#ifdef DIFFTEST_PER_SIG
+  sigFile = fopen((globalConfig.OutputDir + "/" + name + "_sigs.txt").c_str(), "w");
+#endif
 
   /* class start*/
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
@@ -868,11 +852,8 @@ void graph::cppEmitter() {
   fprintf(header, "size_t nodeNum[%d];\n", superId);
 #endif
 
+  fprintf(header, "uint8_t _var_start;\n");
   // header: node definition; src: node evaluation
-#ifdef DIFFTEST_PER_SIG
-  sigFile = fopen((globalConfig.OutputDir + "/" + name + "_sigs.txt").c_str(), "w");
-#endif
-
   for (SuperNode* super : sortedSuper) {
     // std::string insts;
     if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
@@ -884,6 +865,7 @@ void graph::cppEmitter() {
   }
   /* memory definition */
   for (Node* mem : memory) genNodeDef(header, mem);
+  fprintf(header, "uint8_t _var_end;\n");
 
   /* constrcutor */
   fprintf(header, "S%s();\n", name.c_str());
@@ -914,6 +896,8 @@ void graph::cppEmitter() {
   }
   emitBodyLock("  for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
 #endif
+
+  emitBodyLock("  memset(&_var_start, 0, &_var_end - &_var_start);\n");
   for (SuperNode* super : sortedSuper) {
     if (super->superType != SUPER_VALID && super->superType != SUPER_ASYNC_RESET) continue;
     for (Node* member : super->member) {
@@ -921,11 +905,6 @@ void graph::cppEmitter() {
     }
   }
 
-#if  defined (MEM_CHECK) || defined (DIFFTEST_PER_SIG)
-  for (Node* mem :memory) {
-    emitBodyLock("memset(%s, 0, sizeof(%s));\n", mem->name.c_str(), mem->name.c_str());
-  }
-#endif
   emitBodyLock("}\n");
 
   /* activation all nodes for reset */
