@@ -29,16 +29,7 @@ void Node::invalidArrayOptimize() {
       allIdx.insert(i);
     }
   }
-  for (ExpTree* tree : arrayVal) {
-    std::tie(beg, end) = tree->getlval()->getIdx(this);
-    if (beg < 0) return;  // varialble index
-    for (int i = beg; i <= end; i ++) {
-      if (allIdx.find(i) != allIdx.end()) return; // multiple assignment
-      allIdx.insert(i);
-    }
-  }
   for (ExpTree* tree : assignTree) fillArrayInvalid(tree);
-  for (ExpTree* tree : arrayVal) fillArrayInvalid(tree);
 }
 
 bool checkENodeEq(ENode* enode1, ENode* enode2);
@@ -103,16 +94,11 @@ void graph::exprOpt() {
     for (Node* node : super->member) {
       if (node->width == 0) {
         node->assignTree.clear();
-        node->arrayVal.clear();
-        ENode* enodeInt = new ENode(OP_INT);
-        enodeInt->width = 0;
-        enodeInt->strVal = "h0";
-        if (node->isArray()) node->arrayVal.push_back(new ExpTree(enodeInt, node));
-        else node->assignTree.push_back(new ExpTree(enodeInt, node));
+        ENode* enodeInt = allocIntEnode(0, "0");
+        node->assignTree.push_back(new ExpTree(enodeInt, node));
         continue;
       }
       for (ExpTree* tree : node->assignTree) tree->treeOpt();
-      for (ExpTree* tree : node->arrayVal) tree->treeOpt();
       if (node->updateTree) node->updateTree->treeOpt();
       if (node->resetTree) node->resetTree->treeOpt();
     }

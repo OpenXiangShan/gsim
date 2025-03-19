@@ -366,7 +366,6 @@ NodeComponent* Node::reInferComponent() {
   eraseReferSegment(this, oldComp);
   /* erase old component */
   componentMap.erase(this);
-  for (ExpTree* tree : arrayVal) tree->clearComponent();
   for (ExpTree* tree : assignTree) tree->clearComponent();
   NodeComponent* newComp = inferComponent();
   if (!oldComp->assignAllEq(newComp)) {
@@ -423,12 +422,7 @@ NodeComponent* Node::inferComponent() {
       NodeComponent* comp = tree->getRoot()->inferComponent(this);
       addRefer(ret, comp);
       addDirectRef(ret, comp);
-    }
-    for (ExpTree* tree : arrayVal) {
-      NodeComponent* comp = tree->getRoot()->inferComponent(this);
-      addRefer(ret, comp);
-      addDirectRef(ret, comp);
-      if (tree->getlval() && tree->getlval()->child.size() != 0) {
+       if (tree->getlval()->getChildNum() != 0) {
         for (ENode* child : tree->getlval()->child) {
           NodeComponent* indexComp = child->inferComponent(this);
           addRefer(ret, indexComp);
@@ -679,9 +673,7 @@ ENode* constructRootFromComponent(NodeComponent* comp) {
       else if (hiBit < element->hi) mpz_tdiv_q_2exp(realVal, element->val, element->hi - hiBit);
       else mpz_set(realVal, element->val);
 
-      enode = new ENode(OP_INT);
-      enode->strVal = mpz_get_str(nullptr, 10, realVal);
-      enode->width = hiBit + 1;
+      enode = allocIntEnode(hiBit + 1, mpz_get_str(nullptr, 10, realVal));
 
     }
     if (newRoot) {
@@ -837,12 +829,10 @@ void graph::splitNodes() {
     for (Node* member : super->member) {
       if (member->width == 0) continue;
       for (ExpTree* tree : member->assignTree) tree->updateWithSplittedNode();
-      for (ExpTree* tree : member->arrayVal) tree->updateWithSplittedNode();
     }
   }
   for (Node* node : allSplittedNodes) {
     for (ExpTree* tree : node->assignTree) tree->updateWithSplittedNode();
-    for (ExpTree* tree : node->arrayVal) tree->updateWithSplittedNode();
   }
 
 /* update superNodes, replace reg by splitted regs */

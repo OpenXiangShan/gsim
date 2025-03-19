@@ -779,9 +779,6 @@ void Node::recomputeConstant() {
   valInfo* prevVal = consMap[this];
   std::vector<valInfo*> prevArrayVal (consMap[this]->memberInfo);
   consMap.erase(this);
-  for (ExpTree* tree : arrayVal) {
-    if (tree) clearConsEMap(tree);
-  }
   for (ExpTree* tree : assignTree) clearConsEMap(tree);
   computeConstant();
   bool recomputeNext = false;
@@ -831,7 +828,7 @@ valInfo* Node::computeConstantArray() {
     tree->getRoot()->computeConstant(this, false);
   }
 
-  for (ExpTree* tree : arrayVal) {
+  for (ExpTree* tree : assignTree) {
       int beg, end;
       if (tree->getlval()) {
         for (ENode* lchild : tree->getlval()->child) lchild->computeConstant(this, true);
@@ -866,7 +863,7 @@ valInfo* Node::computeConstantArray() {
       }
     }
 
-    for (ExpTree* tree : arrayVal) {
+    for (ExpTree* tree : assignTree) {
       int infoIdxBeg, infoIdxEnd;
       std::tie(infoIdxBeg, infoIdxEnd) = tree->getlval()->getIdx(this);
       if (infoIdxBeg == infoIdxEnd) {
@@ -930,7 +927,7 @@ void graph::constantMemory() {
       bool isConstant = true;
       bool isFirst = true;
       for (Node* port : mem->member) {
-        if (port->type == NODE_WRITER) {
+        if (port->type == NODE_WRITER || port->type == NODE_READWRITER) {
           valInfo* info = consMap[port];
           if (port->status == CONSTANT_NODE || info->sameConstant) {
             if (isFirst) {
@@ -1229,31 +1226,20 @@ void graph::constantAnalysis() {
     for (Node* member : super->member) {
       if (member->status == CONSTANT_NODE) {
         member->assignTree.clear();
-        member->arrayVal.clear();
-        ENode* enode = new ENode(OP_INT);
+        ENode* enode = allocIntEnode(member->width, mpz_get_str(NULL, 10, member->computeInfo->consVal));
         enode->computeInfo = member->computeInfo;
-        enode->width = member->width;
-        enode->strVal = mpz_get_str(NULL, 10, member->computeInfo->consVal);
-        if (member->isArray()) member->arrayVal.push_back(new ExpTree(enode, member));
-        else member->assignTree.push_back(new ExpTree(enode, member));
+        member->assignTree.push_back(new ExpTree(enode, member));
         if (member->type == NODE_SPECIAL) { // set to NODE_OTHERS to enable removeDeadNode
           member->type = NODE_OTHERS;
         }
         continue;
       }
-      for (ExpTree* tree : member->arrayVal) {
-        tree->removeConstant();
-      }
-      member->arrayVal.erase(
-      std::remove_if(member->arrayVal.begin(), member->arrayVal.end(), [](ExpTree* tree){ return !tree->getRoot(); }),
-        member->arrayVal.end()
-      );
       for (ExpTree* tree : member->assignTree) {
         tree->removeConstant();
       }
       member->assignTree.erase(
       std::remove_if(member->assignTree.begin(), member->assignTree.end(),
-        [](ExpTree* tree){ return !tree->getRoot() || (consEMap.find(tree->getRoot()) != consEMap.end() && consEMap[tree->getRoot()]->status == VAL_CONSTANT); }),
+        [](ExpTree* tree){ return !tree->getRoot(); }),
         member->assignTree.end()
       );
       if (member->resetTree) member->resetTree->removeConstant();

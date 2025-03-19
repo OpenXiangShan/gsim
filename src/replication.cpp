@@ -64,8 +64,9 @@ void graph::replicationOpt() {
   std::set<Node*> mustNodes;
   for (SuperNode* super : sortedSuper) { // TODO: support op in index
     for (Node* member : super->member) {
+      if (!member->isArray()) continue;
       std::set<Node*> rely;
-      for (ExpTree* tree : member->arrayVal) {
+      for (ExpTree* tree : member->assignTree) {
         getENodeRelyNodes(tree->getlval(), rely);
       }
       rely.erase(member);
@@ -112,7 +113,6 @@ void graph::replicationOpt() {
       repNode->super = super;
       for (Node* next : iter.second) {
         for (ExpTree* tree : next->assignTree) tree->replace(node, repNode);
-        for (ExpTree* tree : next->arrayVal) tree->replace(node, repNode);
       }
     }
   }

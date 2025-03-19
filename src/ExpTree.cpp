@@ -90,3 +90,10 @@ void ExpTree::matchWidth(int width) {
     }
   }
 }
+
+ENode* allocIntEnode(int width, std::string val) {
+  ENode* ret = new ENode(OP_INT);
+  ret->width = width;
+  ret->strVal = val;
+  return ret;
+}

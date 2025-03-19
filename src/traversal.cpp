@@ -124,11 +124,6 @@ void Node::display() {
     printf("[assign] %ld\n", i);
     assignTree[i]->display();
   }
-  for (size_t i = 0; i < arrayVal.size(); i ++) {
-    if (!arrayVal[i]) continue;
-    printf("[array] %ld\n", i);
-    arrayVal[i]->display();
-  }
   if (updateTree) {
     printf("[updateTree]:\n");
     updateTree->display();

@@ -125,7 +125,6 @@ size_t countOpsInTree(ExpTree* tree) {
 size_t countOpsInNode(Node* node) {
   size_t ret = 0;
   for (ExpTree* tree : node->assignTree) ret += countOpsInTree(tree);
-  for (ExpTree* tree : node->arrayVal) ret += countOpsInTree(tree);
   return ret;
 }
 

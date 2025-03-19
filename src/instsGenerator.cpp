@@ -1464,7 +1464,7 @@ valInfo* ENode::instsGroup(Node* node, std::string lvalue, bool isRoot) {
 
 valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
-  Assert(node->type == NODE_READER, "invalid type %d", node->type);
+  Assert(node->type == NODE_READER || node->type == NODE_READWRITER, "invalid type %d", node->type);
   Node* memory = memoryNode;
   ret->valStr = memory->name + "[" + ChildInfo(0, valStr) + "]";
   for (size_t i = 0; i < memory->dimension.size(); i ++) {
@@ -1480,7 +1480,7 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
 
 valInfo* ENode::instsWriteMem(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
-  Assert(node->type == NODE_WRITER, "invalid type %d", node->type);
+  Assert(node->type == NODE_WRITER || node->type == NODE_READWRITER, "invalid type %d", node->type);
   Node* memory = memoryNode;
 
   std::string indexStr;
@@ -1971,10 +1971,6 @@ void Node::recompute() {
   valInfo* prevVal = computeInfo;
   std::vector<valInfo*> prevArrayVal (computeInfo->memberInfo);
   computeInfo = nullptr;
-  for (ExpTree* tree : arrayVal) {
-    if (tree)
-      tree->clearInfo();
-  }
   insts.clear();
   for (ExpTree* tree : assignTree) tree->clearInfo();
   compute();
@@ -2052,52 +2048,24 @@ valInfo* Node::computeArray() {
   bool anyVarIdx = false;
   for (ExpTree* tree : assignTree) {
     std::string lvalue = name;
-    if (tree->getlval()) {
-      valInfo* lindex = tree->getlval()->compute(this, INVALID_LVALUE, false);
-      lvalue = lindex->valStr;
-      std::tie(lindex->beg, lindex->end) = tree->getlval()->getIdx(this);
-      if (lindex->beg < 0) anyVarIdx = true;
-      else {
-        for (int i = lindex->beg; i <= lindex->end; i ++) {
-          if (allIdx.find(i) != allIdx.end()) anyVarIdx = true;
-          allIdx.insert(i);
-        }
+    valInfo* lindex = tree->getlval()->compute(this, INVALID_LVALUE, false);
+    lvalue = lindex->valStr;
+    std::tie(lindex->beg, lindex->end) = tree->getlval()->getIdx(this);
+    if (lindex->beg < 0) anyVarIdx = true;
+    else {
+      for (int i = lindex->beg; i <= lindex->end; i ++) {
+        if (allIdx.find(i) != allIdx.end()) anyVarIdx = true;
+        allIdx.insert(i);
       }
-      for (std::string inst : lindex->insts) insts.push_back(inst);
-    } else {
-      display();
-      TODO();
     }
     valInfo* info = tree->getRoot()->compute(this, lvalue, true);
+    for (std::string inst : lindex->insts) insts.push_back(inst);
     for (std::string inst : info->insts) insts.push_back(inst);
     info->insts.clear();
     finalConnect(lvalue, info);
   }
 
-  for (ExpTree* tree : arrayVal) {
-      valInfo* lindex = nullptr;
-      if (tree->getlval()) {
-        lindex = tree->getlval()->compute(this, INVALID_LVALUE, false);
-        std::string lvalue = lindex->valStr;
-        valInfo* info = tree->getRoot()->compute(this, lvalue, false);
-        for (std::string inst : lindex->insts) insts.push_back(inst);
-        for (std::string inst : info->insts) insts.push_back(inst);
-        info->insts.clear();
-        finalConnect(lindex->valStr, info);
-        std::tie(lindex->beg, lindex->end) = tree->getlval()->getIdx(this);
-        if (lindex->beg < 0) anyVarIdx = true;
-        else {
-          for (int i = lindex->beg; i <= lindex->end; i ++) {
-            if (allIdx.find(i) != allIdx.end()) anyVarIdx = true;
-            allIdx.insert(i);
-          }
-        }
-      } else {
-        TODO();
-      }
-  }
   for (size_t i = 0; i < assignTree.size(); i ++) ops += assignTree[i]->getRoot()->computeInfo->opNum >= 0 ? assignTree[i]->getRoot()->computeInfo->opNum : 1000;
-  for (size_t i = 0; i < arrayVal.size(); i ++) ops += arrayVal[i]->getRoot()->computeInfo->opNum >= 0 ? arrayVal[i]->getRoot()->computeInfo->opNum : 1000;
   bool updated = false;
   for (size_t i = 0; i < assignTree.size(); i ++) {
     if (assignTree[i]->getRoot()->computeInfo->fullyUpdated) {
@@ -2105,7 +2073,6 @@ valInfo* Node::computeArray() {
       break;
     }
   }
-  for (ExpTree* tree : arrayVal) updated |= tree->getRoot()->computeInfo->fullyUpdated;
   fullyUpdated = updated;
 
   if (!anyVarIdx) {
@@ -2122,22 +2089,6 @@ valInfo* Node::computeArray() {
             computeInfo->memberInfo[infoIdxBeg + i] = tree->getRoot()->computeInfo->getMemberInfo(i);
           }
         }
-      }
-    }
-
-    for (ExpTree* tree : arrayVal) {
-      int infoIdxBeg = tree->getlval()->computeInfo->beg;
-      int infoIdxEnd = tree->getlval()->computeInfo->end;
-      if (tree->getRoot()->computeInfo->valStr.find("TMP$") == tree->getRoot()->computeInfo->valStr.npos) {
-        if (infoIdxBeg == infoIdxEnd) {
-          computeInfo->memberInfo[infoIdxBeg] = tree->getRoot()->computeInfo;
-
-        } else if (tree->getRoot()->computeInfo->memberInfo.size() != 0) {
-          for (int i = 0; i <= infoIdxEnd - infoIdxBeg; i ++) {
-            computeInfo->memberInfo[infoIdxBeg + i] = tree->getRoot()->computeInfo->getMemberInfo(i);
-          }
-        }
-
       }
     }
 

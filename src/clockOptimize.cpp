@@ -1,14 +1,15 @@
 #include "common.h"
 #include <map>
+#include <stack>
 
 class clockVal {
 public:
   Node* node = nullptr;
-  int val = 0;
+  bool isConstant = false;
   bool isInvalid = false;
   ENode* gateENode = nullptr; // ClockGate
   clockVal(Node* n) { node = n; }
-  clockVal(int v) { val = v; }
+  clockVal(int v) { isConstant = true; }
   clockVal() { isInvalid = true; }
 };
 
@@ -67,6 +68,40 @@ clockVal* ENode::clockCompute() {
         ret->gateENode = ret->gateENode;
       } else Panic();
       break;
+    case OP_MUX: {
+      ENode* cond = getChild(0);
+      ENode* neg = new ENode(OP_NOT);
+      neg->addChild(cond);
+      childVal = getChild(1)->clockCompute();
+      Assert(childVal->isConstant || (childVal->node && childVal->node->type == NODE_INP), "invalid mux");
+      ret = getChild(2)->clockCompute();
+      Assert(ret->isConstant || (ret->node && ret->node->type == NODE_INP), "invalid mux");
+      ENode* first = nullptr, *second = nullptr;
+      if (!childVal->isConstant) { // null first
+        if (childVal->gateENode) {
+          first = new ENode(OP_AND);
+          first->addChild(cond);
+          first->addChild(childVal->gateENode);
+        } else first = cond;
+      }
+      if (!ret->isConstant) { // null second
+        if (ret->gateENode) {
+          second = new ENode(OP_AND);
+          second->addChild(neg);
+          second->addChild(ret->gateENode);
+        } else second = neg;
+      }
+      if (!first && !second) ret = new clockVal(0);
+      else if (!first) ret->gateENode = second;
+      else if (!second) ret->gateENode = first;
+      else  {
+        ENode* andEnode = new ENode(OP_OR);
+        andEnode->addChild(first);
+        andEnode->addChild(second);
+        ret->gateENode = andEnode;
+      }
+      break;
+    }
     default:
       Assert(0, "invalid op %d", opType);
   }
@@ -102,11 +137,8 @@ Node* Node::clockAlias() {
 }
 
 void Node::setConstantZero(int w) {
-  ENode* enode = new ENode(OP_INT);
-  enode->width = w;
-  enode->strVal = "0";
+  ENode* enode = allocIntEnode(w, "0");
   assignTree.clear();
-  arrayVal.clear();
   assignTree.push_back(new ExpTree(enode, this));
 }
 void Node::setConstantInfoZero(int w) {
@@ -115,6 +147,25 @@ void Node::setConstantInfoZero(int w) {
   else computeInfo->width = width;
   computeInfo->setConstantByStr("0");
   status = CONSTANT_NODE;
+}
+
+bool ExpTree::isReadTree() {
+  std::stack<ENode*> s;
+  s.push(getRoot());
+  bool isRead = false;
+  while (!s.empty()) {
+    ENode* top = s.top();
+    s.pop();
+    if (top->opType == OP_READ_MEM) {
+      isRead = true;
+      break;
+    } else {
+      for (size_t i = 0; i < top->getChildNum(); i ++) {
+        if (top->getChild(i)) s.push(top->getChild(i));
+      }
+    }
+  }
+  return isRead;
 }
 
 /* clock alias & clock constant analysis */
@@ -142,11 +193,6 @@ void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
         gate->addChild(nullptr);
         gate->addChild(nullptr);
         for (ExpTree* tree : node->assignTree) {
-          ENode* gateDup = gate->dup();
-          gateDup->setChild(1, tree->getRoot());
-          tree->setRoot(gateDup);
-        }
-        for (ExpTree* tree : node->arrayVal) {
           ENode* gateDup = gate->dup();
           gateDup->setChild(1, tree->getRoot());
           tree->setRoot(gateDup);
@@ -182,7 +228,7 @@ void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
       if (val) {
         Assert(!val->gateENode || val->node, "invalid clock %s %d", node->clock->name.c_str(), node->clock->lineno);
         if (val->gateENode) {
-          if (node->type == NODE_WRITER) {
+          if (node->type == NODE_WRITER || node->type == NODE_READWRITER) {
             ENode* gate = new ENode(OP_WHEN);
             gate->width = node->width;
             gate->sign = node->sign;
@@ -191,11 +237,7 @@ void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
             gate->addChild(nullptr);
             gate->addChild(nullptr);
             for (ExpTree* tree : node->assignTree) {
-              ENode* gateDup = gate->dup();
-              gateDup->setChild(1, tree->getRoot());
-              tree->setRoot(gateDup);
-            }
-            for (ExpTree* tree : node->arrayVal) {
+              if (tree->isReadTree()) continue;
               ENode* gateDup = gate->dup();
               gateDup->setChild(1, tree->getRoot());
               tree->setRoot(gateDup);

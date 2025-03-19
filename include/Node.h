@@ -104,7 +104,7 @@ class Node {
   }
 
   std::string name;  // concat the module name in order (member in structure / temp variable)
-  std::string extraInfo;
+  std::string extraInfo; // ruw for memory
   int id = -1;
   NodeType type;
   int width = -1;
@@ -123,7 +123,6 @@ class Node {
   ExpTree* memTree = nullptr;
   ExpTree* resetCond = nullptr;  // valid in reg_src
   ExpTree* resetVal = nullptr;   // valid in reg_src, used in AST2Graph
-  std::vector<ExpTree*> arrayVal;
   std::set<int> invalidIdx;
 
   SuperNode* super = nullptr;
@@ -151,6 +150,7 @@ class Node {
   ResetType reset = UNCERTAIN;
   AsReset asReset = EMPTY;
   bool isArrayMember = false;
+  bool inAggr = false;
 /* used for visitWhen in AST2Graph */
 
   size_t whenDepth = 0;
@@ -212,6 +212,7 @@ class Node {
     return member[idx];
   }
   void set_writer() {
+    if (type == NODE_READWRITER) return;
     Assert(type == NODE_WRITER || type == NODE_INFER, "invalid type %d\n", type);
     type = NODE_WRITER;
   }

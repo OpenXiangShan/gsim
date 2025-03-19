@@ -309,6 +309,7 @@ public:
     void updateWithSplittedNode();
     void clearComponent();
     void updateWithSplittedArray(Node* node, Node* array);
+    bool isReadTree();
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes
@@ -456,5 +457,7 @@ public:
     idx.push_back(_idx);
   }
 };
+
+ENode* allocIntEnode(int width, std::string val);
 
 #endif
