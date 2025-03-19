@@ -119,12 +119,7 @@ void SuperNode::display() {
   for (Node* node : member) {
     node->display();
   }
-  printf("----super %d(type=%d)----:\n", id, superType);
   if (stmtTree) stmtTree->display();
-  printf("     [nodes] \n");
-  for (Node* node : member) {
-    node->display();
-  }
 }
 
 
