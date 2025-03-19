@@ -97,3 +97,8 @@ ENode* allocIntEnode(int width, std::string val) {
   ret->strVal = val;
   return ret;
 }
+
+ExpTree* ExpTree::dup() {
+  ExpTree* ret = new ExpTree(getRoot()->dup(), getlval()->dup());
+  return ret;
+}

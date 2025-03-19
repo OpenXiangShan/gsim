@@ -314,6 +314,7 @@ public:
     void clearComponent();
     void updateWithSplittedArray(Node* node, Node* array);
     bool isReadTree();
+    ExpTree* dup();
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes
