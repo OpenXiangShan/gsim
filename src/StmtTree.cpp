@@ -38,7 +38,7 @@ void maxPath(std::vector<int>& dst, std::vector<int>& path1, std::vector<int>& p
 
 /* generate whens according to enode, and add stmtNode into child */
 void StmtNode::generateWhenTree(ENode* lvalue, ENode* root, std::vector<int>& subPath, Node* belong) {
-  Assert(root->opType == OP_WHEN, "require when");
+  Assert(root->opType == OP_WHEN || root->opType == OP_RESET, "require when");
   StmtNode* stmt = nullptr;
   std::stack<std::tuple<StmtNode*, ENode*, int>> s;
   s.push(std::make_tuple(stmt, root, 1));
