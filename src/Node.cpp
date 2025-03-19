@@ -229,6 +229,12 @@ void Node::updateActivate() {
         nextActiveId.insert(nextNode->super->cppId);
     }
   }
+  if (type == NODE_READER) {
+    for (Node* port : parent->member) {
+      if (port->type == NODE_READER && (port->status == VALID_NODE || port->status == MERGED_NODE) && port->super->cppId != -1)
+        nextActiveId.insert(port->super->cppId);
+    }
+  }
 }
 
 void Node::updateNeedActivate(std::set<int>& alwaysActive) {
