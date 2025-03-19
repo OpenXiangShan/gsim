@@ -1371,7 +1371,7 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, size_t depth) {
     ENode* whenNode = new ENode(OP_WHEN); // return the deepest whenNode
     if (depth == whenTrace.size() - 1) retENode = whenNode;
     ENode* condNode = new ENode(whenTrace[depth].second);
-
+    childRoot = childRoot ? childRoot->dup() : childRoot;
     if (whenTrace[depth].first) {
       whenNode->addChild(condNode);
       whenNode->addChild(newRoot);
