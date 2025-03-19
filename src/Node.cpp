@@ -243,7 +243,7 @@ void Node::updateActivate() {
         nextActiveId.insert(nextNode->super->cppId);
     }
   }
-  if (type == NODE_READER) {
+  if (type == NODE_WRITER) {
     for (Node* port : parent->member) {
       if (port->type == NODE_READER && (port->status == VALID_NODE || port->status == MERGED_NODE) && port->super->cppId != -1)
         nextActiveId.insert(port->super->cppId);
