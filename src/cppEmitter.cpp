@@ -699,7 +699,7 @@ void replaceAssignEnd(SuperNode* super, Node* n, std::string str) {
 }
 
 void saveAssignBeg(SuperNode* super, Node* n) {
-  if (n->needActivate() && !n->isArray()) {
+  if (n->needActivate() && !n->isArray() && n->type != NODE_WRITER) {
     std::string saveStr = format("%s %s = %s;\n", widthUType(n->width).c_str(), oldName(n).c_str(), n->name.c_str());
     replaceAssignBeg(super, n, saveStr);
   } else {
@@ -710,7 +710,7 @@ void saveAssignBeg(SuperNode* super, Node* n) {
 void activateAssignEnd(SuperNode* super, Node* n, std::string flagName) {
   std::string activateStr;
   if (!n->needActivate()) ;
-  else if(!n->isArray()) activateStr = activateNextStr(n, n->nextNeedActivate, oldName(n), true, flagName);
+  else if(!n->isArray() && n->type != NODE_WRITER) activateStr = activateNextStr(n, n->nextNeedActivate, oldName(n), true, flagName);
   else activateStr = activateUncondNextStr(n, n->nextNeedActivate, true, flagName);
   replaceAssignEnd(super, n, activateStr);
 }
