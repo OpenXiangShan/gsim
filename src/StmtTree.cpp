@@ -318,7 +318,11 @@ void graph::generateStmtTree() {
     SuperNode* super = sortedSuper[superIdx];
     for (int nodeIdx = super->member.size() - 1; nodeIdx >= 0; nodeIdx --) {
       Node* member = super->member[nodeIdx];
-      if (member->depNext.size() != 1) continue; // TODO: change to "no loop in SuperNode"
+      int depNextInSuper = 0;
+      for (Node* next : member->depNext) {
+        if (next->super == super) depNextInSuper ++;
+      }
+      if (depNextInSuper != 1 || member->next.size() != 1) continue; // TODO: change to "no loop in SuperNode"
       bool anyExtNext = false;
       for (Node* next : member->next) {
         if (next->super != super) {
