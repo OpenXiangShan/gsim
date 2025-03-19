@@ -1651,16 +1651,20 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
         }
       }
     } else {
-      computeInfo = new valInfo();
-      computeInfo->valStr = nodePtr->name;
-      computeInfo->width = nodePtr->width;
-      computeInfo->sign = nodePtr->sign;
-      computeInfo->typeWidth = upperPower2(nodePtr->width);
-      if (child.size() != 0) {
-        valInfo* indexInfo = computeInfo->dup();
-        computeInfo = indexInfo;
-        for (ENode* childENode : child)
-          computeInfo->valStr += childENode->computeInfo->valStr;
+      if (nodePtr->status == CONSTANT_NODE) {
+        computeInfo = nodePtr->compute()->dup();
+      } else {
+        computeInfo = new valInfo();
+        computeInfo->valStr = nodePtr->name;
+        computeInfo->width = nodePtr->width;
+        computeInfo->sign = nodePtr->sign;
+        computeInfo->typeWidth = upperPower2(nodePtr->width);
+        if (child.size() != 0) {
+          valInfo* indexInfo = computeInfo->dup();
+          computeInfo = indexInfo;
+          for (ENode* childENode : child)
+            computeInfo->valStr += childENode->computeInfo->valStr;
+        }
       }
     }
 
