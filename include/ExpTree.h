@@ -236,7 +236,7 @@ public:
   clockVal* clockCompute();
   ResetType inferReset();
   ArrayMemberList* getArrayMember(Node* node);
-  void display();
+  void display(int depth = 1);
   uint64_t keyHash();
   NodeComponent* inferComponent(Node* node);
 };
@@ -280,7 +280,7 @@ public:
     void setlval(ENode* _lvalue) {
       lvalue = _lvalue;
     }
-    void display();
+    void display(int depth = 1);
     /* used in alias */
     void replace(std::map<Node*, ENode*>& aliasMap, bool isArray);
     /* used in mergeRegister */

@@ -74,31 +74,9 @@ static std::map<NodeStatus, const char*> NodeStatus2Name = {
   {DEAD_SRC, "dead_src"}, {REPLICATION_NODE, "replication"}, {SPLITTED_NODE, "splitted"}
 };
 
-void ExpTree::display() {
-  if (!getRoot()) return;
-  std::stack<std::pair<ENode*, int>> enodes;
-  enodes.push(std::make_pair(getRoot(), 1));
-  if (getlval()) enodes.push(std::make_pair(getlval(), 1));
-  while (!enodes.empty()) {
-    ENode* top;
-    int depth;
-    std::tie(top, depth) = enodes.top();
-    enodes.pop();
-    if (!top) {
-      printf("%s(EMPTY)\n",std::string(depth * 2, ' ').c_str());
-      continue;
-    }
-    printf("%s(%d %s %p) %s %s [width=%d, sign=%d, type=%s, lineno=%d]", std::string(depth * 2, ' ').c_str(), top->opType,
-           OP2Name[top->opType], top, (top->nodePtr) ? top->nodePtr->name.c_str() : (top->opType == OP_READ_MEM || top->opType == OP_WRITE_MEM ? top->memoryNode->name.c_str() : ""),
-           top->strVal.c_str(), top->width,
-           top->sign, (top->nodePtr) ? NodeType2Name[top->nodePtr->type] : NodeType2Name[NODE_INVALID], top->nodePtr ? top->nodePtr->lineno : -1);
-    for (int val : top->values) printf(" %d", val);
-    printf("\n");
-    for (int i = top->child.size() - 1; i >= 0; i --) {
-      ENode* childENode = top->child[i];
-      enodes.push(std::make_pair(childENode, depth + 1));
-    }
-  }
+void ExpTree::display(int depth) {
+  if (getlval()) getlval()->display(depth);
+  if (getRoot()) getRoot()->display(depth);
 }
 
 /* traverse graph */
@@ -142,10 +120,29 @@ void Node::display() {
 #endif
 }
 
-void ENode::display() {
-  ExpTree* tmp = new ExpTree(this, new ENode());
-  tmp->display();
-  delete tmp;
+void ENode::display(int depth) {
+  std::stack<std::pair<ENode*, int>> enodes;
+  enodes.push(std::make_pair(this, depth));
+  while (!enodes.empty()) {
+    ENode* top;
+    int depth;
+    std::tie(top, depth) = enodes.top();
+    enodes.pop();
+    if (!top) {
+      printf("%s(EMPTY)\n",std::string(depth * 2, ' ').c_str());
+      continue;
+    }
+    printf("%s(%d %s %p) %s %s [width=%d, sign=%d, type=%s, lineno=%d]", std::string(depth * 2, ' ').c_str(), top->opType,
+           OP2Name[top->opType], top, (top->nodePtr) ? top->nodePtr->name.c_str() : (top->opType == OP_READ_MEM || top->opType == OP_WRITE_MEM ? top->memoryNode->name.c_str() : ""),
+           top->strVal.c_str(), top->width,
+           top->sign, (top->nodePtr) ? NodeType2Name[top->nodePtr->type] : NodeType2Name[NODE_INVALID], top->nodePtr ? top->nodePtr->lineno : -1);
+    for (int val : top->values) printf(" %d", val);
+    printf("\n");
+    for (int i = top->child.size() - 1; i >= 0; i --) {
+      ENode* childENode = top->child[i];
+      enodes.push(std::make_pair(childENode, depth + 1));
+    }
+  }
 }
 
 void graph::traversalNoTree() {
