@@ -694,7 +694,7 @@ void replaceAssignBeg(std::string& inst, Node* n, std::string str) {
 void replaceAssignEnd(std::string& inst, Node* n, std::string str) {
   size_t pos;
   while ((pos = inst.find(ASSIGN_END(n))) != std::string::npos) {
-    inst.replace(pos, ASSIGN_END(n).length(), str)
+    inst.replace(pos, ASSIGN_END(n).length(), str);
   }
 }
 
