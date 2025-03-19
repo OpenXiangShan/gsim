@@ -133,8 +133,8 @@ void fillEmptyENodeWhen(ENode* newENode, ENode* oldENode) {
       }
     }
     if (top->opType == OP_WHEN) {
-      if (!top->getChild(1)) top->setChild(1, oldENode);
-      if (!top->getChild(2)) top->setChild(2, oldENode);
+      if (!top->getChild(1)) top->setChild(1, oldENode->dup());
+      if (!top->getChild(2)) top->setChild(2, oldENode->dup());
     }
   }
 }
