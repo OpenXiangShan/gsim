@@ -1963,6 +1963,7 @@ valInfo* StmtNode::compute() {
         valInfo* rinfo = tree->getRoot()->compute(node, linfo->valStr, true);
         if (rinfo->status == VAL_FINISH) { // printf / assert
           ret->valStr += format("%s;\n",rinfo->valStr.c_str());
+        } else if (rinfo->status == VAL_INVALID) {
         } else if (rinfo->opNum >= 0) {
           if (rinfo->valStr != linfo->valStr) {
             ret->valStr += ASSIGN_BEG(belong);
