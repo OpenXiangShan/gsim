@@ -278,9 +278,11 @@ class Node {
   void clear_relation();
   void addPrev(Node* node);
   void addPrev(std::set<Node*>& super);
+  void addPrev(std::vector<Node*>& super);
   void erasePrev(Node* node);
   void addNext(Node* node);
   void addNext(std::set<Node*>& super);
+  void addNext(std::vector<Node*>& super);
   void eraseNext(Node* node);
   void clearPrev();
   void updateDep();

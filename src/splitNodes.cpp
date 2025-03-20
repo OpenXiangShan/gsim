@@ -102,15 +102,15 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
     lo = hi + 1;
   }
   for (Node* n : splittedNodesSet[node]) n->updateConnect();
-  node->prev.clear();
-  node->prev.insert(splittedNodesSet[node].begin(), splittedNodesSet[node].end());
+  node->clearPrev();
+  node->addPrev(splittedNodesSet[node]);
   componentMap[node]->invalidateAll();
   std::reverse(splittedNodesSet[node].begin(), splittedNodesSet[node].end());
 
   if (node->type == NODE_REG_SRC) {
     for (Node* n : splittedNodesSet[node->getDst()]) n->updateConnect();
-    node->getDst()->prev.clear();
-    node->getDst()->prev.insert(splittedNodesSet[node->getDst()].begin(), splittedNodesSet[node->getDst()].end());
+    node->getDst()->clearPrev();
+    node->getDst()->addPrev(splittedNodesSet[node->getDst()]);
     std::reverse(splittedNodesSet[node->getDst()].begin(), splittedNodesSet[node->getDst()].end());
   }
 }

@@ -23,8 +23,8 @@ void Node::updateConnect() {
           arrayMember->addNext(this);
         }
       } else {
-        prev.insert(prevNode);
-        prevNode->next.insert(this);
+        addPrev(prevNode);
+        prevNode->addNext(this);
       }
     }
     for (size_t i = 0; i < top->getChildNum(); i ++) {
@@ -260,8 +260,8 @@ void Node::updateNeedActivate(std::set<int>& alwaysActive) {
 }
 
 void Node::removeConnection() {
-  for (Node* prevNode : prev) prevNode->next.erase(this);
-  for (Node* nextNode : next) nextNode->prev.erase(this);
+  for (Node* prevNode : prev) prevNode->eraseNext(this);
+  for (Node* nextNode : next) nextNode->erasePrev(this);
 }
 
 ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index, Node* node);
@@ -348,6 +348,11 @@ void Node::addPrev(std::set<Node*>& node) {
   depPrev.insert(node.begin(), node.end());
 }
 
+void Node::addPrev(std::vector<Node*>& node) {
+  prev.insert(node.begin(), node.end());
+  depPrev.insert(node.begin(), node.end());
+}
+
 void Node::erasePrev(Node* node) {
   prev.erase(node);
   depPrev.erase(node);
@@ -364,6 +369,11 @@ void Node::eraseNext(Node* node) {
 }
 
 void Node::addNext(std::set<Node*>& node) {
+  next.insert(node.begin(), node.end());
+  depNext.insert(node.begin(), node.end());
+}
+
+void Node::addNext(std::vector<Node*>& node) {
   next.insert(node.begin(), node.end());
   depNext.insert(node.begin(), node.end());
 }

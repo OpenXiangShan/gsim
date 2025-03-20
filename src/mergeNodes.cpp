@@ -158,7 +158,7 @@ void graph::mergeOut1() {
       for (Node* member : super->member) {
         member->super = nextSuper;
       }
-
+      /* update member */
       nextSuper->member.insert(nextSuper->member.begin(), super->member.begin(), super->member.end());
       /* update connection */
       nextSuper->erasePrev(super);
@@ -192,8 +192,8 @@ void graph::mergeIn1() {
       prevSuper->eraseNext(super);
       prevSuper->addNext(super->next);
       for (SuperNode* nextSuper : super->next) {
-        nextSuper->prev.erase(super);
-        nextSuper->prev.insert(prevSuper);
+        nextSuper->erasePrev(super);
+        nextSuper->addPrev(prevSuper);
       }
       super->member.clear();
     }

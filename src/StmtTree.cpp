@@ -183,7 +183,7 @@ void getCommonPath(std::vector<int>& path1, ExpTree* referTree, std::vector<int>
   ENode* newRoot = newTree->getRoot();
   for (; commonNum < MIN(path1.size(), path2.size()) && referRoot->opType == OP_WHEN && newRoot->opType == OP_WHEN; commonNum ++) {
     if (path1[commonNum] != path2[commonNum]) break;
-     if (!checkCondENodeSame(referRoot->getChild(0), newRoot->getChild(0))) break;
+    if (!checkCondENodeSame(referRoot->getChild(0), newRoot->getChild(0))) break;
     referRoot = referRoot->getChild(path1[commonNum]);
     newRoot = newRoot->getChild(path2[commonNum]);
   }
@@ -218,7 +218,7 @@ void getRelyPath(std::vector<int>&path, Node* node, ExpTree* tree) { // get the 
         s.pop();
         currentPath.pop_back();
         continue;
-       }
+      }
       /* expand top */
       enodeStatus[top] = EXPANDED;
       for (int i = 0; i < top->getChildNum(); i ++) {
