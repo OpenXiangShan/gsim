@@ -1342,7 +1342,7 @@ newRoot:  when3
       cond3 a b
 replace oldRoot by newRoot
 */
-std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, size_t depth) {
+std::pair<ExpTree*, ENode*> growWhenTrace(Node* node, ExpTree* valTree, size_t depth) {
   ENode* oldParent = nullptr;
   size_t maxDepth = depth;
   if (valTree) std::tie(oldParent, maxDepth) = getDeepestWhen(valTree, depth);
@@ -1385,7 +1385,7 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, size_t depth) {
     if (depth == 0) break;
   }
   if (!oldRoot) {
-    if (maxDepth == depth) {
+    if (maxDepth == depth) { // depth: depth the node defined; maxDepth: deepest when that matches valTree
       if (valTree) valTree->setRoot(newRoot);
       else valTree = new ExpTree(newRoot);
     } else {
@@ -1393,15 +1393,8 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, size_t depth) {
     }
   } else {
     if (maxDepth == depth) {
-      if (valTree->getRoot()->opType == OP_STMT) {
-        valTree->getRoot()->addChild(newRoot);
-      } else {
-        ENode* stmt = nullptr;
-        stmt = new ENode(OP_STMT);
-        stmt->addChild(valTree->getRoot());
-        stmt->addChild(newRoot);
-        valTree->setRoot(stmt);
-      }
+      if (valTree) node->assignTree.push_back(valTree);
+      valTree = new ExpTree(newRoot);
     } else {
       ENode* stmt = nullptr;
       if (oldRoot->opType == OP_STMT) {
@@ -1434,9 +1427,9 @@ void whenConnect(graph* g, Node* node, ENode* lvalue, ENode* rvalue, PNode* conn
   ENode* whenNode;
   size_t connectDepth = (node->type == NODE_WRITER || node->type == NODE_INFER || node->type == NODE_READWRITER) ? 0 : node->whenDepth;
   if (node->isArray()) {
-    std::tie(valTree, whenNode) = growWhenTrace(nullptr, connectDepth);
+    std::tie(valTree, whenNode) = growWhenTrace(node, nullptr, connectDepth);
   } else {
-    std::tie(valTree, whenNode) = growWhenTrace(node->valTree, connectDepth);
+    std::tie(valTree, whenNode) = growWhenTrace(node, node->valTree, connectDepth);
   }
   valTree->setlval(lvalue);
   if (node->type == NODE_WRITER || node->type == NODE_INFER || node->type == NODE_READWRITER) {
@@ -1704,14 +1697,11 @@ void saveWhenTree() {
         fillEmptyWhen(node->valTree, node->assignTree.back()->getRoot());
         node->assignTree.back() = node->valTree;
         node->valTree = nullptr;
-      } else {
+      } else if (countEmptyWhen(node->valTree) != 0) {
         node->assignTree.push_back(node->valTree);
         node->valTree = nullptr;
-      }
-      if (countEmptyWhen(node->assignTree.back()) == 0 && node->assignTree.back()->getRoot()->opType != OP_INVALID) {
-        if (node->assignTree.size() > 1) {
-          node->assignTree.erase(node->assignTree.begin(), node->assignTree.end() - 1);
-        }
+      } else if (countEmptyWhen(node->valTree) == 0 && node->valTree->getRoot()->opType != OP_INVALID) {
+        node->assignTree.clear();
       }
     }
   }
