@@ -36,6 +36,7 @@ void graph::mergeWhenNodes() {
 /* each superNode contain one node */
   std::map<Node*, SuperNode*> whenMap;
   for (SuperNode* super : sortedSuper) {
+    if (super->superType == SUPER_EXTMOD) continue;
     Assert(super->member.size() <= 1, "invalid super size %ld", super->member.size());
     for (Node* member : super->member) {
       if (member->isArray() || member->assignTree.size() != 1) continue;
