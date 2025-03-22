@@ -378,7 +378,7 @@ void graph::generateStmtTree() {
       for (ExpTree* tree : node->assignTree) {
         super->stmtTree->mergeExpTree(tree, prevPath, nodePath, node);
         /* update reg_dst when asyreset arrives */
-        if (node->type == NODE_REG_SRC && node->reset == ASYRESET && node->regSplit) {
+        if (node->type == NODE_REG_SRC && node->reset == ASYRESET && node->regSplit && node->getDst()->status == VALID_NODE) {
           ENode* lvalue = tree->getlval()->dup();
           lvalue->nodePtr = node->getDst();
           ExpTree* dstTree = new ExpTree(tree->getRoot(), lvalue);
