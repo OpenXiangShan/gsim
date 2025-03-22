@@ -24,6 +24,7 @@ public:
   }
   StmtNode* getChild(size_t idx) { return child[checkChildIdx(idx)]; }
   void setChild(size_t idx, StmtNode* node) { child[checkChildIdx(idx)] = node; }
+  void eraseChild(size_t idx) { child.erase(child.begin() + checkChildIdx(idx)); }
   void addChild(StmtNode* node) { child.push_back(node); }
   void generateWhenTree(ENode* lvalue, ENode* enode, std::vector<int>& subPath, Node* belong);
   valInfo* compute();

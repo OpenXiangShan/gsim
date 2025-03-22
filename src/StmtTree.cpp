@@ -142,7 +142,21 @@ void StmtTree::mergeExpTree(ExpTree* tree, std::vector<int>& prevPath, std::vect
           TODO();
         }
       } else {
+        Node* node = tree->getlval()->getNode();
         Assert(stmtNode->type == OP_STMT_SEQ, "stmtNode %d is not seq", stmtNode->type);
+        if (!node->isArray() && enode->opType != OP_INVALID) {
+          for (int i = 0; i < stmtNode->getChildNum(); i ++) {
+            StmtNode* child = stmtNode->getChild(i);
+            if (child->type == OP_STMT_NODE) {
+              Assert(!child->isENode, "invalid stmtNode %d", child->type);
+              Node* childNode = child->tree->getlval()->getNode();
+              Assert(childNode, "invalid node");
+              if (childNode == node) {
+                stmtNode->eraseChild(i);
+              }
+            }
+          }
+        }
         stmtNode->addChild(new StmtNode(new ExpTree(enode->dup(), tree->getlval()->dup()), belong));
         addDepthPath(nodePath, depth, stmtNode->child.size() - 1);
       }
