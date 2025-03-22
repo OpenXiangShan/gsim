@@ -267,7 +267,7 @@ void ExpTree::updateWithSplittedArray(Node* node, Node* array) {
           ENode* idx = new ENode(OP_INT);
           idx->strVal = std::to_string(i);
           idx->width = upperLog2(array->arrayEntryNum());
-          cond->addChild(top_enode->getChild(0)->getChild(0));  // first dimension
+          cond->addChild(top_enode->getChild(0)->getChild(0)->dup());  // first dimension
           cond->addChild(idx);
           mux->addChild(cond);
           mux->addChild(new ENode(member));
