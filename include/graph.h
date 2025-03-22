@@ -23,7 +23,7 @@ class graph {
   void genHeaderEnd(FILE* fp);
   void genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string flagName);
   void genNodeStepEnd(SuperNode* node);
-  void genNodeInit(Node* node);
+  void genNodeInit(Node* node, int mode);
   void genMemInit(Node* node);
   void nodeDisplay(Node* member);
   void genMemRead(FILE* fp);
