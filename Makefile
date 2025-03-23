@@ -324,9 +324,8 @@ diff:
 	set -o pipefail && $(TIME) $(MAKE) diff-internal 2>&1 | tee $(LOG_FILE)
 
 init:
-	cd ready-to-run/bin && tar xvjf linux.tar.bz2
-	cd ready-to-run && tar xvjf xiangshan.tar.bz2
-	cd ready-to-run/difftest && tar xvjf xiangshan.tar.bz2
+	git submodule update --init
+	cd ready-to-run && bash init.sh
 
 perf: $(target)
 	sudo perf record -e branch-instructions,branch-misses,cache-misses,\
