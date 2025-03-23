@@ -1989,12 +1989,6 @@ void ExpTree::removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::s
   }
 }
 
-void setZeroTree(Node* node) {
-  ENode* zero = allocIntEnode(1, "0");
-  node->assignTree.clear();
-  node->assignTree.push_back(new ExpTree(zero, node));
-}
-
 void removeDummyDim(graph* g) {
   /* remove dimensions of size 1 rom the array */
   std::map<Node*, std::vector<int>> arrayMap;
