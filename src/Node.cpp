@@ -249,6 +249,16 @@ void Node::updateActivate() {
         nextActiveId.insert(port->super->cppId);
     }
   }
+  if (type == NODE_READWRITER) {
+    for (Node* port : parent->member) {
+      if (port == this) {
+        if (port->parent->extraInfo != "new") nextActiveId.insert(super->cppId);
+      }
+      else if ((port->type == NODE_READER || port->type == NODE_READWRITER)
+         && (port->status == VALID_NODE || port->status == MERGED_NODE) && port->super->cppId != -1)
+        nextActiveId.insert(port->super->cppId);
+    }
+  }
 }
 
 void Node::updateNeedActivate(std::set<int>& alwaysActive) {
