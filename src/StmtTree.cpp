@@ -236,7 +236,7 @@ void getRelyPath(std::vector<int>&path, Node* node, ExpTree* tree) { // get the 
       /* expand top */
       enodeStatus[top] = EXPANDED;
       for (int i = 0; i < top->getChildNum(); i ++) {
-        Assert(enodeStatus.find(top->getChild(i)) == enodeStatus.end(), "already visited");
+        Assert(enodeStatus.find(top->getChild(i)) == enodeStatus.end(), "already visited %p in %s\n", top->getChild(i), node->name.c_str());
         if (top->getChild(i)) s.push(std::make_pair(top->getChild(i), i));
       }
     } else if (enodeStatus[top] == EXPANDED) {
