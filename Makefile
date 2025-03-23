@@ -105,7 +105,6 @@ else ifeq ($(MODE), 2)
 else
 	CXXFLAGS += -DDIFFTEST_PER_SIG -DGSIM_DIFF
 	MODE_FLAGS += -DGSIM -DGSIM_DIFF
-	EMU_CFLAGS += -O0
 	EMU_CFLAGS += -I$(REF_GSIM_DIR) -DREF_NAME=Diff$(NAME)
 	SIG_COMMAND = python3 scripts/genSigDiff.py $(NAME) $(DIFF_VERSION)
 	target ?= $(EMU_BUILD_DIR)/S$(NAME)_diff
@@ -194,7 +193,7 @@ EMU_MAIN_SRCS = emu/emu.cpp
 EMU_GEN_SRCS = $(shell find $(GEN_CPP_DIR) -name "*.cpp" 2> /dev/null)
 EMU_SRCS = $(EMU_MAIN_SRCS) $(EMU_GEN_SRCS)
 
-EMU_CFLAGS := -O3 -MMD $(addprefix -I, $(abspath $(GEN_CPP_DIR))) $(EMU_CFLAGS) # allow to overwrite -O3
+EMU_CFLAGS := -O1 -MMD $(addprefix -I, $(abspath $(GEN_CPP_DIR))) $(EMU_CFLAGS) # allow to overwrite optimization level
 EMU_CFLAGS += $(MODE_FLAGS) $(CFLAGS_DUT) -Wno-parentheses-equality
 EMU_CFLAGS += -fbracket-depth=2048
 #EMU_CFLAGS += -fsanitize=address -fsanitize-address-use-after-scope
@@ -232,8 +231,8 @@ VERI_BIN = $(WORK_DIR)/V$(NAME)
 VERI_GEN_MK = $(VERI_BUILD_DIR)/V$(NAME).mk
 
 VERI_CFLAGS = $(call escape_quote,$(EMU_CFLAGS) $(CFLAGS_REF))
-VERI_LDFLAGS = -O3
-VERI_VFLAGS = --top $(NAME) -O3 -Wno-lint -j 8 --cc --exe +define+RANDOMIZE_GARBAGE_ASSIGN --max-num-width 1048576 --compiler clang
+VERI_LDFLAGS = -O1
+VERI_VFLAGS = --top $(NAME) -Wno-lint -j 8 --cc --exe +define+RANDOMIZE_GARBAGE_ASSIGN --max-num-width 1048576 --compiler clang
 VERI_VFLAGS += -Mdir $(VERI_BUILD_DIR) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)"
 VERI_VFLAGS += $(VERI_THREADS)
 #VERI_VFLAGS += --trace-fst
@@ -247,7 +246,7 @@ $(VERI_GEN_MK): $(VERI_VSRCS) $(VERI_CSRCS-$(MODE)) | $(EMU_MAIN_SRCS)
 	verilator $(VERI_VFLAGS) $(abspath $^ $|)
 
 $(VERI_BIN): | $(VERI_GEN_MK)
-	$(TIME) $(MAKE) OPT_FAST="-O3" CXX=clang++ -s -C $(VERI_BUILD_DIR) -f $(abspath $|)
+	$(TIME) $(MAKE) OPT_FAST="-O1" CXX=clang++ -s -C $(VERI_BUILD_DIR) -f $(abspath $|)
 	ln -sf $(abspath $(VERI_BUILD_DIR)/V$(NAME)) $@
 
 compile-veri: $(VERI_GEN_MK)
