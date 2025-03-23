@@ -45,7 +45,7 @@
 #ifdef __DUT_xiangshan_default__
 #define CYCLE_MAX_SIM  1900000
 #else
-#define CYCLE_MAX_SIM  3700000
+#define CYCLE_MAX_SIM  3400000
 #endif
 
 // unused blackbox
