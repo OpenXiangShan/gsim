@@ -167,12 +167,17 @@ static std::string arrayPrevName (std::string name) {
 }
 #endif
 
-void graph::genNodeInit(Node* node) {
+void graph::genNodeInit(Node* node, int mode) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
   for (std::string inst : node->initInsts) {
-    if (inst.find("= 0x0;") != std::string::npos) continue; // already set to 0 with memset
-    emitBodyLock("  %s\n", strReplace(inst, ASSIGN_LABLE, "").c_str());
+    std::stringstream ss(inst);
+    std::string s;
+    while (getline(ss, s, '\n')) {
+      bool init0 = (s.find("= 0x0;") != std::string::npos);
+      bool emit = ((mode == 0) && init0) || ((mode == 1) && !init0) || (mode == 2);
+      if (emit) { emitBodyLock("  %s\n", strReplace(s, ASSIGN_LABLE, "").c_str()); }
+    }
   }
 }
 
@@ -184,6 +189,7 @@ FILE* graph::genHeaderStart() {
   includeLib(header, "iostream", true);
   includeLib(header, "vector", true);
   includeLib(header, "assert.h", true);
+  includeLib(header, "stdlib.h", true);
   includeLib(header, "cstdint", true);
   includeLib(header, "ctime", true);
   includeLib(header, "iomanip", true);
@@ -191,7 +197,11 @@ FILE* graph::genHeaderStart() {
   includeLib(header, "map", true);
   newLine(header);
 
-  fprintf(header, "#define Assert(cond, ...) do {"
+  fprintf(header, "\n// User configuration\n");
+  fprintf(header, "//#define ENABLE_LOG\n");
+  fprintf(header, "//#define RANDOMIZE_INIT\n");
+
+  fprintf(header, "\n#define Assert(cond, ...) do {"
                      "if (!(cond)) {"
                        "fprintf(stderr, \"\\33[1;31m\");"
                        "fprintf(stderr, __VA_ARGS__);"
@@ -206,8 +216,6 @@ FILE* graph::genHeaderStart() {
 
   fprintf(header, "#define likely(x) __builtin_expect(!!(x), 1)\n");
   fprintf(header, "#define unlikely(x) __builtin_expect(!!(x), 0)\n");
-
-  fprintf(header, "\n//#define ENABLE_LOG\n");
 
   for (int num = 2; num <= maxConcatNum; num ++) {
     std::string param;
@@ -380,10 +388,31 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", upperPower2(node->depth));
   for (int dim : node->dimension) fprintf(fp, "[%d]", upperPower2(dim));
   fprintf(fp, "; // width = %d, lineno = %d\n", node->width, node->lineno);
+  int w = node->width;
+  bool needInitMask = (node->type != NODE_MEMORY) &&
+    (((w < 64) && (w != 8 && w != 16 && w != 32 && w != 64)) || ((w > 64) && (w % 32 != 0)));
+  if (needInitMask) {
+    if (node->dimension.empty()) {
+      emitBodyLock("  %s &= %s;\n", node->name.c_str(), bitMask(w).c_str());
+    } else {
+      int dims = node->dimension.size();
+      for (int i = 0; i < dims; i ++) {
+        emitBodyLock("  for (int i%d = 0; i%d < %d; i%d ++) {\n", i, i, node->dimension[i], i);
+      }
+      emitBodyLock("  %s", node->name.c_str());
+      for (int i = 0; i < dims; i ++) { emitBodyLock("[i%d]", i); }
+      emitBodyLock(" &= %s;\n", bitMask(w).c_str());
+      for (int i = 0; i < dims; i ++) { emitBodyLock("}\n"); }
+    }
+  }
+
   /* save reset registers */
   if (node->isReset() && node->type == NODE_REG_SRC) {
     Assert(!node->isArray() && node->width <= BASIC_WIDTH, "%s is treated as reset (isArray: %d width: %d)", node->name.c_str(), node->isArray(), node->width);
     fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), RESET_NAME(node).c_str());
+    if (needInitMask) {
+      emitBodyLock("  %s = %s & %s;\n", RESET_NAME(node).c_str(), RESET_NAME(node).c_str(), bitMask(w).c_str());
+    }
   }
 }
 
@@ -852,23 +881,7 @@ void graph::cppEmitter() {
   fprintf(header, "size_t nodeNum[%d];\n", superId);
 #endif
 
-  fprintf(header, "uint8_t _var_start;\n");
-  // header: node definition; src: node evaluation
-  for (SuperNode* super : sortedSuper) {
-    // std::string insts;
-    if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
-      for (Node* n : super->member) genNodeDef(header, n);
-    }
-    if (super->superType == SUPER_EXTMOD) {
-      for (size_t i = 1; i < super->member.size(); i ++) genNodeDef(header, super->member[i]);
-    }
-  }
-  /* memory definition */
-  for (Node* mem : memory) genNodeDef(header, mem);
-  fprintf(header, "uint8_t _var_end;\n");
-
   /* constrcutor */
-  fprintf(header, "S%s();\n", name.c_str());
   emitFuncDecl("S%s::S%s() {\n"
                "  cycles = 0;\n"
                "  LOG_START = 1;\n"
@@ -877,7 +890,6 @@ void graph::cppEmitter() {
                "}\n", name.c_str(), name.c_str());
 
   /* initialization */
-  fprintf(header, "void init();\n");
   emitFuncDecl("void S%s::init() {\n", name.c_str());
   emitBodyLock("  activateAll();\n");
 #ifdef PERF
@@ -897,11 +909,47 @@ void graph::cppEmitter() {
   emitBodyLock("  for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
 #endif
 
-  emitBodyLock("  memset(&_var_start, 0, &_var_end - &_var_start);\n");
+  emitBodyLock("#ifdef RANDOMIZE_INIT\n"
+               "  srand((unsigned int)time(NULL));\n"
+               "  for (uint32_t *p = &_var_start; p != &_var_end; p ++) {\n"
+               "    *p = rand();\n"
+               "  }\n"
+               "// mask out the bits out of the width range\n");
+
+  // header: node definition; src: node evaluation
+  fprintf(header, "uint32_t _var_start;\n");
+  for (SuperNode* super : sortedSuper) {
+    // std::string insts;
+    if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
+      for (Node* n : super->member) genNodeDef(header, n);
+    }
+    if (super->superType == SUPER_EXTMOD) {
+      for (size_t i = 1; i < super->member.size(); i ++) genNodeDef(header, super->member[i]);
+    }
+  }
+  /* memory definition */
+  for (Node* mem : memory) genNodeDef(header, mem);
+  fprintf(header, "uint32_t _var_end;\n");
+
+  emitBodyLock("// initialize registers with reset value 0 to overwrite the rand() results\n" );
   for (SuperNode* super : sortedSuper) {
     if (super->superType != SUPER_VALID && super->superType != SUPER_ASYNC_RESET) continue;
     for (Node* member : super->member) {
-      genNodeInit(member);
+      genNodeInit(member, 0);
+    }
+  }
+
+  emitBodyLock("#else\n" // RANDOMIZE_INIT
+               "  memset(&_var_start, 0, &_var_end - &_var_start);\n"
+               "#endif\n");
+
+  fprintf(header, "S%s();\n", name.c_str());
+  fprintf(header, "void init();\n");
+
+  for (SuperNode* super : sortedSuper) {
+    if (super->superType != SUPER_VALID && super->superType != SUPER_ASYNC_RESET) continue;
+    for (Node* member : super->member) {
+      genNodeInit(member, 1);
     }
   }
 

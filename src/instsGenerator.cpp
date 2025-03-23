@@ -111,23 +111,6 @@ static std::string upperCast(int width1, int width2, bool sign) {
   return "";
 }
 
-static std::string bitMask(int width) {
-  Assert(width > 0, "invalid width %d", width);
-  if (width <= 64) {
-    std::string ret = std::string(width/4, 'f');
-    const char* headTable[] = {"", "1", "3", "7"};
-    ret = headTable[width % 4] + ret;
-    return "0x" + ret;
-  } else {
-    std::string type = widthUType(width);
-    if (width % 64 == 0) { // in such case, (type)1 << width is undefined
-      return format("((%s)0 - 1)", type.c_str());
-    } else {
-      return format("(((%s)1 << %d) - 1)", type.c_str(), width);
-    }
-  }
-}
-
 static std::string rangeMask(int hi, int lo) {
   return format("(%s >> %d << %d)", bitMask(hi + 1).c_str(), lo, lo, hi, lo);
 }
