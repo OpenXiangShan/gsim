@@ -18,7 +18,8 @@ jobs:
           sudo apt install -y clang llvm doxygen flex bison libfl-dev ccache
       - name: Untar linux.bin
         run: |
-          cd ready-to-run/bin && tar xvjf linux.tar.bz2
+          git submodule set-url ready-to-run https://github.com/jaypiper/gsim-ready-to-run.git
+          make init
       - name: Compile
         run: |
           make compile dutName=rocket -j `nproc`
