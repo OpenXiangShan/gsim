@@ -38,13 +38,13 @@ else ifeq ($(dutName),small-boom)
 else ifeq ($(dutName),xiangshan)
 	NAME ?= SimTop
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
-	TEST_FILE = $(NAME)-xiangshan-minimal-202501-20957846
+	TEST_FILE = $(NAME)-xiangshan-minimal
 	GSIM_FLAGS += --supernode-max-size=35 --cpp-max-size-KB=8192
 	VERI_THREADS = --threads 16
 else ifeq ($(dutName),xiangshan-default)
 	NAME ?= SimTop
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
-	TEST_FILE = $(NAME)-xiangshan-default-202501-20957846
+	TEST_FILE = $(NAME)-xiangshan-default
 	GSIM_FLAGS += --supernode-max-size=35 --cpp-max-size-KB=8192
 	VERI_THREADS = --threads 16
 endif
