@@ -238,7 +238,6 @@ VERI_VFLAGS += $(VERI_THREADS)
 #VERI_VFLAGS += --trace-fst
 
 VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
-VERI_VSRCS += $(shell find ready-to-run/difftest/blockbox/ -name ".v")
 VERI_CSRCS-2 = $(EMU_GEN_SRCS)
 
 $(VERI_GEN_MK): $(VERI_VSRCS) $(VERI_CSRCS-$(MODE)) | $(EMU_MAIN_SRCS)
