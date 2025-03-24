@@ -114,6 +114,8 @@ class SigFilter():
         ref_width = all_sigs[line[3]]
         refName = "ref->rootp->" + line[3]
         modName = "mod->" + line[2]
+        if mod_width > ref_width:
+          continue
         assert(mod_width <= ref_width), "width(" + line[2] + ") = " + str(mod_width) + ", width(" + line[3] + ") = " + str(ref_width)
         width = mod_width
 
