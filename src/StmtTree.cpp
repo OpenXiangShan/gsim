@@ -291,6 +291,7 @@ void growTreeFromPath(ExpTree* oldTree, std::vector<int>&path, ExpTree* referTre
 }
 
 void growWhenPathFromNext(Node* node) {
+  if (node->type != NODE_OTHERS) return;
   std::set<ExpTree*> usedTrees;
   std::vector<int> path;
   bool isFirst = true;
