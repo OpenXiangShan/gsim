@@ -327,6 +327,7 @@ class Node {
   int repOpCount();
   void updateIsRoot();
   void updateHeadTail();
+  bool isLocal();
 };
 
 enum SuperType {
@@ -337,6 +338,34 @@ enum SuperType {
   SUPER_UPDATE_REG,
 };
 
+enum SuperInfo {
+  SUPER_INFO_IF,     // start indent
+  SUPER_INFO_ELSE,   // dedent and then indent
+  SUPER_INFO_DEDENT,
+  SUPER_INFO_STR,
+  SUPER_INFO_ASSIGN_BEG,
+  SUPER_INFO_ASSIGN_END
+};
+
+class InstInfo{
+public:
+  SuperInfo infoType = SUPER_INFO_STR;
+  std::string inst;
+  Node* node;
+  InstInfo(SuperInfo _type, Node* _node) {
+    infoType = _type;
+    node = _node;
+  }
+  InstInfo(std::string _inst, SuperInfo _type = SUPER_INFO_STR) {
+    infoType = _type;
+    inst = _inst;
+  }
+  InstInfo(SuperInfo _infoType, Node* _node, std::string _inst) {
+    node = _node;
+    inst = _inst;
+    infoType = _infoType;
+  }
+};
 class SuperNode {
 private:
   static int counter;  // initialize to 1
@@ -349,7 +378,7 @@ public:
   std::set<SuperNode*> depPrev;
   std::set<SuperNode*> depNext;
   std::vector<Node*> member; // The order of member is neccessary
-  std::string inst;
+  std::vector<InstInfo> insts;
   StmtTree* stmtTree = nullptr;
   int id;
   int order;

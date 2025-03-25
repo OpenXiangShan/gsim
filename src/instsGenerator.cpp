@@ -1939,57 +1939,54 @@ valInfo* Node::compute() {
   return ret;
 }
 
-valInfo* StmtNode::compute() {
-  valInfo* ret = new valInfo();
+void StmtNode::compute(std::vector<InstInfo>& insts) {
   switch (type) {
     case OP_STMT_SEQ:
       for (StmtNode* stmt : child) {
-        valInfo* info = stmt->compute();
-        ret->valStr += info->valStr;
+        stmt->compute(insts);
       }
       break;
     case OP_STMT_WHEN: {
-      valInfo* cond = getChild(0)->compute();
-      valInfo* truestmt = getChild(1)->compute();
-      valInfo* falsestmt = getChild(2)->compute();
-      ret->valStr = format("if %s { %s } else { %s }", addBracket(cond->valStr).c_str(), truestmt->valStr.c_str(), falsestmt->valStr.c_str());
+      Assert(getChild(0)->isENode, "invalid when condition\n");
+      valInfo* cond = getChild(0)->enode->compute(nullptr, INVALID_LVALUE, false);
+      insts.push_back(InstInfo(format("if %s {", addBracket(cond->valStr).c_str()), SUPER_INFO_IF));
+      getChild(1)->compute(insts);
+      insts.push_back(InstInfo("} else {", SUPER_INFO_ELSE));
+      getChild(2)->compute(insts);
+      insts.push_back(InstInfo("}", SUPER_INFO_DEDENT));
       break;
     }
     case OP_STMT_NODE: {
-      if (isENode) ret = enode->compute(nullptr, INVALID_LVALUE, false);
-      else {
-        Node* node = tree->getlval()->getNode();
-        valInfo* linfo = tree->getlval()->compute(node, INVALID_LVALUE, false);
-        valInfo* rinfo = tree->getRoot()->compute(node, linfo->valStr, true);
-        if (rinfo->status == VAL_FINISH) { // printf / assert
-          ret->valStr += format("%s;\n",rinfo->valStr.c_str());
-        } else if (rinfo->status == VAL_INVALID) {
-        } else if (rinfo->opNum >= 0) {
-          if (rinfo->valStr != linfo->valStr) {
-            ret->valStr += ASSIGN_BEG(belong);
-            if (isSubArray(linfo->valStr, node)) {
-              ret->valStr += arrayCopy(linfo->valStr, node, rinfo);
-            } else {
-              ret->valStr += format("%s = %s;\n", linfo->valStr.c_str(), rinfo->valStr.c_str());
-            }
-            ret->valStr += ASSIGN_END(belong);
+      Assert(!isENode, "invalid stmt node\n");
+      Node* node = tree->getlval()->getNode();
+      valInfo* linfo = tree->getlval()->compute(node, INVALID_LVALUE, false);
+      valInfo* rinfo = tree->getRoot()->compute(node, linfo->valStr, true);
+      if (rinfo->status == VAL_FINISH) { // printf / assert
+        insts.push_back(InstInfo(rinfo->valStr));
+      } else if (rinfo->status == VAL_INVALID) {
+      } else if (rinfo->opNum >= 0) {
+        if (rinfo->valStr != linfo->valStr) {
+          if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_BEG, belong));
+          if (isSubArray(linfo->valStr, node)) {
+            insts.push_back(InstInfo(arrayCopy(linfo->valStr, node, rinfo)));
+          } else {
+            insts.push_back(InstInfo(format("%s = %s;", linfo->valStr.c_str(), rinfo->valStr.c_str())));
           }
-        } else {
-          ret->valStr += ASSIGN_BEG(belong);
-          ret->valStr += format("%s;\n",rinfo->valStr.c_str());
-          ret->valStr += ASSIGN_END(belong);
+          if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_END, belong));
         }
+      } else {
+        if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_BEG, belong));
+        insts.push_back(InstInfo(rinfo->valStr));
+        if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_END, belong));
       }
       break;
     }
     default: Panic();
   }
-  return ret;
 }
 
-valInfo* StmtTree::compute() {
-  valInfo* ret = root->compute();
-  return ret;
+void StmtTree::compute(std::vector<InstInfo>& insts) {
+  root->compute(insts);
 }
 
 void ExpTree::clearInfo(){
@@ -2244,8 +2241,7 @@ void graph::instsGenerator() {
     if (super->superType == SUPER_EXTMOD) {
       extDecl.push_back(computeExtMod(super));
     } else {
-      valInfo* info = super->stmtTree->compute();
-      super->inst = info->valStr;
+      super->stmtTree->compute(super->insts);
     }
   }
 

@@ -27,7 +27,7 @@ public:
   void eraseChild(size_t idx) { child.erase(child.begin() + checkChildIdx(idx)); }
   void addChild(StmtNode* node) { child.push_back(node); }
   void generateWhenTree(ENode* lvalue, ENode* enode, std::vector<int>& subPath, Node* belong);
-  valInfo* compute();
+  void compute(std::vector<InstInfo>& insts);
 };
 
 class StmtTree {
@@ -37,7 +37,7 @@ public:
   void display();
   void addSeq(ExpTree* tree, Node* belong);
   void mergeStmtTree(StmtTree* tree);
-  valInfo* compute();
+  void compute(std::vector<InstInfo>& insts);
 };
 
 #endif
