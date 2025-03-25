@@ -763,7 +763,6 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
 #endif
     }
     for (InstInfo inst : super->insts) {
-      printf("[%d %s] indent=%d\n", inst.infoType, inst.inst.c_str(), indent);
       switch (inst.infoType) {
         case SUPER_INFO_IF:
           emitBodyLock(indent, "%s\n", inst.inst.c_str());
