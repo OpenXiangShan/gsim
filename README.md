@@ -26,4 +26,4 @@ Run the C++ code for simulation
 + `MODE=1` - run verilator
 + `MODE=2` - run GSIM and verilator concurrently for difftest
 
-See [C++ harness example](https://github.com/jaypiper/simulator/blob/master/emu/emu-NutShell.cpp) to know how it interacts with the emitted C++ code.
+See [C++ harness example](https://github.com/jaypiper/simulator/blob/master/emu/emu.cpp) to know how it interacts with the emitted C++ code.
