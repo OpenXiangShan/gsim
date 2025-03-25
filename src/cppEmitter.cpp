@@ -624,9 +624,12 @@ void graph::genNodeInsts(Node* node, std::string flagName, int indent) { // TODO
   else activateUncondNext(node, node->nextNeedActivate, true, flagName, indent);
 }
 
-void graph::genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string flagName) {
+int graph::genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string flagName, int indent) {
   nodeNum ++;
-  if (!isAlwaysActive(node->cppId)) emitBodyLock(2, "if(unlikely(%s & 0x%lx)) { // id=%d\n", flagName.c_str(), mask, idx);
+  if (!isAlwaysActive(node->cppId)) {
+    emitBodyLock(indent, "if(unlikely(%s & 0x%lx)) { // id=%d\n", flagName.c_str(), mask, idx);
+    indent ++;
+  }
   int id;
   uint64_t newMask;
   std::tie(id, newMask) = clearIdxMask(node->cppId);
@@ -634,6 +637,7 @@ void graph::genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::strin
   emitBodyLock("activeTimes[%d] ++;\n", node->cppId);
   emitBodyLock("bool isActivateValid = false;\n");
 #endif
+  return indent;
 }
 
 void graph::nodeDisplay(Node* member, int indent) {
@@ -683,12 +687,16 @@ void graph::nodeDisplay(Node* member, int indent) {
   emitBodyLock(indent, "#endif\n");
 }
 
-void graph::genNodeStepEnd(SuperNode* node, int indent) {
+int graph::genNodeStepEnd(SuperNode* node, int indent) {
 #ifdef PERF
   emitBodyLock("validActive[%d] += isActivateValid;\n", node->cppId);
 #endif
 
-  if(!isAlwaysActive(node->cppId)) emitBodyLock(indent, "}\n");
+  if(!isAlwaysActive(node->cppId)) {
+    emitBodyLock(indent, "}\n");
+    indent --;
+  }
+  return indent;
 }
 
 void replaceAssignBeg(std::string& inst, Node* n, std::string str) {
@@ -828,9 +836,9 @@ int graph::genActivate() {
       }
       SuperNode* super = cppId2Super[idx];
       std::string flagName = prevActiveWhole ? "oldFlag" : format("activeFlags[%d]", id);
-      genNodeStepStart(super, mask, idx, flagName);
+      indent = genNodeStepStart(super, mask, idx, flagName, indent);
       genSuperEval(super, flagName, indent);
-      genNodeStepEnd(super, indent);
+      indent = genNodeStepEnd(super, indent);
     }
     indent --;
     emitBodyLock(indent, "}\n");

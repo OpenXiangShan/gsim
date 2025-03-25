@@ -22,8 +22,8 @@ class graph {
   void genInterfaceOutput(Node* output);
   void genStep(int subStepIdxMax);
   void genHeaderEnd(FILE* fp);
-  void genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string flagName);
-  void genNodeStepEnd(SuperNode* node);
+  int genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string flagName, int indent);
+  int genNodeStepEnd(SuperNode* node, int indent);
   void genNodeInit(Node* node);
   void genMemInit(Node* node);
   void nodeDisplay(Node* member, int indent);
