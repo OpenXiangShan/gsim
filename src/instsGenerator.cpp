@@ -1494,8 +1494,9 @@ valInfo* ENode::instsInvalid(Node* node, std::string lvalue, bool isRoot) {
 valInfo* ENode::instsPrintf() {
   valInfo* ret = computeInfo;
   ret->status = VAL_FINISH;
-  std::string printfInst = format("if %s { printf(%s", addBracket(ChildInfo(0, valStr)).c_str(), strVal.c_str());
+  std::string printfInst = format("if %s { gprintf(%s", addBracket(ChildInfo(0, valStr)).c_str(), strVal.c_str());
   for (size_t i = 1; i < getChildNum(); i ++) {
+    printfInst += ", " + std::to_string(ChildInfo(i, typeWidth));
     printfInst += ", " + ChildInfo(i, valStr);
   }
   printfInst += "); fflush(stdout); }";
