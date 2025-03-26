@@ -4,7 +4,7 @@ GSIM accepts chirrtl, and compiles it to C++
 
 ## Prerequisites
 
-+Install [GMP](https://gmplib.org/), [clang 16+](https://clang.llvm.org/).
++ Install [GMP](https://gmplib.org/), [clang 16+](https://clang.llvm.org/).
 
 ## Quike Start
 
@@ -15,9 +15,9 @@ GSIM accepts chirrtl, and compiles it to C++
     $ make init
     $ make run dutName=core
     ```
-+ Set core to `ysyx3`, `rocket`, `small-boom`, `large-boom`, `minimal-xiangshan` and `default-xiangshan`
++ Set core to `ysyx3`, `rocket`, `small-boom`, `large-boom`, `minimal-xiangshan` or `default-xiangshan`
 
-## Build GSIM
+## Usage
 
 + Run `make build-gsim` to build GSIM
 + Run `build/gsim/gsim $(chirrtl-file)` to compile chirrtl to C++
