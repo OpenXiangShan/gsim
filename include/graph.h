@@ -33,7 +33,8 @@ class graph {
   void genMemWrite(FILE* fp);
   void saveDiffRegs();
   void genResetAll();
-  void genReset(SuperNode* super, bool isUIntReset, int indent);
+  void genResetDef(SuperNode* super, bool isUIntReset, int indent);
+  void genResetActivation(SuperNode* super, bool isUIntReset, int indent, int resetId);
   void genResetDecl(FILE* fp);
   void genSuperEval(SuperNode* super, std::string flagName, int indent);
   std::string saveOldVal(Node* node);

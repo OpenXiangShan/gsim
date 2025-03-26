@@ -33,7 +33,6 @@ static int activeFlagNum = 0;
 static std::set<Node*> definedNode;
 static std::map<int, SuperNode*> cppId2Super;
 static std::set<int> alwaysActive;
-static std::vector<std::string> resetFuncs;
 extern int maxConcatNum;
 bool nameExist(std::string str);
 static int resetFuncNum = 0;
@@ -847,7 +846,35 @@ int graph::genActivate() {
     return nextSubStepIdx - 1; // return the maxinum subStepIdx currently used
 }
 
-void graph::genReset(SuperNode* super, bool isUIntReset, int indent) {
+void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
+  emitBodyLock(indent, "void S%s::subReset%d(){\n", name.c_str(), resetFuncNum);
+  indent ++;
+  resetFuncNum ++;
+  if (isUIntReset) {
+    for (Node* node : super->member) {
+      for (std::string str : node->resetInsts) {
+        emitBodyLock(indent, "%s\n", str.c_str());
+      }
+    }
+  } else {
+    for (InstInfo inst : super->insts) {
+      switch (inst.infoType) {
+        case SUPER_INFO_IF:
+        case SUPER_INFO_ELSE:
+        case SUPER_INFO_DEDENT:
+        case SUPER_INFO_STR:
+          emitBodyLock(indent, "%s\n", inst.inst.c_str());
+          break;
+        default:
+          break;
+      }
+    }
+  }
+  indent --;
+  emitBodyLock(indent, "}\n");
+}
+
+void graph::genResetActivation(SuperNode* super, bool isUIntReset, int indent, int resetId) {
   std::string resetName = super->resetNode->type == NODE_REG_SRC ? RESET_NAME(super->resetNode).c_str() : super->resetNode->name.c_str();
   emitBodyLock(indent, "if(unlikely(%s)) {\n", resetName.c_str());
   indent ++;
@@ -872,41 +899,18 @@ void graph::genReset(SuperNode* super, bool isUIntReset, int indent) {
       emitBodyLock(indent, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
     }
   }
-  emitBodyLock(indent, "subReset%d();\n", resetFuncNum);
-  std::string resetFuncStr = format("void S%s::subReset%d(){\n", name.c_str(), resetFuncNum);
-  resetFuncNum ++;
-  if (isUIntReset) {
-    for (Node* node : super->member) {
-      for (std::string str : node->resetInsts) {
-        resetFuncStr += str + "\n";
-      }
-    }
-  } else {
-    for (InstInfo inst : super->insts) {
-      switch (inst.infoType) {
-        case SUPER_INFO_IF:
-        case SUPER_INFO_ELSE:
-        case SUPER_INFO_DEDENT:
-        case SUPER_INFO_STR:
-          resetFuncStr += inst.inst + "\n";
-          break;
-        default:
-          break;
-      }
-    }
-  }
-  resetFuncStr += "}\n";
-  resetFuncs.push_back(resetFuncStr);
-
+  emitBodyLock(indent, "subReset%d();\n", resetId);
+  indent --;
   emitBodyLock(indent, "}\n");
 }
 
 void graph::genResetAll() {
-  emitFuncDecl(0, "void S%s::resetAll(){\n", name.c_str());
+  std::vector<SuperNode*> resetSuper;
   for (SuperNode* super : sortedSuper) {
     if (super->superType == SUPER_ASYNC_RESET) {
       Assert(super->resetNode->isAsyncReset(), "invalid reset");
-      genReset(super, false, 1);
+      genResetDef(super, false, 0);
+      resetSuper.push_back(super);
     }
   }
   for (SuperNode* super : uintReset) {
@@ -914,10 +918,15 @@ void graph::genResetAll() {
       Assert(mpz_sgn(super->resetNode->computeInfo->consVal) == 0, "reset %s is always true", super->resetNode->name.c_str());
       continue;
     }
-    genReset(super, true, 1);
+    genResetDef(super, true, 0);
+    resetSuper.push_back(super);
+  }
+
+  emitFuncDecl(0, "void S%s::resetAll(){\n", name.c_str());
+  for (size_t i = 0; i < resetSuper.size(); i ++) {
+    genResetActivation(resetSuper[i], true, 1, i);
   }
   emitBodyLock(0, "}\n");
-  for (std::string str : resetFuncs) emitBodyLock(0, "%s", str.c_str());
 }
 
 void graph::saveDiffRegs() {
