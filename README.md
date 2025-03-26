@@ -1,29 +1,27 @@
-# GSIM: A Graph-based RTL Simulator
+# GSIM: A Fast RTL Simulator for Large-Scale Designs
+
+GSIM accepts chirrtl, and compiles it to C++
 
 ## Prerequisites
 
-Install [Verilator](https://verilator.org/guide/latest/install.html), [GMP](https://gmplib.org/).
++Install [GMP](https://gmplib.org/), [clang 16+](https://clang.llvm.org/).
 
-## Usage
+## Quike Start
 
-Generate high-firrtl from scala
++ GSIM provides 4 RISC-V cores ready for simulation: [ysyx3](https://ysyx.oscc.cc/), [Rocket](https://github.com/chipsalliance/rocket-chip), [BOOM](https://github.com/riscv-boom/riscv-boom), [XiangShan](https://github.com/OpenXiangShan/XiangShan).
 
-    $ mill -i __.test.runMain $(TOP_NAME) -td $(BUILD_DIR) -X high
++ To try GSIM, using
+    ```
+    $ make init
+    $ make run dutName=core
+    ```
++ Set core to `ysyx3`, `rocket`, `small-boom`, `large-boom`, `minimal-xiangshan` and `default-xiangshan`
 
-Generate high-firrtl from chirrtl (using [firrtl](https://github.com/chipsalliance/firrtl))
+## Build GSIM
 
-    $./firrtl/utils/bin/firrtl -i SimTop.fir -X high -o SimTop.hi.fir
++ Run `make build-gsim` to build GSIM
++ Run `build/gsim/gsim $(chirrtl-file)` to compile chirrtl to C++
++ Refer to `build/gsim/gsim --help` for more information
++ See [C++ harness example](https://github.com/jaypiper/simulator/blob/master/emu/emu.cpp) to know how it interacts with the emitted C++ code.
 
-Compile high-firttl to C++
 
-    $ make compile MODE=0
-
-Run the C++ code for simulation
-
-    $ make difftest MODE=0
-
-+ `MODE=0` - run GSIM (default)
-+ `MODE=1` - run verilator
-+ `MODE=2` - run GSIM and verilator concurrently for difftest
-
-See [C++ harness example](https://github.com/jaypiper/simulator/blob/master/emu/emu-NutShell.cpp) to know how it interacts with the emitted C++ code.

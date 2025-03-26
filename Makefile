@@ -23,7 +23,7 @@ else ifeq ($(dutName),rocket)
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-rocket
 	GSIM_FLAGS += --supernode-max-size=20 --cpp-max-size-KB=1024
-else ifeq ($(dutName),boom)
+else ifeq ($(dutName),large-boom)
 	NAME ?= TestHarness
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-LargeBoom
@@ -35,13 +35,13 @@ else ifeq ($(dutName),small-boom)
 	TEST_FILE = $(NAME)-SmallBoom
 	GSIM_FLAGS += --supernode-max-size=35 --cpp-max-size-KB=4096
 	VERI_THREADS = --threads 5
-else ifeq ($(dutName),xiangshan)
+else ifeq ($(dutName),minimal-xiangshan)
 	NAME ?= SimTop
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan-minimal
 	GSIM_FLAGS += --supernode-max-size=35 --cpp-max-size-KB=8192
 	VERI_THREADS = --threads 16
-else ifeq ($(dutName),xiangshan-default)
+else ifeq ($(dutName),default-xiangshan)
 	NAME ?= SimTop
 	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan-default
