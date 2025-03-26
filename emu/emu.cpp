@@ -29,20 +29,20 @@
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 3000000
 #define CYCLE_MAX_SIM  4200000
-#elif defined(__DUT_boom__) || defined(__DUT_small_boom__)
+#elif defined(__DUT_large_boom__) || defined(__DUT_small_boom__)
 #define DUT_MEMORY mem$srams$mem
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 5000000
-#ifdef __DUT_boom__
+#ifdef __DUT_large_boom__
 #define CYCLE_MAX_SIM  3900000
 #else
 #define CYCLE_MAX_SIM  5400000
 #endif
-#elif defined(__DUT_xiangshan__) || defined(__DUT_xiangshan_default__)
+#elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
 #define DUT_MEMORY memory$ram$rdata_mem$mem
 #define REF_MEMORY SimTop__DOT__memory__DOT__ram__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 500000
-#ifdef __DUT_xiangshan_default__
+#ifdef __DUT_default_xiangshan__
 #define CYCLE_MAX_SIM  1900000
 #else
 #define CYCLE_MAX_SIM  3400000
@@ -89,7 +89,7 @@ void dut_init(DUT_NAME *dut) {
   dut->set_difftest$$logCtrl$$begin(0);
   dut->set_difftest$$logCtrl$$end(0);
   dut->set_difftest$$uart$$in$$ch(-1);
-#elif defined(__DUT_xiangshan__) || defined(__DUT_xiangshan_default__)
+#elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
   dut->set_difftest$$perfCtrl$$clean(0);
   dut->set_difftest$$perfCtrl$$dump(0);
   dut->set_difftest$$logCtrl$$begin(0);
@@ -105,7 +105,7 @@ void dut_hook(DUT_NAME *dut) {
     printf("%c", dut->get_difftest$$uart$$out$$ch());
     fflush(stdout);
   }
-#elif defined(__DUT_xiangshan__) || defined(__DUT_xiangshan_default__)
+#elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
   if (dut->get_difftest$$uart$$out$$valid()) {
     printf("%c", dut->get_difftest$$uart$$out$$ch());
     fflush(stdout);
@@ -123,7 +123,7 @@ void ref_init(REF_NAME *ref) {
 #if defined(__DUT_NutShell__)
   ref->rootp->difftest_logCtrl_begin = ref->rootp->difftest_logCtrl_begin = 0;
   ref->rootp->difftest_uart_in_valid = -1;
-#elif defined(__DUT_xiangshan__) || defined(__DUT_xiangshan_default__)
+#elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
   ref->difftest_perfCtrl_clean = ref->difftest_perfCtrl_dump = 0;
   ref->difftest_uart_in_ch = -1;
   ref->difftest_uart_in_valid = 0;
@@ -136,7 +136,7 @@ void ref_hook(REF_NAME *ref) {
     printf("%c", ref->rootp->difftest_uart_out_ch);
     fflush(stdout);
   }
-#elif defined(__DUT_xiangshan__) || defined(__DUT_xiangshan_default__)
+#elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
   if (ref->difftest_uart_out_valid) {
     printf("%c", ref->difftest_uart_out_ch);
     fflush(stdout);
