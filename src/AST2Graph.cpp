@@ -1479,34 +1479,31 @@ void visitWhenConnect(graph* g, PNode* connect) {
 void visitWhenPrintf(graph* g, PNode* print) {
   TYPE_CHECK(print, 3, 3, P_PRINTF);
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, "PRINTF_" + std::to_string(print->lineno)), print->lineno);
-  ASTExpTree* exp = visitExpr(g, print->getChild(1));
+  ASTExpTree* exp = visitExpr(g, print->getChild(1)); // cond
 
   ENode* expRoot = exp->getExpRoot();
-  for (size_t i = 0; i < whenTrace.size(); i ++) {
-    ENode* andNode = new ENode(OP_AND);
-    andNode->addChild(expRoot);
-    ENode* condNode = new ENode(whenTrace[i].second);
-    if (whenTrace[i].first) {
-      andNode->addChild(condNode);
-    } else {
-      ENode* notNode = new ENode(OP_NOT);
-      notNode->addChild(condNode);
-      andNode->addChild(notNode);
-    }
-    expRoot = andNode;
-  }
 
-  ENode* enode = new ENode(OP_PRINTF);
-  enode->strVal = print->getExtra(0);
-  enode->addChild(expRoot);
+  ExpTree* valTree = nullptr;
+  ENode* whenNode;
+  std::tie(valTree, whenNode) = growWhenTrace(n, nullptr, 0);
 
+  ENode* printENode = new ENode(OP_PRINTF);
+  printENode->strVal = print->getExtra(0);
   PNode* exprs = print->getChild(2);
   for (int i = 0; i < exprs->getChildNum(); i ++) {
     ASTExpTree* val = visitExpr(g, exprs->getChild(i));
-    enode->addChild(val->getExpRoot());
+    printENode->addChild(val->getExpRoot());
   }
 
-  n->valTree = new ExpTree(enode, new ENode(n));
+  ENode* when = new ENode(OP_WHEN);
+  when->addChild(expRoot);
+  when->addChild(printENode);
+  when->addChild(nullptr);
+
+  whenNode->setChild(whenTrace.back().first ? 1 : 2, when);
+
+  valTree->setlval(new ENode(n));
+  n->valTree = valTree;
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
 }
@@ -1638,15 +1635,18 @@ void visitPrintf(graph* g, PNode* print) {
   ENode* enode = new ENode(OP_PRINTF);
   enode->strVal = print->getExtra(0);
 
-  enode->addChild(exp->getExpRoot());
-  
   PNode* exprs = print->getChild(2);
   for (int i = 0; i < exprs->getChildNum(); i ++) {
     ASTExpTree* val = visitExpr(g, exprs->getChild(i));
     enode->addChild(val->getExpRoot());
   }
 
-  n->valTree = new ExpTree(enode, new ENode(n));
+  ENode* whenENode = new ENode(OP_WHEN);
+  whenENode->addChild(exp->getExpRoot());
+  whenENode->addChild(enode);
+  whenENode->addChild(nullptr);
+
+  n->valTree = new ExpTree(whenENode, new ENode(n));
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
 }

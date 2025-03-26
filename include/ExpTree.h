@@ -179,7 +179,6 @@ private:
   valInfo* consReset(bool isLvalue);
   valInfo* consAssert();
   valInfo* consExit();
-  valInfo* consPrint();
   /* used in usedBits */
   size_t checkChildIdx(size_t idx) {
     Assert(getChildNum() > idx, "idx %ld is out of bound [0, %ld)", idx, getChildNum());

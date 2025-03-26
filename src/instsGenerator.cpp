@@ -1490,17 +1490,14 @@ valInfo* ENode::instsInvalid(Node* node, std::string lvalue, bool isRoot) {
 
 valInfo* ENode::instsPrintf() {
   valInfo* ret = computeInfo;
-  ret->status = VAL_FINISH;
-  std::string printfInst = format("if %s { gprintf(%s", addBracket(ChildInfo(0, valStr)).c_str(), strVal.c_str());
-  for (size_t i = 1; i < getChildNum(); i ++) {
-    printfInst += ", " + std::to_string(ChildInfo(i, typeWidth));
+  ret->status = VAL_VALID;
+  std::string printfInst = format("gprintf(%s", strVal.c_str());
+  for (size_t i = 0; i < getChildNum(); i ++) {
     printfInst += ", " + ChildInfo(i, valStr);
   }
-  printfInst += "); fflush(stdout); }";
+  printfInst += "); fflush(stdout);";
 
-  if (ChildInfo(0, status) != VAL_CONSTANT || mpz_cmp_ui(ChildInfo(0, consVal), 0) != 0) {
-    ret->insts.push_back(printfInst);
-  }
+  ret->insts.push_back(printfInst);
   ret->valStr = printfInst;
   ret->opNum = -1;
   return ret;
@@ -1961,7 +1958,7 @@ void StmtNode::compute(std::vector<InstInfo>& insts) {
       Node* node = tree->getlval()->getNode();
       valInfo* linfo = tree->getlval()->compute(node, INVALID_LVALUE, false);
       valInfo* rinfo = tree->getRoot()->compute(node, linfo->valStr, true);
-      if (rinfo->status == VAL_FINISH) { // printf / assert
+      if (rinfo->status == VAL_FINISH || node->type == NODE_SPECIAL) { // printf / assert
         insts.push_back(InstInfo(rinfo->valStr));
       } else if (rinfo->status == VAL_INVALID) {
       } else if (rinfo->opNum >= 0) {
