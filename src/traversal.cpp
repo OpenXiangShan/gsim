@@ -103,7 +103,11 @@ void ExpTree::display() {
 
 /* traverse graph */
 void graph::traversal() {
-  for (SuperNode* super : sortedSuper) {
+  auto list = sortedSuper;
+  if (list.empty()){
+    list = supersrc;
+  }
+  for (auto super : list) {
     super->display();
   }
 }
