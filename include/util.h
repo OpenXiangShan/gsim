@@ -2,6 +2,12 @@
 #define UTIL_H
 
 #include <sys/time.h>
+#include <string>
+
+enum class ShiftDir{
+  Left,
+  Right,
+};
 
 OPType str2op_expr2(std::string name);
 OPType str2op_expr1(std::string name);
@@ -14,6 +20,8 @@ std::string to_hex_string(BASIC_TYPE x);
 std::pair<int, std::string> firStrBase(std::string s);
 std::string format(const char *fmt, ...);
 std::string bitMask(int width);
+std::string shiftBits(unsigned int bits, ShiftDir dir);
+std::string shiftBits(std::string bits, ShiftDir dir);
 void print_stacktrace();
 
 static inline struct timeval getTime() {

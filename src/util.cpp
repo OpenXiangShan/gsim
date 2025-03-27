@@ -8,6 +8,7 @@
 #include <iostream>
 #include "common.h"
 #include <execinfo.h>
+#include "util.h"
 
 /* convert firrtl constant to C++ constant 
    In the new FIRRTL spec, there are 'int' and 'rint'.*/
@@ -130,6 +131,17 @@ std::string bitMask(int width) {
       return format("(((%s)1 << %d) - 1)", type.c_str(), width);
     }
   }
+}
+
+std::string shiftBits(unsigned int bits, ShiftDir dir){
+  if(bits == 0)
+    return "";
+  return (dir == ShiftDir::Left? " << " : " >> ") + std::to_string(bits);
+}
+std::string shiftBits(std:: string bits, ShiftDir dir){
+  if(bits == std::to_string(0) || bits == "0x0")
+    return "";
+  return (dir == ShiftDir::Left? " << " : " >> ") + bits;
 }
 
 void print_stacktrace() {
