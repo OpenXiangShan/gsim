@@ -632,7 +632,7 @@ valInfo* ENode::instsDIv(Node* node, std::string lvalue, bool isRoot) {
     us_div(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
   } else {
-    ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign)+ ChildInfo(0, valStr) + " / " + ChildInfo(1, valStr) + ")";
+    ret->valStr = "gdiv(" + upperCast(width, ChildInfo(0, width), sign)+ ChildInfo(0, valStr) + ", " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   }
   return ret;

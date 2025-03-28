@@ -210,6 +210,7 @@ FILE* graph::genHeaderStart() {
                        "assert(cond);"
                      "}"
                    "} while (0)\n");
+  fprintf(header, "#define gdiv(a, b) ((b) == 0 ? 0 : (a) / (b))\n");
 
   fprintf(header, "#ifndef __BITINT_MAXWIDTH__ // defined by clang\n");
   fprintf(header, "#error Please compile with clang 16 or above\n");
