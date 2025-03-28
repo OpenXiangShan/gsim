@@ -838,6 +838,7 @@ bool graph::__emitSrc(bool canNewFile, bool alreadyEndFunc, const char *nextFunc
 void graph::emitPrintf() {
   emitFuncDecl("void gprintf(const char *fmt, ...) {\n");
   emitBodyLock(
+  "  FILE *fp = stderr;\n"
   "  va_list args;\n"
   "  va_start(args, fmt);\n"
   "  int fmt_idx = 0;\n"
@@ -846,7 +847,7 @@ void graph::emitPrintf() {
   "    switch (c) {\n"
   "      case '%%': break;\n"
   "      case 0: return;\n"
-  "      default: putchar(c); continue;\n"
+  "      default: fputc(c, fp); continue;\n"
   "    }\n"
   "\n"
   "    uint64_t lval = 0;\n"
@@ -857,9 +858,9 @@ void graph::emitPrintf() {
   "\n"
   "    c = fmt[fmt_idx ++];\n"
   "    switch (c) {\n"
-  "      case 'd': printf(\"%%ld\", lval); break;\n"
-  "      case 'c': putchar(lval & 0xff); break;\n"
-  "      case 'x': printf(\"%%lx\", lval); break;\n"
+  "      case 'd': fprintf(fp, \"%%ld\", lval); break;\n"
+  "      case 'c': fputc(lval & 0xff, fp); break;\n"
+  "      case 'x': fprintf(fp, \"%%lx\", lval); break;\n"
   "      default: assert(0);\n"
   "    }\n"
   "  }\n"
