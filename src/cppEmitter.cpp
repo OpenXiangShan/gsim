@@ -202,7 +202,7 @@ FILE* graph::genHeaderStart() {
   fprintf(header, "//#define ENABLE_LOG\n");
   fprintf(header, "//#define RANDOMIZE_INIT\n");
 
-  fprintf(header, "\n#define Assert(cond, ...) do {"
+  fprintf(header, "\n#define gAssert(cond, ...) do {"
                      "if (!(cond)) {"
                        "fprintf(stderr, \"\\33[1;31m\");"
                        "fprintf(stderr, __VA_ARGS__);"

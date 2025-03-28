@@ -1526,17 +1526,17 @@ valInfo* ENode::instsAssert() {
   std::string assertInst;
   if (ChildInfo(0, status) == VAL_CONSTANT) { // pred is constant
     if (mpz_cmp_ui(ChildInfo(0, consVal), 0) == 0) {
-      assertInst = "Assert(!" + enStr + ", " + strVal + ");";
+      assertInst = "gAssert(!" + enStr + ", " + strVal + ");";
     } else { // pred is always satisfied
       assertInst = "";
     }
   } else if (ChildInfo(1, status) == VAL_CONSTANT) { // en is constant pred is not constant
     if (mpz_cmp_ui(ChildInfo(1, consVal), 0) == 0) assertInst = "";
     else {
-      assertInst = "Assert(" + predStr + ", " + strVal + ");";
+      assertInst = "gAssert(" + predStr + ", " + strVal + ");";
     }
   } else {
-    assertInst = "Assert(!" + enStr + " || " + predStr + ", " + strVal + ");";
+    assertInst = "gAssert(!" + enStr + " || " + predStr + ", " + strVal + ");";
   }
   
   if (assertInst.length() != 0) ret->insts.push_back(assertInst);
