@@ -1813,6 +1813,8 @@ valInfo* Node::compute() {
     }
     computeInfo->width = width;
     computeInfo->sign = sign;
+    computeInfo->typeWidth = upperPower2(width);
+    computeInfo->opNum = 0;
     tmp_pop();
     return computeInfo;
   }
