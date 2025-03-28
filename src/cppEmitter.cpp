@@ -195,6 +195,7 @@ FILE* graph::genHeaderStart() {
   includeLib(header, "iomanip", true);
   includeLib(header, "cstring", true);
   includeLib(header, "map", true);
+  includeLib(header, "cstdarg", true);
   newLine(header);
 
   fprintf(header, "\n// User configuration\n");
@@ -209,6 +210,7 @@ FILE* graph::genHeaderStart() {
                        "assert(cond);"
                      "}"
                    "} while (0)\n");
+  fprintf(header, "#define gdiv(a, b) ((b) == 0 ? 0 : (a) / (b))\n");
 
   fprintf(header, "#ifndef __BITINT_MAXWIDTH__ // defined by clang\n");
   fprintf(header, "#error Please compile with clang 16 or above\n");
@@ -216,6 +218,7 @@ FILE* graph::genHeaderStart() {
 
   fprintf(header, "#define likely(x) __builtin_expect(!!(x), 1)\n");
   fprintf(header, "#define unlikely(x) __builtin_expect(!!(x), 0)\n");
+  fprintf(header, "void gprintf(const char *fmt, ...);\n");
 
   for (int num = 2; num <= maxConcatNum; num ++) {
     std::string param;
@@ -832,6 +835,39 @@ bool graph::__emitSrc(bool canNewFile, bool alreadyEndFunc, const char *nextFunc
   return newFile;
 }
 
+void graph::emitPrintf() {
+  emitFuncDecl("void gprintf(const char *fmt, ...) {\n");
+  emitBodyLock(
+  "  FILE *fp = stderr;\n"
+  "  va_list args;\n"
+  "  va_start(args, fmt);\n"
+  "  int fmt_idx = 0;\n"
+  "  while (true) {\n"
+  "    char c = fmt[fmt_idx ++];\n"
+  "    switch (c) {\n"
+  "      case '%%': break;\n"
+  "      case 0: return;\n"
+  "      default: fputc(c, fp); continue;\n"
+  "    }\n"
+  "\n"
+  "    uint64_t lval = 0;\n"
+  "    int bits = va_arg(args, uint32_t);\n"
+  "    if      (bits <= 32) { lval = va_arg(args, uint32_t); }\n"
+  "    else if (bits <= 64) { lval = va_arg(args, uint64_t); }\n"
+  "    else                 { assert(0); }\n"
+  "\n"
+  "    c = fmt[fmt_idx ++];\n"
+  "    switch (c) {\n"
+  "      case 'd': fprintf(fp, \"%%ld\", lval); break;\n"
+  "      case 'c': fputc(lval & 0xff, fp); break;\n"
+  "      case 'x': fprintf(fp, \"%%lx\", lval); break;\n"
+  "      default: assert(0);\n"
+  "    }\n"
+  "  }\n"
+  "}\n"
+  );
+}
+
 void graph::cppEmitter() {
   for (SuperNode* super : sortedSuper) {
     if (!super->instsEmpty() || super->superType == SUPER_EXTMOD) {
@@ -880,7 +916,7 @@ void graph::cppEmitter() {
   fprintf(header, "size_t validActive[%d];\n", superId);
   fprintf(header, "size_t nodeNum[%d];\n", superId);
 #endif
-
+  emitPrintf();
   /* constrcutor */
   emitFuncDecl("S%s::S%s() {\n"
                "  cycles = 0;\n"

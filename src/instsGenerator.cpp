@@ -632,7 +632,7 @@ valInfo* ENode::instsDIv(Node* node, std::string lvalue, bool isRoot) {
     us_div(ret->consVal, ChildInfo(0, consVal), ChildInfo(0, width), ChildInfo(1, consVal), ChildInfo(1, width));
     ret->setConsStr();
   } else {
-    ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign)+ ChildInfo(0, valStr) + " / " + ChildInfo(1, valStr) + ")";
+    ret->valStr = "gdiv(" + upperCast(width, ChildInfo(0, width), sign)+ ChildInfo(0, valStr) + ", " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   }
   return ret;
@@ -1494,8 +1494,9 @@ valInfo* ENode::instsInvalid(Node* node, std::string lvalue, bool isRoot) {
 valInfo* ENode::instsPrintf() {
   valInfo* ret = computeInfo;
   ret->status = VAL_FINISH;
-  std::string printfInst = format("if %s { printf(%s", addBracket(ChildInfo(0, valStr)).c_str(), strVal.c_str());
+  std::string printfInst = format("if %s { gprintf(%s", addBracket(ChildInfo(0, valStr)).c_str(), strVal.c_str());
   for (size_t i = 1; i < getChildNum(); i ++) {
+    printfInst += ", " + std::to_string(ChildInfo(i, typeWidth));
     printfInst += ", " + ChildInfo(i, valStr);
   }
   printfInst += "); fflush(stdout); }";
@@ -1812,6 +1813,8 @@ valInfo* Node::compute() {
     }
     computeInfo->width = width;
     computeInfo->sign = sign;
+    computeInfo->typeWidth = upperPower2(width);
+    computeInfo->opNum = 0;
     tmp_pop();
     return computeInfo;
   }

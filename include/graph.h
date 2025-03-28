@@ -11,6 +11,7 @@ class graph {
   int srcFileBytes;
 
   bool __emitSrc(bool canNewFile, bool alreadyEndFunc, const char *nextFuncDef, const char *fmt, ...);
+  void emitPrintf();
   void activateNext(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName);
   void activateUncondNext(Node* node, std::set<int>activateId, bool inStep, std::string flagName);
 
