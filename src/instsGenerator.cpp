@@ -1493,6 +1493,7 @@ valInfo* ENode::instsPrintf() {
   ret->status = VAL_VALID;
   std::string printfInst = format("gprintf(%s", strVal.c_str());
   for (size_t i = 0; i < getChildNum(); i ++) {
+    printfInst += ", " + std::to_string(ChildInfo(i, typeWidth));
     printfInst += ", " + ChildInfo(i, valStr);
   }
   printfInst += "); fflush(stdout);";

@@ -396,16 +396,16 @@ void graph::genNodeDef(FILE* fp, Node* node) {
     (((w < 64) && (w != 8 && w != 16 && w != 32 && w != 64)) || ((w > 64) && (w % 32 != 0)));
   if (needInitMask) {
     if (node->dimension.empty()) {
-      emitBodyLock("  %s &= %s;\n", node->name.c_str(), bitMask(w).c_str());
+      emitBodyLock(1, "%s &= %s;\n", node->name.c_str(), bitMask(w).c_str());
     } else {
       int dims = node->dimension.size();
       for (int i = 0; i < dims; i ++) {
-        emitBodyLock("  for (int i%d = 0; i%d < %d; i%d ++) {\n", i, i, node->dimension[i], i);
+        emitBodyLock(1, "for (int i%d = 0; i%d < %d; i%d ++) {\n", i, i, node->dimension[i], i);
       }
-      emitBodyLock("  %s", node->name.c_str());
-      for (int i = 0; i < dims; i ++) { emitBodyLock("[i%d]", i); }
-      emitBodyLock(" &= %s;\n", bitMask(w).c_str());
-      for (int i = 0; i < dims; i ++) { emitBodyLock("}\n"); }
+      emitBodyLock(1, "%s", node->name.c_str());
+      for (int i = 0; i < dims; i ++) { emitBodyLock(0, "[i%d]", i); }
+      emitBodyLock(0, "&= %s;\n", bitMask(w).c_str());
+      for (int i = 0; i < dims; i ++) { emitBodyLock(0, "}\n"); }
     }
   }
 
@@ -414,7 +414,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
     Assert(!node->isArray() && node->width <= BASIC_WIDTH, "%s is treated as reset (isArray: %d width: %d)", node->name.c_str(), node->isArray(), node->width);
     fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), RESET_NAME(node).c_str());
     if (needInitMask) {
-      emitBodyLock("  %s = %s & %s;\n", RESET_NAME(node).c_str(), RESET_NAME(node).c_str(), bitMask(w).c_str());
+      emitBodyLock(1, "%s = %s & %s;\n", RESET_NAME(node).c_str(), RESET_NAME(node).c_str(), bitMask(w).c_str());
     }
   }
 }
@@ -1008,8 +1008,8 @@ bool graph::__emitSrc(int indent, bool canNewFile, bool alreadyEndFunc, const ch
 }
 
 void graph::emitPrintf() {
-  emitFuncDecl("void gprintf(const char *fmt, ...) {\n");
-  emitBodyLock(
+  emitFuncDecl(0, "void gprintf(const char *fmt, ...) {\n");
+  emitBodyLock(0,
   "  FILE *fp = stderr;\n"
   "  va_list args;\n"
   "  va_start(args, fmt);\n"
@@ -1090,8 +1090,7 @@ void graph::cppEmitter() {
 #endif
   emitPrintf();
   /* constrcutor */
-  fprintf(header, "S%s();\n", name.c_str());
-  emitFuncDecl("S%s::S%s() {\n"
+  emitFuncDecl(0, "S%s::S%s() {\n"
                "  cycles = 0;\n"
                "  LOG_START = 1;\n"
                "  LOG_END = 0;\n"
@@ -1099,9 +1098,8 @@ void graph::cppEmitter() {
                "}\n", name.c_str(), name.c_str());
 
   /* initialization */
-  fprintf(header, "void init();\n");
-  emitFuncDecl("void S%s::init() {\n", name.c_str());
-  emitBodyLock("  activateAll();\n");
+  emitFuncDecl(0, "void S%s::init() {\n", name.c_str());
+  emitBodyLock(1, "activateAll();\n");
 #ifdef PERF
   emitBodyLock("  for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
   #if ENABLE_ACTIVATOR
@@ -1118,8 +1116,30 @@ void graph::cppEmitter() {
   }
   emitBodyLock("  for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
 #endif
+  emitBodyLock(0, "#ifdef RANDOMIZE_INIT\n"
+               "  srand((unsigned int)time(NULL));\n"
+               "  for (uint32_t *p = &_var_start; p != &_var_end; p ++) {\n"
+               "    *p = rand();\n"
+               "  }\n"
+               "// mask out the bits out of the width range\n");
 
-  emitBodyLock("  memset(&_var_start, 0, &_var_end - &_var_start);\n");
+  // header: node definition; src: node evaluation
+  fprintf(header, "uint32_t _var_start;\n");
+  for (SuperNode* super : sortedSuper) {
+    // std::string insts;
+    if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
+      for (Node* n : super->member) genNodeDef(header, n);
+    }
+    if (super->superType == SUPER_EXTMOD) {
+      for (size_t i = 1; i < super->member.size(); i ++) genNodeDef(header, super->member[i]);
+    }
+  }
+  /* memory definition */
+  for (Node* mem : memory) genNodeDef(header, mem);
+  fprintf(header, "uint32_t _var_end;\n");
+
+  emitBodyLock(0, "// initialize registers with reset value 0 to overwrite the rand() results\n" );
+  emitBodyLock(1, "memset(&_var_start, 0, &_var_end - &_var_start);\n");
   for (SuperNode* super : sortedSuper) {
     if (super->superType != SUPER_VALID && super->superType != SUPER_ASYNC_RESET) continue;
     for (Node* member : super->member) {
@@ -1127,7 +1147,7 @@ void graph::cppEmitter() {
     }
   }
 
-  emitBodyLock("#else\n" // RANDOMIZE_INIT
+  emitBodyLock(0, "#else\n" // RANDOMIZE_INIT
                "  memset(&_var_start, 0, &_var_end - &_var_start);\n"
                "#endif\n");
 
