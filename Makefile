@@ -49,7 +49,6 @@ endif
 BUILD_DIR ?= build
 WORK_DIR = $(BUILD_DIR)/$(TEST_FILE)
 CXX = clang++
-CCACHE = ccache
 
 SHELL := /bin/bash
 TIME = /usr/bin/time
@@ -65,7 +64,7 @@ CFLAGS_DUT = -DDUT_NAME=S$(NAME) -DDUT_HEADER=\"$(NAME).h\" -D__DUT_$(shell echo
 define CXX_TEMPLATE =
 $(1): $(2) $(THIS_MAKEFILE) $(5)
 	@mkdir -p $$(@D) && echo + CXX $$<
-	@$(CCACHE) $(CXX) $$< $(3) -c -o $$@
+	@$(CXX) $$< $(3) -c -o $$@
 $(4) += $(1)
 endef
 
