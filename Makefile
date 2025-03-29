@@ -199,7 +199,7 @@ $(foreach x, $(EMU_SRCS), $(eval \
 $(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS)))
 
 run-emu: $(EMU_BIN)
-	$(TIME) $^ $(mainargs)
+	$(TIME) taskset 0x1 $^ $(mainargs)
 
 clean-emu:
 	-rm -rf $(EMU_BUILD_DIR) $(EMU_BIN)
