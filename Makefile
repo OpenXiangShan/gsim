@@ -10,40 +10,33 @@ THIS_MAKEFILE = Makefile
 
 ifeq ($(dutName),ysyx3)
 	NAME ?= newtop
-	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-ysyx3
 	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),NutShell)
 	NAME ?= SimTop
-	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-nutshell
 	GSIM_FLAGS += --supernode-max-size=20
 else ifeq ($(dutName),rocket)
 	NAME ?= TestHarness
-	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-rocket
 	GSIM_FLAGS += --supernode-max-size=20 --cpp-max-size-KB=1024
 else ifeq ($(dutName),large-boom)
 	NAME ?= TestHarness
-	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-LargeBoom
 	GSIM_FLAGS += --supernode-max-size=35 --cpp-max-size-KB=4096
 	VERI_THREADS = --threads 5
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
-	PGO_WORKLOAD ?= ready-to-run/bin/microbench-rocket.bin
 	TEST_FILE = $(NAME)-SmallBoom
 	GSIM_FLAGS += --supernode-max-size=35 --cpp-max-size-KB=4096
 	VERI_THREADS = --threads 5
 else ifeq ($(dutName),minimal-xiangshan)
 	NAME ?= SimTop
-	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan-minimal
 	GSIM_FLAGS += --supernode-max-size=35 --cpp-max-size-KB=8192
 	VERI_THREADS = --threads 16
 else ifeq ($(dutName),default-xiangshan)
 	NAME ?= SimTop
-	PGO_WORKLOAD ?= ready-to-run/bin/microbench-NutShell.bin
 	TEST_FILE = $(NAME)-xiangshan-default
 	GSIM_FLAGS += --supernode-max-size=35 --cpp-max-size-KB=8192
 	VERI_THREADS = --threads 16
@@ -56,7 +49,6 @@ endif
 BUILD_DIR ?= build
 WORK_DIR = $(BUILD_DIR)/$(TEST_FILE)
 CXX = clang++
-CCACHE = ccache
 
 SHELL := /bin/bash
 TIME = /usr/bin/time
@@ -72,7 +64,7 @@ CFLAGS_DUT = -DDUT_NAME=S$(NAME) -DDUT_HEADER=\"$(NAME).h\" -D__DUT_$(shell echo
 define CXX_TEMPLATE =
 $(1): $(2) $(THIS_MAKEFILE) $(5)
 	@mkdir -p $$(@D) && echo + CXX $$<
-	@$(CCACHE) $(CXX) $$< $(3) -c -o $$@
+	@$(CXX) $$< $(3) -c -o $$@
 $(4) += $(1)
 endef
 
@@ -206,7 +198,7 @@ $(foreach x, $(EMU_SRCS), $(eval \
 $(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS)))
 
 run-emu: $(EMU_BIN)
-	$(TIME) $^ $(mainargs)
+	$(TIME) taskset 0x1 $^ $(mainargs)
 
 clean-emu:
 	-rm -rf $(EMU_BUILD_DIR) $(EMU_BIN)
@@ -281,22 +273,17 @@ REF_GSIM_OBJS = $(addprefix $(EMU_BUILD_DIR)/, $(REF_GSIM_SRCS:.cpp=.o))
 LLVM_PROFDATA = llvm-profdata
 PGO_BUILD_DIR = $(WORK_DIR)/pgo
 
-build-emu-pgo:
+pgo:
 	rm -rf $(PGO_BUILD_DIR)
 	mkdir -p $(PGO_BUILD_DIR)
-	make clean-pgo
-	make build-emu PGO_CFLAGS="-fprofile-generate=`realpath $(PGO_BUILD_DIR)`"
-	./scripts/run_until_exit.sh $(target) $(PGO_WORKLOAD)
-ifneq ($(LLVM_PROFDATA),)
+	$(MAKE) MODE=0 compile
+	make clean-emu
+	make run-emu MODE=0 PGO_CFLAGS="-fprofile-generate=$(PGO_BUILD_DIR)"
 	$(LLVM_PROFDATA) merge -o $(PGO_BUILD_DIR)/default.profdata $(PGO_BUILD_DIR)/*.profraw
-endif
-	make clean-pgo
-	make build-emu PGO_CFLAGS="-fprofile-use=$(PGO_BUILD_DIR)/default.profdata"
+	make clean-emu
+	make run-emu MODE=0 PGO_CFLAGS="-fprofile-use=$(PGO_BUILD_DIR)/default.profdata"
 
-clean-pgo:
-	-rm -rf $(EMU_BUILD_DIR)
-
-.PHONY: build-emu-pgo clean-pgo
+.PHONY: pgo
 
 ##############################################
 ### Miscellaneous
