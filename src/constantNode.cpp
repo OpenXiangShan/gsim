@@ -615,15 +615,6 @@ valInfo* ENode::consAssert() {
   return ret;
 }
 
-valInfo* ENode::consPrint() {
-  valInfo* ret = new valInfo(width, sign);
-  if (ChildCons(0, status) == VAL_CONSTANT && mpz_sgn(ChildCons(0, consVal)) == 0) {
-    mpz_set_ui(ret->consVal, 0);
-    ret->updateConsVal();
-  }
-  return ret;
-}
-
 valInfo* ENode::consExit() {
   valInfo* ret = new valInfo(width, sign);
   if (ChildCons(0, status) == VAL_CONSTANT && mpz_sgn(ChildCons(0, consVal)) == 0) {
@@ -739,7 +730,7 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
     case OP_WRITE_MEM: ret = new valInfo(width, sign); break;
     case OP_INVALID: ret = consInvalid(isLvalue); break;
     case OP_RESET: ret = consReset(isLvalue); break;
-    case OP_PRINTF: ret = consPrint(); break;
+    case OP_PRINTF: ret = new valInfo(); break;
     case OP_ASSERT: ret = consAssert(); break;
     case OP_EXIT: ret = consExit(); break;
     case OP_EXT_FUNC: ret = new valInfo(width, sign); break;
@@ -1254,8 +1245,7 @@ void graph::constantAnalysis() {
           constantButValid.insert(member);
         }
       }
-      member->prev.clear();
-      member->next.clear();
+      member->clear_relation();
     }
   }
   removeNodes(CONSTANT_NODE);
@@ -1266,14 +1256,7 @@ void graph::constantAnalysis() {
   for (Node* n : constantButValid) {
     n->status = CONSTANT_NODE;
   }
-
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      member->updateConnect();
-    }
-  }
-  removeEmptySuper();
-  reconnectSuper();
+  reconnectAll();
 
   size_t optimizeNodes = countNodes();
   printf("[constantNode] find %d constantNodes (total %ld)\n", consNum, optimizeNodes);

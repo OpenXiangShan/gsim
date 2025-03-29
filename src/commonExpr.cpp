@@ -188,18 +188,7 @@ void graph::commonExpr() {
 
 /* update connection */
   removeNodesNoConnect(DEAD_NODE);
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      member->prev.clear();
-      member->next.clear();
-    }
-  }
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      member->updateConnect();
-    }
-  }
-  removeNodes(DEAD_NODE);
+  reconnectAll();
 
   printf("[commonExpr] remove %ld nodes (-> %ld)\n", aliasMap.size(), countNodes());
 

@@ -107,7 +107,7 @@ void graph::replicationOpt() {
       if (super == node->super) continue;
       std::string dupName = format("%s$DUP_%d", node->name.c_str(), repIdx ++);
       Node* repNode = node->dup(node->type, dupName);
-      for (Node* prev : node->prev) prev->next.insert(repNode);
+      for (Node* prev : node->prev) prev->addNext(repNode);
       repNode->assignTree.push_back(new ExpTree(node->assignTree[0]->getRoot()->dup(), new ENode(repNode)));
       super->member.insert(super->member.begin(), repNode);
       repNode->super = super;
@@ -117,18 +117,7 @@ void graph::replicationOpt() {
     }
   }
   removeNodesNoConnect(REPLICATION_NODE);
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      member->prev.clear();
-      member->next.clear();
-    }
-  }
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      member->updateConnect();
-    }
-  }
-  removeNodes(REPLICATION_NODE);
+  reconnectAll();
   printf("[replication] remove %ld nodes (%ld -> %ld)\n", optimizeNum, oldNum, countNodes());
   printf("[replication] remove %ld superNodes (%ld -> %ld)\n", oldSuper - sortedSuper.size(), oldSuper, sortedSuper.size());
 }

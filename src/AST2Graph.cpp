@@ -1342,7 +1342,7 @@ newRoot:  when3
       cond3 a b
 replace oldRoot by newRoot
 */
-std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, size_t depth) {
+std::pair<ExpTree*, ENode*> growWhenTrace(Node* node, ExpTree* valTree, size_t depth) {
   ENode* oldParent = nullptr;
   size_t maxDepth = depth;
   if (valTree) std::tie(oldParent, maxDepth) = getDeepestWhen(valTree, depth);
@@ -1371,7 +1371,7 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, size_t depth) {
     ENode* whenNode = new ENode(OP_WHEN); // return the deepest whenNode
     if (depth == whenTrace.size() - 1) retENode = whenNode;
     ENode* condNode = new ENode(whenTrace[depth].second);
-
+    childRoot = childRoot ? childRoot->dup() : childRoot;
     if (whenTrace[depth].first) {
       whenNode->addChild(condNode);
       whenNode->addChild(newRoot);
@@ -1385,7 +1385,7 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, size_t depth) {
     if (depth == 0) break;
   }
   if (!oldRoot) {
-    if (maxDepth == depth) {
+    if (maxDepth == depth) { // depth: depth the node defined; maxDepth: deepest when that matches valTree
       if (valTree) valTree->setRoot(newRoot);
       else valTree = new ExpTree(newRoot);
     } else {
@@ -1393,15 +1393,8 @@ std::pair<ExpTree*, ENode*> growWhenTrace(ExpTree* valTree, size_t depth) {
     }
   } else {
     if (maxDepth == depth) {
-      if (valTree->getRoot()->opType == OP_STMT) {
-        valTree->getRoot()->addChild(newRoot);
-      } else {
-        ENode* stmt = nullptr;
-        stmt = new ENode(OP_STMT);
-        stmt->addChild(valTree->getRoot());
-        stmt->addChild(newRoot);
-        valTree->setRoot(stmt);
-      }
+      if (valTree) node->assignTree.push_back(valTree);
+      valTree = new ExpTree(newRoot);
     } else {
       ENode* stmt = nullptr;
       if (oldRoot->opType == OP_STMT) {
@@ -1434,9 +1427,9 @@ void whenConnect(graph* g, Node* node, ENode* lvalue, ENode* rvalue, PNode* conn
   ENode* whenNode;
   size_t connectDepth = (node->type == NODE_WRITER || node->type == NODE_INFER || node->type == NODE_READWRITER) ? 0 : node->whenDepth;
   if (node->isArray()) {
-    std::tie(valTree, whenNode) = growWhenTrace(nullptr, connectDepth);
+    std::tie(valTree, whenNode) = growWhenTrace(node, nullptr, connectDepth);
   } else {
-    std::tie(valTree, whenNode) = growWhenTrace(node->valTree, connectDepth);
+    std::tie(valTree, whenNode) = growWhenTrace(node, node->valTree, connectDepth);
   }
   valTree->setlval(lvalue);
   if (node->type == NODE_WRITER || node->type == NODE_INFER || node->type == NODE_READWRITER) {
@@ -1486,34 +1479,31 @@ void visitWhenConnect(graph* g, PNode* connect) {
 void visitWhenPrintf(graph* g, PNode* print) {
   TYPE_CHECK(print, 3, 3, P_PRINTF);
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, "PRINTF_" + std::to_string(print->lineno)), print->lineno);
-  ASTExpTree* exp = visitExpr(g, print->getChild(1));
+  ASTExpTree* exp = visitExpr(g, print->getChild(1)); // cond
 
   ENode* expRoot = exp->getExpRoot();
-  for (size_t i = 0; i < whenTrace.size(); i ++) {
-    ENode* andNode = new ENode(OP_AND);
-    andNode->addChild(expRoot);
-    ENode* condNode = new ENode(whenTrace[i].second);
-    if (whenTrace[i].first) {
-      andNode->addChild(condNode);
-    } else {
-      ENode* notNode = new ENode(OP_NOT);
-      notNode->addChild(condNode);
-      andNode->addChild(notNode);
-    }
-    expRoot = andNode;
-  }
 
-  ENode* enode = new ENode(OP_PRINTF);
-  enode->strVal = print->getExtra(0);
-  enode->addChild(expRoot);
+  ExpTree* valTree = nullptr;
+  ENode* whenNode;
+  std::tie(valTree, whenNode) = growWhenTrace(n, nullptr, 0);
 
+  ENode* printENode = new ENode(OP_PRINTF);
+  printENode->strVal = print->getExtra(0);
   PNode* exprs = print->getChild(2);
   for (int i = 0; i < exprs->getChildNum(); i ++) {
     ASTExpTree* val = visitExpr(g, exprs->getChild(i));
-    enode->addChild(val->getExpRoot());
+    printENode->addChild(val->getExpRoot());
   }
 
-  n->valTree = new ExpTree(enode, new ENode(n));
+  ENode* when = new ENode(OP_WHEN);
+  when->addChild(expRoot);
+  when->addChild(printENode);
+  when->addChild(nullptr);
+
+  whenNode->setChild(whenTrace.back().first ? 1 : 2, when);
+
+  valTree->setlval(new ENode(n));
+  n->valTree = valTree;
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
 }
@@ -1645,15 +1635,18 @@ void visitPrintf(graph* g, PNode* print) {
   ENode* enode = new ENode(OP_PRINTF);
   enode->strVal = print->getExtra(0);
 
-  enode->addChild(exp->getExpRoot());
-  
   PNode* exprs = print->getChild(2);
   for (int i = 0; i < exprs->getChildNum(); i ++) {
     ASTExpTree* val = visitExpr(g, exprs->getChild(i));
     enode->addChild(val->getExpRoot());
   }
 
-  n->valTree = new ExpTree(enode, new ENode(n));
+  ENode* whenENode = new ENode(OP_WHEN);
+  whenENode->addChild(exp->getExpRoot());
+  whenENode->addChild(enode);
+  whenENode->addChild(nullptr);
+
+  n->valTree = new ExpTree(whenENode, new ENode(n));
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
 }
@@ -1704,14 +1697,11 @@ void saveWhenTree() {
         fillEmptyWhen(node->valTree, node->assignTree.back()->getRoot());
         node->assignTree.back() = node->valTree;
         node->valTree = nullptr;
-      } else {
+      } else if (countEmptyWhen(node->valTree) != 0) {
         node->assignTree.push_back(node->valTree);
         node->valTree = nullptr;
-      }
-      if (countEmptyWhen(node->assignTree.back()) == 0 && node->assignTree.back()->getRoot()->opType != OP_INVALID) {
-        if (node->assignTree.size() > 1) {
-          node->assignTree.erase(node->assignTree.begin(), node->assignTree.end() - 1);
-        }
+      } else if (countEmptyWhen(node->valTree) == 0 && node->valTree->getRoot()->opType != OP_INVALID) {
+        node->assignTree.clear();
       }
     }
   }
@@ -1997,12 +1987,6 @@ void ExpTree::removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::s
       if (child) s.push(child);
     }
   }
-}
-
-void setZeroTree(Node* node) {
-  ENode* zero = allocIntEnode(1, "0");
-  node->assignTree.clear();
-  node->assignTree.push_back(new ExpTree(zero, node));
 }
 
 void removeDummyDim(graph* g) {

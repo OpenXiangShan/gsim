@@ -9,6 +9,7 @@
 std::string format(const char *fmt, ...);
 
 class NodeComponent;
+class StmtTree;
 
 enum NodeType{
   NODE_INVALID,
@@ -116,8 +117,15 @@ class Node {
   int orderInSuper = -1;
   int ops = 0;
   int lineno = -1;
+  /* adjacent */
   std::set<Node*> next;
   std::set<Node*> prev;
+  /* dependent but not adjacent
+   * e.g. reg_src -> node1; node2->reg_dst; then:
+   * node1 is depPrev of reg_dst, as activeFlags of node1 must first be cleared before reg_dst is activated
+  */
+  std::set<Node*> depPrev;
+  std::set<Node*> depNext;
   std::vector <ExpTree*> assignTree;
   ExpTree* valTree = nullptr;
   ExpTree* memTree = nullptr;
@@ -267,6 +275,17 @@ class Node {
   bool isExt() {
     return type == NODE_EXT || type == NODE_EXT_IN || type == NODE_EXT_OUT;
   }
+  void clear_relation();
+  void addPrev(Node* node);
+  void addPrev(std::set<Node*>& super);
+  void addPrev(std::vector<Node*>& super);
+  void erasePrev(Node* node);
+  void addNext(Node* node);
+  void addNext(std::set<Node*>& super);
+  void addNext(std::vector<Node*>& super);
+  void eraseNext(Node* node);
+  void clearPrev();
+  void updateDep();
   void updateConnect();
   void inferWidth();
   void clearWidth();
@@ -308,6 +327,7 @@ class Node {
   int repOpCount();
   void updateIsRoot();
   void updateHeadTail();
+  bool isLocal();
 };
 
 enum SuperType {
@@ -318,14 +338,48 @@ enum SuperType {
   SUPER_UPDATE_REG,
 };
 
+enum SuperInfo {
+  SUPER_INFO_IF,     // start indent
+  SUPER_INFO_ELSE,   // dedent and then indent
+  SUPER_INFO_DEDENT,
+  SUPER_INFO_STR,
+  SUPER_INFO_ASSIGN_BEG,
+  SUPER_INFO_ASSIGN_END
+};
+
+class InstInfo{
+public:
+  SuperInfo infoType = SUPER_INFO_STR;
+  std::string inst;
+  Node* node;
+  InstInfo(SuperInfo _type, Node* _node) {
+    infoType = _type;
+    node = _node;
+  }
+  InstInfo(std::string _inst, SuperInfo _type = SUPER_INFO_STR) {
+    infoType = _type;
+    inst = _inst;
+  }
+  InstInfo(SuperInfo _infoType, Node* _node, std::string _inst) {
+    node = _node;
+    inst = _inst;
+    infoType = _infoType;
+  }
+};
 class SuperNode {
 private:
   static int counter;  // initialize to 1
 public:
   std::string name;
+  /* adjacent superNodes */
   std::set<SuperNode*> prev;
   std::set<SuperNode*> next;
+  /* dependent but not adjacent */
+  std::set<SuperNode*> depPrev;
+  std::set<SuperNode*> depNext;
   std::vector<Node*> member; // The order of member is neccessary
+  std::vector<InstInfo> insts;
+  StmtTree* stmtTree = nullptr;
   int id;
   int order;
   int cppId = -1;
@@ -344,13 +398,13 @@ public:
     member.push_back(_member);
     _member->set_super(this);
   }
-  void add_prev(SuperNode* _prev) {
-    prev.insert(_prev);
-    _prev->next.insert(this);
+  void connectPrev(SuperNode* _prev) {
+    addPrev(_prev);
+    _prev->addNext(this);
   }
-  void add_next(SuperNode* _next) {
-    next.insert(_next);
-    _next->prev.insert(this);
+  void connectNext(SuperNode* _next) {
+    addNext(_next);
+    _next->addPrev(this);
   }
   bool instsEmpty();
   void display();
@@ -362,6 +416,14 @@ public:
     node->display();
     Panic();
   }
+  void clear_relation();
+  void addPrev(SuperNode* super);
+  void addPrev(std::set<SuperNode*>& super);
+  void erasePrev(SuperNode* super);
+  void addNext(SuperNode* super);
+  void addNext(std::set<SuperNode*>& super);
+  void eraseNext(SuperNode* super);
+  void reorderMember();
 };
 
 #endif

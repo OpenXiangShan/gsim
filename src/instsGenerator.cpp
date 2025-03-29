@@ -425,10 +425,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
       falseStr = falseInst + falseStr;
       getChild(2)->computeInfo->insts.clear();
     }
-    if (node->isArray() || node->type == NODE_WRITER) {
-      if (getChild(1) && ChildInfo(1, directUpdate)) trueStr += ASSIGN_LABLE;
-      if (getChild(2) && ChildInfo(2, directUpdate)) falseStr += ASSIGN_LABLE;
-    }
+
     ret->valStr = format("if %s { %s } else { %s }", addBracket(condStr).c_str(), trueStr.c_str(), falseStr.c_str());
     ret->opNum = -1;
     ret->type = TYPE_STMT;
@@ -1493,18 +1490,17 @@ valInfo* ENode::instsInvalid(Node* node, std::string lvalue, bool isRoot) {
 
 valInfo* ENode::instsPrintf() {
   valInfo* ret = computeInfo;
-  ret->status = VAL_FINISH;
-  std::string printfInst = format("if %s { gprintf(%s", addBracket(ChildInfo(0, valStr)).c_str(), strVal.c_str());
-  for (size_t i = 1; i < getChildNum(); i ++) {
+  ret->status = VAL_VALID;
+  std::string printfInst = format("gprintf(%s", strVal.c_str());
+  for (size_t i = 0; i < getChildNum(); i ++) {
     printfInst += ", " + std::to_string(ChildInfo(i, typeWidth));
     printfInst += ", " + ChildInfo(i, valStr);
   }
-  printfInst += "); fflush(stdout); }";
+  printfInst += "); fflush(stdout);";
 
-  if (ChildInfo(0, status) != VAL_CONSTANT || mpz_cmp_ui(ChildInfo(0, consVal), 0) != 0) {
-    ret->insts.push_back(printfInst);
-  }
-
+  ret->insts.push_back(printfInst);
+  ret->valStr = printfInst;
+  ret->opNum = -1;
   return ret;
 }
 
@@ -1515,6 +1511,8 @@ valInfo* ENode::instsExit() {
   if (ChildInfo(0, status) != VAL_CONSTANT || mpz_cmp_ui(ChildInfo(0, consVal), 0) != 0) {
     ret->insts.push_back(exitInst);
   }
+  ret->valStr = exitInst;
+  ret->opNum = -1;
   return ret;
 }
 
@@ -1540,7 +1538,8 @@ valInfo* ENode::instsAssert() {
   }
   
   if (assertInst.length() != 0) ret->insts.push_back(assertInst);
-
+  ret->valStr = assertInst;
+  ret->opNum = -1;
   return ret;
 }
 
@@ -1564,7 +1563,7 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
   } else {
     ret = format("%s = %s;", lvalue.c_str(), resetVal->valStr.c_str());
   }
-  computeInfo->valStr = format("if %s { %s %s }", addBracket(ChildInfo(0, valStr)).c_str(), ret.c_str(), ASSIGN_LABLE.c_str());
+  computeInfo->valStr = format("if %s { %s }", addBracket(ChildInfo(0, valStr)).c_str(), ret.c_str());
   computeInfo->fullyUpdated = false;
   computeInfo->opNum = -1;
   computeInfo->type = TYPE_STMT;
@@ -1650,12 +1649,20 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
         }
       }
     } else {
-      computeInfo = nodePtr->compute()->dup();
-      if (child.size() != 0) {
-        valInfo* indexInfo = computeInfo->dup();
-        computeInfo = indexInfo;
-        for (ENode* childENode : child)
-          computeInfo->valStr += childENode->computeInfo->valStr;
+      if (nodePtr->status == CONSTANT_NODE) {
+        computeInfo = nodePtr->compute()->dup();
+      } else {
+        computeInfo = new valInfo();
+        computeInfo->valStr = nodePtr->name;
+        computeInfo->width = nodePtr->width;
+        computeInfo->sign = nodePtr->sign;
+        computeInfo->typeWidth = upperPower2(nodePtr->width);
+        if (child.size() != 0) {
+          valInfo* indexInfo = computeInfo->dup();
+          computeInfo = indexInfo;
+          for (ENode* childENode : child)
+            computeInfo->valStr += childENode->computeInfo->valStr;
+        }
       }
     }
 
@@ -1711,7 +1718,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     }
     for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
     computeInfo->setFullyUpdated();
-    MUX_DEBUG(printf("  %p(node) %s width %d info->width %d status %d val %s sameConstant %d opNum %d instsNum %ld %p\n", this, n->name.c_str(), width, computeInfo->width, computeInfo->status, computeInfo->valStr.c_str(), computeInfo->sameConstant, computeInfo->opNum, computeInfo->insts.size(), computeInfo));
+    MUX_DEBUG(printf("  %p(node) width %d info->width %d status %d val %s sameConstant %d opNum %d instsNum %ld %p\n", this, width, computeInfo->width, computeInfo->status, computeInfo->valStr.c_str(), computeInfo->sameConstant, computeInfo->opNum, computeInfo->insts.size(), computeInfo));
     for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
       if (computeInfo->memberInfo[i]) {
         MUX_DEBUG(printf("idx %ld %s instNum %ld %p\n", i, computeInfo->memberInfo[i]->valStr.c_str(), computeInfo->memberInfo[i]->insts.size(), computeInfo->memberInfo[i]));
@@ -1777,7 +1784,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       Assert(0, "invalid opType %d\n", opType);
       Panic();
   }
-  MUX_DEBUG(printf("  %p %s op %d width %d val %s status %d sameConstant %d instsNum %ld opNum %d %p\n", this, n->name.c_str(), opType, width, computeInfo->valStr.c_str(), computeInfo->status, computeInfo->sameConstant, computeInfo->insts.size(), computeInfo->opNum, computeInfo));
+  MUX_DEBUG(printf("  %p %s op %d width %d val %s status %d sameConstant %d instsNum %ld opNum %d %p\n", this, n ? n->name.c_str() : "null", opType, width, computeInfo->valStr.c_str(), computeInfo->status, computeInfo->sameConstant, computeInfo->insts.size(), computeInfo->opNum, computeInfo));
   return computeInfo;
 
 }
@@ -1928,6 +1935,56 @@ valInfo* Node::compute() {
   MUX_DEBUG(printf("compute [%s(%d), %d] = %s status %d %p ret=%p retInst=%ld\n", name.c_str(), type, ret->status, ret->valStr.c_str(), status, this, ret, ret->insts.size()));
   if (needRecompute) recomputeAllNodes();
   return ret;
+}
+
+void StmtNode::compute(std::vector<InstInfo>& insts) {
+  switch (type) {
+    case OP_STMT_SEQ:
+      for (StmtNode* stmt : child) {
+        stmt->compute(insts);
+      }
+      break;
+    case OP_STMT_WHEN: {
+      Assert(getChild(0)->isENode, "invalid when condition\n");
+      valInfo* cond = getChild(0)->enode->compute(nullptr, INVALID_LVALUE, false);
+      insts.push_back(InstInfo(format("if %s {", addBracket(cond->valStr).c_str()), SUPER_INFO_IF));
+      getChild(1)->compute(insts);
+      insts.push_back(InstInfo("} else {", SUPER_INFO_ELSE));
+      getChild(2)->compute(insts);
+      insts.push_back(InstInfo("}", SUPER_INFO_DEDENT));
+      break;
+    }
+    case OP_STMT_NODE: {
+      Assert(!isENode, "invalid stmt node\n");
+      Node* node = tree->getlval()->getNode();
+      valInfo* linfo = tree->getlval()->compute(node, INVALID_LVALUE, false);
+      valInfo* rinfo = tree->getRoot()->compute(node, linfo->valStr, true);
+      if (rinfo->status == VAL_FINISH || node->type == NODE_SPECIAL) { // printf / assert
+        insts.push_back(InstInfo(rinfo->valStr));
+      } else if (rinfo->status == VAL_INVALID) {
+      } else if (rinfo->opNum >= 0) {
+        if (rinfo->valStr != linfo->valStr) {
+          if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_BEG, belong));
+          if (isSubArray(linfo->valStr, node)) {
+            insts.push_back(InstInfo(arrayCopy(linfo->valStr, node, rinfo)));
+          } else {
+            insts.push_back(InstInfo(format("%s = %s;", linfo->valStr.c_str(), rinfo->valStr.c_str())));
+          }
+          if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_END, belong));
+        }
+      } else {
+        if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_BEG, belong));
+        insts.push_back(InstInfo(rinfo->valStr));
+        if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_END, belong));
+      }
+      break;
+    }
+    default: Panic();
+  }
+}
+
+void StmtTree::compute(std::vector<InstInfo>& insts) {
+  root->compute(insts);
 }
 
 void ExpTree::clearInfo(){
@@ -2182,15 +2239,7 @@ void graph::instsGenerator() {
     if (super->superType == SUPER_EXTMOD) {
       extDecl.push_back(computeExtMod(super));
     } else {
-      for (Node* n : super->member) {
-        if (n->dimension.size() != 0) {
-          n->compute();
-          s_array.insert(n);
-        } else {
-          n->compute();
-          s.insert(n);
-        }
-      }
+      super->stmtTree->compute(super->insts);
     }
   }
 
@@ -2231,43 +2280,10 @@ void graph::instsGenerator() {
     }
   }
 
-  for (Node* n: s_array) srcUpdateDst(n);
-
-  /* generate assignment instrs */
-  for (Node* n : s) {
-    if (n->status == CONSTANT_NODE) {
-      if ((n->type == NODE_REG_DST && !n->getSrc()->regSplit && n->getSrc()->status != CONSTANT_NODE) || (n->type == NODE_REG_UPDATE && n->regNext->status != CONSTANT_NODE)) {
-        n->insts.push_back(n->name + " = " + n->computeInfo->valStr + ";");
-        n->status = VALID_NODE;
-      }
-    }
-    if (n->status == MERGED_NODE || n->status == CONSTANT_NODE) continue;
-    for (ExpTree* tree : n->assignTree) {
-      valInfo* assignInfo = tree->getRoot()->computeInfo;
-      if (assignInfo->status == VAL_VALID) {
-        if (assignInfo->type == TYPE_STMT) {
-            n->insts.push_back(assignInfo->valStr);
-        } else if(assignInfo->type == TYPE_ARRAY) {
-          n->insts.push_back(arrayCopy(n->name, n, assignInfo));
-        } else if (assignInfo->opNum > 0 || assignInfo->valStr != n->name) {
-          n->insts.push_back(n->name + " = " + assignInfo->valStr + ";");
-        }
-        if (n->type == NODE_REG_SRC && n->reset == ASYRESET && n->regSplit && n->getDst()->status == VALID_NODE) {
-          srcUpdateDst(n);
-        }
-      }
-    }
-  }
   /* remove constant nodes */
   size_t totalNodes = countNodes();
   size_t totalSuper = sortedSuper.size();
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      if (member->status == CONSTANT_NODE) member->removeConnection();
-      if (member->status == MERGED_NODE && member->next.size() == 1) member->insts.clear();
-    }
-  }
-  removeNodes(CONSTANT_NODE);
+  /* TODO: remove constant nodes */
 
   size_t optimizeNodes = countNodes();
   size_t optimizeSuper = sortedSuper.size();

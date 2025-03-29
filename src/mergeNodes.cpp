@@ -1,12 +1,79 @@
 
 #include <cstdio>
 #include <vector>
+#include <stack>
+#include <set>
 #include "common.h"
 #define MAX_NODES_PER_SUPER 7000
 #define MAX_SUBLINGS 30
 #define MAX_NEAR_NUM 50
 
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
+
+bool anyPath(SuperNode* src, SuperNode* dst) {
+  std::stack<SuperNode*> s;
+  std::set<SuperNode*> visited;
+  visited.insert(src);
+  for (SuperNode* prev : src->depPrev) {
+    s.push(prev);
+    visited.insert(prev);
+  }
+  while (!s.empty()) {
+    SuperNode* top = s.top();
+    s.pop();
+    if (top == dst) return true;
+    for (SuperNode* prev : top->depPrev) {
+      if (visited.find(prev) == visited.end()) {
+        visited.insert(prev);
+        s.push(prev);
+      }
+    }
+  }
+  return false;
+}
+
+void graph::mergeWhenNodes() {
+/* each superNode contain one node */
+  std::map<Node*, SuperNode*> whenMap;
+  for (SuperNode* super : sortedSuper) {
+    if (super->superType == SUPER_EXTMOD) continue;
+    Assert(super->member.size() <= 1, "invalid super size %ld", super->member.size());
+    for (Node* member : super->member) {
+      if (member->isArray() || member->assignTree.size() != 1) continue;
+      if (member->assignTree[0]->getRoot()->opType != OP_WHEN) continue;
+      Node* whenNode = member->assignTree[0]->getRoot()->getChild(0)->getNode();
+      if (!whenNode) continue; // TODO: expr can also be optimized
+      /* exists and no loop */
+      if (whenMap.find(whenNode) == whenMap.end()) {
+        whenMap[whenNode] = super;
+        continue;
+      }
+      SuperNode* whenSuper = whenMap[whenNode];
+      if (anyPath(super, whenSuper)) continue;
+      /* merge member to whenSuper */
+      whenSuper->member.push_back(member);
+      member->super = whenSuper;
+      super->member.clear();
+      /* update super connection */
+      whenSuper->addNext(super->next);
+      for (SuperNode* next : super->next) {
+        next->erasePrev(super);
+        next->addPrev(whenSuper);
+      }
+      whenSuper->addPrev(super->prev);
+      for (SuperNode* prev : super->prev) {
+        prev->eraseNext(super);
+        prev->addNext(whenSuper);
+      }
+    }
+  }
+
+  size_t prevSuper = sortedSuper.size();
+  removeEmptySuper();
+  reconnectSuper();
+  detectSortedSuperLoop();
+  printf("[mergeNodes-when] remove %ld superNodes (%ld -> %ld)\n", prevSuper - sortedSuper.size(), prevSuper, sortedSuper.size());
+}
 
 void graph::mergeAsyncReset() {
   std::map<Node*, SuperNode*> resetMap;
@@ -15,6 +82,7 @@ void graph::mergeAsyncReset() {
       if (member->type != NODE_REG_SRC || member->reset != ASYRESET) continue;
       if (member->assignTree.size() != 1) continue;
       Assert(member->assignTree[0]->getRoot()->opType == OP_RESET, "reset not found %s", member->name.c_str());
+      Assert(sortedSuper[i]->member.size() == 1, "multiple member %s", member->name.c_str());
       std::set<Node*> resetNoeds;
       getENodeRelyNodes(member->assignTree[0]->getRoot()->getChild(0), resetNoeds);
       Assert(resetNoeds.size() == 1, "multiple reset %s", member->name.c_str());
@@ -91,14 +159,14 @@ void graph::mergeOut1() {
       for (Node* member : super->member) {
         member->super = nextSuper;
       }
-
+      /* update member */
       nextSuper->member.insert(nextSuper->member.begin(), super->member.begin(), super->member.end());
       /* update connection */
-      nextSuper->prev.erase(super);
-      nextSuper->prev.insert(super->prev.begin(), super->prev.end());
+      nextSuper->erasePrev(super);
+      nextSuper->addPrev(super->prev);
       for (SuperNode* prevSuper : super->prev) {
-        prevSuper->next.erase(super);
-        prevSuper->next.insert(nextSuper);
+        prevSuper->eraseNext(super);
+        prevSuper->addNext(nextSuper);
       }
       super->member.clear();
     }
@@ -122,11 +190,11 @@ void graph::mergeIn1() {
       Assert(prevSuper->member.size() != 0, "empty prevSuper %d", prevSuper->id);
       prevSuper->member.insert(prevSuper->member.end(), super->member.begin(), super->member.end());
       /* update connection */
-      prevSuper->next.erase(super);
-      prevSuper->next.insert(super->next.begin(), super->next.end());
+      prevSuper->eraseNext(super);
+      prevSuper->addNext(super->next);
       for (SuperNode* nextSuper : super->next) {
-        nextSuper->prev.erase(super);
-        nextSuper->prev.insert(prevSuper);
+        nextSuper->erasePrev(super);
+        nextSuper->addPrev(prevSuper);
       }
       super->member.clear();
     }

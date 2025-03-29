@@ -71,7 +71,7 @@ void graph::removeDeadNodes() {
     totalNodes += super->member.size();
     for (Node* member : super->member) {
       for (Node* next : member->next) {
-        if (next->status == DEAD_NODE) member->next.erase(next);
+        if (next->status == DEAD_NODE) member->eraseNext(next);
       }
       if (!anyOuterEdge(member) && potentialDead(member)) {
         s.push(member);
@@ -89,12 +89,12 @@ void graph::removeDeadNodes() {
     for (Node* prev : top->prev) {
       /* remove node connection */
       Assert(prev->next.find(top) != prev->next.end(), "node %s is not in prev(%s)->next", top->name.c_str(), prev->name.c_str());
-      prev->next.erase(top);
+      prev->eraseNext(top);
       if (!anyOuterEdge(prev) && potentialDead(prev)) {
         s.push(prev);
       }
     }
-    top->prev.clear();
+    top->clearPrev();
   }
   removeNodes(DEAD_NODE);
   regsrc.erase(

@@ -86,6 +86,8 @@ void graph::detectSortedSuperLoop() {
     } else if (states[top] == EXPANDED) {
       states[top] = VISITED;
       s.pop();
+    } else if (states[top] == VISITED) {
+      s.pop();
     }
   }
   std::cout << "NO Loop!\n";

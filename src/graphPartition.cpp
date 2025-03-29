@@ -48,6 +48,8 @@ void graph::resort() {
 
 // coarsen phase
 void graph::graphCoarsen() {
+  mergeWhenNodes();
+  resort();
   mergeAsyncReset();
   mergeUIntReset();
   // mergeSublings();

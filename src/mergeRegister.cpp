@@ -149,9 +149,7 @@ void graph::constructRegs() {
         sortedSuper.push_back(nodeUpdate->super);
         dstSuper2updateSuper[dstSuper] = nodeUpdate->super;
       }
-      nodeUpdate->next.insert(node->next.begin(), node->next.end());
       nodeUpdate->isArrayMember = node->isArrayMember;
-      nodeUpdate->updateConnect();
     } else {
       Assert(node->getDst()->assignTree.size() == 1, "invalid assignTree for node %s", node->name.c_str());
       node->updateTree->replace(node->getDst(), node->getDst()->assignTree.back()->getRoot());
@@ -161,10 +159,10 @@ void graph::constructRegs() {
         node->getDst()->assignTree[0] = node->updateTree;
         node->getDst()->assignTree[0]->removeSelfAssignMent(node);
       }
-      node->next.erase(node->getDst());
-      node->getDst()->updateConnect();
+      node->eraseNext(node->getDst());
       node->getDst()->status = VALID_NODE;
       node->getDst()->computeInfo = nullptr;
     }
   }
+  reconnectAll();
 }

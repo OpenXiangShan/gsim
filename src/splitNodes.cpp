@@ -95,22 +95,22 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
         splittedNode->getDst()->assignTree.push_back(newTree);
       }
       splittedNode->getDst()->order = node->getDst()->order - 1;
-      splittedNode->getDst()->next.insert(node->getDst());
+      splittedNode->getDst()->addNext(node->getDst());
     }
     splittedNode->order = node->order - 1;
-    splittedNode->next.insert(node);
+    splittedNode->addNext(node);
     lo = hi + 1;
   }
   for (Node* n : splittedNodesSet[node]) n->updateConnect();
-  node->prev.clear();
-  node->prev.insert(splittedNodesSet[node].begin(), splittedNodesSet[node].end());
+  node->clearPrev();
+  node->addPrev(splittedNodesSet[node]);
   componentMap[node]->invalidateAll();
   std::reverse(splittedNodesSet[node].begin(), splittedNodesSet[node].end());
 
   if (node->type == NODE_REG_SRC) {
     for (Node* n : splittedNodesSet[node->getDst()]) n->updateConnect();
-    node->getDst()->prev.clear();
-    node->getDst()->prev.insert(splittedNodesSet[node->getDst()].begin(), splittedNodesSet[node->getDst()].end());
+    node->getDst()->clearPrev();
+    node->getDst()->addPrev(splittedNodesSet[node->getDst()]);
     std::reverse(splittedNodesSet[node->getDst()].begin(), splittedNodesSet[node->getDst()].end());
   }
 }
@@ -869,8 +869,7 @@ void graph::splitNodes() {
 /* update connection */
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
-      member->prev.clear();
-      member->next.clear();
+      member->clear_relation();
     }
   }
 
