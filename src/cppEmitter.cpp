@@ -767,8 +767,8 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
             }
             inst += format("%s$prev%s = %s%s;\n", n->name.c_str(), idxStr.c_str(), n->name.c_str(), idxStr.c_str());
             inst += bracket;
-            emitBodyLock("%s", inst.c_str());
-          } else emitBodyLock("%s$prev = %s;\n", n->name.c_str(), n->name.c_str());
+            emitBodyLock(indent, "%s", inst.c_str());
+          } else emitBodyLock(indent, "%s$prev = %s;\n", n->name.c_str(), n->name.c_str());
         }
 #endif
     }
@@ -935,6 +935,7 @@ void graph::genResetAll() {
 void graph::saveDiffRegs() {
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
   emitFuncDecl(0, "void S%s::saveDiffRegs(){\n", name.c_str());
+  int indent = 1;
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->type == NODE_REG_SRC && (!member->isArray() || member->arrayEntryNum() == 1) && member->status == VALID_NODE) {
@@ -942,20 +943,20 @@ void graph::saveDiffRegs() {
         if (member->isArray() && member->arrayEntryNum() == 1) {
           for (size_t i = 0; i < member->dimension.size(); i ++) memberName += "[0]";
         }
-        emitBodyLock("%s = %s;\n", arrayPrevName(member->getSrc()->name).c_str(), memberName.c_str());
+        emitBodyLock(indent, "%s = %s;\n", arrayPrevName(member->getSrc()->name).c_str(), memberName.c_str());
       } else if (member->type == NODE_REG_SRC && member->isArray() && member->status == VALID_NODE) {
         std::string idxStr, bracket;
         for (size_t i = 0; i < member->dimension.size(); i ++) {
-          emitBodyLock("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, member->dimension[i], i);
+          emitBodyLock(indent, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, member->dimension[i], i);
           idxStr += "[i" + std::to_string(i) + "]";
           bracket += "}\n";
         }
-        emitBodyLock("%s$prev%s = %s%s;\n", member->name.c_str(), idxStr.c_str(), member->name.c_str(), idxStr.c_str());
-        emitBodyLock("%s", bracket.c_str());
+        emitBodyLock(indent + 1, "%s$prev%s = %s%s;\n", member->name.c_str(), idxStr.c_str(), member->name.c_str(), idxStr.c_str());
+        emitBodyLock(indent, "%s", bracket.c_str());
       }
     }
   }
-  emitBodyLock("}\n");
+  emitBodyLock(0, "}\n");
 #endif
 }
 
@@ -970,7 +971,7 @@ void graph::genStep(int subStepIdxMax) {
     }
   }
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-  emitBodyLock("saveDiffRegs();\n");
+  emitBodyLock(1, "saveDiffRegs();\n");
 #endif
   for (int i = 0; i <= subStepIdxMax; i ++) {
     emitBodyLock(1, "subStep%d();\n", i);

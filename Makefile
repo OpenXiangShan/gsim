@@ -47,12 +47,12 @@ endif
 ##############################################
 
 BUILD_DIR ?= build
-WORK_DIR = $(BUILD_DIR)/$(TEST_FILE)
+WORK_DIR = $(BUILD_DIR)/$(dutName)
 CXX = clang++
 
 SHELL := /bin/bash
 TIME = /usr/bin/time
-LOG_FILE = $(WORK_DIR)/$(TEST_FILE).log
+LOG_FILE = $(WORK_DIR)/$(dutName).log
 
 CFLAGS_DUT = -DDUT_NAME=S$(NAME) -DDUT_HEADER=\"$(NAME).h\" -D__DUT_$(shell echo $(dutName) | tr - _)__
 
@@ -277,11 +277,11 @@ pgo:
 	rm -rf $(PGO_BUILD_DIR)
 	mkdir -p $(PGO_BUILD_DIR)
 	$(MAKE) MODE=0 compile
-	make clean-emu
-	make run-emu MODE=0 PGO_CFLAGS="-fprofile-generate=$(PGO_BUILD_DIR)"
+	$(MAKE) clean-emu
+	$(MAKE) run MODE=0 PGO_CFLAGS="-fprofile-generate=$(PGO_BUILD_DIR)"
 	$(LLVM_PROFDATA) merge -o $(PGO_BUILD_DIR)/default.profdata $(PGO_BUILD_DIR)/*.profraw
-	make clean-emu
-	make run-emu MODE=0 PGO_CFLAGS="-fprofile-use=$(PGO_BUILD_DIR)/default.profdata"
+	$(MAKE) clean-emu
+	$(MAKE) run MODE=0 PGO_CFLAGS="-fprofile-use=$(PGO_BUILD_DIR)/default.profdata"
 
 .PHONY: pgo
 
@@ -290,7 +290,7 @@ pgo:
 ##############################################
 
 clean:
-	-rm -rf $(BUILD_DIR)
+	-@rm -rf $(BUILD_DIR)
 
 run-internal:
 	$(MAKE) MODE=0 compile
