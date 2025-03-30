@@ -47,12 +47,12 @@ endif
 ##############################################
 
 BUILD_DIR ?= build
-WORK_DIR = $(BUILD_DIR)/$(TEST_FILE)
+WORK_DIR = $(BUILD_DIR)/$(dutName)
 CXX = clang++
 
 SHELL := /bin/bash
 TIME = /usr/bin/time
-LOG_FILE = $(WORK_DIR)/$(TEST_FILE).log
+LOG_FILE = $(WORK_DIR)/$(dutName).log
 
 CFLAGS_DUT = -DDUT_NAME=S$(NAME) -DDUT_HEADER=\"$(NAME).h\" -D__DUT_$(shell echo $(dutName) | tr - _)__
 
