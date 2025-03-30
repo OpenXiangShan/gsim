@@ -277,11 +277,11 @@ pgo:
 	rm -rf $(PGO_BUILD_DIR)
 	mkdir -p $(PGO_BUILD_DIR)
 	$(MAKE) MODE=0 compile
-	make clean-emu
-	make run-emu MODE=0 PGO_CFLAGS="-fprofile-generate=$(PGO_BUILD_DIR)"
+	$(MAKE) clean-emu
+	$(MAKE) run MODE=0 PGO_CFLAGS="-fprofile-generate=$(PGO_BUILD_DIR)"
 	$(LLVM_PROFDATA) merge -o $(PGO_BUILD_DIR)/default.profdata $(PGO_BUILD_DIR)/*.profraw
-	make clean-emu
-	make run-emu MODE=0 PGO_CFLAGS="-fprofile-use=$(PGO_BUILD_DIR)/default.profdata"
+	$(MAKE) clean-emu
+	$(MAKE) run MODE=0 PGO_CFLAGS="-fprofile-use=$(PGO_BUILD_DIR)/default.profdata"
 
 .PHONY: pgo
 
