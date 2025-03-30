@@ -290,7 +290,7 @@ pgo:
 ##############################################
 
 clean:
-	-rm -rf $(BUILD_DIR)
+	-@rm -rf $(BUILD_DIR)
 
 run-internal:
 	$(MAKE) MODE=0 compile
