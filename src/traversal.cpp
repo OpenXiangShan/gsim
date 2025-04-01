@@ -125,7 +125,7 @@ void SuperNode::display() {
 
 
 void Node::display() {
-  printf("node %s[width %d sign %d status=%s type=%s][", name.c_str(), width, sign, NodeStatus2Name[status], NodeType2Name[type]);
+  printf("node %s[width %d sign %d status=%s type=%s lineno=%d][", name.c_str(), width, sign, NodeStatus2Name[status], NodeType2Name[type], lineno);
   for (int dim : dimension) printf(" %d", dim);
   printf(" ]\n");
   for (size_t i = 0; i < assignTree.size(); i ++) {
