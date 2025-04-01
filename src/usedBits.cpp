@@ -151,10 +151,6 @@ void ENode::passWidthToChild() {
 
 /* the with of node->next may be updated, thus node should also re-compute */
 void Node::passWidthToPrev() {
-  if (updateTree) {
-    updateTree->getRoot()->usedBit = usedBit;
-    updateTree->getRoot()->passWidthToChild();
-  }
   if (resetTree) {
     resetTree->getRoot()->usedBit = usedBit;
     resetTree->getRoot()->passWidthToChild();
@@ -221,7 +217,6 @@ void graph::usedBits() {
   for (Node* node : visitedNodes) {
     node->width = node->usedBit;
     for (ExpTree* tree : node->assignTree) tree->getRoot()->updateWidth();
-    if (node->updateTree) node->updateTree->getRoot()->updateWidth();
     if (node->resetTree) node->resetTree->getRoot()->updateWidth();
   }
 
@@ -240,13 +235,11 @@ void graph::usedBits() {
 void Node::updateTreeWithNewWIdth() {
   /* add ops to match tree width */
   for (ExpTree* tree : assignTree) tree->updateWithNewWidth();
-  if (updateTree) updateTree->updateWithNewWidth();
   if (resetTree) resetTree->updateWithNewWidth();
 
   for (ExpTree* tree : assignTree) {
     tree->when2mux(width);
     tree->matchWidth(width);
   }
-  if (updateTree) updateTree->matchWidth(width);
   if (resetTree) resetTree->matchWidth(width);
 }

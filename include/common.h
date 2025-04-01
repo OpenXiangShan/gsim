@@ -153,4 +153,6 @@ struct ordercmp {
   }
 };
 
+void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
+
 #endif

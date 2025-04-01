@@ -65,7 +65,6 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
       componentMap[newSrcNode] = new NodeComponent();
       componentMap[newSrcNode]->addElementAll(new NodeElement(ELE_SPACE));
       nodeSegments[newSrcNode] = std::make_pair(new Segments(newSrcNode->width), new Segments(newSrcNode->width));
-      if (node->updateTree) newSrcNode->updateTree = dupSplittedTree(node->updateTree, node, newSrcNode);
       if (node->resetTree) newSrcNode->resetTree = dupSplittedTree(node->resetTree, node, newSrcNode);
       splittedNode = newSrcNode;
     } else {
@@ -756,7 +755,9 @@ void graph::splitNodes() {
 /* update nodeComponent & nodeSegments */
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) {
-      NodeComponent* comp = node->inferComponent();
+      NodeComponent* comp;
+      if (node->type == NODE_REG_SRC) comp = spaceComp(node->width);
+      else comp = node->inferComponent();
       setComponent(node, comp);
       // printf("after infer %s\n", node->name.c_str());
       // node->display();

@@ -99,7 +99,6 @@ void graph::exprOpt() {
         continue;
       }
       for (ExpTree* tree : node->assignTree) tree->treeOpt();
-      if (node->updateTree) node->updateTree->treeOpt();
       if (node->resetTree) node->resetTree->treeOpt();
     }
   }

@@ -1859,10 +1859,6 @@ valInfo* Node::compute() {
       if ((getSrc()->status == DEAD_SRC || getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, getSrc()->computeInfo->consVal) == 0)) && resetConsEq(ret, getSrc())) {
         getSrc()->status = CONSTANT_NODE;
         getSrc()->computeInfo = ret;
-        if (getSrc()->regUpdate) {
-          getSrc()->regUpdate->computeInfo = ret;
-          getSrc()->regUpdate->status = CONSTANT_NODE;
-        }
         /* re-compute nodes depend on src */
         for (Node* next : getSrc()->next) {
           if (next->computeInfo) {
@@ -1899,10 +1895,6 @@ valInfo* Node::compute() {
     status = CONSTANT_NODE;
     getSrc()->status = CONSTANT_NODE;
     getSrc()->computeInfo = ret;
-    if (getSrc()->regUpdate) {
-      getSrc()->regUpdate->status = CONSTANT_NODE;
-      getSrc()->regUpdate->computeInfo = ret;
-    }
     for (Node* next : getSrc()->next) {
       if (next->computeInfo) {
         addRecompute(next);

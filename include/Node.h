@@ -25,7 +25,7 @@ enum NodeType{
   NODE_INFER,
   NODE_MEM_MEMBER,
   NODE_OTHERS,
-  NODE_REG_UPDATE,
+  NODE_REG_RESET,
   NODE_EXT_IN,
   NODE_EXT_OUT,
   NODE_EXT,
@@ -142,8 +142,6 @@ class Node {
   Node* parent = nullptr;
 /* used for registers */
   Node* regNext = nullptr;
-  Node* regUpdate = nullptr;
-  ExpTree* updateTree = nullptr;
   ExpTree* resetTree = nullptr;
   bool regSplit = true;
 /* used for instGerator */
@@ -196,6 +194,10 @@ class Node {
     Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node %s is not register", name.c_str());
     if (type == NODE_REG_DST) return this->regNext;
     return this;
+  }
+  Node* getResetSrc () {
+    Assert(type == NODE_REG_RESET, "The node %s is not register", name.c_str());
+    return regNext;
   }
   Node* getBindReg() {
     Assert(type == NODE_REG_SRC || type == NODE_REG_DST, "The node %s is not register", name.c_str());
@@ -280,10 +282,14 @@ class Node {
   void addPrev(std::set<Node*>& super);
   void addPrev(std::vector<Node*>& super);
   void erasePrev(Node* node);
+  void addDepPrev(Node* node);
+  void eraseDepPrev(Node* node);
   void addNext(Node* node);
   void addNext(std::set<Node*>& super);
   void addNext(std::vector<Node*>& super);
   void eraseNext(Node* node);
+  void addDepNext(Node* node);
+  void eraseDepNext(Node* node);
   void clearPrev();
   void updateDep();
   void updateConnect();
@@ -420,9 +426,13 @@ public:
   void addPrev(SuperNode* super);
   void addPrev(std::set<SuperNode*>& super);
   void erasePrev(SuperNode* super);
+  void addDepPrev(SuperNode* super);
+  void eraseDepPrev(SuperNode* super);
   void addNext(SuperNode* super);
   void addNext(std::set<SuperNode*>& super);
   void eraseNext(SuperNode* super);
+  void eraseDepNext(SuperNode* super);
+  void addDepNext(SuperNode* super);
   void reorderMember();
 };
 

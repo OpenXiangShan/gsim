@@ -5,6 +5,7 @@
 int Node::counter = 1;
 
 void Node::updateConnect() {
+  if (type == NODE_REG_SRC) return;
   std::queue<ENode*> q;
   for (ExpTree* tree : assignTree) {
     q.push(tree->getRoot());
@@ -50,19 +51,24 @@ void Node::updateConnect() {
   }
 }
 
-void Node::updateDep(){
-  if (regSplit && regUpdate) {
-    Node* update = regUpdate;
-    for (Node* nextNode : next) {
-      nextNode->depNext.insert(update);
-      update->depPrev.insert(nextNode);
-    }
-  } else {
-    Node* dst = getDst();
-    for (Node* nextNode : next) {
-      if (nextNode == dst) continue;
-      nextNode->depNext.insert(dst);
-      dst->depPrev.insert(nextNode);
+void Node::updateDep(){ // only reg_src can reach here
+  std::set<Node*> prevNodes;
+  for (ExpTree* tree : assignTree) tree->getRelyNodes(prevNodes);
+  for (Node* n : prevNodes) {
+    depNext.insert(n);
+    n->depPrev.insert(this);
+  }
+  std::set<Node*> nextNodes;
+  if (reset == ASYRESET) {
+    Assert(resetTree->getRoot()->opType == OP_RESET, "invalid resetTree");
+    getENodeRelyNodes(resetTree->getRoot()->getChild(0), nextNodes);
+  }
+  for (Node* n : nextNodes) {
+    depNext.insert(n);
+    n->depPrev.insert(this);
+    for (Node* srcNext : next) {
+      srcNext->addDepPrev(n);
+      n->addDepNext(n);
     }
   }
 }
@@ -138,6 +144,16 @@ void Node::constructSuperConnect() {
     if (n->super == this->super) continue;
     super->connectNext(n->super);
   }
+  for (Node* n : depPrev) {
+    if (n->super == this->super) continue;
+    this->super->depPrev.insert(n->super);
+    n->super->depNext.insert(this->super);
+  }
+  for (Node* n : depNext) {
+    if (n->super == this->super) continue;
+    this->super->depNext.insert(n->super);
+    n->super->depPrev.insert(this->super);
+  }
 }
 
 void Node::updateInfo(TypeInfo* info) {
@@ -195,8 +211,8 @@ void TypeInfo::flip() {
 void Node::addUpdateTree() {
   ENode* dstENode = new ENode(getDst());
   dstENode->width = width;
-  updateTree = new ExpTree(dstENode, this);
-  if (resetCond->getRoot()->reset == UINTRESET) {
+  assignTree.push_back(new ExpTree(dstENode, this));
+  if (reset == UINTRESET || reset == ASYRESET) {
     ENode* whenNode = new ENode(OP_RESET);
     whenNode->addChild(resetCond->getRoot());
     whenNode->addChild(resetVal->getRoot());
@@ -231,17 +247,8 @@ void Node::updateActivate() {
         nextActiveId.insert(super->cppId);
     }
   }
-  if (type == NODE_REG_DST && !regSplit) {
-    for (Node* nextNode : getSrc()->next) {
-      if (nextNode->super->cppId != -1)
-        nextActiveId.insert(nextNode->super->cppId);
-    }
-  }
-  if (type == NODE_REG_UPDATE) {
-    for (Node* nextNode : regNext->next) {
-      if (nextNode->super->cppId != -1)
-        nextActiveId.insert(nextNode->super->cppId);
-    }
+  if (type == NODE_REG_DST) {
+    nextActiveId.insert(getSrc()->super->cppId);
   }
   if (type == NODE_WRITER) {
     for (Node* port : parent->member) {
@@ -391,4 +398,20 @@ void Node::addNext(std::vector<Node*>& node) {
 void Node::clearPrev() {
   prev.clear();
   depPrev.clear();
+}
+
+void Node::addDepPrev(Node* node) {
+  depPrev.insert(node);
+}
+
+void Node::eraseDepPrev(Node* node) {
+  depPrev.erase(node);
+}
+
+void Node::eraseDepNext(Node* node) {
+  depNext.erase(node);
+}
+
+void Node::addDepNext(Node* node) {
+  depNext.insert(node);
 }

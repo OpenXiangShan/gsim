@@ -36,7 +36,7 @@ void graph::mergeWhenNodes() {
 /* each superNode contain one node */
   std::map<Node*, SuperNode*> whenMap;
   for (SuperNode* super : sortedSuper) {
-    if (super->superType == SUPER_EXTMOD) continue;
+    if (super->superType != SUPER_VALID) continue;
     Assert(super->member.size() <= 1, "invalid super size %ld", super->member.size());
     for (Node* member : super->member) {
       if (member->isArray() || member->assignTree.size() != 1) continue;
@@ -77,41 +77,32 @@ void graph::mergeWhenNodes() {
 
 void graph::mergeAsyncReset() {
   std::map<Node*, SuperNode*> resetMap;
-  for (size_t i = 0; i < sortedSuper.size(); i++) {
-    for (Node* member: sortedSuper[i]->member) {
-      if (member->type != NODE_REG_SRC || member->reset != ASYRESET) continue;
-      if (member->assignTree.size() != 1) continue;
-      Assert(member->assignTree[0]->getRoot()->opType == OP_RESET, "reset not found %s", member->name.c_str());
-      Assert(sortedSuper[i]->member.size() == 1, "multiple member %s", member->name.c_str());
-      std::set<Node*> resetNoeds;
-      getENodeRelyNodes(member->assignTree[0]->getRoot()->getChild(0), resetNoeds);
-      Assert(resetNoeds.size() == 1, "multiple reset %s", member->name.c_str());
-      bool resetConstant = true;
-      for (Node* prev : member->prev) {
-        if (resetNoeds.find(prev) == resetNoeds.end() && prev->status != CONSTANT_NODE) resetConstant = false;
-      }
-      if (!resetConstant) continue;
-      /* if resetVal is constant (using prev.size() == 1, TODO: optimize) */
-      if (member->super->member.size() != 1) member->super->display();
-      Assert(member->super->member.size() == 1, "super already merged %s id %d (size = %ld)", member->name.c_str(), member->super->id, member->super->member.size());
-      Node* resetNode = *(resetNoeds.begin());
-      resetNode->setAsyncReset();
-      SuperNode* resetSuper;
-      if (resetMap.find(resetNode) == resetMap.end()) {
-        resetSuper = member->super;
-        resetSuper->superType = SUPER_ASYNC_RESET;
-        resetSuper->resetNode = resetNode;
-        resetMap[resetNode] = resetSuper;
-      } else {
-        resetSuper = resetMap[resetNode];
-        member->super = resetSuper;
-        resetSuper->member.push_back(member);
-        sortedSuper[i]->member.clear();
-      }
+  for (Node* reg : regsrc) {
+    if (reg->reset != ASYRESET) continue;
+    std::set<Node*> prev;
+    Assert(reg->resetTree->getRoot()->opType == OP_RESET, "invalid resetTree");
+    getENodeRelyNodes(reg->resetTree->getRoot()->getChild(0), prev);
+    Assert(prev.size() == 1, "multiple prevReset %s", reg->name.c_str());
+    Node* condNode = *prev.begin();
+    SuperNode* condSuper;
+    if (resetMap.find(condNode) == resetMap.end()) {
+      condSuper = condNode->super;
+      condSuper->superType = SUPER_ASYNC_RESET;
+      resetMap[condNode] = condSuper;
+      condSuper->resetNode = condNode;
+      condNode->setAsyncReset();
+    } else {
+      condSuper = resetMap[condNode];
     }
+    Node* resetReg = reg->dup(NODE_REG_RESET, reg->name);
+    Node* resetRegDst = reg->dup(NODE_REG_RESET, reg->getDst()->name);
+    resetReg->regNext = reg;
+    resetRegDst->regNext = reg;
+    resetReg->assignTree.push_back(new ExpTree(reg->resetTree->getRoot(), resetReg));
+    resetRegDst->assignTree.push_back(new ExpTree(reg->resetTree->getRoot(), resetRegDst));
+    condSuper->add_member(resetReg);
+    condSuper->add_member(resetRegDst);
   }
-  removeEmptySuper();
-  reconnectSuper();
 }
 
 void graph::mergeUIntReset() {
@@ -154,6 +145,11 @@ void graph::mergeOut1() {
       SuperNode* nextSuper = *(super->next.begin());
       if (nextSuper->superType != SUPER_VALID) continue;
       if (nextSuper->member.size() > MAX_NODES_PER_SUPER) continue;
+      bool canMerge = true;
+      for (SuperNode* depNext : super->depNext) {
+        if (depNext->order < nextSuper->order) canMerge = false;
+      }
+      if (!canMerge) continue;
       for (Node* member : super->member) member->super = nextSuper;
       /* move members in super to next super*/
       for (Node* member : super->member) {
@@ -164,11 +160,26 @@ void graph::mergeOut1() {
       /* update connection */
       nextSuper->erasePrev(super);
       nextSuper->addPrev(super->prev);
-      for (SuperNode* prevSuper : super->prev) {
-        prevSuper->eraseNext(super);
-        prevSuper->addNext(nextSuper);
+      for (SuperNode* prev : super->depPrev) {
+        if (super->prev.find(prev) != super->prev.end()) {
+          prev->eraseNext(super);
+          prev->addNext(nextSuper);
+          nextSuper->addPrev(prev);
+        } else { // only in depPrev
+          prev->eraseDepNext(super);
+          prev->addDepNext(nextSuper);
+          nextSuper->addDepPrev(prev);
+        }
+      }
+      for (SuperNode* next : super->depNext) {
+        if (super->next.find(next) == super->prev.end()) { // only in depNext
+          next->eraseDepPrev(super);
+          next->addDepPrev(nextSuper);
+          nextSuper->addDepNext(next);
+        }
       }
       super->member.clear();
+      super->clear_relation();
     }
   }
   removeEmptySuper();
@@ -185,6 +196,11 @@ void graph::mergeIn1() {
       SuperNode* prevSuper = *(super->prev.begin());
       if (prevSuper->superType != SUPER_VALID) continue;
       if (prevSuper->member.size() > MAX_NODES_PER_SUPER) continue;
+      bool canMerge = true;
+      for (SuperNode* depPrev : super->depPrev) {
+        if (depPrev->order > prevSuper->order) canMerge = false;
+      }
+      if (!canMerge) continue;
       /* move members in super to prev super */
       for (Node* member : super->member) member->super = prevSuper;
       Assert(prevSuper->member.size() != 0, "empty prevSuper %d", prevSuper->id);
@@ -192,9 +208,16 @@ void graph::mergeIn1() {
       /* update connection */
       prevSuper->eraseNext(super);
       prevSuper->addNext(super->next);
-      for (SuperNode* nextSuper : super->next) {
-        nextSuper->erasePrev(super);
-        nextSuper->addPrev(prevSuper);
+      for (SuperNode* next : super->depNext) {
+        if (super->next.find(next) != super->next.end()) {
+          next->erasePrev(super);
+          next->addPrev(prevSuper);
+          prevSuper->addNext(next);
+        } else { // only in depNext
+          next->eraseDepPrev(super);
+          next->addDepPrev(prevSuper);
+          prevSuper->addDepNext(next);
+        }
       }
       super->member.clear();
     }

@@ -321,7 +321,7 @@ void graph::splitArrayNode(Node* node) {
   }
   /* distribute arrayVal */
   for (ExpTree* tree : node->assignTree) distributeTree(node, tree);
-  if (node->updateTree || node->resetTree) {
+  if (node->resetTree) {
     for (size_t idx = 0; idx < node->arrayEntryNum(); idx ++) {
       /* compute index for all array operands in tree */
       std::vector<int> subIdx(node->dimension.size());
@@ -329,10 +329,6 @@ void graph::splitArrayNode(Node* node) {
       for (int i = node->dimension.size() - 1; i >= 0; i --) {
         subIdx[i] = tmp % node->dimension[i];
         tmp /= node->dimension[i];
-      }
-      if (node->updateTree) {
-        ExpTree* newTree = dupTreeWithIdx(node->updateTree, subIdx, node);
-        node->arrayMember[idx]->updateTree = newTree;
       }
       if (node->resetTree) {
         ExpTree* newTree = dupTreeWithIdx(node->resetTree, subIdx, node);
@@ -361,7 +357,6 @@ void graph::splitArrayNode(Node* node) {
   }
   for (Node* n : checkNodes) {
     for (ExpTree* tree : n->assignTree) tree->updateWithSplittedArray(n, node);
-    if (n->updateTree) n->updateTree->updateWithSplittedArray(n, node);
     if (n->resetTree) n->resetTree->updateWithSplittedArray(n, node);
   }
 

@@ -167,7 +167,7 @@ static std::string arrayPrevName (std::string name) {
 #endif
 
 void graph::genNodeInit(Node* node, int mode) {
-  if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
+  if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || node->status != VALID_NODE) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
   for (std::string inst : node->initInsts) {
     std::stringstream ss(inst);
@@ -379,7 +379,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
 #endif
 
 void graph::genNodeDef(FILE* fp, Node* node) {
-  if (node->type == NODE_SPECIAL || node->type == NODE_REG_UPDATE || node->status != VALID_NODE) return;
+  if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || node->status != VALID_NODE) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
   if (node->type == NODE_OTHERS && !node->anyNextActive() && !node->isArray()) return;
 #if defined(GSIM_DIFF) || defined(VERILATOR_DIFF)
@@ -847,7 +847,7 @@ int graph::genActivate() {
 }
 
 void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
-  emitBodyLock(indent, "void S%s::subReset%d(){\n", name.c_str(), resetFuncNum);
+  emitBodyLock(indent, "void S%s::subReset%d(){ // %s reset\n", name.c_str(), resetFuncNum, isUIntReset ? "uint" : "async");
   indent ++;
   resetFuncNum ++;
   if (isUIntReset) {
@@ -881,13 +881,9 @@ void graph::genResetActivation(SuperNode* super, bool isUIntReset, int indent, i
   std::set<int> allNext;
   for (size_t i = 0; i < super->member.size(); i ++) {
     Node* node = super->member[i];
+    if (node->type == NODE_REG_RESET) node = node->getResetSrc();
     for (Node* next : node->next) {
       if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
-    }
-    if (!node->regSplit) {
-      if (node->getDst()->super->cppId >= 0) allNext.insert(node->getDst()->super->cppId);
-    } else {
-      if (node->getSrc()->regUpdate->super->cppId >= 0) allNext.insert(node->regUpdate->super->cppId);
     }
   }
 

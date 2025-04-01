@@ -198,7 +198,6 @@ void Node::clearWidth() {
     tree->getRoot()->clearWidth();
     tree->getlval()->clearWidth();
   }
-  if (updateTree) updateTree->getRoot()->clearWidth();
   if (resetTree) resetTree->getRoot()->clearWidth();
 }
 
@@ -211,26 +210,40 @@ void Node::inferWidth() {
   if (isArray() && arraySplitted()) {
     for (Node* member : arrayMember) member->inferWidth();
   }
-  for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();
-  if (updateTree) updateTree->getRoot()->inferWidth();
   if (resetTree) resetTree->getRoot()->inferWidth();
+
+  if (type != NODE_REG_SRC) {
+    for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();
+  }
 
   if (width == -1) {
     int newWidth = 0;
     bool newSign = sign;
     bool newClock = isClock;
-    for (ExpTree* tree : assignTree) {
-      newWidth = MAX(newWidth, tree->getRoot()->width);
-      newSign = tree->getRoot()->sign;
-      newClock |= tree->getRoot()->isClock;
+    if (type == NODE_REG_SRC) {
+      if (resetTree) {
+        newWidth = MAX(newWidth, resetTree->getRoot()->width);
+        newSign = resetTree->getRoot()->sign;
+      }
+    } else {
+      for (ExpTree* tree : assignTree) {
+        newWidth = MAX(newWidth, tree->getRoot()->width);
+        newSign = tree->getRoot()->sign;
+        newClock |= tree->getRoot()->isClock;
+      }
     }
-    if (resetTree) newWidth = MAX(newWidth, resetTree->getRoot()->width);
     setType(newWidth, newSign);
     isClock = newClock;
   }
 
   for (ExpTree* tree : assignTree) {
     tree->getlval()->inferWidth();
+  }
+  if (type == NODE_REG_DST) {
+    for (ExpTree* tree : getSrc()->assignTree) {
+      tree->getRoot()->inferWidth();
+      tree->getlval()->inferWidth();
+    }
   }
 }
 
@@ -312,7 +325,7 @@ void graph::inferAllWidth() {
   }
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) {
-      if (node->type == NODE_REG_SRC) node->updateTree->getRoot()->inferWidth();
+      if (node->resetTree) node->resetTree->getRoot()->inferWidth();
       node->updateHeadTail();
       node->updateTreeWithNewWIdth();
     }
@@ -322,7 +335,6 @@ void graph::inferAllWidth() {
 void Node::updateHeadTail() {
   std::stack<ENode*> s;
   for (ExpTree* tree : assignTree) s.push(tree->getRoot());
-  if (updateTree) s.push(updateTree->getRoot());
   if (resetTree) s.push(resetTree->getRoot());
   while (!s.empty()) {
     ENode* top = s.top();
