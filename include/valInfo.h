@@ -71,7 +71,7 @@ public:
     mpz_set_str(consVal, str.c_str(), base);
     updateConsVal();
   }
-  valInfo* dup(int beg = -1, int end = -1) {
+  valInfo* dup(int beg = 0, int end = -1) {
     valInfo* ret = new valInfo();
     ret->opNum = opNum;
     ret->type = type;
