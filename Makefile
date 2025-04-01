@@ -167,7 +167,8 @@ GEN_CPP_DIR = $(WORK_DIR)/model
 
 $(GEN_CPP_DIR)/$(NAME)0.cpp: $(GSIM_BIN) $(FIRRTL_FILE)
 	@mkdir -p $(@D)
-	set -o pipefail && $(TIME) $(GSIM_BIN) $(GSIM_FLAGS) --dir $(@D) $(FIRRTL_FILE) | tee $(BUILD_DIR)/gsim.log
+	set -o pipefail && $(TIME) $(GSIM_BIN) $(GSIM_FLAGS) --dir $(@D) \
+		$(GSIM_FLAGS_EXTRA) $(FIRRTL_FILE) | tee $(BUILD_DIR)/gsim.log
 	$(SIG_COMMAND)
 
 compile: $(GEN_CPP_DIR)/$(NAME)0.cpp
