@@ -19,26 +19,26 @@ else ifeq ($(dutName),NutShell)
 else ifeq ($(dutName),rocket)
 	NAME ?= TestHarness
 	TEST_FILE = $(NAME)-rocket
-	GSIM_FLAGS += --supernode-max-size=20 --cpp-max-size-KB=1024
+	GSIM_FLAGS += --supernode-max-size=30 --cpp-max-size-KB=1024
 else ifeq ($(dutName),large-boom)
 	NAME ?= TestHarness
 	TEST_FILE = $(NAME)-LargeBoom
-	GSIM_FLAGS += --supernode-max-size=35 --cpp-max-size-KB=4096
+	GSIM_FLAGS += --supernode-max-size=65 --cpp-max-size-KB=4096
 	VERI_THREADS = --threads 5
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
 	TEST_FILE = $(NAME)-SmallBoom
-	GSIM_FLAGS += --supernode-max-size=35 --cpp-max-size-KB=4096
+	GSIM_FLAGS += --supernode-max-size=90 --cpp-max-size-KB=4096
 	VERI_THREADS = --threads 5
 else ifeq ($(dutName),minimal-xiangshan)
 	NAME ?= SimTop
 	TEST_FILE = $(NAME)-xiangshan-minimal
-	GSIM_FLAGS += --supernode-max-size=35 --cpp-max-size-KB=8192
+	GSIM_FLAGS += --supernode-max-size=60 --cpp-max-size-KB=8192
 	VERI_THREADS = --threads 16
 else ifeq ($(dutName),default-xiangshan)
 	NAME ?= SimTop
 	TEST_FILE = $(NAME)-xiangshan-default
-	GSIM_FLAGS += --supernode-max-size=35 --cpp-max-size-KB=8192
+	GSIM_FLAGS += --supernode-max-size=60 --cpp-max-size-KB=8192
 	VERI_THREADS = --threads 16
 endif
 
