@@ -324,6 +324,7 @@ class Node {
   void display();
   size_t arrayEntryNum() { size_t num = 1; for (size_t idx : dimension) num *= idx; return num; }
   valInfo* computeConstant();
+  valInfo* computeRegConstant();
   void invalidArrayOptimize();
   void fillArrayInvalid(ExpTree* tree);
   uint64_t keyHash();
@@ -334,6 +335,7 @@ class Node {
   void updateIsRoot();
   void updateHeadTail();
   bool isLocal();
+  void setConstant(valInfo* info);
 };
 
 enum SuperType {

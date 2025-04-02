@@ -25,7 +25,15 @@ bool allOnes(mpz_t& val, int width);
 static std::map<Node*, valInfo*> consMap;
 static std::map<ENode*, valInfo*> consEMap;
 
-static std::priority_queue<Node*, std::vector<Node*>, ordercmp> recomputeQueue;
+struct computeOrder {
+  bool operator()(Node* n1, Node* n2) {
+    if (n2->type == NODE_REG_SRC) return false;
+    if (n1->type == NODE_REG_SRC) return true;
+    return n1->order > n2->order;
+  }
+};
+
+static std::priority_queue<Node*, std::vector<Node*>, computeOrder> recomputeQueue;
 static std::set<Node*> uniqueRecompute;
 
 static void addRecompute(Node* node) {
@@ -60,15 +68,14 @@ valInfo* setNodeCons(Node* node, std::string str) {
   return consInfo;
 }
 
-bool cons_resetConsEq(valInfo* dstInfo, Node* regsrc) {
-  if (!regsrc->resetTree) return true;
-  valInfo* info = regsrc->resetTree->getRoot()->computeConstant(regsrc, regsrc->name.c_str());
-  if (info->status == VAL_EMPTY) return true;
+bool cons_resetConsEq(valInfo* dstInfo, valInfo* resetInfo) {
+  if (!resetInfo) return true;
+  if (resetInfo->status == VAL_EMPTY) return true;
   mpz_t consVal;
   mpz_init(consVal);
   mpz_set(consVal, dstInfo->status == VAL_CONSTANT ? dstInfo->consVal : dstInfo->assignmentCons);
-  if (info->status == VAL_CONSTANT && mpz_cmp(info->consVal, consVal) == 0) return true;
-  if (info->sameConstant && mpz_cmp(info->assignmentCons, consVal) == 0) return true;
+  if (resetInfo->status == VAL_CONSTANT && mpz_cmp(resetInfo->consVal, consVal) == 0) return true;
+  if (resetInfo->sameConstant && mpz_cmp(resetInfo->assignmentCons, consVal) == 0) return true;
   return false;
 }
 
@@ -771,6 +778,7 @@ void Node::recomputeConstant() {
   std::vector<valInfo*> prevArrayVal (consMap[this]->memberInfo);
   consMap.erase(this);
   for (ExpTree* tree : assignTree) clearConsEMap(tree);
+  if (resetTree) clearConsEMap(resetTree);
   computeConstant();
   bool recomputeNext = false;
   if (consMap[this]->status != prevVal->status) {
@@ -787,11 +795,12 @@ void Node::recomputeConstant() {
     }
   }
   if (recomputeNext) {
-    for (Node* nextNode : (type == NODE_REG_DST ? getSrc()->next : next)) {
-      if (uniqueRecompute.find(nextNode) == uniqueRecompute.end()) {
-        recomputeQueue.push(nextNode);
-        uniqueRecompute.insert(nextNode);
+    if (type == NODE_REG_DST) addRecompute(getSrc());
+    else {
+      for (Node* nextNode : next) {
+        addRecompute(nextNode);
       }
+
     }
   }
 }
@@ -962,6 +971,34 @@ void graph::constantMemory() {
   printf("[constantNode] find %d constant memories\n", num);
 }
 
+valInfo* Node::computeRegConstant() {
+  valInfo* resetInfo = resetTree ? resetTree->getRoot()->computeConstant(this, false) : nullptr;
+  Assert(assignTree.size() == 1, "invalid update tree for reg %s\n", name.c_str());
+  valInfo* updateInfo = assignTree.back()->getRoot()->computeConstant(this, false);
+  if (resetInfo && resetInfo->status == VAL_CONSTANT) {
+    status = CONSTANT_NODE;
+    setConstant(resetInfo);
+    consMap[this] = resetInfo;
+    getDst()->status = CONSTANT_NODE;
+    getDst()->setConstant(resetInfo);
+    consMap[getDst()] = resetInfo;
+  } else {
+    if (resetInfo && resetInfo->status == VAL_EMPTY) {
+      resetTree = nullptr;
+      reset = ZERO_RESET;
+      consMap[this] = new valInfo(width, sign);
+    }
+    if (updateInfo->status == VAL_CONSTANT && cons_resetConsEq(updateInfo, resetInfo)) {
+      status = CONSTANT_NODE;
+      setConstant(updateInfo);
+      consMap[this] = updateInfo;
+    } else {
+      consMap[this] = new valInfo(width, sign);
+    }
+  }
+  return consMap[this];
+}
+
 valInfo* Node::computeConstant() {
   if (consMap.find(this) != consMap.end()) return consMap[this];
   if (computeInfo) {
@@ -977,10 +1014,26 @@ valInfo* Node::computeConstant() {
     consMap[this] = consInfo;
     return consInfo;
   }
+  if (type == NODE_REG_SRC) return computeRegConstant();
   if (isArray()) {
     return computeConstantArray();
   }
 
+  for (size_t i = 0; i < assignTree.size(); i ++) {
+    ExpTree* tree = assignTree[i];
+    valInfo* info = tree->getRoot()->computeConstant(this, false);
+    if (info->status == VAL_EMPTY) {
+      assignTree.erase(assignTree.begin() + i);
+      i --;
+      continue;
+    }
+    if ((info->status == VAL_INVALID || info->status == VAL_CONSTANT) && (i < assignTree.size() - 1) ) {
+      // TODO: replace using OP_INT
+      fillEmptyWhen(assignTree[i+1], tree->getRoot());
+      assignTree.erase(assignTree.begin() + i);
+      i --;
+    }
+  }
   if (assignTree.size() == 0) {
     valInfo* ret = new valInfo(width, sign);
     if (type == NODE_OTHERS) {
@@ -990,80 +1043,13 @@ valInfo* Node::computeConstant() {
     consMap[this] = ret;
     return ret;
   }
-  valInfo* ret = nullptr;
-  for (size_t i = 0; i < assignTree.size(); i ++) {
-    ExpTree* tree = assignTree[i];
-    valInfo* info = tree->getRoot()->computeConstant(this, false);
-    if (info->status == VAL_EMPTY) {
-      assignTree.erase(assignTree.begin() + i);
-      i --;
-      continue;
-    }
-    ret = info->dupWithCons();
-    if ((ret->status == VAL_INVALID || ret->status == VAL_CONSTANT) && (i < assignTree.size() - 1) ) {
-      // TODO: replace using OP_INT
-      fillEmptyWhen(assignTree[i+1], tree->getRoot());
-      assignTree.erase(assignTree.begin() + i);
-      i --;
-    }
-  }
-  if (!ret && assignTree.size() != 0) {
-    ret = assignTree.back()->getRoot()->computeConstant(this, false)->dup();
-  }
-  if (!ret) {
-    ret = new valInfo(width, sign);
-    ret->setConstantByStr("0");
-  } else if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) {
+  valInfo* ret = assignTree.back()->getRoot()->computeConstant(this, false)->dup();
+  if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) {
     ret->setConstantByStr("0");
   }
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
-    if (type == NODE_REG_DST) {
-      if (cons_resetConsEq(ret, getSrc())) {
-        getSrc()->status = CONSTANT_NODE;
-        consMap[getSrc()] = ret;
-        /* re-compute nodes depend on src */
-        for (Node* next : (regSplit ? getSrc() : this)->next) {
-          if (consMap.find(next) != consMap.end()) {
-            addRecompute(next);
-          }
-        }
-        recomputeAllNodes();
-      }
-    } else if (type == NODE_MEM_MEMBER && mpz_sgn(ret->consVal) == 0) {
-      Node* port = parent;
-      if (port->type == NODE_READER) {
-        if (this == port->get_member(READER_EN)) {
-          setNodeCons(port->get_member(READER_DATA), "0");
-          setNodeCons(port->get_member(READER_ADDR), "0");
-          for (Node* next : port->get_member(READER_DATA)->next) {
-            if (consMap.find(next) != consMap.end()) addRecompute(next);
-          }
-        }
-      } else if (port->type == NODE_WRITER) {
-        if (this == port->get_member(WRITER_EN) || this == port->get_member(WRITER_MASK)) {
-          setNodeCons(port->get_member(WRITER_ADDR), "0");
-          setNodeCons(port->get_member(WRITER_DATA), "0");
-          if (this != port->get_member(WRITER_EN)) setNodeCons(port->get_member(WRITER_EN), "0");
-          if (this != port->get_member(WRITER_MASK)) setNodeCons(port->get_member(WRITER_MASK), "0");
-        }
-      }
-      recomputeAllNodes();
-    }
-  } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant &&
-          cons_resetConsEq(ret, getSrc())) {
-    ret->status = VAL_CONSTANT;
-    mpz_set(ret->consVal, ret->assignmentCons);
-    ret->updateConsVal();
-    status = CONSTANT_NODE;
-    getSrc()->status = CONSTANT_NODE;
-    consMap[getSrc()] = ret;
-    for (Node* next : (regSplit ? getSrc() : this)->next) {
-      if (consMap.find(next) != consMap.end()) {
-        addRecompute(next);
-      }
-    }
-    recomputeAllNodes();
+    setConstant(ret);
   }
   ret->width = width;
   ret->sign = sign;
@@ -1191,19 +1177,21 @@ void ExpTree::removeConstant() {
   }
 }
 
+void Node::setConstant(valInfo* info) {
+  Assert(info->status == VAL_CONSTANT, "invalid info in %s", name.c_str());
+  assignTree.clear();
+  ENode* enode = allocIntEnode(width, mpz_get_str(NULL, 10, info->consVal));
+  assignTree.push_back(new ExpTree(enode, this));
+}
+
 void graph::constantAnalysis() {
-  std::set<Node*>s;
   for (SuperNode* super : sortedSuper) {
     for (Node* n : super->member) {
-      if (n->type == NODE_REG_SRC && consMap.find(n) == consMap.end()) consMap[n] = new valInfo(n->width, n->sign);
-      n->computeConstant();
+      consMap[n] = new valInfo(n->width, n->sign);
+      addRecompute(n);
     }
   }
-  for (SuperNode* super : sortedSuper) {
-    for (Node* n : super->member) {
-      if (n->resetTree) n->resetTree->getRoot()->computeConstant(n, false);
-    }
-  }
+  recomputeAllNodes();
   constantMemory();
   /* remove constant nodes */
   int consNum = 0;
