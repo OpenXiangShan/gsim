@@ -172,7 +172,7 @@ void graph::mergeOut1() {
         }
       }
       for (SuperNode* next : super->depNext) {
-        if (super->next.find(next) == super->prev.end()) { // only in depNext
+        if (super->next.find(next) == super->next.end()) { // only in depNext
           next->eraseDepPrev(super);
           next->addDepPrev(nextSuper);
           nextSuper->addDepNext(next);
