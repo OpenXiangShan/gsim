@@ -206,7 +206,6 @@ void graph::essentPartition(){
     std::sort(super->member.begin(), super->member.end(), sortOrderCmp);
   }
   resort();
-  orderAllNodes();
   printf("[mergeNodes-MFFC] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
 
   phaseSuper = sortedSuper.size();

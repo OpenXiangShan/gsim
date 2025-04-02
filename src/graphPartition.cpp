@@ -43,7 +43,7 @@ void graph::resort() {
   }
 
   Assert(sortedSuper.size() == prevSize, "invalid size %ld %ld\n", sortedSuper.size(), prevSize);
-
+  orderAllNodes();
 }
 
 // coarsen phase
@@ -55,7 +55,6 @@ void graph::graphCoarsen() {
   mergeWhenNodes();
   resort();
 
-  // mergeSublings();
   mergeOut1();
   mergeIn1();
   mergeSublings();
@@ -375,7 +374,6 @@ void graph::graphPartition() {
 /* coarsen phase */
   graphCoarsen();
   resort();
-  orderAllNodes();
   printf("[graphCoarsen] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
 
 /* initial partition */

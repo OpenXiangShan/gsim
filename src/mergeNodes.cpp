@@ -219,6 +219,13 @@ void graph::mergeIn1() {
           prevSuper->addDepNext(next);
         }
       }
+      for (SuperNode* prev : super->depPrev) {
+        if (super->prev.find(prev) == super->prev.end()) { // only in depPrev
+          prev->eraseDepNext(super);
+          prev->addDepNext(prevSuper);
+          prevSuper->addDepPrev(prev);
+        }
+      }
       super->member.clear();
     }
   }
