@@ -248,7 +248,10 @@ void Node::updateActivate() {
     }
   }
   if (type == NODE_REG_DST) {
-    nextActiveId.insert(getSrc()->super->cppId);
+    if (getSrc()->status == EMPTY_REG) {
+      for (Node* nextNode : getSrc()->next) nextActiveId.insert(nextNode->super->cppId);
+    }
+    else nextActiveId.insert(getSrc()->super->cppId);
   }
   if (type == NODE_WRITER) {
     for (Node* port : parent->member) {

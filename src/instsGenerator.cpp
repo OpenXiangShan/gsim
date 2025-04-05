@@ -1548,7 +1548,7 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
 
   if (ChildInfo(0, status) == VAL_CONSTANT) {
     if (mpz_sgn(ChildInfo(0, consVal)) == 0) {
-      computeInfo->status = VAL_EMPTY_SRC;
+      computeInfo->status = VAL_EMPTY;
       return computeInfo;
     } else {
       computeInfo = Child(1, computeInfo);
@@ -1850,23 +1850,11 @@ valInfo* Node::compute() {
   if (!ret) ret = assignTree.back()->getRoot()->compute(this, name, isRoot)->dup();
   Assert(ret, "empty info in %s\n", name.c_str());
   if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) ret->setConstantByStr("0");
-  if (ret->status == VAL_EMPTY_SRC && assignTree.size() == 1) status = DEAD_SRC;
   MUX_DEBUG(printf("compute [%s(%d), %d] = %s width %d info->width %d status %d sameCons %d insts(%ld, %ld) isRoot %d infoType %d %p\n", name.c_str(), type, ret->status, ret->valStr.c_str(), width, ret->width, status, ret->sameConstant, ret->insts.size(), insts.size(), isRoot, ret->type, this));
   bool needRecompute = false;
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
     if (type == NODE_REG_DST) {
-      if ((getSrc()->status == DEAD_SRC || getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(ret->consVal, getSrc()->computeInfo->consVal) == 0)) && resetConsEq(ret, getSrc())) {
-        getSrc()->status = CONSTANT_NODE;
-        getSrc()->computeInfo = ret;
-        /* re-compute nodes depend on src */
-        for (Node* next : getSrc()->next) {
-          if (next->computeInfo) {
-            addRecompute(next);
-          }
-        }
-        needRecompute = true;
-      }
     } else if (type == NODE_MEM_MEMBER && mpz_sgn(ret->consVal) == 0) {
       Node* port = parent;
       if (port->type == NODE_READER) {

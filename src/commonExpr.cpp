@@ -113,7 +113,7 @@ void graph::commonExpr() {
       continue;
     }
     for (Node* node : super->member) {
-      if(node->status != VALID_NODE) continue;
+      if(node->status != VALID_NODE && node->status != EMPTY_REG) continue;
       nodeId[node] = node->id;
       if (node->type != NODE_OTHERS || node->isArray()) continue;
       if (node->prev.size() == 0) continue;

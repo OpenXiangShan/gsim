@@ -4,7 +4,13 @@
 std::string legalCppCons(std::string str);
 int upperPower2(int x);
 
-enum valStatus {VAL_EMPTY = 0, VAL_VALID, VAL_CONSTANT, VAL_FINISH /* for printf/assert*/ , VAL_INVALID, VAL_EMPTY_SRC};
+enum valStatus {
+  VAL_EMPTY = 0,
+  VAL_VALID,
+  VAL_CONSTANT,
+  VAL_FINISH /* for printf/assert*/ ,
+  VAL_INVALID
+};
 enum valType {TYPE_NORMAL = 0, TYPE_ARRAY, TYPE_STMT};
 class valInfo {
 private:

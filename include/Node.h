@@ -31,7 +31,15 @@ enum NodeType{
   NODE_EXT,
 };
 
-enum NodeStatus{ VALID_NODE, DEAD_NODE, CONSTANT_NODE, MERGED_NODE, DEAD_SRC, REPLICATION_NODE, SPLITTED_NODE };
+enum NodeStatus{
+  VALID_NODE,
+  DEAD_NODE,
+  CONSTANT_NODE,
+  MERGED_NODE,
+  REPLICATION_NODE,
+  SPLITTED_NODE,
+  EMPTY_REG  /* reg_src or reg_dst that are empty, which means that regNext represets the whole register */
+};
 enum IndexType{ INDEX_INT, INDEX_NODE };
 enum AsReset { EMPTY, NODE_ASYNC_RESET, NODE_UINT_RESET, NODE_ALL_RESET};
 
