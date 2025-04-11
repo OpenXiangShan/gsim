@@ -256,8 +256,8 @@ void graph::inferAllWidth() {
   auto addRecomputeNext = [&uniqueNodes, &fixedWidth, &reinferNodes](Node* node) {
     for (Node* next : node->next) {
       if (uniqueNodes.find(next) == uniqueNodes.end()) {
+        if (fixedWidth.find(next) != fixedWidth.end()) return;
         next->clearWidth();
-        if (fixedWidth.find(next) == fixedWidth.end()) next->width = -1;
         reinferNodes.push(next);
         uniqueNodes.insert(next);
       }
@@ -265,8 +265,8 @@ void graph::inferAllWidth() {
   };
   auto addRecompute = [&uniqueNodes, &fixedWidth, &reinferNodes](Node* node) {
     if (uniqueNodes.find(node) == uniqueNodes.end()) {
+      if (fixedWidth.find(node) != fixedWidth.end()) return;
       node->clearWidth();
-      if (fixedWidth.find(node) == fixedWidth.end()) node->width = -1;
       reinferNodes.push(node);
       uniqueNodes.insert(node);
     }
