@@ -127,7 +127,7 @@ PARSER_GEN_HEADER = $(PARSER_BUILD_DIR)/$(SYNTAX_NAME).hh
 GSIM_SRCS = $(foreach x, src $(PARSER_DIR), $(wildcard $(x)/*.cpp))
 
 GSIM_INC_DIR = include $(PARSER_DIR)/include $(PARSER_BUILD_DIR)
-CXXFLAGS += -ggdb -O3 -MMD $(addprefix -I,$(GSIM_INC_DIR)) -Wall -Werror --std=c++17
+CXXFLAGS += -ggdb -O3 -MMD $(addprefix -I,$(GSIM_INC_DIR)) -Wall -Werror --std=c++20
 
 ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
