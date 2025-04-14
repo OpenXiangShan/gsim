@@ -1023,7 +1023,7 @@ valInfo* ENode::instsAsSInt(Node* node, std::string lvalue, bool isRoot) {
     else {
       int shift = widthBits(width) - ChildInfo(0, width);
       if (shift == 0)
-        ret->valStr = format("(%s%s)", Cast(width, true).c_str(), ChildInfo(0, valStr).c_str(), shift, shift);
+        ret->valStr = format("(%s%s)", Cast(width, true).c_str(), ChildInfo(0, valStr).c_str());
       else
         ret->valStr = format("(%s(%s%s %s) %s)",
                              Cast(width, true).c_str(),
