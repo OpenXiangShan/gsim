@@ -35,7 +35,7 @@
 #define MAX(a, b) ((a >= b) ? a : b)
 #define MIN(a, b) ((a >= b) ? b : a)
 #define ABS(a) (a >= 0 ? a : -a)
-#define ROUNDUP(a, sz) ((((uintptr_t)a) + (sz) - 1) & ~((sz) - 1))
+#define ROUNDUP(a, sz) ((((unsigned long long)a) + (sz) - 1) & ~((sz) - 1))
 
 #define nodeType(node) widthUType(node->width)
 
@@ -45,17 +45,18 @@
 #define widthType(width, sign)                     \
   (sign ? widthSType(width) : widthUType(width))
 
+//TODO: check width with __BITINT_MAXWIDTH__
 #define widthUType(width) \
   std::string(width <= 8 ? "uint8_t" : \
             (width <= 16 ? "uint16_t" : \
             (width <= 32 ? "uint32_t" : \
-            (width <= 64 ? "uint64_t" : format("unsigned _BitInt(%d)", ROUNDUP(width, 64))))))
+            (width <= 64 ? "uint64_t" : format("unsigned _BitInt(%llu)", ROUNDUP(width, 64))))))
 
 #define widthSType(width) \
   std::string(width <= 8 ? "int8_t" : \
             (width <= 16 ? "int16_t" : \
             (width <= 32 ? "int32_t" : \
-            (width <= 64 ? "int64_t" : format("_BitInt(%d)", ROUNDUP(width, 64))))))
+            (width <= 64 ? "int64_t" : format("_BitInt(%llu)", ROUNDUP(width, 64))))))
 
 #define widthBits(width) \
         (width <= 8 ? 8 : \
