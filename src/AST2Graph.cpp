@@ -1877,6 +1877,7 @@ graph* AST2Graph(PNode* root) {
   }
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     updatePrevNext(it->second);
+    if (it->second->type == NODE_REG_SRC) it->second->updateDep();
   }
 
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
