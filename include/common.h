@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <set>
 #include <map>
+#include <format>
 #include <gmp.h>
 #include <cstdarg>
 
@@ -50,13 +51,13 @@
   std::string(width <= 8 ? "uint8_t" : \
             (width <= 16 ? "uint16_t" : \
             (width <= 32 ? "uint32_t" : \
-            (width <= 64 ? "uint64_t" : format("unsigned _BitInt(%llu)", ROUNDUP(width, 64))))))
+            (width <= 64 ? "uint64_t" : std::format("unsigned _BitInt({})", ROUNDUP(width, 64))))))
 
 #define widthSType(width) \
   std::string(width <= 8 ? "int8_t" : \
             (width <= 16 ? "int16_t" : \
             (width <= 32 ? "int32_t" : \
-            (width <= 64 ? "int64_t" : format("_BitInt(%llu)", ROUNDUP(width, 64))))))
+            (width <= 64 ? "int64_t" : std::format("_BitInt({})", ROUNDUP(width, 64))))))
 
 #define widthBits(width) \
         (width <= 8 ? 8 : \

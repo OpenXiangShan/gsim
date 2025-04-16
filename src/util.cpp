@@ -5,9 +5,9 @@
 
 #include <string>
 #include <map>
-#include <iostream>
-#include "common.h"
 #include <execinfo.h>
+
+#include "common.h"
 #include "util.h"
 
 /* convert firrtl constant to C++ constant 
@@ -104,18 +104,6 @@ int upperLog2(int x) {
   return (32 - __builtin_clz(x - 1));
 }
 
-static char buf[0x4000000];
-
-std::string format(const char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  std::vsnprintf(buf, sizeof(buf), fmt, args);
-  va_end(args);
-  std::string ret = buf;
-  Assert(ret.length() < sizeof(buf) - 1, "require larger buf");
-  return ret;
-}
-
 std::string bitMask(int width) {
   Assert(width > 0, "invalid width %d", width);
   if (width <= 64) {
@@ -126,9 +114,9 @@ std::string bitMask(int width) {
   } else {
     std::string type = widthUType(width);
     if (width % 64 == 0) { // in such case, (type)1 << width is undefined
-      return format("((%s)0 - 1)", type.c_str());
+      return std::format("(({})0 - 1)", type);
     } else {
-      return format("(((%s)1 << %d) - 1)", type.c_str(), width);
+      return std::format("((({})1 << {}) - 1)", type, width);
     }
   }
 }

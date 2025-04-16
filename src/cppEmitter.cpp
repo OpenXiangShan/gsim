@@ -10,6 +10,7 @@
 #include <map>
 #include <string>
 #include <utility>
+#include <format>
 
 #define ACTIVE_WIDTH 8
 #define RESET_PER_FUNC 400
@@ -108,24 +109,24 @@ ActiveType activeSet2bitMap(std::set<int>& activeId, std::map<uint64_t, ActiveTy
 }
 
 std::string updateActiveStr(int idx, uint64_t mask) {
-  if (mask <= MAX_U8) return format("activeFlags[%d] |= 0x%lx;", idx, mask);
-  if (mask <= MAX_U16) return format("*(uint16_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
-  if (mask <= MAX_U32) return format("*(uint32_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
-  return format("*(uint64_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
+  if (mask <= MAX_U8) return std::format("activeFlags[{}] |= {:#x};", idx, mask);
+  if (mask <= MAX_U16) return std::format("*(uint16_t*)&activeFlags[{}] |= {:#x};", idx, mask);
+  if (mask <= MAX_U32) return std::format("*(uint32_t*)&activeFlags[{}] |= {:#x};", idx, mask);
+  return std::format("*(uint64_t*)&activeFlags[{}] |= {:#x};", idx, mask);
 }
 
 std::string updateActiveStr(int idx, uint64_t mask, std::string& cond, int uniqueId) {
-  auto activeFlags = std::string("activeFlags[") + std::to_string(idx) + std::string("]");
+  auto activeFlags = std::format("activeFlags[{}]", idx);
 
   if (mask <= MAX_U8) {
-    if (uniqueId >= 0) return format("%s |= %s %s;", activeFlags.c_str(), cond.c_str(), shiftBits(uniqueId, ShiftDir::Left).c_str());
-    else return format("%s |= -(uint8_t)%s & 0x%lx;", activeFlags.c_str(), cond.c_str(), mask);
+    if (uniqueId >= 0) return std::format("{} |= {} {};", activeFlags, cond, shiftBits(uniqueId, ShiftDir::Left));
+    else return std::format("{} |= -(uint8_t){} & {:#x};", activeFlags, cond, mask);
   }
   if (mask <= MAX_U16)
-    return format("*(uint16_t*)&%s |= -(uint16_t)%s & 0x%lx;", activeFlags.c_str(), cond.c_str(), mask);
+    return std::format("*(uint16_t*)&{} |= -(uint16_t){} & {:#x};", activeFlags, cond, mask);
   if (mask <= MAX_U32)
-    return format("*(uint32_t*)&%s |= -(uint32_t)%s & 0x%lx;", activeFlags.c_str(), cond.c_str(), mask);
-  return format("*(uint64_t*)&%s |= -(uint64_t)%s & 0x%lx;", activeFlags.c_str(), cond.c_str(), mask);
+    return std::format("*(uint32_t*)&{} |= -(uint32_t){} & {:#x};", activeFlags, cond, mask);
+  return std::format("*(uint64_t*)&{} |= -(uint64_t){} & {:#x};", activeFlags, cond, mask);
 }
 
 std::string strRepeat(std::string str, int times) {
@@ -222,13 +223,13 @@ FILE* graph::genHeaderStart() {
 
   for (int num = 2; num <= maxConcatNum; num ++) {
     std::string param;
-    for (int i = num; i > 0; i --) param += format(i == num ? "_%d" : ", _%d", i);
+    for (int i = num; i > 0; i --) param += std::format("{}_{}", i == num ? "" : ", ", i);
     std::string value;
     std::string type = widthUType(num * 64);
     for (int i = num; i > 1; i --) {
-      value += format(i == num ? "((%s)_%d << %d) " : "| ((%s)_%d << %d)", type.c_str(), i, (i-1) * 64);
+      value += std::format("{}(({})_{} << {}) ", i == num ? "" : "| " , type, i, (i-1) * 64);
     }
-    value += format("| ((%s)_1)", type.c_str());
+    value += std::format("| (({})_1)", type);
     fprintf(header, "#define UINT_CONCAT%d(%s) (%s)\n", num, param.c_str(), value.c_str());
   }
   for (std::string str : extDecl) fprintf(header, "%s\n", str.c_str());
@@ -445,31 +446,31 @@ std::string activateNextStr(Node* node, std::set<int>& nextNodeId, std::string o
   std::map<uint64_t, ActiveType> bitMapInfo;
   ActiveType curMask;
   if (node->isAsyncReset()) {
-    ret += format("if (%s || (%s != %s)) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
+    ret += std::format("if ({0} || ({1} != {0})) {{\n", oldName, nodeName);
   } else {
     curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
     opt = ((ACTIVE_MASK(curMask) != 0) + bitMapInfo.size()) <= 3;
     if (opt) {
-      if (node->width == 1) ret += format("bool %s = %s ^ %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
-      else ret += format("bool %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
+      if (node->width == 1) ret += std::format("bool {} = {} ^ {};\n", condName, nodeName, oldName);
+      else ret += std::format("bool {} = {} != {};\n", condName, nodeName, oldName);
     }
-    else ret += format("if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
+    else ret += std::format("if ({} != {}) {{\n", nodeName, oldName);
   }
   if (inStep) {
-    if (node->isReset() && node->type == NODE_REG_SRC) ret += format("%s = %s;\n", RESET_NAME(node).c_str(), newName(node).c_str());
+    if (node->isReset() && node->type == NODE_REG_SRC) ret += std::format("{} = {};\n", RESET_NAME(node), newName(node));
   }
   if (node->isAsyncReset()) {
     Assert(!opt, "invalid opt");
     ret += "activateAll();\n";
-    ret += format("%s = -1;\n", flagName.c_str());
+    ret += std::format("{} = -1;\n", flagName);
   } else {
     if (ACTIVE_MASK(curMask) != 0) {
-      if (opt) ret += format("%s |= -(uint%d_t)%s & 0x%lx; // %s\n", flagName.c_str(), ACTIVE_WIDTH, condName.c_str() ,ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
-      else ret += format("%s |= 0x%lx; // %s\n", flagName.c_str(), ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
+      if (opt) ret += std::format("{} |= -(uint{}_t){} & {:#x}; // %s\n", flagName, ACTIVE_WIDTH, condName ,ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask));
+      else ret += std::format("{} |= {:#x}; // {}\n", flagName, ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask));
     }
     for (auto iter : bitMapInfo) {
       auto str = opt ? updateActiveStr(iter.first, ACTIVE_MASK(iter.second), condName, ACTIVE_UNIQUE(iter.second)) : updateActiveStr(iter.first, ACTIVE_MASK(iter.second));
-      ret += format("%s // %s\n", str.c_str(), ACTIVE_COMMENT(iter.second).c_str());
+      ret += std::format("{} // {}\n", str, ACTIVE_COMMENT(iter.second));
     }
   #ifdef PERF
     #if ENABLE_ACTIVATOR
@@ -489,9 +490,9 @@ static std::string activateUncondNextStr(Node* node, std::set<int>activateId, bo
   std::string ret;
   std::map<uint64_t, ActiveType> bitMapInfo;
   auto curMask = activeSet2bitMap(activateId, bitMapInfo, node->super->cppId);
-  if (ACTIVE_MASK(curMask) != 0) ret += format("%s |= 0x%lx; // %s\n", flagName.c_str(), ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
+  if (ACTIVE_MASK(curMask) != 0) ret += std::format("{} |= {:#x}; // {}\n", flagName, ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask));
   for (auto iter : bitMapInfo) {
-    ret += format("%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+    ret += std::format("{} // {}\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)), ACTIVE_COMMENT(iter.second));
   }
 #ifdef PERF
   #if ENABLE_ACTIVATOR
@@ -603,7 +604,7 @@ void graph::genNodeInsts(Node* node, std::string flagName, int indent) { // TODO
     /* display all insts */
     std::string indiStr;
     if (!node->fullyUpdated && node->isArray() && node->anyNextActive()) {
-      indiStr = format("\n%s = true;\n", ASSIGN_INDI(node).c_str());
+      indiStr = std::format("\n{} = true;\n", ASSIGN_INDI(node));
     } else if (node->type == NODE_WRITER) { // activate all readers
       indiStr += "\n";
       std::set<int> allReaderId;
@@ -613,7 +614,7 @@ void graph::genNodeInsts(Node* node, std::string flagName, int indent) { // TODO
       std::map<uint64_t, ActiveType> bitMapInfo;
       activeSet2bitMap(allReaderId, bitMapInfo, -1);
       for (auto iter : bitMapInfo) {
-        indiStr += format("%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+        indiStr += std::format("{} // {}\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)), ACTIVE_COMMENT(iter.second));
       }
     }
     for (std::string inst : newInsts) {
@@ -651,10 +652,10 @@ void graph::nodeDisplay(Node* member, int indent) {
     } \
     s += "\", "; \
     for (n --; n > 0; n --) { \
-      s += format("(uint64_t)(%s >> %d)", varname, n * 64); \
+      s += std::format("(uint64_t)({} >> {})", varname, n * 64); \
       s += ", "; \
     } \
-    s += format("(uint64_t)%s",varname);\
+    s += std::format("(uint64_t){}", varname);\
     s += ");"; \
     emitBodyLock(indent, s.c_str()); \
   } while (0)
@@ -717,7 +718,7 @@ void replaceAssignEnd(std::string& inst, Node* n, std::string str) {
 
 void saveAssignBeg(std::string& inst, Node* n, int indent) {
   if (n->needActivate() && !n->isArray() && n->type != NODE_WRITER) {
-    std::string saveStr = format("%s %s = %s;\n", widthUType(n->width).c_str(), oldName(n).c_str(), n->name.c_str());
+    std::string saveStr = std::format("{} {} = {};\n", widthUType(n->width), oldName(n), n->name);
     replaceAssignBeg(inst, n, saveStr);
   } else {
     replaceAssignBeg(inst, n, "");
@@ -761,11 +762,11 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
           if (n->isArray()) {
             std::string idxStr, bracket, inst;
             for (int i = 0; i < n->dimension.size(); i ++) {
-              inst += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, n->dimension[i], i);
-              idxStr += "[i" + std::to_string(i) + "]";
+              inst += std::format("for(int i{0} = 0; i{0} < {1}; i{0} ++) {{\n", i, n->dimension[i]);
+              idxStr += std::format("[i{}]", i);
               bracket += "}\n";
             }
-            inst += format("%s$prev%s = %s%s;\n", n->name.c_str(), idxStr.c_str(), n->name.c_str(), idxStr.c_str());
+            inst += std::format("{0}$prev{1} = {0}{1};\n", n->name, idxStr);
             inst += bracket;
             emitBodyLock(indent, "%s", inst.c_str());
           } else emitBodyLock(indent, "%s$prev = %s;\n", n->name.c_str(), n->name.c_str());
@@ -810,7 +811,7 @@ int graph::genActivate() {
     emitFuncDecl(0, "void S%s::subStep0() {\n", name.c_str());
     int indent = 1;
     int nextSubStepIdx = 1;
-    std::string nextFuncDef = format("void S%s::subStep%d()", name.c_str(), nextSubStepIdx);
+    std::string nextFuncDef = std::format("void S{}::subStep{}()", name, nextSubStepIdx);
     bool prevActiveWhole = false;
     for (int idx = 0; idx < superId; idx ++) {
       int id;
@@ -830,14 +831,14 @@ int graph::genActivate() {
           bool newFile = __emitSrc(indent, true, false, nextFuncDef.c_str(), "if(unlikely(activeFlags[%d] != 0)) {\n", id);
           indent ++;
           if (newFile) {
-            nextFuncDef = format("void S%s::subStep%d()", name.c_str(), ++ nextSubStepIdx);
+            nextFuncDef = std::format("void S{}::subStep{}()", name, ++ nextSubStepIdx);
           }
           emitBodyLock(indent, "uint%d_t oldFlag = activeFlags[%d];\n", ACTIVE_WIDTH, id);
           emitBodyLock(indent, "activeFlags[%d] = 0;\n", id);
         }
       }
       SuperNode* super = cppId2Super[idx];
-      std::string flagName = prevActiveWhole ? "oldFlag" : format("activeFlags[%d]", id);
+      std::string flagName = prevActiveWhole ? "oldFlag" : std::format("activeFlags[{}]", id);
       indent = genNodeStepStart(super, mask, idx, flagName, indent);
       genSuperEval(super, flagName, indent);
       indent = genNodeStepEnd(super, indent);
@@ -992,7 +993,7 @@ bool graph::__emitSrc(int indent, bool canNewFile, bool alreadyEndFunc, const ch
       if (!alreadyEndFunc) fprintf(srcFp, "}"); // the end of the current function
       fclose(srcFp);
     }
-    srcFp = std::fopen(format("%s%d.cpp", (globalConfig.OutputDir + "/" + name).c_str(), srcFileIdx).c_str(), "w");
+    srcFp = std::fopen(std::format("{}{}.cpp", (globalConfig.OutputDir + "/" + name), srcFileIdx).c_str(), "w");
     srcFileIdx ++;
     assert(srcFp != NULL);
     srcFileBytes = fprintf(srcFp, "#include \"%s.h\"\n", name.c_str());
