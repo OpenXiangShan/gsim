@@ -132,10 +132,6 @@ void ENode::inferWidth() {
         break;
       case OP_MUX:
       case OP_WHEN:
-        if (getChild(1) && getChild(2)) {
-          if (w1 > w2) getChild(2)->setWidth(w1, s2);
-          if (w2 > w1) getChild(1)->setWidth(w2, s1);
-        }
         Assert(getChildNum() == 3 && (getChild(1) || getChild(2)), "invalid child");
         if (getChild(1) && getChild(2)) setWidth(MAX(w1, w2), s1);
         else if (getChild(1)) setWidth(w1, s1);
@@ -212,9 +208,7 @@ void Node::inferWidth() {
   }
   if (resetTree) resetTree->getRoot()->inferWidth();
 
-  if (type != NODE_REG_SRC) {
-    for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();
-  }
+  for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();
 
   if (width == -1) {
     int newWidth = 0;
@@ -225,25 +219,19 @@ void Node::inferWidth() {
         newWidth = MAX(newWidth, resetTree->getRoot()->width);
         newSign = resetTree->getRoot()->sign;
       }
-    } else {
-      for (ExpTree* tree : assignTree) {
-        newWidth = MAX(newWidth, tree->getRoot()->width);
-        newSign = tree->getRoot()->sign;
-        newClock |= tree->getRoot()->isClock;
-      }
     }
+    for (ExpTree* tree : assignTree) {
+      newWidth = MAX(newWidth, tree->getRoot()->width);
+      newSign = tree->getRoot()->sign;
+      newClock |= tree->getRoot()->isClock;
+    }
+
     setType(newWidth, newSign);
     isClock = newClock;
   }
 
   for (ExpTree* tree : assignTree) {
     tree->getlval()->inferWidth();
-  }
-  if (type == NODE_REG_DST) {
-    for (ExpTree* tree : getSrc()->assignTree) {
-      tree->getRoot()->inferWidth();
-      tree->getlval()->inferWidth();
-    }
   }
 }
 
@@ -253,20 +241,16 @@ void graph::inferAllWidth() {
   std::set<Node*> uniqueNodes;
   std::set<Node*> fixedWidth;
 
-  auto addRecomputeNext = [&uniqueNodes, &fixedWidth, &reinferNodes](Node* node) {
+  auto addRecomputeNext = [&uniqueNodes, &reinferNodes](Node* node) {
     for (Node* next : node->next) {
       if (uniqueNodes.find(next) == uniqueNodes.end()) {
-        if (fixedWidth.find(next) != fixedWidth.end()) return;
-        next->clearWidth();
         reinferNodes.push(next);
         uniqueNodes.insert(next);
       }
     }
   };
-  auto addRecompute = [&uniqueNodes, &fixedWidth, &reinferNodes](Node* node) {
+  auto addRecompute = [&uniqueNodes, &reinferNodes](Node* node) {
     if (uniqueNodes.find(node) == uniqueNodes.end()) {
-      if (fixedWidth.find(node) != fixedWidth.end()) return;
-      node->clearWidth();
       reinferNodes.push(node);
       uniqueNodes.insert(node);
     }
@@ -285,20 +269,12 @@ void graph::inferAllWidth() {
     reinferNodes.pop();
     uniqueNodes.erase(node);
     int prevWidth = node->width;
+    if (fixedWidth.find(node) == fixedWidth.end()) node->width = -1;
+    node->clearWidth();
     node->inferWidth();
     if (prevWidth != node->width) {
       addRecomputeNext(node);
-    }
-    if (node->type == NODE_REG_DST && node->width != node->getSrc()->width) {
-      if (node->getSrc()->width == -1) node->getSrc()->inferWidth();
-      if (node->width < node->getSrc()->width) {
-        node->width = node->getSrc()->width;
-      } else {
-        reinferNodes.push(node->getSrc()); // re-infer the src node for updateTree
-        uniqueNodes.insert(node->getSrc());
-        node->getSrc()->width = node->width;
-        addRecomputeNext(node->getSrc());
-      }
+      if (node->type == NODE_REG_DST) addRecompute(node->getSrc());
     }
 
     if (node->type == NODE_WRITER && node->width > node->parent->width) {
@@ -312,13 +288,18 @@ void graph::inferAllWidth() {
     if (reinferNodes.empty()) { // re-checking reset tree, the resetVal may be inferred after registers
       for (SuperNode* super : sortedSuper) {
         for (Node* node : super->member) {
-          if (!node->resetTree || node->resetTree->getRoot()->width != -1) continue;
-          node->resetTree->getRoot()->inferWidth();
-          if (node->resetTree->getRoot()->width > node->width) {
-            node->width = node->resetTree->getRoot()->width;
+          if (node->type != NODE_REG_SRC) continue;
+          int srcWidth = node->width;
+          int dstWidth = node->getDst()->width;
+          if (node->width > node->getDst()->width) {
             node->getDst()->width = node->width;
+          } else if (node->getDst()->width > node->width) {
+            node->width = node->getDst()->width;
+          }
+          if (srcWidth != node->width) {
             addRecomputeNext(node);
           }
+          if (dstWidth != node->getDst()->width) addRecomputeNext(node->getDst());
         }
       }
     }

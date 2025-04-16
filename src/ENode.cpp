@@ -270,6 +270,22 @@ void ExpTree::updateWithNewWidth() {
             top->setChild(1, pad);
           }
           break;
+        case OP_MUX:
+          if (top->getChild(1)->width > top->getChild(2)->width) {
+            ENode* pad = new ENode(OP_PAD);
+            pad->width = top->width;
+            pad->sign = top->getChild(1)->sign;
+            pad->addVal(top->width);
+            pad->addChild(top->getChild(1));
+            top->setChild(1, pad);
+          } else if (top->getChild(1)->width < top->getChild(2)->width) {
+            ENode* pad = new ENode(OP_PAD);
+            pad->width = top->width;
+            pad->sign = top->getChild(2)->sign;
+            pad->addVal(top->width);
+            pad->addChild(top->getChild(2));
+            top->setChild(2, pad);
+          }
         default:
           break;
       }
