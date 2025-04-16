@@ -89,10 +89,8 @@ public:
     ret->sign = sign;
     ret->consLength = consLength;
     ret->fullyUpdated = fullyUpdated;
-    if (status == VAL_CONSTANT) {
-      mpz_set(ret->assignmentCons, assignmentCons);
-      ret->sameConstant = sameConstant;
-    }
+    mpz_set(ret->assignmentCons, assignmentCons);
+    ret->sameConstant = sameConstant;
 
     for (int i = beg; i <= end; i ++) {
       if (getMemberInfo(i)) ret->memberInfo.push_back(getMemberInfo(i)->dup());

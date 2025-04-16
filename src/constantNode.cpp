@@ -994,8 +994,12 @@ valInfo* Node::computeRegConstant() {
       reset = ZERO_RESET;
       consMap[this] = new valInfo(width, sign);
     }
-    if (updateInfo->status == VAL_CONSTANT && cons_resetConsEq(updateInfo, resetInfo)) {
+    if ((updateInfo->status == VAL_CONSTANT || updateInfo->sameConstant) && cons_resetConsEq(updateInfo, resetInfo)) {
       status = CONSTANT_NODE;
+      if (updateInfo->status != VAL_CONSTANT) { // sameConstant
+        updateInfo->status = VAL_CONSTANT;
+        mpz_set(updateInfo->consVal, updateInfo->assignmentCons);
+      }
       setConstant(updateInfo);
       consMap[this] = updateInfo;
     } else if (updateInfo->status == VAL_CONSTANT) { // dst is constant but not equals to reset val
@@ -1075,6 +1079,27 @@ valInfo* Node::computeConstant() {
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
     setConstant(ret);
+  } else {
+    if (assignTree.size() > 1 && ret->sameConstant) {
+      mpz_t sameConsVal;
+      mpz_init(sameConsVal);
+      bool isStart = true, isSame = true;
+      for (ExpTree* tree : assignTree) {
+        valInfo* info = tree->getRoot()->computeConstant(this, false);
+        if (isStart) {
+          mpz_set(sameConsVal, info->assignmentCons);
+          isStart = false;
+        }
+        if (mpz_cmp(sameConsVal, info->assignmentCons) != 0) {
+          isSame = false;
+          break;
+        }
+      }
+      if (!isSame) {
+        ret = new valInfo();
+      }
+    }
+
   }
   ret->width = width;
   ret->sign = sign;
