@@ -1277,11 +1277,7 @@ void graph::constantAnalysis() {
         member->assignTree.end()
       );
       if (member->resetTree) {
-        valInfo* info = member->resetTree->getRoot()->computeConstant(member, false);
-        if (info->status == VAL_EMPTY) {
-          member->resetTree = nullptr;
-          member->reset = ZERO_RESET;
-        } else member->resetTree->removeConstant();
+        member->resetTree->removeConstant();
       }
     }
   }
