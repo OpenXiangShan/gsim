@@ -1054,22 +1054,6 @@ valInfo* Node::computeConstant() {
   if (isArray()) {
     return computeConstantArray();
   }
-
-  for (size_t i = 0; i < assignTree.size(); i ++) {
-    ExpTree* tree = assignTree[i];
-    valInfo* info = tree->getRoot()->computeConstant(this, false);
-    if (info->status == VAL_EMPTY) {
-      assignTree.erase(assignTree.begin() + i);
-      i --;
-      continue;
-    }
-    if ((info->status == VAL_INVALID || info->status == VAL_CONSTANT) && (i < assignTree.size() - 1) ) {
-      // TODO: replace using OP_INT
-      fillEmptyWhen(assignTree[i+1], tree->getRoot());
-      assignTree.erase(assignTree.begin() + i);
-      i --;
-    }
-  }
   if (assignTree.size() == 0) {
     valInfo* ret = new valInfo(width, sign);
     if (type == NODE_OTHERS) {
@@ -1081,7 +1065,12 @@ valInfo* Node::computeConstant() {
     consMap[this] = ret;
     return ret;
   }
-  valInfo* ret = assignTree.back()->getRoot()->computeConstant(this, false)->dup();
+  valInfo* ret = nullptr;
+  for (size_t i = 0; i < assignTree.size(); i ++) {
+    ExpTree* tree = assignTree[i];
+    valInfo* info = tree->getRoot()->computeConstant(this, false);
+    if (info->status != VAL_INVALID || i == (assignTree.size() - 1)) ret = info;
+  }
   if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) {
     ret->setConstantByStr("0");
   }
@@ -1277,8 +1266,25 @@ void graph::constantAnalysis() {
         }
         continue;
       }
-      for (ExpTree* tree : member->assignTree) {
-        tree->removeConstant();
+      for (size_t i = 0; i < member->assignTree.size(); i ++) {
+        ExpTree* tree = member->assignTree[i];
+        valInfo* info = tree->getRoot()->computeConstant(member, false);
+        if (info->status == VAL_EMPTY) {
+          member->assignTree.erase(member->assignTree.begin() + i);
+          i --;
+        } else if (!member->isArray() && (i < member->assignTree.size() - 1) && (info->status == VAL_INVALID || info->status == VAL_CONSTANT)) {
+          ENode* enode;
+          if (info->status == VAL_CONSTANT) {
+            enode = allocIntEnode(info->width, mpz_get_str(NULL, 10, info->consVal));
+          } else {
+            enode = new ENode(OP_INVALID);
+          }
+          fillEmptyWhen(member->assignTree[i+1], enode);
+          member->assignTree.erase(member->assignTree.begin() + i);
+          i --;
+        } else {
+          tree->removeConstant();
+        }
       }
       member->assignTree.erase(
       std::remove_if(member->assignTree.begin(), member->assignTree.end(),
