@@ -789,6 +789,10 @@ void Node::recomputeConstant() {
       recomputeNext = true;
     }
   }
+  if (consMap[this]->sameConstant != prevVal->sameConstant ||
+      (consMap[this]->sameConstant && mpz_cmp(consMap[this]->assignmentCons, prevVal->assignmentCons) != 0)) {
+    recomputeNext = true;
+  }
   for (size_t i = 0; i < prevArrayVal.size(); i ++) {
     if ((!prevArrayVal[i] && consMap[this]->memberInfo[i]) || (prevArrayVal[i] && !consMap[this]->memberInfo[i])) {
       recomputeNext = true;
