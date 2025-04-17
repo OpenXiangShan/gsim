@@ -60,7 +60,6 @@ void Node::updateDep(){ // only reg_src can reach here
   }
   std::set<Node*> nextNodes;
   if (reset == ASYRESET) {
-    Assert(resetTree->getRoot()->opType == OP_RESET, "invalid resetTree");
     getENodeRelyNodes(resetTree->getRoot()->getChild(0), nextNodes);
   }
   for (Node* n : nextNodes) {
@@ -69,6 +68,20 @@ void Node::updateDep(){ // only reg_src can reach here
     for (Node* srcNext : next) {
       srcNext->addDepPrev(n);
       n->addDepNext(n);
+    }
+  }
+  std::set<Node*> resetValNodes;
+  if (resetTree) {
+    Assert(resetTree->getRoot()->opType == OP_RESET, "invalid resetTree");
+    getENodeRelyNodes(resetTree->getRoot()->getChild(1), resetValNodes);
+  }
+  for (Node* n : resetValNodes) {
+    if (n->type == NODE_REG_SRC) {
+      depNext.insert(n);
+      n->depPrev.insert(this);
+    } else {
+      depPrev.insert(n);
+      n->depNext.insert(this);
     }
   }
 }
