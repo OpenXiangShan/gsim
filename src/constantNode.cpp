@@ -784,6 +784,11 @@ void Node::recomputeConstant() {
   if (consMap[this]->status != prevVal->status) {
     recomputeNext = true;
   }
+  if (consMap[this]->status == VAL_CONSTANT && prevVal->status == VAL_CONSTANT) {
+    if (mpz_cmp(consMap[this]->consVal, prevVal->consVal) != 0) {
+      recomputeNext = true;
+    }
+  }
   for (size_t i = 0; i < prevArrayVal.size(); i ++) {
     if ((!prevArrayVal[i] && consMap[this]->memberInfo[i]) || (prevArrayVal[i] && !consMap[this]->memberInfo[i])) {
       recomputeNext = true;
