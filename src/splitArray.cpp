@@ -303,10 +303,10 @@ void graph::splitArrayNode(Node* node) {
   splittedArray.insert(node);
   node->status = DEAD_NODE;
   /* remove prev connection */
-  for (Node* prev : node->prev) prev->eraseNext(node);
-  for (SuperNode* super : node->super->prev) super->eraseNext(node->super);
-  for (Node* next : node->next) next->erasePrev(node);
-  for (SuperNode* super : node->super->next) super->erasePrev(node->super);
+  for (Node* prev : node->depPrev) prev->eraseNext(node);
+  for (SuperNode* super : node->super->depPrev) super->eraseNext(node->super);
+  for (Node* next : node->depNext) next->erasePrev(node);
+  for (SuperNode* super : node->super->depNext) super->erasePrev(node->super);
   node->super->clear_relation();
 
   for (Node* memberInSuper : node->super->member) {
@@ -341,15 +341,14 @@ void graph::splitArrayNode(Node* node) {
   /* construct connections */
   if (node->type == NODE_REG_SRC || node->type == NODE_REG_DST) {
     Node* regBind = node->getBindReg();
-    checkNodes.insert(regBind);
     for (Node* member : regBind->arrayMember) {
-    checkNodes.insert(member);
-  }
+      checkNodes.insert(member);
+    }
   }
   for (Node* member : node->arrayMember) {
     checkNodes.insert(member);
   }
-  for (Node* next : node->next) {
+  for (Node* next : node->depNext) {
     checkNodes.insert(next);
     if (next != node) {
       next->clearPrev();
@@ -362,11 +361,12 @@ void graph::splitArrayNode(Node* node) {
 
   for (Node* n : checkNodes) {
     n->updateConnect();
+    if (n->type == NODE_REG_SRC) {
+      n->updateDep();
+    }
   }
-
   /* clear node connection */
   node->clear_relation();
-
   for (Node* member : node->arrayMember) member->constructSuperConnect();
   for (Node* member : node->arrayMember) {
     if (member->super->prev.size() == 0) supersrc.push_back(member->super);
@@ -575,7 +575,6 @@ void graph::splitOptionalArray() {
       for (size_t i = 0; i < arrayNode->arrayMember.size(); i ++) {
         regsrc.push_back(arrayNode->arrayMember[i]);
         arrayNode->arrayMember[i]->bindReg(arrayNode->getDst()->arrayMember[i]);
-        arrayNode->arrayMember[i]->updateDep();
       }
     }
     num ++;
