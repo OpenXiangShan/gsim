@@ -1090,7 +1090,7 @@ valInfo* Node::computeConstant() {
           mpz_set(sameConsVal, info->assignmentCons);
           isStart = false;
         }
-        if (mpz_cmp(sameConsVal, info->assignmentCons) != 0) {
+        if (!info->sameConstant || mpz_cmp(sameConsVal, info->assignmentCons) != 0) {
           isSame = false;
           break;
         }
