@@ -1584,6 +1584,15 @@ valInfo* ENode::instsExtFunc(Node* n) {
   return ret;
 }
 
+valInfo* allocNodeInfo(Node* n) {
+  valInfo* ret = new valInfo();
+  ret->width = n->width;
+  ret->sign = n->sign;
+  ret->valStr = n->name;
+  ret->typeWidth = upperPower2(n->width);
+  return ret;
+}
+
 /* compute enode */
 valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
   if (computeInfo) return computeInfo;
@@ -1602,40 +1611,25 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       if (getChildNum() < nodePtr->dimension.size()) {
         int beg, end;
         std::tie(beg, end) = getIdx(nodePtr);
-        if (beg >= 0 && beg == end) {
-          computeInfo = nodePtr->getArrayMember(beg)->compute()->dup();
-        } else {
-          computeInfo = new valInfo();
-          computeInfo->beg = beg;
-          computeInfo->end = end;
-          computeInfo->width = nodePtr->width;
-          computeInfo->sign = nodePtr->sign;
-          computeInfo->valStr = nodePtr->name;
-          for (ENode* childENode : child)
-            computeInfo->valStr += childENode->computeInfo->valStr;
-          if (!IS_INVALID_LVALUE(lvalue)) {
-            for (size_t i = 0; i < nodePtr->dimension.size() - getChildNum(); i ++) {
-              computeInfo->valStr += "[i" + std::to_string(i) + "]";
-            }
-          }
-          computeInfo->opNum = 0;
-          if (computeInfo->beg >= 0) {
-            for (int i = computeInfo->beg; i <= computeInfo->end; i ++) {
-              nodePtr->getArrayMember(i)->compute();
-              computeInfo->memberInfo.push_back(nodePtr->getArrayMember(i)->computeInfo);
-            }
+        computeInfo = allocNodeInfo(nodePtr);
+        computeInfo->beg = beg;
+        computeInfo->end = end;
+        for (ENode* childENode : child)
+          computeInfo->valStr += childENode->computeInfo->valStr;
+        if (!IS_INVALID_LVALUE(lvalue)) {
+          for (size_t i = 0; i < nodePtr->dimension.size() - getChildNum(); i ++) {
+            computeInfo->valStr += "[i" + std::to_string(i) + "]";
           }
         }
+        computeInfo->opNum = 0;
       } else {
         int idx = getArrayIndex(nodePtr);
         MUX_DEBUG(printf("node %s %s\n", nodePtr->name.c_str(), nodePtr->getArrayMember(idx)->name.c_str()));
         computeInfo = nodePtr->getArrayMember(idx)->compute()->dup();
       }
     } else if (nodePtr->isArray()) {
-      computeInfo = nodePtr->compute()->dup();
+      computeInfo = allocNodeInfo(nodePtr);
       if (child.size() != 0 && computeInfo->status == VAL_VALID) { // TODO: constant array representation
-        valInfo* indexInfo = computeInfo->dup();  // TODO: no need
-        computeInfo = indexInfo;
         for (ENode* childENode : child)
           computeInfo->valStr += childENode->computeInfo->valStr;
       }
@@ -1652,11 +1646,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       if (nodePtr->status == CONSTANT_NODE) {
         computeInfo = nodePtr->compute()->dup();
       } else {
-        computeInfo = new valInfo();
-        computeInfo->valStr = nodePtr->name;
-        computeInfo->width = nodePtr->width;
-        computeInfo->sign = nodePtr->sign;
-        computeInfo->typeWidth = upperPower2(nodePtr->width);
+        computeInfo = allocNodeInfo(nodePtr);
         if (child.size() != 0) {
           valInfo* indexInfo = computeInfo->dup();
           computeInfo = indexInfo;
