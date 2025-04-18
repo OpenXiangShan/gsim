@@ -999,8 +999,6 @@ valInfo* Node::computeRegConstant() {
     consMap[getDst()] = dstInfo;
   } else {
     if (resetInfo && resetInfo->status == VAL_EMPTY) {
-      resetTree = nullptr;
-      reset = ZERO_RESET;
       consMap[this] = new valInfo(width, sign);
     }
     if ((updateInfo->status == VAL_CONSTANT || updateInfo->sameConstant) && cons_resetConsEq(updateInfo, resetInfo)) {
@@ -1069,7 +1067,7 @@ valInfo* Node::computeConstant() {
   for (size_t i = 0; i < assignTree.size(); i ++) {
     ExpTree* tree = assignTree[i];
     valInfo* info = tree->getRoot()->computeConstant(this, false);
-    if (info->status != VAL_INVALID || i == (assignTree.size() - 1)) ret = info;
+    if ((info->status != VAL_INVALID && info->status != VAL_EMPTY) || (i == (assignTree.size() - 1) && !ret)) ret = info;
   }
   if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) {
     ret->setConstantByStr("0");
@@ -1263,6 +1261,10 @@ void graph::constantAnalysis() {
         member->assignTree.push_back(new ExpTree(enode, member));
         if (member->type == NODE_SPECIAL) { // set to NODE_OTHERS to enable removeDeadNode
           member->type = NODE_OTHERS;
+        }
+        if (member->resetTree) {
+          member->resetTree = nullptr;
+          member->reset = ZERO_RESET;
         }
         continue;
       }
