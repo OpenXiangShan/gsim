@@ -13,7 +13,9 @@ void graph::topoSort() {
   }
   std::map<SuperNode*, int>times;
   std::stack<SuperNode*> s;
-  for (SuperNode* node : supersrc) s.push(node);
+  for (SuperNode* node : supersrc) {
+    if (node->depPrev.size() == 0) s.push(node);
+  }
   /* next.size() == 0, place the registers at the end to benefit mergeRegisters */
   std::vector<SuperNode*> potentialRegs;
   std::set<SuperNode*> visited;
