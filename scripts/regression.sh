@@ -1,10 +1,12 @@
+#!/bin/bash
+
 # usage: regression.sh
-# See log file at build/$task/$task.log
+# See log file at build/$task/$task.log and build/regression.log
 
 TASKS="ysyx3 rocket small-boom large-boom minimal-xiangshan default-xiangshan"
 
 function log() {
-  echo "`date`|| $1"
+  echo "`date`|| $1" | tee -a build/regression.log
 }
 
 function rebuild_gsim() {
@@ -35,6 +37,8 @@ for t in $TASKS; do
   result=`grep "simulation process 100.00%" build/$t/$t.log | grep -o "[0-9]* per sec" | awk '{print $1}'`
   make pgo dutName=$t -j `nproc` > /dev/null
   result_pgo=`grep "simulation process 100.00%" build/$t/$t.log | grep -o "[0-9]* per sec" | awk '{print $1}'`
-  log "$t(non-pgo / pgo): ${result}Hz / ${result_pgo}Hz"
+  make bolt dutName=$t -j `nproc` > /dev/null
+  result_bolt=`grep "simulation process 100.00%" build/$t/$t.log | grep -o "[0-9]* per sec" | awk '{print $1}'`
+  log "$t(plain / pgo / bolt ): ${result}Hz / ${result_pgo}Hz / ${result_bolt}Hz"
 done
 log "Performance regression finish"
