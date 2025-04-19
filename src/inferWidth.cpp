@@ -9,6 +9,13 @@
 #define s1 getChild(1)->sign
 #define s2 getChild(2)->sign
 
+/*
+ * Recursively calculates the width of each ENode (DFS)
+ * For leaf ENodes, the width is directly derived from the corresponding Node.
+ * For non-leaf ENodes, the width is determined based on:
+ *     1. The widths of its child ENodes, and
+ *     2. The operation represented by this ENode.
+ */
 void ENode::inferWidth() {
   for (ENode* enode : child) {
     if (enode) enode->inferWidth();

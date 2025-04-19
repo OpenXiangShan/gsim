@@ -27,12 +27,12 @@
 #elif defined(__DUT_rocket__)
 #define DUT_MEMORY mem$srams$mem
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
-#define CYCLE_MAX_PERF 3000000
+#define CYCLE_MAX_PERF 2000000
 #define CYCLE_MAX_SIM  4200000
 #elif defined(__DUT_large_boom__) || defined(__DUT_small_boom__)
 #define DUT_MEMORY mem$srams$mem
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
-#define CYCLE_MAX_PERF 5000000
+#define CYCLE_MAX_PERF 1000000
 #ifdef __DUT_large_boom__
 #define CYCLE_MAX_SIM  3900000
 #else
@@ -302,8 +302,9 @@ int main(int argc, char** argv) {
         out << dut->allNames[sorted[i]] << " " << dut->nodeNum[sorted[i]] << " " << (double)activeTimes[sorted[i]] / cycles << " " << activeTimes[sorted[i]] << " " \
             << dut->posActives[sorted[i]] << " "  << (double)dut->posActives[sorted[i]] / activeTimes[sorted[i]] << std::endl;
       }
-
-      if (cycles == CYCLE_MAX_PERF) return 0;
+#endif
+#if defined(PERF) || defined(PERF_CYCLE)
+      if (cycles >= CYCLE_MAX_PERF) return 0;
 #endif
       if (cycles == CYCLE_MAX_SIM) return 0;
     }
