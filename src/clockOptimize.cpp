@@ -73,18 +73,18 @@ clockVal* ENode::clockCompute() {
       ENode* neg = new ENode(OP_NOT);
       neg->addChild(cond);
       childVal = getChild(1)->clockCompute();
-      Assert(childVal->isConstant || (childVal->node && childVal->node->type == NODE_INP), "invalid mux");
+      Assert(childVal->isConstant || childVal->isInvalid || (childVal->node && childVal->node->type == NODE_INP), "invalid mux");
       ret = getChild(2)->clockCompute();
-      Assert(ret->isConstant || (ret->node && ret->node->type == NODE_INP), "invalid mux");
+      Assert(ret->isConstant || ret->isInvalid || (ret->node && ret->node->type == NODE_INP), "invalid mux");
       ENode* first = nullptr, *second = nullptr;
-      if (!childVal->isConstant) { // null first
+      if (!childVal->isConstant && !childVal->isInvalid) { // null first
         if (childVal->gateENode) {
           first = new ENode(OP_AND);
           first->addChild(cond);
           first->addChild(childVal->gateENode);
         } else first = cond;
       }
-      if (!ret->isConstant) { // null second
+      if (!ret->isConstant && !ret->isInvalid) { // null second
         if (ret->gateENode) {
           second = new ENode(OP_AND);
           second->addChild(neg);
