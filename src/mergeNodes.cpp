@@ -96,7 +96,16 @@ void graph::mergeAsyncReset() {
     }
     Node* resetReg = reg->dup(NODE_REG_RESET, reg->name);
     resetReg->regNext = reg;
-    resetReg->assignTree.push_back(new ExpTree(reg->resetTree->getRoot(), resetReg));
+    if (reg->status == CONSTANT_RESET_REG) {
+      Assert(reg->assignTree.size() == 1, "invalid assignTree size %ld in %s", reg->assignTree.size(), reg->name.c_str());
+      ENode* mux = new ENode(OP_MUX);
+      mux->addChild(reg->resetTree->getRoot()->getChild(0));
+      mux->addChild(reg->resetTree->getRoot()->getChild(1));
+      mux->addChild(reg->assignTree.back()->getRoot());
+      resetReg->assignTree.push_back(new ExpTree(mux, resetReg));
+      reg->assignTree.clear();
+      reg->getDst()->assignTree.clear();
+    } else resetReg->assignTree.push_back(new ExpTree(reg->resetTree->getRoot(), resetReg));
     condSuper->add_member(resetReg);
     if (reg->getDst()->status == VALID_NODE) {
       Node* resetRegDst = reg->dup(NODE_REG_RESET, reg->getDst()->name);
@@ -132,7 +141,26 @@ void graph::mergeUIntReset() {
     } else {
       prevSuper = resetSuper[prevNode];
     }
-    prevSuper->member.push_back(reg);
+    Node* resetReg = reg->dup(NODE_REG_RESET, reg->name);
+    resetReg->regNext = reg;
+    if (reg->status == CONSTANT_RESET_REG) {
+      Assert(reg->assignTree.size() == 1, "invalid assignTree size %ld in %s", reg->assignTree.size(), reg->name.c_str());
+      ENode* mux = new ENode(OP_MUX);
+      mux->addChild(reg->resetTree->getRoot()->getChild(0));
+      mux->addChild(reg->resetTree->getRoot()->getChild(1));
+      mux->addChild(reg->assignTree.back()->getRoot());
+      resetReg->assignTree.push_back(new ExpTree(mux, resetReg));
+      reg->assignTree.clear();
+      reg->getDst()->assignTree.clear();
+    } else resetReg->assignTree.push_back(new ExpTree(reg->resetTree->getRoot(), resetReg));
+
+    prevSuper->add_member(resetReg);
+    if (reg->getDst()->status == VALID_NODE) {
+      Node* resetRegDst = reg->dup(NODE_REG_RESET, reg->getDst()->name);
+      resetRegDst->regNext = reg;
+      resetRegDst->assignTree.push_back(new ExpTree(reg->resetTree->getRoot(), resetRegDst));
+      prevSuper->add_member(resetRegDst);
+    }
   }
 }
 /*

@@ -2212,42 +2212,8 @@ void graph::instsGenerator() {
       super->stmtTree->compute(super->insts);
     }
   }
-
-  for (Node* reg : regsrc) {
-    if (reg->status != VALID_NODE || !reg->resetTree) continue;
-    if (reg->resetTree) {
-      reg->resetTree->getRoot()->compute(reg, reg->name, true);
-    }
-    valInfo* info = reg->resetTree->getRoot()->computeInfo;
-    for (std::string inst : info->insts) {
-      reg->resetInsts.push_back(inst);
-    }
-    if (info->status == VAL_EMPTY) info->setConstantByStr("0");
-    if (info->type == TYPE_STMT) {
-      reg->resetInsts.push_back(info->valStr);
-    } else if (info->type == TYPE_ARRAY) {
-      reg->resetInsts.push_back(arrayCopy(reg->name, reg, info));
-    } else if (reg->isArray()) {
-      if (info->status == VAL_CONSTANT && reg->width <= BASIC_WIDTH)
-        reg->resetInsts.push_back(format("memset(%s, %s, sizeof(%s));", reg->name.c_str(), info->valStr.c_str(), reg->name.c_str()));
-      else {
-        reg->resetInsts.push_back(arrayCopy(reg->name, reg, info));
-      }
-    } else {
-      reg->resetInsts.push_back(reg->name + " = " + info->valStr + ";");
-    }
-    if (reg->regSplit && reg->getDst()->status == VALID_NODE) {
-      std::vector<std::string> newInsts;
-      size_t start_pos = 0;
-      for (std::string inst : reg->resetInsts) {
-        while((start_pos = inst.find(reg->name, start_pos)) != std::string::npos) {
-          inst.replace(start_pos, reg->name.length(), reg->getDst()->name);
-          start_pos += reg->name.length();
-        }
-        newInsts.push_back(inst);
-      }
-      reg->resetInsts.insert(reg->resetInsts.end(), newInsts.begin(), newInsts.end());
-    }
+  for (SuperNode* super : uintReset) {
+    super->stmtTree->compute(super->insts);
   }
 
   /* remove constant nodes */

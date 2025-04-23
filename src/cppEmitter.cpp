@@ -379,7 +379,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
 #endif
 
 void graph::genNodeDef(FILE* fp, Node* node) {
-  if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || node->status != VALID_NODE) return;
+  if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || (node->status != VALID_NODE && node->status != CONSTANT_RESET_REG)) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
   if (node->type == NODE_OTHERS && !node->anyNextActive() && !node->isArray()) return;
 #if defined(GSIM_DIFF) || defined(VERILATOR_DIFF)
@@ -850,24 +850,16 @@ void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
   emitBodyLock(indent, "void S%s::subReset%d(){ // %s reset\n", name.c_str(), resetFuncNum, isUIntReset ? "uint" : "async");
   indent ++;
   resetFuncNum ++;
-  if (isUIntReset) {
-    for (Node* node : super->member) {
-      for (std::string str : node->resetInsts) {
-        emitBodyLock(indent, "%s\n", str.c_str());
-      }
-    }
-  } else {
-    for (InstInfo inst : super->insts) {
-      switch (inst.infoType) {
-        case SUPER_INFO_IF:
-        case SUPER_INFO_ELSE:
-        case SUPER_INFO_DEDENT:
-        case SUPER_INFO_STR:
-          emitBodyLock(indent, "%s\n", inst.inst.c_str());
-          break;
-        default:
-          break;
-      }
+  for (InstInfo inst : super->insts) {
+    switch (inst.infoType) {
+      case SUPER_INFO_IF:
+      case SUPER_INFO_ELSE:
+      case SUPER_INFO_DEDENT:
+      case SUPER_INFO_STR:
+        emitBodyLock(indent, "%s\n", inst.inst.c_str());
+        break;
+      default:
+        break;
     }
   }
   indent --;
