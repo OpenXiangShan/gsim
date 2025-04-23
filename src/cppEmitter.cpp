@@ -157,15 +157,6 @@ std::string arrayMemberName(Node* node, std::string suffix) {
   return ret;
 }
 
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-static std::string arrayPrevName (std::string name) {
-  size_t pos = name.find("[");
-  if (pos == name.npos) return name + "$prev";
-  std::string ret = name.insert(pos, "$prev");
-  return ret;
-}
-#endif
-
 void graph::genNodeInit(Node* node, int mode) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || node->status != VALID_NODE) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
@@ -313,14 +304,6 @@ void graph::genDiffSig(FILE* fp, Node* node) {
 
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
 void graph::genDiffSig(FILE* fp, Node* node) {
-  if (node->type == NODE_REG_SRC){
-    fprintf(fp, "%s %s%s", widthUType(node->width).c_str(), node->name.c_str(), "$prev");
-
-    if (node->isArray() && node->arrayEntryNum() != 1) {
-      for (int dim : node->dimension) fprintf(fp, "[%d]", dim);
-    }
-    fprintf(fp, ";\n");
-  }
   std::string verilatorName = name + "__DOT__" + node->name;
   size_t pos;
   while ((pos = verilatorName.find("$$")) != std::string::npos) {
@@ -330,8 +313,8 @@ void graph::genDiffSig(FILE* fp, Node* node) {
     verilatorName.replace(pos, 1, "__DOT__");
   }
   std::map<std::string, std::string> allNames;
-  std::string diffNodeName = node->type == NODE_REG_SRC ? (node->getSrc()->name + "$prev") : node->name;
-  std::string originName = (node->type == NODE_REG_SRC ? node->getSrc()->name : node->name);
+  std::string diffNodeName = node->name;
+  std::string originName = node->name;
   if (node->type == NODE_MEMORY){
 
   } else if (node->isArrayMember) {
@@ -753,21 +736,6 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
       if (n->isLocal()) {
         emitBodyLock(indent, "%s %s;\n", widthUType(n->width).c_str(), n->name.c_str());
       }
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-        if (n->type == NODE_REG_SRC) {
-          if (n->isArray()) {
-            std::string idxStr, bracket, inst;
-            for (int i = 0; i < n->dimension.size(); i ++) {
-              inst += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, n->dimension[i], i);
-              idxStr += "[i" + std::to_string(i) + "]";
-              bracket += "}\n";
-            }
-            inst += format("%s$prev%s = %s%s;\n", n->name.c_str(), idxStr.c_str(), n->name.c_str(), idxStr.c_str());
-            inst += bracket;
-            emitBodyLock("%s", inst.c_str());
-          } else emitBodyLock("%s$prev = %s;\n", n->name.c_str(), n->name.c_str());
-        }
-#endif
     }
     for (InstInfo inst : super->insts) {
       switch (inst.infoType) {
@@ -917,33 +885,6 @@ void graph::genResetAll() {
   emitBodyLock(0, "}\n");
 }
 
-void graph::saveDiffRegs() {
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-  emitFuncDecl(0, "void S%s::saveDiffRegs(){\n", name.c_str());
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      if (member->type == NODE_REG_SRC && (!member->isArray() || member->arrayEntryNum() == 1) && member->status == VALID_NODE) {
-        std::string memberName = member->name;
-        if (member->isArray() && member->arrayEntryNum() == 1) {
-          for (size_t i = 0; i < member->dimension.size(); i ++) memberName += "[0]";
-        }
-        emitBodyLock("%s = %s;\n", arrayPrevName(member->getSrc()->name).c_str(), memberName.c_str());
-      } else if (member->type == NODE_REG_SRC && member->isArray() && member->status == VALID_NODE) {
-        std::string idxStr, bracket;
-        for (size_t i = 0; i < member->dimension.size(); i ++) {
-          emitBodyLock("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, member->dimension[i], i);
-          idxStr += "[i" + std::to_string(i) + "]";
-          bracket += "}\n";
-        }
-        emitBodyLock("%s$prev%s = %s%s;\n", member->name.c_str(), idxStr.c_str(), member->name.c_str(), idxStr.c_str());
-        emitBodyLock("%s", bracket.c_str());
-      }
-    }
-  }
-  emitBodyLock("}\n");
-#endif
-}
-
 void graph::genStep(int subStepIdxMax) {
   emitFuncDecl(0, "void S%s::step() {\n", name.c_str());
 
@@ -954,9 +895,6 @@ void graph::genStep(int subStepIdxMax) {
       }
     }
   }
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-  emitBodyLock("saveDiffRegs();\n");
-#endif
   for (int i = 0; i <= subStepIdxMax; i ++) {
     emitBodyLock(1, "subStep%d();\n", i);
   }
@@ -1183,11 +1121,6 @@ void graph::cppEmitter() {
   /* step wrapper */
   fprintf(header, "void step();\n");
   genStep(subStepIdxMax);
-
-#if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-  fprintf(header, "void saveDiffRegs();\n");
-#endif
-  saveDiffRegs();
 
   /* end of file */
   fprintf(header, "};\n"
