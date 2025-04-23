@@ -206,6 +206,8 @@ void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
       } else {
         node->setConstantZero(0);
         node->regNext->setConstantZero(0);
+        node->getSrc()->resetTree = nullptr;
+        node->getSrc()->reset = ZERO_RESET;
       }
     } else if (node->type == NODE_EXT && node->clock) {
       clockVal* val = clockMap[node->clock];
