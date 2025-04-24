@@ -130,7 +130,9 @@ valInfo* ENode::consWhen(Node* node, bool isLvalue) {
 
   valInfo* ret = new valInfo(width, sign);
 
-  if ((!getChild(1) || ChildCons(1, status) == VAL_EMPTY) && getChild(2)) {
+  if ((!getChild(1) || ChildCons(1, status) == VAL_EMPTY) && (!getChild(2) || ChildCons(2, status) == VAL_EMPTY)) {
+    ret->status = VAL_EMPTY;
+  } else if ((!getChild(1) || ChildCons(1, status) == VAL_EMPTY) && getChild(2)) {
     if (ChildCons(2, sameConstant)) {
       ret->sameConstant = true;
       mpz_set(ret->assignmentCons, ChildCons(2, assignmentCons));
