@@ -1056,7 +1056,7 @@ valInfo* Node::computeConstant() {
     valInfo* info = tree->getRoot()->computeConstant(this, false);
     if ((info->status != VAL_INVALID && info->status != VAL_EMPTY) || (i == (assignTree.size() - 1) && !ret)) ret = info;
   }
-  if (ret->status == VAL_INVALID || ret->status == VAL_EMPTY) {
+  if (type == NODE_OTHERS && (ret->status == VAL_INVALID || ret->status == VAL_EMPTY)) {
     ret->setConstantByStr("0");
   }
   if (ret->status == VAL_CONSTANT) {
