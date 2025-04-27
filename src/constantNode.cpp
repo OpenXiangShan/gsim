@@ -1008,11 +1008,21 @@ valInfo* Node::computeRegConstant() {
       }
       consMap[this] = updateInfo;
     } else if (updateInfo->status == VAL_CONSTANT) { // dst is constant but not equals to reset val
-      status = CONSTANT_RESET_REG;
-      getDst()->status = CONSTANT_RESET_REG;
-      assignTree.clear();
-      assignTree.push_back(new ExpTree(allocIntEnode(width, mpz_get_str(NULL, 10, updateInfo->consVal)), this));
+      ENode* enode = new ENode(OP_MUX);
+      Assert(resetTree->getRoot()->opType == OP_RESET, "invalid tree");
+      enode->addChild(resetTree->getRoot()->getChild(0));
+      enode->addChild(resetTree->getRoot()->getChild(1));
+      enode->addChild(allocIntEnode(width, mpz_get_str(NULL, 10, updateInfo->consVal)));
+      enode->width = width;
+      enode->sign = sign;
+      getDst()->assignTree.clear();
+      getDst()->assignTree.push_back(new ExpTree(enode, getDst()));
+      status = VALID_NODE;
+      getDst()->status = VALID_NODE;
       consMap[getDst()] = consMap[this] = new valInfo(width, sign);
+      for (ExpTree* tree : assignTree) clearConsEMap(tree);
+      resetTree = nullptr;
+      reset = ZERO_RESET;
     } else {
       consMap[this] = new valInfo(width, sign);
     }

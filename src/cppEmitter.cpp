@@ -362,7 +362,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
 #endif
 
 void graph::genNodeDef(FILE* fp, Node* node) {
-  if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || (node->status != VALID_NODE && node->status != CONSTANT_RESET_REG)) return;
+  if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || (node->status != VALID_NODE)) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
   if (node->type == NODE_OTHERS && !node->anyNextActive() && !node->isArray()) return;
 #if defined(GSIM_DIFF) || defined(VERILATOR_DIFF)
@@ -887,7 +887,7 @@ void graph::genResetAll() {
 
 void graph::genStep(int subStepIdxMax) {
   emitFuncDecl(0, "void S%s::step() {\n", name.c_str());
-
+  emitBodyLock(1, "resetAll();\n");
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->isReset() && member->type == NODE_REG_SRC) {
@@ -898,7 +898,7 @@ void graph::genStep(int subStepIdxMax) {
   for (int i = 0; i <= subStepIdxMax; i ++) {
     emitBodyLock(1, "subStep%d();\n", i);
   }
-  emitBodyLock(1, "resetAll();\n");
+
   emitBodyLock(1, "cycles ++;\n");
   emitBodyLock(0, "}\n");
 }

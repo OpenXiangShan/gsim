@@ -38,7 +38,6 @@ enum NodeStatus{
   MERGED_NODE,
   REPLICATION_NODE,
   SPLITTED_NODE,
-  CONSTANT_RESET_REG,
   EMPTY_REG  /* reg_src or reg_dst that are empty, which means that regNext represets the whole register */
 };
 enum IndexType{ INDEX_INT, INDEX_NODE };
