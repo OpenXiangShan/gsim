@@ -70,7 +70,7 @@ void ExpTree::treeOpt() {
       s.push(std::make_tuple(top->getChild(0), parent, idx));
       continue;
     }
-    if (top->opType == OP_ASSINT) {
+    if (top->opType == OP_ASSINT || top->opType == OP_ASUINT) {
       if (top->getChild(0)->sign == top->sign && top->getChild(0)->width == top->width) {
         if (parent) {
           parent->setChild(idx, top->getChild(0));
