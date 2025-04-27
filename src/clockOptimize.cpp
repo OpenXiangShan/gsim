@@ -10,7 +10,7 @@ public:
   ENode* gateENode = nullptr; // ClockGate
   clockVal(Node* n) { node = n; }
   clockVal(int v) { isConstant = true; }
-  clockVal() { isInvalid = true; }
+  clockVal(bool invalid) { isInvalid = invalid; }
 };
 
 std::map<Node*, clockVal*> clockMap;
@@ -42,7 +42,7 @@ clockVal* ENode::clockCompute() {
       ret = getChild(0)->clockCompute();
       break;
     case OP_INVALID:
-      ret = new clockVal();
+      ret = new clockVal(true);
       ret->isInvalid = true;
       break;
     case OP_INT:
@@ -56,7 +56,7 @@ clockVal* ENode::clockCompute() {
       display();
       break;
     case OP_OR:
-      ret = new clockVal();
+      ret = new clockVal(false);
       ret->gateENode = this;
       break;
     case OP_AND:
@@ -77,28 +77,32 @@ clockVal* ENode::clockCompute() {
       ret = getChild(2)->clockCompute();
       Assert(ret->isConstant || ret->isInvalid || (ret->node && ret->node->type == NODE_INP), "invalid mux");
       ENode* first = nullptr, *second = nullptr;
-      if (!childVal->isConstant && !childVal->isInvalid) { // null first
-        if (childVal->gateENode) {
-          first = new ENode(OP_AND);
-          first->addChild(cond);
-          first->addChild(childVal->gateENode);
-        } else first = cond;
-      }
-      if (!ret->isConstant && !ret->isInvalid) { // null second
-        if (ret->gateENode) {
-          second = new ENode(OP_AND);
-          second->addChild(neg);
-          second->addChild(ret->gateENode);
-        } else second = neg;
-      }
-      if (!first && !second) ret = new clockVal(0);
-      else if (!first) ret->gateENode = second;
-      else if (!second) ret->gateENode = first;
-      else  {
-        ENode* andEnode = new ENode(OP_OR);
-        andEnode->addChild(first);
-        andEnode->addChild(second);
-        ret->gateENode = andEnode;
+      if (ret->isInvalid) {
+        ret = childVal;
+      } else if (!childVal->isInvalid) { // if childVal is invalid, ret is the clock
+        if (!childVal->isConstant) { // null first
+          if (childVal->gateENode) {
+            first = new ENode(OP_AND);
+            first->addChild(cond);
+            first->addChild(childVal->gateENode);
+          } else first = cond;
+        }
+        if (!ret->isConstant) { // null second
+          if (ret->gateENode) {
+            second = new ENode(OP_AND);
+            second->addChild(neg);
+            second->addChild(ret->gateENode);
+          } else second = neg;
+        }
+        if (!first && !second) ret = new clockVal(0);
+        else if (!first) ret->gateENode = second;
+        else if (!second) ret->gateENode = first;
+        else  {
+          ENode* andEnode = new ENode(OP_OR);
+          andEnode->addChild(first);
+          andEnode->addChild(second);
+          ret->gateENode = andEnode;
+        }
       }
       break;
     }
@@ -206,6 +210,8 @@ void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
       } else {
         node->setConstantZero(0);
         node->regNext->setConstantZero(0);
+        node->getSrc()->resetTree = nullptr;
+        node->getSrc()->reset = ZERO_RESET;
       }
     } else if (node->type == NODE_EXT && node->clock) {
       clockVal* val = clockMap[node->clock];
