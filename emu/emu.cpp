@@ -117,6 +117,11 @@ void dut_hook(DUT_NAME *dut) {
 #if defined(VERILATOR)
 #include "verilated.h"
 #include REF_HEADER
+#if defined (V_WAVE)
+#include "verilated_fst_c.h"
+VerilatedFstC *tfp;
+const std::unique_ptr<VerilatedContext> contextp{new VerilatedContext};
+#endif
 static REF_NAME* ref;
 
 void ref_init(REF_NAME *ref) {
@@ -127,6 +132,16 @@ void ref_init(REF_NAME *ref) {
   ref->difftest_perfCtrl_clean = ref->difftest_perfCtrl_dump = 0;
   ref->difftest_uart_in_ch = -1;
   ref->difftest_uart_in_valid = 0;
+#endif
+#if defined(V_WAVE)
+  Verilated::traceEverOn(true);
+  tfp = new VerilatedFstC;
+  ref->trace(tfp, 10);
+  Verilated::mkdir("wave/");
+  tfp->open("wave/V_wave.fst");
+  if(tfp->isOpen() == false){
+    printf("Fail to open wave file!\n");
+  }
 #endif
 }
 
@@ -198,8 +213,18 @@ void dut_reset() { dut->set_reset(1); dut_cycle(10); dut->set_reset(0); }
 #ifdef VERILATOR
 void ref_cycle(int n) {
   while (n --) {
+#ifdef V_WAVE
+    contextp->timeInc(1);
+#endif
     ref->clock = 0; ref->eval();
+#ifdef V_WAVE
+    tfp->dump(contextp->time());
+    contextp->timeInc(1);
+#endif
     ref->clock = 1; ref->eval();
+#ifdef V_WAVE
+    tfp->dump(contextp->time());
+#endif
   }
 }
 void ref_reset() { ref->reset = 1; ref_cycle(10); ref->reset = 0; }
@@ -267,6 +292,10 @@ int main(int argc, char** argv) {
       printf("ALL diffs: dut -- ref\n");
       printf("Failed after %ld cycles\n", cycles);
       checkSignals(false);
+#ifdef V_WAVE
+      tfp->flush();
+      tfp->close();
+#endif
       return -1;
     }
 #endif
@@ -309,4 +338,8 @@ int main(int argc, char** argv) {
       if (cycles == CYCLE_MAX_SIM) return 0;
     }
   }
+#ifdef V_WAVE
+      tfp->flush();
+      tfp->close();
+#endif
 }

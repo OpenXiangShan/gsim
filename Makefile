@@ -230,7 +230,10 @@ VERI_LDFLAGS = -O1
 VERI_VFLAGS = --top $(NAME) -Wno-lint -j 8 --cc --exe +define+RANDOMIZE_GARBAGE_ASSIGN --max-num-width 1048576 --compiler clang
 VERI_VFLAGS += -Mdir $(VERI_BUILD_DIR) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)"
 VERI_VFLAGS += $(VERI_THREADS)
-#VERI_VFLAGS += --trace-fst
+ifeq ($(V_WAVE),1)
+VERI_VFLAGS += --trace-fst
+VERI_CFLAGS += -DV_WAVE
+endif
 
 VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
 VERI_CSRCS-2 = $(EMU_GEN_SRCS)
