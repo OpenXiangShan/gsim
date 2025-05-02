@@ -182,7 +182,11 @@ compile: $(GEN_CPP_DIR)/$(NAME)0.cpp
 EMU_BUILD_DIR = $(WORK_DIR)/emu
 EMU_BIN = $(WORK_DIR)/S$(NAME)
 
+ifeq ($(SIMPOINT),1)
+EMU_MAIN_SRCS = emu/emu-checkpoint.cpp emu/support/compress.cpp
+else
 EMU_MAIN_SRCS = emu/emu.cpp
+endif
 EMU_GEN_SRCS = $(shell find $(GEN_CPP_DIR) -name "*.cpp" 2> /dev/null)
 EMU_SRCS = $(EMU_MAIN_SRCS) $(EMU_GEN_SRCS)
 
@@ -228,6 +232,9 @@ VERI_GEN_MK = $(VERI_BUILD_DIR)/V$(NAME).mk
 VERI_CFLAGS = $(call escape_quote,$(EMU_CFLAGS) $(CFLAGS_REF))
 VERI_LDFLAGS = -O1
 VERI_VFLAGS = --top $(NAME) -Wno-lint -j 8 --cc --exe +define+RANDOMIZE_GARBAGE_ASSIGN --max-num-width 1048576 --compiler clang
+ifeq ($(SIMPOINT),1)
+VERI_LDFLAGS += -lz -lzstd
+endif
 VERI_VFLAGS += -Mdir $(VERI_BUILD_DIR) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)"
 VERI_VFLAGS += $(VERI_THREADS)
 #VERI_VFLAGS += --trace-fst
