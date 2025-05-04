@@ -196,6 +196,9 @@ EMU_CFLAGS += -fbracket-depth=2048
 #EMU_CFLAGS += -fsanitize=address -fsanitize-address-use-after-scope
 #EMU_CFLAGS += -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract
 #EMU_CFLAGS += -pg -ggdb
+ifeq ($(SIMPOINT),1)
+EMU_LDFLAGS += -lz -lzstd
+endif
 
 $(foreach x, $(EMU_SRCS), $(eval \
 	$(call CXX_TEMPLATE, $(EMU_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(EMU_CFLAGS), EMU_OBJS,)))
