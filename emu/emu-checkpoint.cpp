@@ -313,8 +313,7 @@ int main(int argc, char** argv) {
       return -1;
     }
 #endif
-    dut_end = instrCnt >= MAX_INSTS;
-    if ((cycles % 100000) == 0 || dut_end) {
+    if ((cycles % 100000) == 0 || dut_end || instrCnt >= MAX_INSTS) {
       auto dur = std::chrono::system_clock::now() - start;
       auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
       fprintf(stderr, "cycles %ld (%ld ms, %ld per sec) \n",
