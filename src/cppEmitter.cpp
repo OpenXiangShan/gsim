@@ -3,6 +3,7 @@
 */
 
 #include "common.h"
+#include "util.h"
 
 #include <cstddef>
 #include <cstdio>
@@ -117,7 +118,7 @@ std::string updateActiveStr(int idx, uint64_t mask, std::string& cond, int uniqu
   auto activeFlags = std::string("activeFlags[") + std::to_string(idx) + std::string("]");
 
   if (mask <= MAX_U8) {
-    if (uniqueId >= 0) return format("%s |= %s << %d;", activeFlags.c_str(), cond.c_str(), uniqueId);
+    if (uniqueId >= 0) return format("%s |= %s %s;", activeFlags.c_str(), cond.c_str(), shiftBits(uniqueId, ShiftDir::Left).c_str());
     else return format("%s |= -(uint8_t)%s & 0x%lx;", activeFlags.c_str(), cond.c_str(), mask, activeFlags.c_str());
   }
   if (mask <= MAX_U16)
@@ -215,9 +216,10 @@ FILE* graph::genHeaderStart() {
     for (int i = num; i > 0; i --) param += format(i == num ? "_%d" : ", _%d", i);
     std::string value;
     std::string type = widthUType(num * 64);
-    for (int i = num; i > 0; i --) {
+    for (int i = num; i > 1; i --) {
       value += format(i == num ? "((%s)_%d << %d) " : "| ((%s)_%d << %d)", type.c_str(), i, (i-1) * 64);
     }
+    value += format("| ((%s)_1)", type.c_str());
     fprintf(header, "#define UINT_CONCAT%d(%s) (%s)\n", num, param.c_str(), value.c_str());
   }
   for (std::string str : extDecl) fprintf(header, "%s\n", str.c_str());
@@ -631,10 +633,11 @@ void graph::nodeDisplay(Node* member, int indent) {
       s += "|%%lx"; \
     } \
     s += "\", "; \
-    for (n --; n >= 0; n --) { \
+    for (n --; n > 0; n --) { \
       s += format("(uint64_t)(%s >> %d)", varname, n * 64); \
-      if (n != 0) s += ", "; \
+      s += ", "; \
     } \
+    s += format("(uint64_t)%s",varname);\
     s += ");"; \
     emitBodyLock(indent, s.c_str()); \
   } while (0)
@@ -976,6 +979,8 @@ void graph::cppEmitter() {
     }
   }
   activeFlagNum = (superId + ACTIVE_WIDTH - 1) / ACTIVE_WIDTH;
+  // avoid buffer overflow when accessing the last elements as uint64_t
+  activeFlagNum = ROUNDUP(activeFlagNum, 8);
 
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {

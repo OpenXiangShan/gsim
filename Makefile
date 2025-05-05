@@ -47,18 +47,18 @@ endif
 ##############################################
 
 BUILD_DIR ?= build
-WORK_DIR = $(BUILD_DIR)/$(TEST_FILE)
+WORK_DIR = $(BUILD_DIR)/$(dutName)
 CXX = clang++
 
 SHELL := /bin/bash
 TIME = /usr/bin/time
-LOG_FILE = $(WORK_DIR)/$(TEST_FILE).log
+LOG_FILE = $(WORK_DIR)/$(dutName).log
 
 CFLAGS_DUT = -DDUT_NAME=S$(NAME) -DDUT_HEADER=\"$(NAME).h\" -D__DUT_$(shell echo $(dutName) | tr - _)__
 
 # $(1): object file
 # $(2): source file
-# $(3): compile flags
+# $(3): compile flags (for linker flags, use -Xlinker --xxx instead of -Wl,--xxx)
 # $(4): object file list
 # $(5): extra dependency
 define CXX_TEMPLATE =
@@ -70,7 +70,7 @@ endef
 
 # $(1): object file
 # $(2): source file
-# $(3): ld flags
+# $(3): ld flags (use -Xlinker --xxx instead of -Wl,--xxx)
 define LD_TEMPLATE =
 $(1): $(2)
 	@mkdir -p $$(@D) && echo + LD $$@
@@ -84,7 +84,8 @@ ifeq ($(PERF),1)
 	target ?= run-emu
 else ifeq ($(MODE),0)
 	MODE_FLAGS += -DGSIM
-	EMU_CFLAGS += -O3 -Wno-format $(PGO_CFLAGS)
+	EMU_CFLAGS += -O3 -Wno-format $(PGO_CFLAGS) $(BOLT_CFLAGS)
+	EMU_LDFLAGS += $(BOLT_LDFLAGS)
 	target ?= run-emu
 else ifeq ($(MODE), 1)
 	MODE_FLAGS += -DVERILATOR
@@ -195,7 +196,9 @@ EMU_CFLAGS += -fbracket-depth=2048
 $(foreach x, $(EMU_SRCS), $(eval \
 	$(call CXX_TEMPLATE, $(EMU_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(EMU_CFLAGS), EMU_OBJS,)))
 
-$(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS)))
+$(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS) $(EMU_LDFLAGS)))
+
+build-emu: $(EMU_BIN)
 
 run-emu: $(EMU_BIN)
 	$(TIME) taskset 0x1 $^ $(mainargs)
@@ -206,7 +209,7 @@ clean-emu:
 # Dependency
 -include $(EMU_OBJS:.o=.d)
 
-.PHONY: run-emu clean-emu
+.PHONY: run-emu clean-emu build-emu
 
 ##############################################
 ### Building EMU from Verilator
@@ -277,20 +280,53 @@ pgo:
 	rm -rf $(PGO_BUILD_DIR)
 	mkdir -p $(PGO_BUILD_DIR)
 	$(MAKE) MODE=0 compile
-	make clean-emu
-	make run-emu MODE=0 PGO_CFLAGS="-fprofile-generate=$(PGO_BUILD_DIR)"
+	$(MAKE) clean-emu
+	$(MAKE) run MODE=0 PGO_CFLAGS="-fprofile-generate=$(PGO_BUILD_DIR)"
 	$(LLVM_PROFDATA) merge -o $(PGO_BUILD_DIR)/default.profdata $(PGO_BUILD_DIR)/*.profraw
-	make clean-emu
-	make run-emu MODE=0 PGO_CFLAGS="-fprofile-use=$(PGO_BUILD_DIR)/default.profdata"
+	$(MAKE) clean-emu
+	$(MAKE) run MODE=0 PGO_CFLAGS="-fprofile-use=$(PGO_BUILD_DIR)/default.profdata"
 
 .PHONY: pgo
+
+##############################################
+### BOLT
+##############################################
+
+BOLT_BUILD_DIR = $(WORK_DIR)/bolt
+BOLT_INSTRUMENT ?= $(shell perf record -e cycles -j any,u -- ls >/dev/null 2>&1; echo $$?)
+
+bolt:
+	mkdir -p $(BOLT_BUILD_DIR)
+	$(MAKE) compile MODE=0
+	$(MAKE) clean-emu
+	$(MAKE) build-emu MODE=0 BOLT_CFLAGS="-DPERF_CYCLE" BOLT_LDFLAGS="-Xlinker --emit-relocs"
+ifeq ($(BOLT_INSTRUMENT), 0)
+	perf record -e cycles:u -j any,u -o $(BOLT_BUILD_DIR)/perf.data -- $(EMU_BIN) $(mainargs)
+	perf2bolt -p $(BOLT_BUILD_DIR)/perf.data -o $(BOLT_BUILD_DIR)/perf.fdata $(EMU_BIN)
+else
+	llvm-bolt $(EMU_BIN) -instrument -o $(BOLT_BUILD_DIR)/S$(NAME).inst --instrumentation-file=$(BOLT_BUILD_DIR)/perf.fdata
+	$(BOLT_BUILD_DIR)/S$(NAME).inst $(mainargs)
+endif
+	$(MAKE) clean-emu 
+	$(MAKE) build-emu MODE=0 BOLT_LDFLAGS="-Xlinker --emit-relocs"
+	llvm-bolt $(EMU_BIN) -o $(EMU_BIN).bolt \
+			-data=$(BOLT_BUILD_DIR)/perf.fdata \
+			-reorder-blocks=ext-tsp \
+			-reorder-functions=cdsort \
+			-split-functions \
+			-split-all-cold \
+			-split-eh
+	@mv $(EMU_BIN).bolt $(EMU_BIN)
+	$(MAKE) run MODE=0
+
+.PHONY: bolt
 
 ##############################################
 ### Miscellaneous
 ##############################################
 
 clean:
-	-rm -rf $(BUILD_DIR)
+	-@rm -rf $(BUILD_DIR)
 
 run-internal:
 	$(MAKE) MODE=0 compile
