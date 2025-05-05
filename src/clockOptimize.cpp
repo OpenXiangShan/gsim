@@ -10,7 +10,7 @@ public:
   ENode* gateENode = nullptr; // ClockGate
   clockVal(Node* n) { node = n; }
   clockVal(int v) { isConstant = true; }
-  clockVal() { isInvalid = true; }
+  clockVal(bool invalid) { isInvalid = invalid; }
 };
 
 std::map<Node*, clockVal*> clockMap;
@@ -42,7 +42,7 @@ clockVal* ENode::clockCompute() {
       ret = getChild(0)->clockCompute();
       break;
     case OP_INVALID:
-      ret = new clockVal();
+      ret = new clockVal(true);
       ret->isInvalid = true;
       break;
     case OP_INT:
@@ -56,7 +56,7 @@ clockVal* ENode::clockCompute() {
       display();
       break;
     case OP_OR:
-      ret = new clockVal();
+      ret = new clockVal(false);
       ret->gateENode = this;
       break;
     case OP_AND:
@@ -73,32 +73,36 @@ clockVal* ENode::clockCompute() {
       ENode* neg = new ENode(OP_NOT);
       neg->addChild(cond);
       childVal = getChild(1)->clockCompute();
-      Assert(childVal->isConstant || (childVal->node && childVal->node->type == NODE_INP), "invalid mux");
+      Assert(childVal->isConstant || childVal->isInvalid || (childVal->node && childVal->node->type == NODE_INP), "invalid mux");
       ret = getChild(2)->clockCompute();
-      Assert(ret->isConstant || (ret->node && ret->node->type == NODE_INP), "invalid mux");
+      Assert(ret->isConstant || ret->isInvalid || (ret->node && ret->node->type == NODE_INP), "invalid mux");
       ENode* first = nullptr, *second = nullptr;
-      if (!childVal->isConstant) { // null first
-        if (childVal->gateENode) {
-          first = new ENode(OP_AND);
-          first->addChild(cond);
-          first->addChild(childVal->gateENode);
-        } else first = cond;
-      }
-      if (!ret->isConstant) { // null second
-        if (ret->gateENode) {
-          second = new ENode(OP_AND);
-          second->addChild(neg);
-          second->addChild(ret->gateENode);
-        } else second = neg;
-      }
-      if (!first && !second) ret = new clockVal(0);
-      else if (!first) ret->gateENode = second;
-      else if (!second) ret->gateENode = first;
-      else  {
-        ENode* andEnode = new ENode(OP_OR);
-        andEnode->addChild(first);
-        andEnode->addChild(second);
-        ret->gateENode = andEnode;
+      if (ret->isInvalid) {
+        ret = childVal;
+      } else if (!childVal->isInvalid) { // if childVal is invalid, ret is the clock
+        if (!childVal->isConstant) { // null first
+          if (childVal->gateENode) {
+            first = new ENode(OP_AND);
+            first->addChild(cond);
+            first->addChild(childVal->gateENode);
+          } else first = cond;
+        }
+        if (!ret->isConstant) { // null second
+          if (ret->gateENode) {
+            second = new ENode(OP_AND);
+            second->addChild(neg);
+            second->addChild(ret->gateENode);
+          } else second = neg;
+        }
+        if (!first && !second) ret = new clockVal(0);
+        else if (!first) ret->gateENode = second;
+        else if (!second) ret->gateENode = first;
+        else  {
+          ENode* andEnode = new ENode(OP_OR);
+          andEnode->addChild(first);
+          andEnode->addChild(second);
+          ret->gateENode = andEnode;
+        }
       }
       break;
     }
