@@ -350,9 +350,7 @@ void graph::splitArrayNode(Node* node) {
   }
   for (Node* next : node->depNext) {
     checkNodes.insert(next);
-    if (next != node) {
-      next->clearPrev();
-    }
+    if (next != node) next->erasePrev(node);
   }
   for (Node* n : checkNodes) {
     for (ExpTree* tree : n->assignTree) tree->updateWithSplittedArray(n, node);
