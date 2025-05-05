@@ -50,7 +50,7 @@ void graph::resort() {
 void graph::graphCoarsen() {
 
   mergeAsyncReset();
-  mergeUIntReset();
+  mergeResetAll();
 
   mergeWhenNodes();
   resort();

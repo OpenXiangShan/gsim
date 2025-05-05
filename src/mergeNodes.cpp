@@ -107,10 +107,10 @@ void graph::mergeAsyncReset() {
   }
 }
 
-void graph::mergeUIntReset() {
+void graph::mergeResetAll() {
   std::map<Node*, SuperNode*> resetSuper;
   for (Node* reg : regsrc) {
-    if (reg->reset != UINTRESET) continue;
+    if (reg->reset != UINTRESET && reg->reset != ASYRESET) continue;
     std::set<Node*> prev;
     if (reg->resetTree->getRoot()->opType == OP_RESET) {
       getENodeRelyNodes(reg->resetTree->getRoot()->getChild(0), prev);
@@ -315,7 +315,7 @@ void graph::mergeNodes() {
   size_t phaseSuper = sortedSuper.size();
 
   mergeAsyncReset();
-  mergeUIntReset();
+  mergeResetAll();
   printf("[mergeNodes-reset] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
 
   phaseSuper = sortedSuper.size();
