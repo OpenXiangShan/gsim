@@ -31,7 +31,7 @@ bool anyPath(SuperNode* src, SuperNode* dst) {
   }
   return false;
 }
-
+#if 0
 void graph::mergeWhenNodes() {
 /* each superNode contain one node */
   std::map<Node*, SuperNode*> whenMap;
@@ -74,6 +74,105 @@ void graph::mergeWhenNodes() {
   detectSortedSuperLoop();
   printf("[mergeNodes-when] remove %ld superNodes (%ld -> %ld)\n", prevSuper - sortedSuper.size(), prevSuper, sortedSuper.size());
 }
+#else
+void graph::mergeWhenNodes() {
+  std::queue<SuperNode*> s;
+  std::queue<SuperNode*> cond;
+  std::set<SuperNode*> condWait;
+  std::map<SuperNode*, std::set<SuperNode*>> allCond;
+  std::map<SuperNode*, SuperNode*> node2Cond;
+  std::map<SuperNode*, int>times;
+  std::map<SuperNode*, std::vector<SuperNode*>> whenMap;
+  /* generator all cond nodes */
+  for (SuperNode* super : sortedSuper) {
+    times[super] = 0;
+    if (super->superType != SUPER_VALID) continue;
+    Assert(super->member.size() <= 1, "invalid super size %ld", super->member.size());
+    for (Node* member : super->member) {
+      if (member->isArray() || member->assignTree.size() != 1) continue;
+      if (member->assignTree[0]->getRoot()->opType != OP_WHEN) continue;
+      Node* whenNode = member->assignTree[0]->getRoot()->getChild(0)->getNode();
+      if (!whenNode) continue; // TODO: expr can also be optimized
+      if (allCond.find(whenNode->super) == allCond.end()) {
+        allCond[whenNode->super] = std::set<SuperNode*>();
+      }
+      allCond[whenNode->super].insert(super);
+      node2Cond[super] = whenNode->super;
+    }
+  }
+
+  auto addCond = [&cond, &condWait, &allCond, &times](SuperNode* super) {
+    int num = 0;
+    for (SuperNode* s : allCond[super]) {
+      if (times[s] + 1 == s->depPrev.size()) num ++;
+    }
+    if (num >= 2) cond.push(super);
+    else condWait.insert(super);
+  };
+
+  auto cond2Queue = [&cond, &condWait](SuperNode* super) {
+    if (condWait.find(super) != condWait.end()) {
+      condWait.erase(super);
+      cond.push(super);
+    }
+  };
+
+  for (SuperNode* super : sortedSuper) {
+    if (super->depPrev.size() == 0) {
+      if (allCond.find(super) != allCond.end()) addCond(super);
+      else s.push(super);
+    }
+  }
+  while (!s.empty()) {
+    SuperNode* top = s.front();
+    s.pop();
+    for (SuperNode* next : top->depNext) {
+      times[next] ++;
+      if (times[next] + 1 == next->depPrev.size()) {
+        if (node2Cond.find(next) != node2Cond.end()) {
+          cond2Queue(node2Cond[next]);
+        }
+      }
+      if (times[next] == next->depPrev.size()) {
+        if (allCond.find(next) != allCond.end()) addCond(next);
+        else s.push(next);
+      }
+    }
+    while (s.empty() && (!cond.empty() || condWait.size() > 0)) {
+      if (cond.empty()) {
+        cond2Queue(*condWait.begin());
+      }
+      SuperNode* mergeCond = cond.front();
+      cond.pop();
+      std::vector<SuperNode*> mergeSuper;
+      for (SuperNode* next : mergeCond->depNext) {
+        times[next] ++;
+        if (times[next] == next->depPrev.size()) {
+          if (allCond[mergeCond].find(next) != allCond[mergeCond].end()) mergeSuper.push_back(next);
+          s.push(next);
+        }
+      }
+      if (mergeSuper.size() > 1) whenMap[mergeCond] = mergeSuper;
+    }
+  }
+  for (auto iter : whenMap) {
+    std::vector<SuperNode*> allSuper = iter.second;
+    SuperNode* mergeSuper = allSuper[0];
+    for (size_t i = 1; i < allSuper.size(); i ++) {
+      for (Node* member : allSuper[i]->member) {
+        mergeSuper->add_member(member);
+        member->super = mergeSuper;
+      }
+      allSuper[i]->member.clear();
+    }
+  }
+  size_t prevSuper = sortedSuper.size();
+  removeEmptySuper();
+  reconnectSuper();
+  detectSortedSuperLoop();
+  printf("[mergeNodes-when] remove %ld superNodes (%ld -> %ld)\n", prevSuper - sortedSuper.size(), prevSuper, sortedSuper.size());
+}
+#endif
 
 void graph::mergeAsyncReset() {
   std::map<Node*, SuperNode*> resetMap;
