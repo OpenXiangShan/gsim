@@ -1,11 +1,7 @@
 name: ci
-on:
-  push:
-    branches: [ v1-dev, master ]
-  pull_request:
-    branches: [ v1-dev, master ]
+on: [push, pull_request]
 jobs:
-  build_rocket:
+  ysyx3:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out code
@@ -15,14 +11,229 @@ jobs:
           python-version: 3.x
       - name: Install dependencies
         run: |
-          sudo apt install -y clang llvm doxygen flex bison libfl-dev ccache
+          sudo apt install -y clang llvm flex bison libfl-dev
+      - name: Install verilator
+        run: |
+          wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-04-24/oss-cad-suite-linux-x64-20250424.tgz
+          tar xf oss-cad-suite-linux-x64-20250424.tgz
+          OSS_CAD_SUITE_BIN_PATH=`pwd`/oss-cad-suite/bin
+          echo "PATH=$PATH:$OSS_CAD_SUITE_BIN_PATH" >> "$GITHUB_ENV"
+      - name: Check resources
+        run: |
+          echo "nproc = `nproc`"
+          free -h
+          df -h
+          verilator --version
       - name: Untar linux.bin
         run: |
           git submodule set-url ready-to-run https://github.com/jaypiper/gsim-ready-to-run.git
           make init
-      - name: Compile
+      - name: Run ysyx3 (difftest with verilator)
         run: |
-          make compile dutName=rocket -j `nproc`
-      - name: Build EMU
+          sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
+          make -j `nproc` diff dutName=ysyx3
+
+  rocket:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+      - name: Install dependencies
         run: |
-          make difftest MODE=0 dutName=rocket -j `nproc`
+          sudo apt install -y clang llvm flex bison libfl-dev
+      - name: Install verilator
+        run: |
+          wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-04-24/oss-cad-suite-linux-x64-20250424.tgz
+          tar xf oss-cad-suite-linux-x64-20250424.tgz
+          OSS_CAD_SUITE_BIN_PATH=`pwd`/oss-cad-suite/bin
+          echo "PATH=$PATH:$OSS_CAD_SUITE_BIN_PATH" >> "$GITHUB_ENV"
+      - name: Check resources
+        run: |
+          echo "nproc = `nproc`"
+          free -h
+          df -h
+          verilator --version
+      - name: Untar linux.bin
+        run: |
+          git submodule set-url ready-to-run https://github.com/jaypiper/gsim-ready-to-run.git
+          make init
+      - name: Run rocket (difftest with verilator)
+        run: |
+          sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
+          make -j `nproc` diff dutName=rocket
+
+  small-boom:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+      - name: Install dependencies
+        run: |
+          sudo apt install -y clang llvm flex bison libfl-dev
+      - name: Install verilator
+        run: |
+          wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-04-24/oss-cad-suite-linux-x64-20250424.tgz
+          tar xf oss-cad-suite-linux-x64-20250424.tgz
+          OSS_CAD_SUITE_BIN_PATH=`pwd`/oss-cad-suite/bin
+          echo "PATH=$PATH:$OSS_CAD_SUITE_BIN_PATH" >> "$GITHUB_ENV"
+      - name: Check resources
+        run: |
+          echo "nproc = `nproc`"
+          free -h
+          df -h
+          verilator --version
+      - name: Untar linux.bin
+        run: |
+          git submodule set-url ready-to-run https://github.com/jaypiper/gsim-ready-to-run.git
+          make init
+      - name: Run small-boom (difftest with verilator)
+        run: |
+          sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
+          make -j `nproc` diff dutName=small-boom
+
+  large-boom:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+      - name: Install dependencies
+        run: |
+          sudo apt install -y clang llvm flex bison libfl-dev
+      - name: Install verilator
+        run: |
+          wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-04-24/oss-cad-suite-linux-x64-20250424.tgz
+          tar xf oss-cad-suite-linux-x64-20250424.tgz
+          OSS_CAD_SUITE_BIN_PATH=`pwd`/oss-cad-suite/bin
+          echo "PATH=$PATH:$OSS_CAD_SUITE_BIN_PATH" >> "$GITHUB_ENV"
+      - name: Check resources
+        run: |
+          echo "nproc = `nproc`"
+          free -h
+          df -h
+          verilator --version
+      - name: Untar linux.bin
+        run: |
+          git submodule set-url ready-to-run https://github.com/jaypiper/gsim-ready-to-run.git
+          make init
+      - name: Run large-boom (difftest with verilator)
+        run: |
+          sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
+          make -j `nproc` diff dutName=large-boom
+
+  minimal-xiangshan:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+      - name: Install dependencies
+        run: |
+          sudo apt install -y clang llvm flex bison libfl-dev
+      - name: Install verilator
+        run: |
+          wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-04-24/oss-cad-suite-linux-x64-20250424.tgz
+          tar xf oss-cad-suite-linux-x64-20250424.tgz
+          OSS_CAD_SUITE_BIN_PATH=`pwd`/oss-cad-suite/bin
+          echo "PATH=$PATH:$OSS_CAD_SUITE_BIN_PATH" >> "$GITHUB_ENV"
+      - name: Enlarge swap
+        run: |
+          sudo fallocate -l 60G /mnt/swapfile2
+          sudo mkswap /mnt/swapfile2
+          sudo swapon /mnt/swapfile2
+      - name: Check resources
+        run: |
+          echo "nproc = `nproc`"
+          free -h
+          df -h
+          verilator --version
+      - name: Untar linux.bin
+        run: |
+          git submodule set-url ready-to-run https://github.com/jaypiper/gsim-ready-to-run.git
+          make init
+      - name: Run minimal-xiangshan (difftest with verilator)
+        run: |
+          sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
+          make -j `nproc` diff dutName=minimal-xiangshan
+
+  default-xiangshan:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+      - name: Install dependencies
+        run: |
+          sudo apt install -y clang llvm flex bison libfl-dev
+      - name: Install verilator
+        run: |
+          wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-04-24/oss-cad-suite-linux-x64-20250424.tgz
+          tar xf oss-cad-suite-linux-x64-20250424.tgz
+          OSS_CAD_SUITE_BIN_PATH=`pwd`/oss-cad-suite/bin
+          echo "PATH=$PATH:$OSS_CAD_SUITE_BIN_PATH" >> "$GITHUB_ENV"
+      - name: Enlarge swap
+        run: |
+          sudo fallocate -l 60G /mnt/swapfile2
+          sudo mkswap /mnt/swapfile2
+          sudo swapon /mnt/swapfile2
+      - name: Check resources
+        run: |
+          echo "nproc = `nproc`"
+          free -h
+          df -h
+          verilator --version
+      - name: Untar linux.bin
+        run: |
+          git submodule set-url ready-to-run https://github.com/jaypiper/gsim-ready-to-run.git
+          make init
+      - name: Run default-xiangshan (difftest with verilator)
+        run: |
+          sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
+          make -j `nproc` diff dutName=default-xiangshan
+
+  ysyx3-bolt:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+      - name: Install dependencies
+        run: |
+          sudo apt install -y clang llvm flex bison libfl-dev llvm-bolt libbolt-dev
+          clang --version
+          llvm-bolt --version
+          sudo ln -s /usr/lib/llvm-18/lib/libbolt_rt_instr.a /usr/lib/libbolt_rt_instr.a
+      - name: Install verilator
+        run: |
+          wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-04-24/oss-cad-suite-linux-x64-20250424.tgz
+          tar xf oss-cad-suite-linux-x64-20250424.tgz
+          OSS_CAD_SUITE_BIN_PATH=`pwd`/oss-cad-suite/bin
+          echo "PATH=$PATH:$OSS_CAD_SUITE_BIN_PATH" >> "$GITHUB_ENV"
+      - name: Check resources
+        run: |
+          echo "nproc = `nproc`"
+          free -h
+          df -h
+          verilator --version
+      - name: Untar linux.bin
+        run: |
+          git submodule set-url ready-to-run https://github.com/jaypiper/gsim-ready-to-run.git
+          make init
+      - name: Run ysyx3 (with bolt)
+        run: |
+          sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
+          make -j `nproc` bolt dutName=ysyx3
