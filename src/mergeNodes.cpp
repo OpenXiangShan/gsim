@@ -194,16 +194,6 @@ void graph::mergeAsyncReset() {
     } else {
       condSuper = resetMap[condNode];
     }
-    Node* resetReg = reg->dup(NODE_REG_RESET, reg->name);
-    resetReg->regNext = reg;
-    resetReg->assignTree.push_back(new ExpTree(reg->resetTree->getRoot(), resetReg));
-    condSuper->add_member(resetReg);
-    if (reg->getDst()->status == VALID_NODE) {
-      Node* resetRegDst = reg->dup(NODE_REG_RESET, reg->getDst()->name);
-      resetRegDst->regNext = reg;
-      resetRegDst->assignTree.push_back(new ExpTree(reg->resetTree->getRoot(), resetRegDst));
-      condSuper->add_member(resetRegDst);
-    }
   }
 }
 

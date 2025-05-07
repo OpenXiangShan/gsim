@@ -573,6 +573,7 @@ void graph::splitOptionalArray() {
       for (size_t i = 0; i < arrayNode->arrayMember.size(); i ++) {
         regsrc.push_back(arrayNode->arrayMember[i]);
         arrayNode->arrayMember[i]->bindReg(arrayNode->getDst()->arrayMember[i]);
+        arrayNode->arrayMember[i]->updateDep();
       }
     }
     num ++;

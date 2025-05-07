@@ -357,6 +357,7 @@ void graph::generateStmtTree() {
   /* add when path for nodes with next = 1 */
   for (int superIdx = sortedSuper.size() - 1; superIdx >= 0; superIdx --) {
     SuperNode* super = sortedSuper[superIdx];
+    if (super->superType != SUPER_VALID) continue;
     for (int nodeIdx = super->member.size() - 1; nodeIdx >= 0; nodeIdx --) {
       Node* member = super->member[nodeIdx];
       int depNextInSuper = 0;

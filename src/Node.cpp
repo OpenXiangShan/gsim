@@ -67,7 +67,11 @@ void Node::updateDep(){ // only reg_src can reach here
     n->depPrev.insert(this);
     for (Node* srcNext : next) {
       srcNext->addDepPrev(n);
-      n->addDepNext(n);
+      n->addDepNext(srcNext);
+    }
+    if (getDst()) {
+      getDst()->depPrev.insert(n);
+      n->depNext.insert(getDst());
     }
   }
   std::set<Node*> resetValNodes;

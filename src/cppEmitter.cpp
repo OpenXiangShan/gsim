@@ -34,6 +34,9 @@ static int activeFlagNum = 0;
 static std::set<Node*> definedNode;
 static std::map<int, SuperNode*> cppId2Super;
 static std::set<int> alwaysActive;
+
+static std::map<SuperNode*, int> super2ResetId;
+
 extern int maxConcatNum;
 bool nameExist(std::string str);
 static int resetFuncNum = 0;
@@ -734,6 +737,9 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
       else activateNext(super->member[i], super->member[i]->nextActiveId, oldName(super->member[i]), false, flagName, indent);
     }
   } else {
+    if (super->superType == SUPER_ASYNC_RESET) {
+      emitBodyLock(indent, "subReset%d();\n", super2ResetId[super]);
+    }
     /* local nodes definition */
     for (Node* n : super->member) {
       if (n->isLocal()) {
@@ -769,6 +775,7 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
           break;
       }
     }
+    if (super->superType == SUPER_ASYNC_RESET) emitBodyLock(indent, "subReset%d();\n", super2ResetId[super]);
     for (Node* n : super->member) nodeDisplay(n, indent);
   }
 }
@@ -819,25 +826,9 @@ int graph::genActivate() {
 
 void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
   emitBodyLock(indent, "void S%s::subReset%d(){ // %s reset\n", name.c_str(), resetFuncNum, isUIntReset ? "uint" : "async");
+  super2ResetId[super] = resetFuncNum;
   indent ++;
   resetFuncNum ++;
-  for (InstInfo inst : super->insts) {
-    switch (inst.infoType) {
-      case SUPER_INFO_IF:
-      case SUPER_INFO_ELSE:
-      case SUPER_INFO_DEDENT:
-      case SUPER_INFO_STR:
-        emitBodyLock(indent, "%s\n", inst.inst.c_str());
-        break;
-      default:
-        break;
-    }
-  }
-  indent --;
-  emitBodyLock(indent, "}\n");
-}
-
-void graph::genResetActivation(SuperNode* super, bool isUIntReset, int indent, int resetId) {
   std::string resetName = super->resetNode->type == NODE_REG_SRC ? RESET_NAME(super->resetNode).c_str() : super->resetNode->name.c_str();
   emitBodyLock(indent, "if(unlikely(%s)) {\n", resetName.c_str());
   indent ++;
@@ -858,9 +849,25 @@ void graph::genResetActivation(SuperNode* super, bool isUIntReset, int indent, i
       emitBodyLock(indent, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
     }
   }
-  emitBodyLock(indent, "subReset%d();\n", resetId);
+  emitBodyLock(indent, "}\n");
+  for (InstInfo inst : super->insts) {
+    switch (inst.infoType) {
+      case SUPER_INFO_IF:
+      case SUPER_INFO_ELSE:
+      case SUPER_INFO_DEDENT:
+      case SUPER_INFO_STR:
+        emitBodyLock(indent, "%s\n", inst.inst.c_str());
+        break;
+      default:
+        break;
+    }
+  }
   indent --;
   emitBodyLock(indent, "}\n");
+}
+
+void graph::genResetActivation(SuperNode* super, bool isUIntReset, int indent, int resetId) {
+  emitBodyLock(indent, "subReset%d();\n", resetId);
 }
 
 void graph::genResetAll() {
