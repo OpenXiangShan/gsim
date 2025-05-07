@@ -6,7 +6,6 @@
 #define NODE_H
 
 #include "debug.h"
-std::string format(const char *fmt, ...);
 
 class NodeComponent;
 class StmtTree;

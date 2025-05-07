@@ -105,7 +105,7 @@ void graph::replicationOpt() {
     for (auto iter : nextSuper) {
       SuperNode* super = iter.first;
       if (super == node->super) continue;
-      std::string dupName = format("%s$DUP_%d", node->name.c_str(), repIdx ++);
+      std::string dupName = std::format("{}$DUP_{}", node->name, repIdx ++);
       Node* repNode = node->dup(node->type, dupName);
       for (Node* prev : node->prev) prev->addNext(repNode);
       repNode->assignTree.push_back(new ExpTree(node->assignTree[0]->getRoot()->dup(), new ENode(repNode)));

@@ -52,10 +52,10 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
     Node* splittedNode = nullptr;
     /* allocate component & update cut */
     if (node->type == NODE_REG_SRC) {
-      Node* newSrcNode = node->dup(node->type, node->name + format("$%d_%d", hi, lo));
+      Node* newSrcNode = node->dup(node->type, node->name + std::format("${}_{}", hi, lo));
       newSrcNode->width = hi - lo + 1;
       newSrcNode->super = new SuperNode(newSrcNode);
-      Node* newDstNode = node->dup(node->getDst()->type, node->getDst()->name + format("$%d_%d", hi, lo));
+      Node* newDstNode = node->dup(node->getDst()->type, node->getDst()->name + std::format("${}_{}", hi, lo));
       newDstNode->width = hi - lo + 1;
       newDstNode->super = new SuperNode(newDstNode);
       newSrcNode->bindReg(newDstNode);
@@ -69,7 +69,7 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
       if (node->resetTree) newSrcNode->resetTree = dupSplittedTree(node->resetTree, node, newSrcNode);
       splittedNode = newSrcNode;
     } else {
-      splittedNode = node->dup(node->type, node->name + format("$%d_%d", hi, lo));
+      splittedNode = node->dup(node->type, node->name + std::format("${}_{}", hi, lo));
       splittedNode->width = hi - lo + 1;
       splittedNode->super = new SuperNode(splittedNode);
       componentMap[splittedNode] = new NodeComponent();

@@ -4,7 +4,8 @@ GSIM accepts chirrtl, and compiles it to C++
 
 ## Prerequisites
 
-+ Install [GMP](https://gmplib.org/), [clang 16+](https://clang.llvm.org/).
++ [GMP](https://gmplib.org/), [clang 17+](https://clang.llvm.org/).
++ [libc++ 17+](https://libcxx.llvm.org/) (Debian only)
 
 ## Quike Start
 

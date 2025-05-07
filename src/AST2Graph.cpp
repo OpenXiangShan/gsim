@@ -967,11 +967,11 @@ void visitMemory(graph* g, PNode* mem) {
 
 static Node* allocAddrNode(graph* g, Node* port) {
   ENode* addr_enode = port->memTree->getRoot()->getChild(0);
-  Node* addr_src = allocNode(NODE_REG_SRC, format("%s%s%s", port->name.c_str(), SEP_AGGR, "ADDR"), port->lineno);
+  Node* addr_src = allocNode(NODE_REG_SRC, std::format("{}{}{}", port->name, SEP_AGGR, "ADDR"), port->lineno);
   g->addReg(addr_src);
   Node* addr_dst = addr_src->dup();
   addr_dst->type = NODE_REG_DST;
-  addr_dst->name += format("%s%s", SEP_AGGR, "NEXT");
+  addr_dst->name += std::format("{}{}", SEP_AGGR, "NEXT");
   addSignal(addr_src->name, addr_src);
   addSignal(addr_dst->name, addr_dst);
   addr_src->bindReg(addr_dst);
