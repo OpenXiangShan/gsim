@@ -35,7 +35,7 @@ static std::set<Node*> definedNode;
 static std::map<int, SuperNode*> cppId2Super;
 static std::set<int> alwaysActive;
 
-static std::map<SuperNode*, int> super2ResetId;
+static std::map<Node*, std::pair<int, int>> super2ResetId;  // uint & async reset
 
 extern int maxConcatNum;
 bool nameExist(std::string str);
@@ -738,7 +738,7 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
     }
   } else {
     if (super->superType == SUPER_ASYNC_RESET) {
-      emitBodyLock(indent, "subReset%d();\n", super2ResetId[super]);
+      emitBodyLock(indent, "subReset%d();\n", super2ResetId[super->resetNode].second);
     }
     /* local nodes definition */
     for (Node* n : super->member) {
@@ -775,7 +775,7 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
           break;
       }
     }
-    if (super->superType == SUPER_ASYNC_RESET) emitBodyLock(indent, "subReset%d();\n", super2ResetId[super]);
+    if (super->superType == SUPER_ASYNC_RESET) emitBodyLock(indent, "subReset%d();\n", super2ResetId[super->resetNode].second);
     for (Node* n : super->member) nodeDisplay(n, indent);
   }
 }
@@ -826,7 +826,11 @@ int graph::genActivate() {
 
 void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
   emitBodyLock(indent, "void S%s::subReset%d(){ // %s reset\n", name.c_str(), resetFuncNum, isUIntReset ? "uint" : "async");
-  super2ResetId[super] = resetFuncNum;
+  if (super2ResetId.find(super->resetNode) != super2ResetId.end()) {
+    super2ResetId[super->resetNode] = std::make_pair(-1, -1);
+  }
+  if (isUIntReset) super2ResetId[super->resetNode].first = resetFuncNum;
+  else super2ResetId[super->resetNode].second = resetFuncNum;
   indent ++;
   resetFuncNum ++;
   std::string resetName = super->resetNode->type == NODE_REG_SRC ? RESET_NAME(super->resetNode).c_str() : super->resetNode->name.c_str();
@@ -877,7 +881,7 @@ void graph::genResetAll() {
       Assert(mpz_sgn(super->resetNode->computeInfo->consVal) == 0, "reset %s is always true", super->resetNode->name.c_str());
       continue;
     }
-    genResetDef(super, true, 0);
+    genResetDef(super, super->superType == SUPER_UINT_RESET, 0);
     resetSuper.push_back(super);
   }
 
@@ -971,7 +975,7 @@ void graph::emitPrintf() {
 
 void graph::cppEmitter() {
   for (SuperNode* super : sortedSuper) {
-    if (!super->instsEmpty() || super->superType == SUPER_EXTMOD) {
+    if (!super->instsEmpty() || super->superType == SUPER_EXTMOD || super->superType == SUPER_ASYNC_RESET) {
       super->cppId = superId ++;
       cppId2Super[super->cppId] = super;
       if (super->superType == SUPER_EXTMOD) {

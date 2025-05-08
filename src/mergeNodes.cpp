@@ -198,7 +198,7 @@ void graph::mergeAsyncReset() {
 }
 
 void graph::mergeResetAll() {
-  std::map<Node*, SuperNode*> resetSuper;
+  std::map<Node*, std::pair<SuperNode*, SuperNode*>> resetSuper; // node as uint / async reset
   for (Node* reg : regsrc) {
     if (reg->reset != UINTRESET && reg->reset != ASYRESET) continue;
     std::set<Node*> prev;
@@ -211,27 +211,41 @@ void graph::mergeResetAll() {
     if (prev.size() != 1) reg->display();
     Assert(prev.size() == 1, "multiple prevReset %s", reg->name.c_str());
     Node* prevNode = *prev.begin();
-    SuperNode* prevSuper;
+    SuperNode* uintSuper, *asyncSuper;
     if (resetSuper.find(prevNode) == resetSuper.end()) {
-      prevSuper = new SuperNode();
-      prevSuper->superType = SUPER_UINT_RESET;
-      resetSuper[prevNode] = prevSuper;
-      uintReset.push_back(prevSuper);
-      prevSuper->resetNode = prevNode;
-      prevNode->setUIntReset();
+      uintSuper = new SuperNode();
+      uintSuper->superType = SUPER_UINT_RESET;
+      asyncSuper = new SuperNode();
+      asyncSuper->superType = SUPER_ASYNC_RESET;
+      uintSuper->resetNode = asyncSuper->resetNode = prevNode;
+      resetSuper[prevNode] = std::make_pair(uintSuper, asyncSuper);
     } else {
-      prevSuper = resetSuper[prevNode];
+      std::tie(uintSuper, asyncSuper) = resetSuper[prevNode];
     }
     Node* resetReg = reg->dup(NODE_REG_RESET, reg->name);
     resetReg->regNext = reg;
     resetReg->assignTree.push_back(new ExpTree(reg->resetTree->getRoot(), resetReg));
+    if (reg->reset == ASYRESET) asyncSuper->add_member(resetReg);
+    else uintSuper->add_member(resetReg);
 
-    prevSuper->add_member(resetReg);
     if (reg->getDst()->status == VALID_NODE) {
       Node* resetRegDst = reg->dup(NODE_REG_RESET, reg->getDst()->name);
       resetRegDst->regNext = reg;
       resetRegDst->assignTree.push_back(new ExpTree(reg->resetTree->getRoot(), resetRegDst));
-      prevSuper->add_member(resetRegDst);
+      if (reg->reset == ASYRESET) asyncSuper->add_member(resetRegDst);
+      else uintSuper->add_member(resetRegDst);
+    }
+  }
+  for (auto iter : resetSuper) {
+    SuperNode* uintSuper = iter.second.first;
+    SuperNode* asyncSuper = iter.second.second;
+    if (uintSuper->member.size() != 0) {
+      uintReset.push_back(uintSuper);
+      iter.first->setUIntReset();
+    }
+    if (asyncSuper->member.size() != 0) {
+      uintReset.push_back(asyncSuper);
+      iter.first->setAsyncReset();
     }
   }
 }
