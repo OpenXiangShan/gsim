@@ -1008,7 +1008,6 @@ valInfo* Node::computeRegConstant() {
       }
       consMap[this] = updateInfo;
     } else if (updateInfo->status == VAL_CONSTANT) { // dst is constant but not equals to reset val
-      printf("update %s %d\n", name.c_str(), reset);
       Assert(resetTree->getRoot()->opType == OP_RESET, "invalid tree");
       if (reset == ASYRESET) {
         status = VALID_NODE;
