@@ -173,7 +173,6 @@ void graph::commonExpr() {
     for (Node* member : super->member) {
       if (member->status == DEAD_NODE) continue;
       for (ExpTree* tree : member->assignTree) tree->replace(aliasMap);
-      if (member->updateTree) member->updateTree->replace(aliasMap);
       if (member->resetTree) member->resetTree->replace(aliasMap);
     }
   }

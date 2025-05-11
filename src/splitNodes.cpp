@@ -65,8 +65,6 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
       componentMap[newSrcNode] = new NodeComponent();
       componentMap[newSrcNode]->addElementAll(new NodeElement(ELE_SPACE));
       nodeSegments[newSrcNode] = std::make_pair(new Segments(newSrcNode->width), new Segments(newSrcNode->width));
-      if (node->updateTree) newSrcNode->updateTree = dupSplittedTree(node->updateTree, node, newSrcNode);
-      if (node->resetTree) newSrcNode->resetTree = dupSplittedTree(node->resetTree, node, newSrcNode);
       splittedNode = newSrcNode;
     } else {
       splittedNode = node->dup(node->type, node->name + format("$%d_%d", hi, lo));
@@ -96,6 +94,10 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
       }
       splittedNode->getDst()->order = node->getDst()->order - 1;
       splittedNode->getDst()->addNext(node->getDst());
+      if (node->resetTree) {
+        splittedNode->resetTree = dupTreeWithBits(node->resetTree, hi, lo);
+        splittedNode->resetTree->setlval(new ENode(splittedNode));
+      }
     }
     splittedNode->order = node->order - 1;
     splittedNode->addNext(node);
@@ -367,6 +369,7 @@ NodeComponent* Node::reInferComponent() {
   /* erase old component */
   componentMap.erase(this);
   for (ExpTree* tree : assignTree) tree->clearComponent();
+  if (resetTree) resetTree->clearComponent();
   NodeComponent* newComp = inferComponent();
   if (!oldComp->assignAllEq(newComp)) {
     for (Node* nextNode : next) addReInfer(nextNode);
@@ -416,6 +419,7 @@ NodeComponent* Node::inferComponent() {
     }
     return ret;
   }
+  if (resetTree) resetTree->getRoot()->inferComponent(this);
   if (assignTree.size() != 1 || isArray() || sign || width == 0) {
     NodeComponent* ret = spaceComp(width);
     for (ExpTree* tree : assignTree) {
@@ -756,7 +760,9 @@ void graph::splitNodes() {
 /* update nodeComponent & nodeSegments */
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) {
-      NodeComponent* comp = node->inferComponent();
+      NodeComponent* comp;
+      if (node->type == NODE_REG_SRC) comp = spaceComp(node->width);
+      else comp = node->inferComponent();
       setComponent(node, comp);
       // printf("after infer %s\n", node->name.c_str());
       // node->display();
@@ -829,10 +835,12 @@ void graph::splitNodes() {
     for (Node* member : super->member) {
       if (member->width == 0) continue;
       for (ExpTree* tree : member->assignTree) tree->updateWithSplittedNode();
+      if (member->resetTree) member->resetTree->updateWithSplittedNode();
     }
   }
   for (Node* node : allSplittedNodes) {
     for (ExpTree* tree : node->assignTree) tree->updateWithSplittedNode();
+    if (node->resetTree) node->resetTree->updateWithSplittedNode();
   }
 
 /* update superNodes, replace reg by splitted regs */

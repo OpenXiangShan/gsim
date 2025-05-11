@@ -69,26 +69,10 @@ void fillOuterWhen(ExpTree* newTree, ENode* enode) {
   }
 }
 
-void Node::addReset() {
+void Node::addReset() { // remove
   Assert(type == NODE_REG_SRC, "%s(%d) is not regsrc", name.c_str(), type);
 
   ResetType resetType = resetCond->getRoot()->inferReset();
   reset = resetType;
   Assert(resetType != UNCERTAIN, "reset %s is uncertain", name.c_str());
-  if (resetType == ZERO_RESET) {
-    /* do nothing */
-  } else if (resetType == UINTRESET) {
-
-  } else if (resetType == ASYRESET) {
-    ENode* regTop = new ENode(OP_RESET);
-    regTop->addChild(resetCond->getRoot());
-    if (resetVal->getRoot()->getNode() != this)
-      regTop->addChild(resetVal->getRoot());
-    else
-      regTop->addChild(nullptr);
-    assignTree.clear();
-    assignTree.push_back(new ExpTree(regTop, this));
-  } else {
-    Panic();
-  }
 }

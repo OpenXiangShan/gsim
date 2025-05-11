@@ -7,13 +7,11 @@
 #include <map>
 
 void graph::topoSort() {
-  std::set<SuperNode*> dstNode;
-  for (Node* reg : regsrc) {
-    dstNode.insert(reg->getDst()->super);
-  }
   std::map<SuperNode*, int>times;
   std::stack<SuperNode*> s;
-  for (SuperNode* node : supersrc) s.push(node);
+  for (SuperNode* node : supersrc) {
+    if (node->depPrev.size() == 0) s.push(node);
+  }
   /* next.size() == 0, place the registers at the end to benefit mergeRegisters */
   std::vector<SuperNode*> potentialRegs;
   std::set<SuperNode*> visited;
@@ -34,8 +32,7 @@ void graph::topoSort() {
       if (times.find(next) == times.end()) times[next] = 0;
       times[next] ++;
       if (times[next] == (int)next->depPrev.size()) {
-        if (dstNode.find(next) != dstNode.end()) potentialRegs.push_back(next);
-        else s.push(next);
+        s.push(next);
       }
     }
   }

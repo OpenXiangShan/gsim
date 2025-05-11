@@ -90,11 +90,11 @@ void dut_init(DUT_NAME *dut) {
   dut->set_difftest$$logCtrl$$end(0);
   dut->set_difftest$$uart$$in$$ch(-1);
 #elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
-  dut->set_difftest$$perfCtrl$$clean(0);
-  dut->set_difftest$$perfCtrl$$dump(0);
-  dut->set_difftest$$logCtrl$$begin(0);
-  dut->set_difftest$$logCtrl$$end(0);
-  dut->set_difftest$$logCtrl$$level(0);
+  // dut->set_difftest$$perfCtrl$$clean(0);
+  // dut->set_difftest$$perfCtrl$$dump(0);
+  // dut->set_difftest$$logCtrl$$begin(0);
+  // dut->set_difftest$$logCtrl$$end(0);
+  // dut->set_difftest$$logCtrl$$level(0);
   dut->set_difftest$$uart$$in$$ch(-1);
 #endif
 }
@@ -223,7 +223,6 @@ int main(int argc, char** argv) {
   memcpy(&dut->DUT_MEMORY, program, program_sz);
   dut_init(dut);
   dut_reset();
-  dut_cycle(1);
 #endif
 #ifdef VERILATOR
   ref = new REF_NAME();

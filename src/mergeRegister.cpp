@@ -73,96 +73,96 @@ void graph::orderAllNodes() {
   }
 }
 
-void graph::mergeRegister() {
-  orderAllNodes();
-  int num = 0;
-  int totalNum = 0;
-  std::map<Node*, Node*> maxNode;
-  std::map<Node*, bool> anyNextNodes;
+// void graph::mergeRegister() {
+//   orderAllNodes();
+//   int num = 0;
+//   int totalNum = 0;
+//   std::map<Node*, Node*> maxNode;
+//   std::map<Node*, bool> anyNextNodes;
 
-  for (int i = sortedSuper.size() - 1; i >= 0; i --) {
-    for (int j = (int)sortedSuper[i]->member.size() - 1; j >= 0; j --) {
-      Node* node = sortedSuper[i]->member[j];
-      Node* latestNode = nullptr;
-      for (Node* next : node->next) {
-        latestNode = laterNode(latestNode, next);
-      }
-      maxNode[node] = latestNode;
-    }
-  }
-  for (Node* reg : regsrc) {
-    if (reg->status != VALID_NODE) continue;
-    totalNum ++;
-    if (reg->isArray() || reg->getDst()->assignTree.size() != 1) continue;
-    bool split = false;
-    if (maxNode[reg] && isNext(reg->getDst(), maxNode[reg])) split = true;
-    /* checking updateTree */
-    std::stack<ENode*> s;
-    s.push(reg->updateTree->getRoot());
-    while (!s.empty() && !split) {
-      ENode* top = s.top();
-      s.pop();
-      if (top->getNode()) {
-        Node* topNode = top->getNode();
-        if (topNode->isArray() && topNode->arraySplitted()) {
-          ArrayMemberList* list = top->getArrayMember(topNode);
-          for (Node* member : list->member) {
-            if (isNext(reg->getDst(), member)) {
-              split = true;
-              break;
-            }
-          }
-        } else {
-          if (isNext(reg->getDst(), topNode)) split = true;
-        }
-        for (ENode* child : top->child) {
-          if (child) s.push(child);
-        }
-      }
-    }
-    if (!split) { // treat dst as NODE_OTHER
-      num ++;
-      reg->regSplit = reg->getDst()->regSplit = false;
-      reg->getDst()->name = reg->name;
-    }
-  }
+//   for (int i = sortedSuper.size() - 1; i >= 0; i --) {
+//     for (int j = (int)sortedSuper[i]->member.size() - 1; j >= 0; j --) {
+//       Node* node = sortedSuper[i]->member[j];
+//       Node* latestNode = nullptr;
+//       for (Node* next : node->next) {
+//         latestNode = laterNode(latestNode, next);
+//       }
+//       maxNode[node] = latestNode;
+//     }
+//   }
+//   for (Node* reg : regsrc) {
+//     if (reg->status != VALID_NODE) continue;
+//     totalNum ++;
+//     if (reg->isArray() || reg->getDst()->assignTree.size() != 1) continue;
+//     bool split = false;
+//     if (maxNode[reg] && isNext(reg->getDst(), maxNode[reg])) split = true;
+//     /* checking updateTree */
+//     std::stack<ENode*> s;
+//     s.push(reg->updateTree->getRoot());
+//     while (!s.empty() && !split) {
+//       ENode* top = s.top();
+//       s.pop();
+//       if (top->getNode()) {
+//         Node* topNode = top->getNode();
+//         if (topNode->isArray() && topNode->arraySplitted()) {
+//           ArrayMemberList* list = top->getArrayMember(topNode);
+//           for (Node* member : list->member) {
+//             if (isNext(reg->getDst(), member)) {
+//               split = true;
+//               break;
+//             }
+//           }
+//         } else {
+//           if (isNext(reg->getDst(), topNode)) split = true;
+//         }
+//         for (ENode* child : top->child) {
+//           if (child) s.push(child);
+//         }
+//       }
+//     }
+//     if (!split) { // treat dst as NODE_OTHER
+//       num ++;
+//       reg->regSplit = reg->getDst()->regSplit = false;
+//       reg->getDst()->name = reg->name;
+//     }
+//   }
 
-  printf("[mergeRegister] merge %d registers (total %d)\n", num, totalNum);
-}
+//   printf("[mergeRegister] merge %d registers (total %d)\n", num, totalNum);
+// }
 
-void graph::constructRegs() {
-  std::map<SuperNode*, SuperNode*> dstSuper2updateSuper;
-  for (Node* node : regsrc) {
-    if (node->status != VALID_NODE) continue;
-    if (node->regSplit) {
-      Node* nodeUpdate = node->dup(NODE_REG_UPDATE);
-      node->regUpdate = nodeUpdate;
-      nodeUpdate->regNext = node;
-      nodeUpdate->assignTree.push_back(node->updateTree);
-      SuperNode* dstSuper = node->getDst()->super;
-      if (dstSuper2updateSuper.find(dstSuper) != dstSuper2updateSuper.end()) {
-        nodeUpdate->super = dstSuper2updateSuper[dstSuper];
-        dstSuper2updateSuper[dstSuper]->member.push_back(nodeUpdate);
-      } else {
-        nodeUpdate->super = new SuperNode(nodeUpdate);
-        nodeUpdate->super->superType = SUPER_UPDATE_REG;
-        sortedSuper.push_back(nodeUpdate->super);
-        dstSuper2updateSuper[dstSuper] = nodeUpdate->super;
-      }
-      nodeUpdate->isArrayMember = node->isArrayMember;
-    } else {
-      Assert(node->getDst()->assignTree.size() == 1, "invalid assignTree for node %s", node->name.c_str());
-      node->updateTree->replace(node->getDst(), node->getDst()->assignTree.back()->getRoot());
-      /* remove self-assignments */
-      if (getLeafNode(true, node->updateTree->getRoot()) == node->getSrc()) node->getDst()->assignTree.clear();
-      else {
-        node->getDst()->assignTree[0] = node->updateTree;
-        node->getDst()->assignTree[0]->removeSelfAssignMent(node);
-      }
-      node->eraseNext(node->getDst());
-      node->getDst()->status = VALID_NODE;
-      node->getDst()->computeInfo = nullptr;
-    }
-  }
-  reconnectAll();
-}
+// void graph::constructRegs() {
+//   std::map<SuperNode*, SuperNode*> dstSuper2updateSuper;
+//   for (Node* node : regsrc) {
+//     if (node->status != VALID_NODE) continue;
+//     if (node->regSplit) {
+//       Node* nodeUpdate = node->dup(NODE_REG_UPDATE);
+//       node->regUpdate = nodeUpdate;
+//       nodeUpdate->regNext = node;
+//       nodeUpdate->assignTree.push_back(node->updateTree);
+//       SuperNode* dstSuper = node->getDst()->super;
+//       if (dstSuper2updateSuper.find(dstSuper) != dstSuper2updateSuper.end()) {
+//         nodeUpdate->super = dstSuper2updateSuper[dstSuper];
+//         dstSuper2updateSuper[dstSuper]->member.push_back(nodeUpdate);
+//       } else {
+//         nodeUpdate->super = new SuperNode(nodeUpdate);
+//         nodeUpdate->super->superType = SUPER_UPDATE_REG;
+//         sortedSuper.push_back(nodeUpdate->super);
+//         dstSuper2updateSuper[dstSuper] = nodeUpdate->super;
+//       }
+//       nodeUpdate->isArrayMember = node->isArrayMember;
+//     } else {
+//       Assert(node->getDst()->assignTree.size() == 1, "invalid assignTree for node %s", node->name.c_str());
+//       node->updateTree->replace(node->getDst(), node->getDst()->assignTree.back()->getRoot());
+//       /* remove self-assignments */
+//       if (getLeafNode(true, node->updateTree->getRoot()) == node->getSrc()) node->getDst()->assignTree.clear();
+//       else {
+//         node->getDst()->assignTree[0] = node->updateTree;
+//         node->getDst()->assignTree[0]->removeSelfAssignMent(node);
+//       }
+//       node->eraseNext(node->getDst());
+//       node->getDst()->status = VALID_NODE;
+//       node->getDst()->computeInfo = nullptr;
+//     }
+//   }
+//   reconnectAll();
+// }

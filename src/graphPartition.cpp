@@ -18,7 +18,7 @@ void graph::resort() {
 
   size_t prevSize = sortedSuper.size();
   for (SuperNode* node : sortedSuper) {
-    if (node->prev.size() == 0) s.push(node);
+    if (node->depPrev.size() == 0) s.push(node);
     times[node] = 0;
   }
   sortedSuper.clear();
@@ -31,28 +31,29 @@ void graph::resort() {
     sortedSuper.push_back(top);
 #ifdef ORDERED_TOPO_SORT
     std::vector<SuperNode*> sortedNext;
-    sortedNext.insert(sortedNext.end(), top->next.begin(), top->next.end());
+    sortedNext.insert(sortedNext.end(), top->depNext.begin(), top->depNext.end());
     std::sort(sortedNext.begin(), sortedNext.end(), [](SuperNode* a, SuperNode* b) {return a->id < b->id;});
     for (SuperNode* next : sortedNext) {
 #else
-    for (SuperNode* next : top->next) {
+    for (SuperNode* next : top->depNext) {
 #endif
       times[next] ++;
-      if (times[next] == (int)next->prev.size()) s.push(next);
+      if (times[next] == (int)next->depPrev.size()) s.push(next);
     }
   }
 
   Assert(sortedSuper.size() == prevSize, "invalid size %ld %ld\n", sortedSuper.size(), prevSize);
-
+  orderAllNodes();
 }
 
 // coarsen phase
 void graph::graphCoarsen() {
+  mergeResetAll();
+  mergeAsyncReset();
+
   mergeWhenNodes();
   resort();
-  mergeAsyncReset();
-  mergeUIntReset();
-  // mergeSublings();
+
   mergeOut1();
   mergeIn1();
   mergeSublings();
@@ -372,7 +373,6 @@ void graph::graphPartition() {
 /* coarsen phase */
   graphCoarsen();
   resort();
-  orderAllNodes();
   printf("[graphCoarsen] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
 
 /* initial partition */

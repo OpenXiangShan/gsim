@@ -45,7 +45,7 @@ class graph {
   /* defined in mergeNodes */
   void mergeWhenNodes();
   void mergeAsyncReset();
-  void mergeUIntReset();
+  void mergeResetAll();
   void mergeOut1();
   void mergeIn1();
   void mergeSublings();

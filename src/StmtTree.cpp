@@ -357,6 +357,7 @@ void graph::generateStmtTree() {
   /* add when path for nodes with next = 1 */
   for (int superIdx = sortedSuper.size() - 1; superIdx >= 0; superIdx --) {
     SuperNode* super = sortedSuper[superIdx];
+    if (super->superType != SUPER_VALID) continue;
     for (int nodeIdx = super->member.size() - 1; nodeIdx >= 0; nodeIdx --) {
       Node* member = super->member[nodeIdx];
       int depNextInSuper = 0;
@@ -401,6 +402,16 @@ void graph::generateStmtTree() {
         }
       }
       allPath[node] = nodePath;
+    }
+  }
+  for (SuperNode* super : uintReset) {
+    super->stmtTree = new StmtTree();
+    super->stmtTree->root = new StmtNode(OP_STMT_SEQ);
+    for (Node* node : super->member) {
+      for (ExpTree* tree : node->assignTree) {
+        std::vector<int> emptyPath;
+        super->stmtTree->mergeExpTree(tree, emptyPath, emptyPath, node);
+      }
     }
   }
 }

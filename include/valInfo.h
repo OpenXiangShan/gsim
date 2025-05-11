@@ -4,7 +4,13 @@
 std::string legalCppCons(std::string str);
 int upperPower2(int x);
 
-enum valStatus {VAL_EMPTY = 0, VAL_VALID, VAL_CONSTANT, VAL_FINISH /* for printf/assert*/ , VAL_INVALID, VAL_EMPTY_SRC};
+enum valStatus {
+  VAL_EMPTY = 0,
+  VAL_VALID,
+  VAL_CONSTANT,
+  VAL_FINISH /* for printf/assert*/ ,
+  VAL_INVALID
+};
 enum valType {TYPE_NORMAL = 0, TYPE_ARRAY, TYPE_STMT};
 class valInfo {
 private:
@@ -71,7 +77,7 @@ public:
     mpz_set_str(consVal, str.c_str(), base);
     updateConsVal();
   }
-  valInfo* dup(int beg = -1, int end = -1) {
+  valInfo* dup(int beg = 0, int end = -1) {
     valInfo* ret = new valInfo();
     ret->opNum = opNum;
     ret->type = type;
@@ -83,10 +89,8 @@ public:
     ret->sign = sign;
     ret->consLength = consLength;
     ret->fullyUpdated = fullyUpdated;
-    if (status == VAL_CONSTANT) {
-      mpz_set(ret->assignmentCons, assignmentCons);
-      ret->sameConstant = sameConstant;
-    }
+    mpz_set(ret->assignmentCons, assignmentCons);
+    ret->sameConstant = sameConstant;
 
     for (int i = beg; i <= end; i ++) {
       if (getMemberInfo(i)) ret->memberInfo.push_back(getMemberInfo(i)->dup());

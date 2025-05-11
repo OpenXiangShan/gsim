@@ -65,7 +65,7 @@ void graph::detectSortedSuperLoop() {
     if (states[top] == NOT_VISIT) {
       states[top] = EXPANDED;
 
-      for (SuperNode* next : top->next) {
+      for (SuperNode* next : top->depNext) {
         /* enable self-loop for memory reader port with latency = 0 */
         if (next == top) continue;
         if (states.find(next) == states.end()) {

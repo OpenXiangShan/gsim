@@ -303,10 +303,10 @@ void graph::splitArrayNode(Node* node) {
   splittedArray.insert(node);
   node->status = DEAD_NODE;
   /* remove prev connection */
-  for (Node* prev : node->prev) prev->eraseNext(node);
-  for (SuperNode* super : node->super->prev) super->eraseNext(node->super);
-  for (Node* next : node->next) next->erasePrev(node);
-  for (SuperNode* super : node->super->next) super->erasePrev(node->super);
+  for (Node* prev : node->depPrev) prev->eraseNext(node);
+  for (SuperNode* super : node->super->depPrev) super->eraseNext(node->super);
+  for (Node* next : node->depNext) next->erasePrev(node);
+  for (SuperNode* super : node->super->depNext) super->erasePrev(node->super);
   node->super->clear_relation();
 
   for (Node* memberInSuper : node->super->member) {
@@ -321,7 +321,7 @@ void graph::splitArrayNode(Node* node) {
   }
   /* distribute arrayVal */
   for (ExpTree* tree : node->assignTree) distributeTree(node, tree);
-  if (node->updateTree || node->resetTree) {
+  if (node->resetTree) {
     for (size_t idx = 0; idx < node->arrayEntryNum(); idx ++) {
       /* compute index for all array operands in tree */
       std::vector<int> subIdx(node->dimension.size());
@@ -329,10 +329,6 @@ void graph::splitArrayNode(Node* node) {
       for (int i = node->dimension.size() - 1; i >= 0; i --) {
         subIdx[i] = tmp % node->dimension[i];
         tmp /= node->dimension[i];
-      }
-      if (node->updateTree) {
-        ExpTree* newTree = dupTreeWithIdx(node->updateTree, subIdx, node);
-        node->arrayMember[idx]->updateTree = newTree;
       }
       if (node->resetTree) {
         ExpTree* newTree = dupTreeWithIdx(node->resetTree, subIdx, node);
@@ -345,33 +341,30 @@ void graph::splitArrayNode(Node* node) {
   /* construct connections */
   if (node->type == NODE_REG_SRC || node->type == NODE_REG_DST) {
     Node* regBind = node->getBindReg();
-    checkNodes.insert(regBind);
     for (Node* member : regBind->arrayMember) {
-    checkNodes.insert(member);
-  }
+      checkNodes.insert(member);
+    }
   }
   for (Node* member : node->arrayMember) {
     checkNodes.insert(member);
   }
-  for (Node* next : node->next) {
+  for (Node* next : node->depNext) {
     checkNodes.insert(next);
-    if (next != node) {
-      next->clearPrev();
-    }
+    if (next != node) next->erasePrev(node);
   }
   for (Node* n : checkNodes) {
     for (ExpTree* tree : n->assignTree) tree->updateWithSplittedArray(n, node);
-    if (n->updateTree) n->updateTree->updateWithSplittedArray(n, node);
     if (n->resetTree) n->resetTree->updateWithSplittedArray(n, node);
   }
 
   for (Node* n : checkNodes) {
     n->updateConnect();
+    if (n->type == NODE_REG_SRC) {
+      n->updateDep();
+    }
   }
-
   /* clear node connection */
   node->clear_relation();
-
   for (Node* member : node->arrayMember) member->constructSuperConnect();
   for (Node* member : node->arrayMember) {
     if (member->super->prev.size() == 0) supersrc.push_back(member->super);

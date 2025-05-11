@@ -42,6 +42,9 @@ void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes) {
 
 void ExpTree::getRelyNodes(std::set<Node*>& allNodes) {
   getENodeRelyNodes(getRoot(), allNodes);
+  for (ENode* child : getlval()->child) {
+    getENodeRelyNodes(child, allNodes);
+  }
 }
 
 bool anyOuterEdge(Node* node) {
@@ -55,55 +58,79 @@ bool anyOuterEdge(Node* node) {
 }
 
 void graph::removeDeadNodes() {
-  removeDeadReg();
-  /* counters */
-  size_t totalNodes = 0;
-  size_t deadNum = 0;
-  size_t totalSuper = sortedSuper.size();
-
-  for (Node* reg : regsrc) {
-    if (reg->resetTree) reg->resetTree->getRelyNodes(nodesInUpdateTree);
-  }
-
-  std::stack<Node*> s;
   std::set<Node*> visited;
-  for (SuperNode* super : sortedSuper) {
-    totalNodes += super->member.size();
-    for (Node* member : super->member) {
-      for (Node* next : member->next) {
-        if (next->status == DEAD_NODE) member->eraseNext(next);
-      }
-      if (!anyOuterEdge(member) && potentialDead(member)) {
-        s.push(member);
-      }
+  std::stack<Node*> s;
+  auto add = [&visited, &s](Node* node) {
+    if (visited.find(node) == visited.end()) {
+      s.push(node);
+      visited.insert(node);
     }
-  }
-  while(!s.empty()) {
-    deadNum ++;
+  };
+  for (Node* outNode : output) add(outNode);
+  for (Node* special : specialNodes) add(special);
+  while (!s.empty()) {
     Node* top = s.top();
     s.pop();
-    if (visited.find(top) != visited.end()) continue;
-    visited.insert(top);
-    if (top->type == NODE_REG_SRC) s.push(top->getDst());
-    top->status = DEAD_NODE;
     for (Node* prev : top->prev) {
-      /* remove node connection */
-      Assert(prev->next.find(top) != prev->next.end(), "node %s is not in prev(%s)->next", top->name.c_str(), prev->name.c_str());
-      prev->eraseNext(top);
-      if (!anyOuterEdge(prev) && potentialDead(prev)) {
-        s.push(prev);
+      add(prev);
+    }
+    if (top->type == NODE_REG_SRC) {
+      add(top->getDst());
+      std::set<Node*> resetNodes;
+      if (top->resetTree) top->resetTree->getRelyNodes(resetNodes);
+      for (Node* node : resetNodes) add(node);
+    } else if (top->type == NODE_READER) {
+      Node* memory = top->parent;
+      for (Node* port : memory->member) {
+        if (port->type == NODE_WRITER) add(port);
+        if (port->type == NODE_READWRITER) add(port);
+      }
+    } else if (top->type == NODE_EXT_OUT) {
+      Node* ext = top->parent;
+      for (Node* member : ext->member) add(member);
+    }
+  }
+
+  for (SuperNode* super : sortedSuper) {
+    for (Node* node : super->member) {
+      if (visited.find(node) == visited.end()) {
+        node->status = DEAD_NODE;
       }
     }
-    top->clearPrev();
   }
+
+  /* counters */
+  size_t totalNodes = countNodes();
+  size_t totalSuper = sortedSuper.size();
+
   removeNodes(DEAD_NODE);
   regsrc.erase(
     std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
         regsrc.end()
   );
+  input.erase(
+    std::remove_if(input.begin(), input.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
+    input.end()
+  );
+  for (size_t i = 0; i < memory.size(); i ++) {
+    Node* mem = memory[i];
+    mem->member.erase(
+      std::remove_if(mem->member.begin(), mem->member.end(), [](const Node* n) {return n->status == DEAD_NODE; }),
+      mem->member.end()
+    );
+    if (mem->member.size() == 0) {
+      mem->status = DEAD_NODE;
+      memory.erase(memory.begin() + i);
+      i --;
+    }
+  }
+  reconnectAll();
 
-  printf("[removeDeadNodes] remove %ld deadNodes (%ld -> %ld)\n", deadNum, totalNodes, totalNodes - deadNum);
-  printf("[removeDeadNodes] remove %ld superNodes (%ld -> %ld)\n", totalSuper - sortedSuper.size(), totalSuper, sortedSuper.size());
+  size_t optimizedNodes = countNodes();
+  size_t optimizedSuper = sortedSuper.size();
+
+  printf("[removeDeadNodes] remove %ld deadNodes (%ld -> %ld)\n", totalNodes - optimizedNodes, totalNodes, optimizedNodes);
+  printf("[removeDeadNodes] remove %ld superNodes (%ld -> %ld)\n", totalSuper - optimizedSuper, totalSuper, optimizedSuper);
 
 }
 

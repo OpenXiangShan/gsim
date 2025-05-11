@@ -66,13 +66,13 @@ static std::map<NodeType, const char*> NodeType2Name = {
   {NODE_INVALID, "invalid"}, {NODE_REG_SRC, "reg_src"}, {NODE_REG_DST, "reg_dst"}, {NODE_SPECIAL, "special"},
   {NODE_INP, "inp"}, {NODE_OUT, "out"}, {NODE_MEMORY, "memory"}, {NODE_READER, "reader"},
   {NODE_WRITER, "writer"}, {NODE_READWRITER, "readwriter"}, {NODE_MEM_MEMBER, "mem_member"},
-  {NODE_OTHERS, "others"}, {NODE_REG_UPDATE, "reg_update"}, {NODE_EXT, "ext"}, {NODE_EXT_IN, "ext_in"},
+  {NODE_OTHERS, "others"}, {NODE_REG_RESET, "reg_reset"}, {NODE_EXT, "ext"}, {NODE_EXT_IN, "ext_in"},
   {NODE_EXT_OUT, "ext_out"}
 };
 
 static std::map<NodeStatus, const char*> NodeStatus2Name = {
   {VALID_NODE, "valid"}, {DEAD_NODE, "dead"}, {CONSTANT_NODE, "constant"}, {MERGED_NODE, "merged"},
-  {DEAD_SRC, "dead_src"}, {REPLICATION_NODE, "replication"}, {SPLITTED_NODE, "splitted"}
+  {REPLICATION_NODE, "replication"}, {SPLITTED_NODE, "splitted"}
 };
 
 void ExpTree::display(int depth) {
@@ -125,16 +125,12 @@ void SuperNode::display() {
 
 
 void Node::display() {
-  printf("node %s[width %d sign %d status=%s type=%s][", name.c_str(), width, sign, NodeStatus2Name[status], NodeType2Name[type]);
+  printf("node %s[width %d sign %d status=%s type=%s lineno=%d][", name.c_str(), width, sign, NodeStatus2Name[status], NodeType2Name[type], lineno);
   for (int dim : dimension) printf(" %d", dim);
   printf(" ]\n");
   for (size_t i = 0; i < assignTree.size(); i ++) {
     printf("[assign] %ld\n", i);
     assignTree[i]->display();
-  }
-  if (updateTree) {
-    printf("[updateTree]:\n");
-    updateTree->display();
   }
   if (resetTree) {
     printf("[resetTree]:\n");
