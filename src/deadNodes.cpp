@@ -68,6 +68,11 @@ void graph::removeDeadNodes() {
   };
   for (Node* outNode : output) add(outNode);
   for (Node* special : specialNodes) add(special);
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->type == NODE_EXT) add(member);
+    }
+  }
   while (!s.empty()) {
     Node* top = s.top();
     s.pop();
