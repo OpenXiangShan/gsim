@@ -25,9 +25,8 @@
 #define MAX_INSTS 40000000
 size_t warmupInsts = 20000000;
 
-#if defined(GSIM_DIFF)
-#include <top_ref.h>
-REF_NAME* ref;
+#if not defined(__DUT_minimal_xiangshan__) && not defined(__DUT_default_xiangshan__)
+#error checkpoint require Xiangshan
 #endif
 
 #if defined(GSIM)
