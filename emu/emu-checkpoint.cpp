@@ -21,18 +21,18 @@
 #define DUT_MEMORY memory$ram$rdata_mem$mem
 #define REF_MEMORY SimTop__DOT__memory__DOT__ram__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
 
-#define MAX_PROGRAM_SIZE (8 * 1024 * 1024 * 1024UL)
+#define MEM_SIZE (8 * 1024 * 1024 * 1024UL)
 #define MAX_INSTS 40000000
 size_t warmupInsts = 20000000;
 
-#if defined(GSIM_DIFF)
-#include <top_ref.h>
-REF_NAME* ref;
+#if not defined(__DUT_minimal_xiangshan__) && not defined(__DUT_default_xiangshan__)
+#error checkpoint require Xiangshan
 #endif
 
 #if defined(GSIM)
 #include DUT_HEADER
 DUT_NAME* dut;
+uint64_t* g_mem;
 // unused blackbox
 void imsic_csr_top(uint8_t _0, uint8_t _1, uint16_t _2, uint8_t _3, uint8_t _4, uint16_t _5, uint8_t _6, uint8_t _7, uint8_t _8, uint8_t _9, uint8_t _10, uint8_t _11, uint64_t _12, uint8_t& _13, uint64_t& _14, uint8_t& _15, uint8_t& _16, uint32_t& _17, uint32_t& _18, uint32_t& _19) {
   _13 = 0;
@@ -61,6 +61,15 @@ void SDCardHelper(uint8_t setAddr, uint32_t addr, uint8_t ren, uint32_t& data) {
   data = 0;
 }
 
+void MemRWHelper(uint8_t r_enable, uint64_t r_index, uint64_t& r_data, uint8_t w_enable, uint64_t w_index, uint64_t w_data, uint64_t w_mask){
+  if(r_enable){
+    r_data = g_mem[r_index];
+  }
+  if(w_enable){
+    g_mem[w_index] =  (g_mem[w_index] & ~w_mask) | (w_data & w_mask);
+  }
+}
+
 void dut_init(DUT_NAME *dut) {
   dut->set_difftest$$perfCtrl$$clean(0);
   dut->set_difftest$$perfCtrl$$dump(0);
@@ -69,7 +78,6 @@ void dut_init(DUT_NAME *dut) {
   dut->set_difftest$$logCtrl$$level(0);
   dut->set_difftest$$uart$$in$$ch(-1);
 }
-
 
 void dut_hook(DUT_NAME *dut) {
   if (dut->get_difftest$$uart$$out$$valid()) {
@@ -82,11 +90,28 @@ void dut_hook(DUT_NAME *dut) {
 #if defined(VERILATOR)
 #include "verilated.h"
 #include REF_HEADER
+#if defined (V_WAVE)
+#include "verilated_fst_c.h"
+VerilatedFstC *tfp;
+const std::unique_ptr<VerilatedContext> contextp{new VerilatedContext};
+#endif
 REF_NAME* ref;
+uint64_t* v_mem;
 void ref_init(REF_NAME *ref) {
   ref->difftest_perfCtrl_clean = ref->difftest_perfCtrl_dump = 0;
   ref->difftest_uart_in_ch = -1;
   ref->difftest_uart_in_valid = 0;
+
+#if defined(V_WAVE)
+Verilated::traceEverOn(true);
+tfp = new VerilatedFstC;
+ref->trace(tfp, 10);
+Verilated::mkdir("wave/");
+tfp->open("wave/V_wave.fst");
+if(tfp->isOpen() == false){
+  printf("Fail to open wave file!\n");
+}
+#endif
 }
 
 void ref_hook(REF_NAME *ref) {
@@ -95,79 +120,122 @@ void ref_hook(REF_NAME *ref) {
     fflush(stdout);
   }
 }
+
+extern "C" void flash_read(unsigned int addr, unsigned long long* data){
+  printf("WARNING: Trying to invoke flash_read\n");
+}
+
+extern "C" void sd_setaddr(int addr){
+  printf("WARNING: Trying to invoke sd_setaddr\n");
+}
+
+extern "C" void sd_read(int* data){
+  printf("WARNING: Trying to invoke sd_read\n");
+}
+
+extern "C" long long difftest_ram_read(long long rIdx){
+  return v_mem[rIdx];
+}
+
+extern "C" void difftest_ram_write(long long index, long long data, long long mask){
+  v_mem[index] =  (v_mem[index] & ~mask) | (data & mask);
+}
 #endif
 
 static size_t program_sz = 0;
-static int program_fd = 0;
-static void *program = NULL;
 static bool dut_end = false;
 
+size_t readFromBin(void* dest, const char* filename, long max_bytes) {
+  uint64_t file_size;
+  std::ifstream file(filename, std::ios::binary | std::ios::in);
+  if(!file.is_open()){
+    printf("Can't open %s\n", filename);
+    return 0;
+  }
+  file.seekg(0, std::ios::end);
+  file_size = file.tellg();
+  file.seekg(0, std::ios::beg);
 
-template <typename T>
-std::vector<size_t> sort_indexes(const std::vector<T>& v) {
-  // initialize original index locations
-  std::vector<size_t> idx(v.size());
-  iota(idx.begin(), idx.end(), 0);
-
-  // when v contains elements of equal values
-  stable_sort(idx.begin(), idx.end(), [&v](size_t i1, size_t i2) { return v[i1] < v[i2]; });
-
-  return idx;
+  uint64_t read_size = (file_size > max_bytes) ? max_bytes : file_size;
+  file.read(static_cast<char *>(dest), read_size);
+  file.close();
+  return read_size;
 }
 
-void readFromBin(const char* filename) {
-  assert(filename != NULL);
-  program_fd = open(filename, O_RDONLY);
-  assert(program_fd != -1);
-
-  struct stat s;
-  int ret = fstat(program_fd, &s);
-  assert(ret == 0);
-  program_sz = s.st_size;
-
-  program = mmap(NULL, program_sz, PROT_READ, MAP_PRIVATE, program_fd, 0);
-  assert(program != (void *)-1); 
-}
-
-void load_program(char* filename) {
+void load_program(void* dest,const char* filename) {
   assert(filename != NULL);
   printf("The image is %s\n", filename);
   if (isGzFile(filename)) {
-    program = (uint64_t *)mmap(NULL, MAX_PROGRAM_SIZE, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     printf("Gzip file detected and loading image from extracted gz file\n");
-    program_sz = readFromGz(program, filename, MAX_PROGRAM_SIZE, LOAD_RAM);
+    program_sz = readFromGz(dest, filename, MEM_SIZE, LOAD_RAM);
   } else if (isZstdFile(filename)) {
-    program = (uint64_t *)mmap(NULL, MAX_PROGRAM_SIZE, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     printf("Zstd file detected and loading image from extracted zstd file\n");
-    program_sz = readFromZstd(program, filename, MAX_PROGRAM_SIZE, LOAD_RAM);
+    program_sz = readFromZstd(dest, filename, MEM_SIZE, LOAD_RAM);
   } else {
     printf("Bin file detected and loading image from binary file\n");
-    readFromBin(filename);
+    program_sz = readFromBin(dest, filename, MEM_SIZE);
   }
 
   printf("load program size: 0x%lx\n", program_sz);
-  assert(program_sz > 0 && program_sz <= MAX_PROGRAM_SIZE);
+  assert(program_sz > 0 && program_sz <= MEM_SIZE);
   return;
 }
 
-static void close_program() {
-  munmap(program, program_sz);
-  close(program_fd);
-}
-
-void overwrite_ram(const char* filename) {
+// load gcpt
+void overwrite_ram(void* mem, const char* filename) {
   std::fstream fs(filename, std::ios::binary | std::ios::in);
   if (!fs.is_open()) {
     printf("Failed to open: %s\n", filename);
     exit(EXIT_FAILURE);
   }
-
-  if (!fs.read((char*)program, 0xe00)) {
+  fs.seekg(0, std::ios::end);
+  auto file_size = fs.tellg();
+  fs.seekg(0, std::ios::beg);
+  if (!fs.read((char*)mem, file_size)) {
     printf("Failed to read: %s\n", filename);
     exit(EXIT_FAILURE);
   }
+  std::cout<< "size of gcpt is " << file_size << std::endl;
 
   fs.close();
+}
+
+void init_sim_mem(int &mem_fd, const char* filename, const char* gcptname){
+  mem_fd =  memfd_create("sim_mem", 0);
+  if(mem_fd == -1){
+    printf("Couldn't memfd_create\n");
+    exit(-1);
+  }
+  ftruncate(mem_fd, MEM_SIZE);
+
+  auto mem = (uint64_t*)mmap(NULL, MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, mem_fd, 0);
+  if(mem == MAP_FAILED){
+    printf("Couldn't mmap\n");
+    exit(-1);
+   }
+  // This way, we only need to load those two file once when diff-testing
+  load_program(mem, filename);
+  overwrite_ram(mem, gcptname);
+
+  munmap(mem, MEM_SIZE);
+}
+
+uint64_t* new_mem(const char* filename, const char* gcptname){
+ static int mem_fd =0;
+ if(mem_fd == 0){
+  init_sim_mem(mem_fd, filename, gcptname);
+ }
+ auto mem = (uint64_t*)mmap(NULL, MEM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE, mem_fd, 0);
+ if(mem == MAP_FAILED){
+  printf("Couldn't mmap\n");
+  exit(-1);
+ }
+ return mem;
+}
+
+
+static void del_mem(void* mem) {
+  munmap(mem, MEM_SIZE);
 }
 
 #ifdef GSIM
@@ -177,18 +245,24 @@ void dut_reset() { dut->set_reset(1); dut_cycle(10); dut->set_reset(0); }
 #ifdef VERILATOR
 void ref_cycle(int n) {
   while (n --) {
+    #ifdef V_WAVE
+    contextp->timeInc(1);
+#endif
     ref->clock = 0; ref->eval();
+#ifdef V_WAVE
+    tfp->dump(contextp->time());
+    contextp->timeInc(1);
+#endif
     ref->clock = 1; ref->eval();
+#ifdef V_WAVE
+    tfp->dump(contextp->time());
+#endif
   }
 }
 void ref_reset() { ref->reset = 1; ref_cycle(10); ref->reset = 0; }
 #endif
-#ifdef GSIM_DIFF
-void ref_cycle(int n) { while (n --) ref->step(); }
-void ref_reset() { ref->set_reset(1); ref_cycle(10); ref->set_reset(0); }
-#endif
 
-#if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
+#if defined(VERILATOR) && defined(GSIM)
 bool checkSig(bool display, REF_NAME* ref, DUT_NAME* dut);
 bool checkSignals(bool display) {
   return checkSig(display, ref, dut);
@@ -196,27 +270,20 @@ bool checkSignals(bool display) {
 #endif
 
 int main(int argc, char** argv) {
-  load_program(argv[2]);
-  overwrite_ram(argv[1]);
 #ifdef GSIM
   dut = new DUT_NAME();
-  memcpy(&dut->DUT_MEMORY, program, program_sz);
+  g_mem = new_mem(argv[2], argv[1]);
+  
   dut_init(dut);
   dut_reset();
   dut_cycle(1);
 #endif
 #ifdef VERILATOR
   ref = new REF_NAME();
-  memcpy(&ref->rootp->REF_MEMORY, program, program_sz);
+  v_mem = new_mem(argv[2], argv[1]);
   ref_init(ref);
   ref_reset();
 #endif
-#ifdef GSIM_DIFF
-  ref = new REF_NAME();
-  memcpy(&ref->DUT_MEMORY, program, program_sz);
-  ref_reset();
-#endif
-  close_program();
   std::cout << "start testing.....\n";
   std::signal(SIGINT, [](int){ dut_end = true; });
   std::signal(SIGTERM, [](int){ dut_end = true; });
@@ -230,7 +297,7 @@ int main(int argc, char** argv) {
 #ifdef VERILATOR
     ref_cycle(1);
     ref_hook(ref);
-    instrCnt += ref->rootp->SimTop__DOT__l_soc__DOT__core_with_l2__DOT__core__DOT__backend__DOT__inner__DOT__ctrlBlock__DOT__io_robio_csr_perfinfo_retiredInstr_REG;
+    instrCnt += ref->rootp->SimTop__DOT__l_soc__DOT__core_with_l2__DOT__core__DOT__backend__DOT__inner_ctrlBlock__DOT__io_robio_csr_perfinfo_retiredInstr_REG;
     if (instrCnt >= warmupInsts) {
       ref->difftest_perfCtrl_clean = 1;
       ref->difftest_perfCtrl_dump = 1;
@@ -241,7 +308,7 @@ int main(int argc, char** argv) {
 #if defined(GSIM)
     dut_cycle(1);
     dut_hook(dut);
-  #if not defined(GSIM_DIFF)
+  #if not defined(VERILATOR)
     instrCnt += dut->l_soc$core_with_l2$core$backend$inner$ctrlBlock$io_robio_csr_perfinfo_retiredInstr_REG;
   #endif
     if (instrCnt >= warmupInsts) {
@@ -252,15 +319,9 @@ int main(int argc, char** argv) {
       std::cout << "instrCnt = " << instrCnt << std::endl;
     }
 #endif
-#ifdef GSIM_DIFF
-    ref_cycle(1);
-#endif
   if (instrCnt >= warmupInsts) warmupInsts = -1;
-#ifdef GSIM_DIFF
-    ref->step();
-#endif
     cycles++;
-    #if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
+#if defined(VERILATOR) && defined(GSIM)
     bool isDiff = checkSignals(false);
     if(isDiff) {
       printf("all Sigs:\n -----------------\n");
@@ -271,19 +332,29 @@ int main(int argc, char** argv) {
       return -1;
     }
 #endif
-    dut_end = instrCnt >= MAX_INSTS;
-    if ((cycles % 100000) == 0 || dut_end) {
+    if ((cycles % 100000) == 0 || dut_end || instrCnt >= MAX_INSTS) {
+      if(instrCnt >= MAX_INSTS) dut_end = 1;
       auto dur = std::chrono::system_clock::now() - start;
       auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
-      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec) \n",
-          cycles, msec.count(), cycles * 1000 / msec.count());
+      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec) instructs %zu\n",
+          cycles, msec.count(), cycles * 1000 / msec.count(), instrCnt);
     }
-
+    
   }
 
   auto now = std::chrono::system_clock::now();
   auto dur = now - start;
 
   std::cout << "Host time spent: " << std::chrono::duration_cast<std::chrono::milliseconds>(dur).count() << "ms" << std::endl;
+#ifdef GSIM
+  del_mem(g_mem);
+#endif
+#ifdef VERILATOR
+  del_mem(v_mem);
+#endif
+#ifdef V_WAVE
+      tfp->flush();
+      tfp->close();
+#endif
   return 0;
 }

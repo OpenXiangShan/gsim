@@ -108,7 +108,9 @@ ifdef GSIM_TARGET
 target = $(GSIM_TARGET)
 endif
 
-difftest: $(target)
+SIMPOINT_VAR = $(if $(filter 1,$(SIMPOINT)),-simpoint,)
+
+difftest: $(target)$(SIMPOINT_VAR)
 
 .PHONY: difftest
 
@@ -182,7 +184,11 @@ compile: $(GEN_CPP_DIR)/$(NAME)0.cpp
 EMU_BUILD_DIR = $(WORK_DIR)/emu
 EMU_BIN = $(WORK_DIR)/S$(NAME)
 
+ifeq ($(SIMPOINT),1)
+EMU_MAIN_SRCS = emu/emu-checkpoint.cpp emu/support/compress.cpp
+else
 EMU_MAIN_SRCS = emu/emu.cpp
+endif
 EMU_GEN_SRCS = $(shell find $(GEN_CPP_DIR) -name "*.cpp" 2> /dev/null)
 EMU_SRCS = $(EMU_MAIN_SRCS) $(EMU_GEN_SRCS)
 
@@ -192,6 +198,9 @@ EMU_CFLAGS += -fbracket-depth=2048
 #EMU_CFLAGS += -fsanitize=address -fsanitize-address-use-after-scope
 #EMU_CFLAGS += -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract
 #EMU_CFLAGS += -pg -ggdb
+ifeq ($(SIMPOINT),1)
+EMU_LDFLAGS += -lz -lzstd
+endif
 
 $(foreach x, $(EMU_SRCS), $(eval \
 	$(call CXX_TEMPLATE, $(EMU_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(EMU_CFLAGS), EMU_OBJS,)))
@@ -199,6 +208,9 @@ $(foreach x, $(EMU_SRCS), $(eval \
 $(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS) $(EMU_LDFLAGS)))
 
 build-emu: $(EMU_BIN)
+
+run-emu-simpoint: $(EMU_BIN)
+	@echo 'Please run "$^ <gcpt> <checkpoint>" manually'
 
 run-emu: $(EMU_BIN)
 	$(TIME) taskset 0x1 $^ $(mainargs)
@@ -228,6 +240,9 @@ VERI_GEN_MK = $(VERI_BUILD_DIR)/V$(NAME).mk
 VERI_CFLAGS = $(call escape_quote,$(EMU_CFLAGS) $(CFLAGS_REF))
 VERI_LDFLAGS = -O1
 VERI_VFLAGS = --top $(NAME) -Wno-lint -j 8 --cc --exe +define+RANDOMIZE_GARBAGE_ASSIGN --max-num-width 1048576 --compiler clang
+ifeq ($(SIMPOINT),1)
+VERI_LDFLAGS += -lz -lzstd
+endif
 VERI_VFLAGS += -Mdir $(VERI_BUILD_DIR) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)"
 VERI_VFLAGS += $(VERI_THREADS)
 #VERI_VFLAGS += --trace-fst
@@ -244,6 +259,9 @@ $(VERI_BIN): | $(VERI_GEN_MK)
 	ln -sf $(abspath $(VERI_BUILD_DIR)/V$(NAME)) $@
 
 compile-veri: $(VERI_GEN_MK)
+
+run-veri-simpoint: $(VERI_BIN)
+	@echo 'Please run "$^ <gcpt> <checkpoint>" manually'
 
 run-veri: $(VERI_BIN)
 	$(TIME) $^ $(mainargs)
