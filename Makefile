@@ -108,7 +108,9 @@ ifdef GSIM_TARGET
 target = $(GSIM_TARGET)
 endif
 
-difftest: $(target)
+SIMPOINT_VAR = $(if $(filter 1,$(SIMPOINT)),-simpoint,)
+
+difftest: $(target)$(SIMPOINT_VAR)
 
 .PHONY: difftest
 
@@ -207,6 +209,9 @@ $(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS) $(EMU_LDFLAGS)
 
 build-emu: $(EMU_BIN)
 
+run-emu-simpoint: $(EMU_BIN)
+	@echo 'Please run "$^ <gcpt> <checkpoint>" manually'
+
 run-emu: $(EMU_BIN)
 	$(TIME) taskset 0x1 $^ $(mainargs)
 
@@ -254,6 +259,9 @@ $(VERI_BIN): | $(VERI_GEN_MK)
 	ln -sf $(abspath $(VERI_BUILD_DIR)/V$(NAME)) $@
 
 compile-veri: $(VERI_GEN_MK)
+
+run-veri-simpoint: $(VERI_BIN)
+	@echo 'Please run "$^ <gcpt> <checkpoint>" manually'
 
 run-veri: $(VERI_BIN)
 	$(TIME) $^ $(mainargs)
