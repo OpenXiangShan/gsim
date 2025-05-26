@@ -386,14 +386,15 @@ void graph::genNodeDef(FILE* fp, Node* node) {
     if (node->dimension.empty()) {
       emitBodyLock(1, "%s &= %s;\n", node->name.c_str(), bitMask(w).c_str());
     } else {
+      int indent = 1;
       int dims = node->dimension.size();
       for (int i = 0; i < dims; i ++) {
-        emitBodyLock(1, "for (int i%d = 0; i%d < %d; i%d ++) {\n", i, i, node->dimension[i], i);
+        emitBodyLock(indent++, "for (int i%d = 0; i%d < %d; i%d ++) {\n", i, i, node->dimension[i], i);
       }
-      emitBodyLock(1, "%s", node->name.c_str());
+      emitBodyLock(indent, "%s", node->name.c_str());
       for (int i = 0; i < dims; i ++) { emitBodyLock(0, "[i%d]", i); }
       emitBodyLock(0, "&= %s;\n", bitMask(w).c_str());
-      for (int i = 0; i < dims; i ++) { emitBodyLock(0, "}\n"); }
+      for (int i = 0; i < dims; i ++) { emitBodyLock(-- indent, "}\n"); }
     }
   }
 
@@ -853,7 +854,7 @@ void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
       emitBodyLock(indent, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
     }
   }
-  emitBodyLock(indent, "}\n");
+  emitBodyLock(-- indent, "}\n");
   for (InstInfo inst : super->insts) {
     switch (inst.infoType) {
       case SUPER_INFO_IF:
