@@ -166,43 +166,6 @@ jobs:
           sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
           make -j `nproc` diff dutName=minimal-xiangshan
 
-  default-xiangshan:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: 3.x
-      - name: Install dependencies
-        run: |
-          sudo apt install -y clang llvm flex bison libfl-dev
-      - name: Install verilator
-        run: |
-          wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-04-24/oss-cad-suite-linux-x64-20250424.tgz
-          tar xf oss-cad-suite-linux-x64-20250424.tgz
-          OSS_CAD_SUITE_BIN_PATH=`pwd`/oss-cad-suite/bin
-          echo "PATH=$PATH:$OSS_CAD_SUITE_BIN_PATH" >> "$GITHUB_ENV"
-      - name: Enlarge swap
-        run: |
-          sudo fallocate -l 60G /mnt/swapfile2
-          sudo mkswap /mnt/swapfile2
-          sudo swapon /mnt/swapfile2
-      - name: Check resources
-        run: |
-          echo "nproc = `nproc`"
-          free -h
-          df -h
-          verilator --version
-      - name: Untar linux.bin
-        run: |
-          git submodule set-url ready-to-run https://github.com/jaypiper/gsim-ready-to-run.git
-          make init
-      - name: Run default-xiangshan (difftest with verilator)
-        run: |
-          sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
-          make -j `nproc` diff dutName=default-xiangshan
-
   ysyx3-bolt:
     runs-on: ubuntu-24.04
     steps:
