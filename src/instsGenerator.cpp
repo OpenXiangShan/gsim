@@ -183,11 +183,11 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int
   } else {
     std::string idxStr, bracket;
     for (size_t i = 0; i < node->dimension.size() - dimIdx; i ++) {
-      ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i + dimIdx], i);
+      ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) { ", i, i, node->dimension[i + dimIdx], i);
       idxStr += "[i" + std::to_string(i) + "]";
-      bracket += "}\n";
+      bracket += "}";
     }
-    ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
+    ret += format("%s%s = %s; ", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
     ret += bracket;
   }
   return ret;
@@ -1939,21 +1939,79 @@ valInfo* Node::compute() {
   return ret;
 }
 
-void StmtNode::compute(std::vector<InstInfo>& insts) {
+void extractCommonInstInfo(std::set<InstInfo>& s1, std::set<InstInfo>& s2, std::set<InstInfo>& common) {
+  std::set_intersection(
+      s1.begin(), s1.end(),
+      s2.begin(), s2.end(),
+      std::inserter(common, common.end())
+  );
+
+  std::set<InstInfo> s1_unique;
+  std::set_difference(
+      s1.begin(), s1.end(),
+      common.begin(), common.end(),
+      std::inserter(s1_unique, s1_unique.end())
+  );
+
+  std::set<InstInfo> s2_unique;
+  std::set_difference(
+      s2.begin(), s2.end(),
+      common.begin(), common.end(),
+      std::inserter(s2_unique, s2_unique.end())
+  );
+
+  s1.swap(s1_unique);
+  s2.swap(s2_unique);
+}
+void StmtNode::compute(std::vector<InstInfo>& insts, std::set<InstInfo> assign_insts[]) {
   switch (type) {
-    case OP_STMT_SEQ:
-      for (StmtNode* stmt : child) {
-        stmt->compute(insts);
+    case OP_STMT_SEQ: {
+      if (assign_insts != nullptr) {
+        for (StmtNode* stmt : child) {
+          stmt->compute(insts, assign_insts);
+        }
+      }else {
+        std::set<InstInfo> assign[2]; // Collector for all the SUPER_INFO_ASSIGN_{BEG/END}
+        const auto marker = insts.size() > 0 ? insts.size() - 1 : 0;
+        for (StmtNode* stmt : child) {
+          stmt->compute(insts, assign);
+        }
+        insts.insert(insts.begin() + static_cast<std::ptrdiff_t>(marker), assign[0].begin(), assign[0].end());
+        insts.insert(insts.end(), assign[1].begin(), assign[1].end());
       }
+    }
       break;
     case OP_STMT_WHEN: {
       Assert(getChild(0)->isENode, "invalid when condition\n");
+      Assert(assign_insts != nullptr, "a when that is not in seq");
+      std::set<InstInfo> insts_branch_if_assign[2],insts_branch_else_assign[2]; // Collector for the SUPER_INFO_ASSIGN_{BEG/END} in if and else branch
+
+      std::vector<InstInfo> branch_if_insts, branch_else_insts;
       valInfo* cond = getChild(0)->enode->compute(nullptr, INVALID_LVALUE, false);
-      insts.push_back(InstInfo(format("if %s {", addBracket(cond->valStr).c_str()), SUPER_INFO_IF));
-      getChild(1)->compute(insts);
-      insts.push_back(InstInfo("} else {", SUPER_INFO_ELSE));
-      getChild(2)->compute(insts);
-      insts.push_back(InstInfo("}", SUPER_INFO_DEDENT));
+      getChild(1)->compute(branch_if_insts, insts_branch_if_assign);
+      getChild(2)->compute(branch_else_insts, insts_branch_else_assign);
+
+      extractCommonInstInfo(insts_branch_if_assign[0], insts_branch_else_assign[0], assign_insts[0]);
+      extractCommonInstInfo(insts_branch_if_assign[1], insts_branch_else_assign[1], assign_insts[1]);
+
+      insts.emplace_back(format("if %s {", addBracket(cond->valStr).c_str()), SUPER_INFO_IF);
+      insts.reserve(insts.size()
+              + insts_branch_if_assign[0].size() * 2
+              + branch_if_insts.size()
+              + insts_branch_else_assign[0].size() * 2
+              + branch_else_insts.size()
+              + 3); // "if {", "} else {", "}"
+      insts.insert(insts.end(), insts_branch_if_assign[0].begin(), insts_branch_if_assign[0].end());
+      insts.insert(insts.end(), std::make_move_iterator(branch_if_insts.begin()), std::make_move_iterator(branch_if_insts.end()));
+      insts.insert(insts.end(), insts_branch_if_assign[1].begin(), insts_branch_if_assign[1].end());
+      /* Don't emit empty else block */
+      if (!getChild(2)->child.empty()) {
+        insts.emplace_back("} else {", SUPER_INFO_ELSE);
+        insts.insert(insts.end(), insts_branch_else_assign[0].begin(), insts_branch_else_assign[0].end());
+        insts.insert(insts.end(), std::make_move_iterator(branch_else_insts.begin()), std::make_move_iterator(branch_else_insts.end()));
+        insts.insert(insts.end(), insts_branch_else_assign[1].begin(), insts_branch_else_assign[1].end());
+      }
+      insts.emplace_back("}", SUPER_INFO_DEDENT); // if block
       break;
     }
     case OP_STMT_NODE: {
@@ -1962,22 +2020,34 @@ void StmtNode::compute(std::vector<InstInfo>& insts) {
       valInfo* linfo = tree->getlval()->compute(node, INVALID_LVALUE, false);
       valInfo* rinfo = tree->getRoot()->compute(node, linfo->valStr, true);
       if (rinfo->status == VAL_FINISH || node->type == NODE_SPECIAL) { // printf / assert
-        insts.push_back(InstInfo(rinfo->valStr));
+        insts.emplace_back(rinfo->valStr);
       } else if (rinfo->status == VAL_INVALID) {
       } else if (rinfo->opNum >= 0) {
         if (rinfo->valStr != linfo->valStr) {
-          if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_BEG, belong));
-          if (isSubArray(linfo->valStr, node)) {
-            insts.push_back(InstInfo(arrayCopy(linfo->valStr, node, rinfo)));
-          } else {
-            insts.push_back(InstInfo(format("%s = %s;", linfo->valStr.c_str(), rinfo->valStr.c_str())));
+          if (belong){
+            if (assign_insts) assign_insts[0].emplace(SUPER_INFO_ASSIGN_BEG, belong);
+            else insts.emplace_back(SUPER_INFO_ASSIGN_BEG, belong);
           }
-          if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_END, belong));
+          if (isSubArray(linfo->valStr, node)) {
+            insts.emplace_back(arrayCopy(linfo->valStr, node, rinfo));
+          } else {
+            insts.emplace_back(format("%s = %s;", linfo->valStr.c_str(), rinfo->valStr.c_str()));
+          }
+          if (belong) {
+            if (assign_insts) assign_insts[1].emplace(SUPER_INFO_ASSIGN_END, belong);
+            else insts.emplace_back(SUPER_INFO_ASSIGN_END, belong);
+          }
         }
       } else {
-        if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_BEG, belong));
-        insts.push_back(InstInfo(rinfo->valStr));
-        if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_END, belong));
+        if (belong) {
+          if (assign_insts) assign_insts[0].emplace(SUPER_INFO_ASSIGN_BEG, belong);
+          else insts.emplace_back(SUPER_INFO_ASSIGN_BEG, belong);
+        }
+        insts.emplace_back(rinfo->valStr);
+        if (belong) {
+          if (assign_insts) assign_insts[1].emplace(SUPER_INFO_ASSIGN_END, belong);
+          else insts.emplace_back(SUPER_INFO_ASSIGN_END, belong);
+        }
       }
       break;
     }

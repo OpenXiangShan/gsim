@@ -359,8 +359,8 @@ enum SuperInfo {
   SUPER_INFO_ELSE,   // dedent and then indent
   SUPER_INFO_DEDENT,
   SUPER_INFO_STR,
-  SUPER_INFO_ASSIGN_BEG,
-  SUPER_INFO_ASSIGN_END
+  SUPER_INFO_ASSIGN_BEG, // backup the value
+  SUPER_INFO_ASSIGN_END  // compare the backuped value
 };
 
 class InstInfo{
@@ -380,6 +380,11 @@ public:
     node = _node;
     inst = _inst;
     infoType = _infoType;
+  }
+  bool operator<(const InstInfo& other) const {
+    if (infoType != other.infoType) return infoType < other.infoType;
+    if (inst != other.inst) return inst < other.inst;
+    return node < other.node;
   }
 };
 class SuperNode {
