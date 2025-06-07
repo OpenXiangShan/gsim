@@ -369,6 +369,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
 void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || (node->status != VALID_NODE)) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
+  if (node->type == NODE_WRITER) return;
   if (node->type == NODE_OTHERS && !node->anyNextActive() && !node->isArray()) return;
 #if defined(GSIM_DIFF) || defined(VERILATOR_DIFF)
   genDiffSig(fp, node);
@@ -380,7 +381,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   for (int dim : node->dimension) fprintf(fp, "[%d]", upperPower2(dim));
   fprintf(fp, "; // width = %d, lineno = %d\n", node->width, node->lineno);
   int w = node->width;
-  bool needInitMask = (node->type != NODE_MEMORY) &&
+  bool needInitMask = (node->type != NODE_MEMORY && node->type != NODE_WRITER) &&
     (((w < 64) && (w != 8 && w != 16 && w != 32 && w != 64)) || ((w > 64) && (w % 32 != 0)));
   if (needInitMask) {
     if (node->dimension.empty()) {
@@ -647,6 +648,7 @@ void graph::nodeDisplay(Node* member, int indent) {
   } while (0)
 
   if (member->status != VALID_NODE) return;
+  if (member->type == NODE_WRITER) return;
   emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
   emitBodyLock(indent, "if (cycles >= LOG_START && cycles <= LOG_END) {\n");
   indent ++;
