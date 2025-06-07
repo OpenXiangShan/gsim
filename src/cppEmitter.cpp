@@ -649,8 +649,6 @@ void graph::nodeDisplay(Node* member, int indent) {
 
   if (member->status != VALID_NODE) return;
   if (member->type == NODE_WRITER) return;
-  emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
-  emitBodyLock(indent, "if (cycles >= LOG_START && cycles <= LOG_END) {\n");
   indent ++;
   emitBodyLock(indent, "printf(\"%%ld %d %s: \", cycles);\n", member->super->cppId, member->name.c_str());
   if (member->dimension.size() != 0) {
@@ -779,7 +777,11 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
       }
     }
     if (super->superType == SUPER_ASYNC_RESET) emitBodyLock(indent, "subReset%d();\n", super2ResetId[super->resetNode].second);
+    emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
+    emitBodyLock(indent, "if (cycles >= LOG_START && cycles <= LOG_END) {\n");
     for (Node* n : super->member) nodeDisplay(n, indent);
+    emitBodyLock(indent, "}\n");
+    emitBodyLock(indent, "#endif\n");
   }
 }
 
