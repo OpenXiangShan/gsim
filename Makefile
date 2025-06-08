@@ -38,7 +38,7 @@ else ifeq ($(dutName),minimal-xiangshan)
 else ifeq ($(dutName),default-xiangshan)
 	NAME ?= SimTop
 	TEST_FILE = $(NAME)-xiangshan-default
-	GSIM_FLAGS += --supernode-max-size=60 --cpp-max-size-KB=8192
+	GSIM_FLAGS += --supernode-max-size=2 --cpp-max-size-KB=8192
 	VERI_THREADS = --threads 16
 endif
 
