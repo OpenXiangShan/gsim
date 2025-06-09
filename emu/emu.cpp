@@ -76,6 +76,18 @@ void SDCardHelper(uint8_t setAddr, uint32_t addr, uint8_t ren, uint32_t& data) {
   data = 0;
 }
 
+extern "C" void flash_read(unsigned int addr, unsigned long long* data){
+  printf("WARNING: Trying to invoke flash_read\n");
+}
+
+extern "C" void sd_setaddr(int addr){
+  printf("WARNING: Trying to invoke sd_setaddr\n");
+}
+
+extern "C" void sd_read(int* data){
+  printf("WARNING: Trying to invoke sd_read\n");
+}
+
 #else
 #error Unsupport DUT = DUT_NAME
 #endif

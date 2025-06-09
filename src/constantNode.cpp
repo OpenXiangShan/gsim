@@ -824,6 +824,8 @@ valInfo* Node::computeConstantArray() {
   for (ExpTree* tree : assignTree) {
     std::string lvalue = name;
     if (tree->getlval()) {
+      for (ENode* lchild : tree->getlval()->child) lchild->computeConstant(this, true);
+      tree->getRoot()->computeConstant(this, false);
       int beg, end;
       std::tie(beg, end) = tree->getlval()->getIdx(this);
       if (beg < 0) anyVarIdx = true;
@@ -837,25 +839,6 @@ valInfo* Node::computeConstantArray() {
       display();
       TODO();
     }
-    tree->getRoot()->computeConstant(this, false);
-  }
-
-  for (ExpTree* tree : assignTree) {
-      int beg, end;
-      if (tree->getlval()) {
-        for (ENode* lchild : tree->getlval()->child) lchild->computeConstant(this, true);
-        tree->getRoot()->computeConstant(this, false);
-        std::tie(beg, end) = tree->getlval()->getIdx(this);
-        if (beg < 0) anyVarIdx = true;
-        else {
-          for (int i = beg; i <= end; i ++) {
-            if (allIdx.find(i) != allIdx.end()) anyVarIdx = true;
-            allIdx.insert(i);
-          }
-        }
-      } else {
-        TODO();
-      }
   }
 
   if (!anyVarIdx) {

@@ -369,6 +369,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
 void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || (node->status != VALID_NODE)) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
+  if (node->type == NODE_WRITER) return;
   if (node->type == NODE_OTHERS && !node->anyNextActive() && !node->isArray()) return;
 #if defined(GSIM_DIFF) || defined(VERILATOR_DIFF)
   genDiffSig(fp, node);
@@ -380,7 +381,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   for (int dim : node->dimension) fprintf(fp, "[%d]", upperPower2(dim));
   fprintf(fp, "; // width = %d, lineno = %d\n", node->width, node->lineno);
   int w = node->width;
-  bool needInitMask = (node->type != NODE_MEMORY) &&
+  bool needInitMask = (node->type != NODE_MEMORY && node->type != NODE_WRITER) &&
     (((w < 64) && (w != 8 && w != 16 && w != 32 && w != 64)) || ((w > 64) && (w % 32 != 0)));
   if (needInitMask) {
     if (node->dimension.empty()) {
@@ -465,7 +466,7 @@ std::string activateNextStr(Node* node, std::set<int>& nextNodeId, std::string o
                   id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
     }
     #endif
-    if (inStep) fprintf(fp, "isActivateValid = true;\n");
+    if (inStep) ret += "isActivateValid = true;\n";
   #endif
   }
   if (!opt) ret += "}\n";
@@ -487,7 +488,7 @@ static std::string activateUncondNextStr(Node* node, std::set<int>activateId, bo
                 id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
   }
   #endif
-  if (inStep) fprintf(fp, "isActivateValid = true;\n");
+  if (inStep) ret += "isActivateValid = true;\n";
 #endif
   return ret;
 }
@@ -535,11 +536,11 @@ void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldN
   #ifdef PERF
     #if ENABLE_ACTIVATOR
     for (int id : nextNodeId) {
-      emitBodyLock("if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\nactivator[%d][%d] ++;\n",
+      emitBodyLock(indent, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\nactivator[%d][%d] ++;\n",
                   id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
     }
     #endif
-    if (inStep) emitBodyLock("isActivateValid = true;\n");
+    if (inStep && node->type != NODE_EXT_OUT) emitBodyLock(indent, "isActivateValid = true;\n");
   #endif
   }
   if (!opt) emitBodyLock(indent - 1, "}\n");
@@ -555,11 +556,11 @@ void graph::activateUncondNext(Node* node, std::set<int>activateId, bool inStep,
 #ifdef PERF
   #if ENABLE_ACTIVATOR
   for (int id : activateId) {
-    emitBodyLock("if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\n activator[%d][%d] ++;\n",
+    emitBodyLock(indent, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\n activator[%d][%d] ++;\n",
                 id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
   }
   #endif
-  if (inStep) emitBodyLock("isActivateValid = true;\n");
+  if (inStep) emitBodyLock(indent, "isActivateValid = true;\n");
 #endif
 }
 
@@ -622,8 +623,10 @@ int graph::genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string
   uint64_t newMask;
   std::tie(id, newMask) = clearIdxMask(node->cppId);
 #ifdef PERF
-  emitBodyLock("activeTimes[%d] ++;\n", node->cppId);
-  emitBodyLock("bool isActivateValid = false;\n");
+  emitBodyLock(indent, "activeTimes[%d] ++;\n", node->cppId);
+  if (node->superType != SUPER_EXTMOD) {
+    emitBodyLock(indent, "bool isActivateValid = false;\n");
+  }
 #endif
   return indent;
 }
@@ -647,8 +650,7 @@ void graph::nodeDisplay(Node* member, int indent) {
   } while (0)
 
   if (member->status != VALID_NODE) return;
-  emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
-  emitBodyLock(indent, "if (cycles >= LOG_START && cycles <= LOG_END) {\n");
+  if (member->type == NODE_WRITER) return;
   indent ++;
   emitBodyLock(indent, "printf(\"%%ld %d %s: \", cycles);\n", member->super->cppId, member->name.c_str());
   if (member->dimension.size() != 0) {
@@ -672,13 +674,13 @@ void graph::nodeDisplay(Node* member, int indent) {
   }
   emitBodyLock(indent, "printf(\"\\n\");\n");
   indent --;
-  emitBodyLock(indent, "}\n");
-  emitBodyLock(indent, "#endif\n");
 }
 
 int graph::genNodeStepEnd(SuperNode* node, int indent) {
 #ifdef PERF
-  emitBodyLock("validActive[%d] += isActivateValid;\n", node->cppId);
+  if (node->superType != SUPER_EXTMOD) {
+    emitBodyLock(indent, "validActive[%d] += isActivateValid;\n", node->cppId);
+  }
 #endif
 
   if(!isAlwaysActive(node->cppId)) {
@@ -777,7 +779,11 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
       }
     }
     if (super->superType == SUPER_ASYNC_RESET) emitBodyLock(indent, "subReset%d();\n", super2ResetId[super->resetNode].second);
+    emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
+    emitBodyLock(indent, "if (cycles >= LOG_START && cycles <= LOG_END) {\n");
     for (Node* n : super->member) nodeDisplay(n, indent);
+    emitBodyLock(indent, "}\n");
+    emitBodyLock(indent, "#endif\n");
   }
 }
 
@@ -1037,9 +1043,9 @@ void graph::cppEmitter() {
   emitFuncDecl(0, "void S%s::init() {\n", name.c_str());
   emitBodyLock(1, "activateAll();\n");
 #ifdef PERF
-  emitBodyLock("  for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
+  emitBodyLock(1, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
   #if ENABLE_ACTIVATOR
-  emitBodyLock("  for (int i = 0; i < %d; i ++) activator[i] = std::map<int, int>();\n", superId);
+  emitBodyLock(1, "for (int i = 0; i < %d; i ++) activator[i] = std::map<int, int>();\n", superId);
   #endif
   for (SuperNode* super : sortedSuper) {
     if (super->cppId >= 0) {
@@ -1047,10 +1053,10 @@ void graph::cppEmitter() {
       for (Node* member : super->member) {
         if (member->anyNextActive()) num ++;
       }
-      emitBodyLock("  nodeNum[%d] = %ld; // memberNum=%ld\n", super->cppId, num, super->member.size());
+      emitBodyLock(1, "nodeNum[%d] = %ld; // memberNum=%ld\n", super->cppId, num, super->member.size());
     }
   }
-  emitBodyLock("  for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
+  emitBodyLock(1, "for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
 #endif
   emitBodyLock(0, "#ifdef RANDOMIZE_INIT\n"
                "  srand((unsigned int)time(NULL));\n"
