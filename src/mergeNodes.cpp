@@ -359,7 +359,7 @@ uint64_t prevHash(SuperNode* super) {
 }
 
 bool prevEq(SuperNode* super1, SuperNode* super2) {
-  return super1->prev == super2->prev;
+  return super1->prev == super2->prev && super1->depPrev == super2->depPrev;
 }
 
 void graph::mergeSublings() {
