@@ -71,13 +71,15 @@ void MemRWHelper(uint8_t r_enable, uint64_t r_index, uint64_t& r_data, uint8_t w
 }
 
 void dut_init(DUT_NAME *dut) {
-  dut->set_difftest$$perfCtrl$$clean(0);
-  dut->set_difftest$$perfCtrl$$dump(0);
-  dut->set_difftest$$logCtrl$$begin(0);
-  dut->set_difftest$$logCtrl$$end(0);
-  dut->set_difftest$$logCtrl$$level(0);
+  // dut->set_difftest$$perfCtrl$$clean(0);
+  // dut->set_difftest$$perfCtrl$$dump(0);
+  // dut->set_difftest$$logCtrl$$begin(0);
+  // dut->set_difftest$$logCtrl$$end(0);
+  // dut->set_difftest$$logCtrl$$level(0);
   dut->set_difftest$$uart$$in$$ch(-1);
 }
+
+void PrintCommitIDModule(uint8_t _0, uint64_t _1, uint8_t _2) { }
 
 void dut_hook(DUT_NAME *dut) {
   if (dut->get_difftest$$uart$$out$$valid()) {
@@ -276,7 +278,6 @@ int main(int argc, char** argv) {
   
   dut_init(dut);
   dut_reset();
-  dut_cycle(1);
 #endif
 #ifdef VERILATOR
   ref = new REF_NAME();
@@ -313,8 +314,8 @@ int main(int argc, char** argv) {
   #endif
     if (instrCnt >= warmupInsts) {
       printf("Warmup finished. The performance counters will be dumped and then reset.\n");
-      dut->set_difftest$$perfCtrl$$clean(true);
-      dut->set_difftest$$perfCtrl$$dump(true);
+      // dut->set_difftest$$perfCtrl$$clean(true);
+      // dut->set_difftest$$perfCtrl$$dump(true);
       std::cout << "cycleCnt = " << cycles << std::endl;
       std::cout << "instrCnt = " << instrCnt << std::endl;
     }
