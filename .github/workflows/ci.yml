@@ -14,7 +14,7 @@ jobs:
           sudo apt install -y clang llvm flex bison libfl-dev
       - name: Install verilator
         run: |
-          wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-04-24/oss-cad-suite-linux-x64-20250424.tgz
+          wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-06-25/oss-cad-suite-linux-x64-20250625.tgz
           tar xf oss-cad-suite-linux-x64-20250424.tgz
           OSS_CAD_SUITE_BIN_PATH=`pwd`/oss-cad-suite/bin
           echo "PATH=$PATH:$OSS_CAD_SUITE_BIN_PATH" >> "$GITHUB_ENV"
@@ -163,7 +163,7 @@ jobs:
           make init
       - name: Run minimal-xiangshan (difftest with verilator)
         run: |
-          sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
+          sed -i -e "s/--threads [^ ]*/--threads 1/" Makefile
           make -j `nproc` diff dutName=minimal-xiangshan
 
   ysyx3-bolt:
