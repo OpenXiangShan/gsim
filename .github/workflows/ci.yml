@@ -15,7 +15,7 @@ jobs:
       - name: Install verilator
         run: |
           wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-06-25/oss-cad-suite-linux-x64-20250625.tgz
-          tar xf oss-cad-suite-linux-x64-20250424.tgz
+          tar xf oss-cad-suite-linux-x64-20250625.tgz
           OSS_CAD_SUITE_BIN_PATH=`pwd`/oss-cad-suite/bin
           echo "PATH=$PATH:$OSS_CAD_SUITE_BIN_PATH" >> "$GITHUB_ENV"
       - name: Check resources
