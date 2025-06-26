@@ -160,25 +160,54 @@ void StmtTree::mergeExpTree(ExpTree* tree, std::vector<int>& prevPath, std::vect
         } else {
           TODO();
         }
-      /* C. For non-conditional operations, just adds it to a STMT_SEQ */
+      /* C. For non-conditional operations */
       } else {
         Node* node = tree->getlval()->getNode();
         Assert(stmtNode->type == OP_STMT_SEQ, "stmtNode %d is not seq", stmtNode->type);
+        /* For non-array, first try to deduplicate it. Avoid xxx = yyy; ... ... xxx = zzz; */
         if (!node->isArray() && enode->opType != OP_INVALID) {
-          for (int i = 0; i < stmtNode->getChildNum(); i ++) { /* avoid xxx = yyy; ... ... xxx = zzz; */
+          for (int i = 0; i < stmtNode->getChildNum(); i ++) {
             StmtNode* child = stmtNode->getChild(i);
             if (child->type == OP_STMT_NODE) {
               Assert(!child->isENode, "invalid stmtNode %d", child->type);
               Node* childNode = child->tree->getlval()->getNode();
               Assert(childNode, "invalid node");
               if (childNode == node) {
-                stmtNode->eraseChild(i);printf("!!eraseChild %d\n",i); // won't remove this leads to problem in other path?
+                stmtNode->eraseChild(i);
               }
             }
           }
         }
-        stmtNode->addChild(new StmtNode(new ExpTree(enode->dup(), tree->getlval()->dup()), belong));
-        addDepthPath(nodePath, depth, stmtNode->child.size() - 1);
+        /* Insert the node to the earliest possible position to minimize dependency path.
+           Allowing more extensive conditional operations merging */
+        int start = 0; // Caculated earliest possible position
+        bool found = false;
+        if (anyLimit) {
+          /* Even path might not describing the current branch, it's always safe as long as not get out of bound */
+          start = std::min((int)stmtNode->child.size(), path[depth]);
+        }
+        /* Find the earliest non-conditional operation (NODE or SEQ) to insert */
+        for (int i = start; i < stmtNode->getChildNum(); i++) {
+          /* For STMT_Node, elevate it to a STMT_SEQ, then append  */
+          if (stmtNode->getChild(i)->type == OP_STMT_NODE) {
+            const auto tmp = stmtNode->getChild(i);
+            stmtNode->setChild(i, new StmtNode(OP_STMT_SEQ));
+            stmtNode->getChild(i)->addChild(tmp);
+            stmtNode->getChild(i)->addChild(new StmtNode(new ExpTree(enode->dup(), tree->getlval()->dup()), belong));
+            addDepthPath(nodePath, depth, i);
+            found = true;break;
+          /* For STMT_SEQ, just append */
+          }else if(stmtNode->getChild(i)->type == OP_STMT_SEQ){
+            stmtNode->getChild(i)->addChild(new StmtNode(new ExpTree(enode->dup(), tree->getlval()->dup()), belong));
+            addDepthPath(nodePath, depth, i);
+            found = true;break;
+          }
+        }
+        /* No suitable sibling found. Append to current stmtNode (must be a OP_STMT_SEQ) */
+        if (!found){
+          stmtNode->addChild(new StmtNode(new ExpTree(enode->dup(), tree->getlval()->dup()), belong));
+          addDepthPath(nodePath, depth, stmtNode->child.size() - 1);
+        }
       }
     }
   }
@@ -202,11 +231,12 @@ void StmtTree::mergeStmtTree(StmtTree* tree) {
  *
  * Traverses all dependencies of a node in the same superNode and calculates the longest path,
  * storing the result in `prevPath`.
- * A path is the dependency relation inside a StmtTree. Represented as std::vector<int>,
- * each integer is 0-based index of the child of a OP_STMT_SEQ at a specific depth level in the StmtTree.
+ * A path is the dependency relation inside a StmtTree. Represented as std::vector<int>, each integer is 0-based index
+ * of the child of a OP_STMT_SEQ at a specific depth level in the StmtTree.
  * The root node of a StmtTree, that is a OP_STMT_SEQ, is the depth 0, and it's children OP_STMT_SEQ are depth 1, etc.
- * Note: For OP_STMT_WHEN, the two OP_STMT_SEQ (branchs) nodes are not distinguished. This could generate false
- * dependency at some situation. Maybe we should notate the branch at future
+ * If there are multiple path at a given depth (branchs intrudoced by OP_STMT_WHEN), the path with greatest index is
+ * taken. This could generate false postive dependency at many situation but never false negative
+ * dependency.
  *
  * @param node The node to analyze
  * @param[out] prevPath Path information of the depPrev of the node
@@ -390,7 +420,7 @@ void SuperNode::reorderMember() {
 void graph::generateStmtTree() {
   orderAllNodes();
   std::map<Node*, std::vector<int>> allPath; // order in seq
-  /* add when path for nodes with next = 1 */
+  /* add when path for nodes with len(next in same SN) == 1 */
   for (int superIdx = sortedSuper.size() - 1; superIdx >= 0; superIdx --) {
     SuperNode* super = sortedSuper[superIdx];
     if (super->superType != SUPER_VALID) continue;
