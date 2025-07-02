@@ -20,6 +20,8 @@
                            (type == NODE_EXT_IN ? NODE_EXT_OUT : \
                            (type == NODE_EXT_OUT ? NODE_EXT_IN : type))))
 
+#define RW_COND_READ 0
+
 int p_stoi(const char* str);
 TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType);
 ASTExpTree* visitExpr(graph* g, PNode* expr);
@@ -1803,7 +1805,43 @@ void updatePrevNext(Node* n) {
   }
 }
 
+#if RW_COND_READ
+static ExpTree* allocRWcond(graph* g, Node* node) {
+  Assert(node->assignTree.size()!=0, "no writer for %s", node->name.c_str());
 
+  ENode* writeRoot = node->assignTree.back()->getRoot();
+  ENode* cond = new ENode(OP_AND);
+  Assert(writeRoot->opType == OP_WHEN, "invalid writer for %s", node->name.c_str());
+
+  cond->addChild(writeRoot->getChild(0)->dup());
+  writeRoot = writeRoot->getChild(1);
+  Assert(writeRoot && writeRoot->opType == OP_WHEN, "invalid writer for %s", node->name.c_str());
+
+  ENode* notENode = new ENode(OP_NOT);
+  notENode->addChild(writeRoot->getChild(0)->dup());
+  cond->addChild(notENode);
+  Node* cond_src = allocNode(NODE_REG_SRC, format("%s%s%s", node->name.c_str(), SEP_AGGR, "COND"), node->lineno);
+  g->addReg(cond_src);
+  Node* cond_dst = cond_src->dup();
+  cond_dst->type = NODE_REG_DST;
+  cond_dst->name += format("%s%s", SEP_AGGR, "NEXT");
+  addSignal(cond_src->name, cond_src);
+  addSignal(cond_dst->name, cond_dst);
+  cond_src->bindReg(cond_dst);
+  cond_src->clock = cond_dst->clock = node->clock;
+  cond_src->valTree = new ExpTree(cond, cond_src);
+  ENode* resetCond = allocIntEnode(1,"0");
+  cond_src->resetCond = new ExpTree(resetCond, cond_src);
+  cond_src->resetVal = new ExpTree(new ENode(cond_src), cond_src);
+  ENode* whenNode = new ENode(OP_WHEN);
+  whenNode->addChild(new ENode(cond_src));
+  whenNode->addChild(node->memTree->getRoot());
+  whenNode->addChild(allocIntEnode(1,"0"));
+  ExpTree* newTree = new ExpTree(whenNode, new ENode(node));
+  return newTree;
+}
+
+#endif
 /*
   traverse the AST and generate graph
 */
@@ -1842,16 +1880,46 @@ graph* AST2Graph(PNode* root) {
       node->valTree = nullptr;
     }
     if (node->type == NODE_READWRITER) {
+#if RW_COND_READ
+      ExpTree* newTree;
+      if (node->parent->rlatency == 1) {
+        Node* addrReg = allocAddrNode(g, node);
+        node->memTree->getRoot()->setChild(0, new ENode(addrReg));
+        newTree = allocRWcond(g, node);
+      } else {
+        Assert(node->assignTree.size()!=0, "no writen fon %s", node->name.c_str());
+        ENode* writeRoot = node->assignTree.back()->getRoot();
+        ENode* cond = new ENode(OP_AND);
+        Assert(writeRoot->opType == OP_WHEN,"invalid writer fon %s", node->name.c_str());
+        cond->addChild(writeRoot->getChild(0)->dup());
+        writeRoot = writeRoot->getChild(1);
+        Assert(writeRoot && writeRoot->opType == OP_WHEN, "invalid writer fon %s", node->name.c_str());
+        ENode* notENode = new ENode(OP_NOT);
+        notENode->addChild(writeRoot->getChild(0)->dup());
+        cond->addChild(notENode);
+        ENode* whenNode = new ENode(OP_WHEN);
+        whenNode->addChild(cond);
+        whenNode->addChild(node->memTree->getRoot());
+        whenNode->addChild(allocIntEnode(1, "0"));
+        newTree =new ExpTree(whenNode, new ENode(node));
+      }
+
+      if (node->parent->extraInfo == "new") {
+        node->assignTree.push_back(newTree);
+      } else {
+        node->assignTree.insert(node->assignTree.begin(), newTree);
+      }
+#else
       if (node->parent->rlatency == 1) {
         Node* addrReg = allocAddrNode(g, node);
         node->memTree->getRoot()->setChild(0, new ENode(addrReg));
       }
-
       if (node->parent->extraInfo == "new") {
         node->assignTree.push_back(node->memTree);
       } else {
         node->assignTree.insert(node->assignTree.begin(), node->memTree);
       }
+#endif
     }
   }
   removeDummyDim(g);

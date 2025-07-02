@@ -12,6 +12,7 @@ class SigFilter():
     self.fileIdx = 0
     self.varNum = 0
     self.dstFileName = sys.argv[1] + "/model/" + name + "_checkSig"
+    self.diffSigNum = 0
 
   def closeDstFile(self):
     if self.dstfp is not None:
@@ -37,6 +38,7 @@ class SigFilter():
     return int(data[startIdx : endIdx]) + 1
 
   def genDiffCode(self, modName, refName, line, mod_width, ref_width):
+    self.diffSigNum += 1
     refUName = line[3] + "_u"
     if mod_width > 128:
       num = int((ref_width + 31) / 32)
@@ -142,3 +144,4 @@ if __name__ == "__main__":
   sigFilter = SigFilter(sys.argv[2])
   sigFilter.filter(sys.argv[1] + "/model/" + sys.argv[2] + "_sigs.txt",
                    sys.argv[1] + "/verilator/V" + sys.argv[2] + "___024root.h")
+  print("diff sig num: " + str(sigFilter.diffSigNum))
