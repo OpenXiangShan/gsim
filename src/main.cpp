@@ -178,7 +178,9 @@ int main(int argc, char** argv) {
 
   FUNC_TIMER(g->instsGenerator());
 
-  FUNC_WRAPPER(g->cppEmitter(), "Final");
+  Assert(globalConfig.OutputDir != "", "output dir can not be empty");
+  g->dump(globalConfig.OutputDir + "/gsim.dot");
+  g->cppEmitter();
 
   TIMER_END(total);
 

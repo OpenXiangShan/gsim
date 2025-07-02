@@ -15,7 +15,7 @@
 #define CYCLE_STEP_PERCENT 1
 
 #if defined(__DUT_ysyx3__)
-#define DUT_MEMORY mem$ram
+#define DUT_MEMORY mem_ram
 #define REF_MEMORY newtop__DOT__mem__DOT__ram_ext__DOT__Memory
 #define CYCLE_MAX_PERF 5000000
 #define CYCLE_MAX_SIM  11000000

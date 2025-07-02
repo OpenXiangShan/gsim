@@ -49,6 +49,7 @@ endif
 BUILD_DIR ?= build
 WORK_DIR = $(BUILD_DIR)/$(dutName)
 CXX = clang++
+CC = clang
 
 SHELL := /bin/bash
 TIME = /usr/bin/time
@@ -129,8 +130,23 @@ PARSER_GEN_SRCS = $(foreach x, $(LEXICAL_NAME) $(SYNTAX_NAME), $(PARSER_BUILD_DI
 PARSER_GEN_HEADER = $(PARSER_BUILD_DIR)/$(SYNTAX_NAME).hh
 GSIM_SRCS = $(foreach x, src $(PARSER_DIR), $(wildcard $(x)/*.cpp))
 
-GSIM_INC_DIR = include $(PARSER_DIR)/include $(PARSER_BUILD_DIR)
+GSIM_INC_DIR = include $(PARSER_DIR)/include $(PARSER_BUILD_DIR) include/libfst
 CXXFLAGS += -ggdb -O3 -MMD $(addprefix -I,$(GSIM_INC_DIR)) -Wall -Werror --std=c++17
+
+LDLIBS = -lz
+
+LIBFST_DIR = include/libfst
+CFLAGS_LIBFST = -ggdb -O3 -MMD $(addprefix -I,$(GSIM_INC_DIR)) -Wall
+LIBFST_SRCS = $(wildcard $(LIBFST_DIR)/*.c)
+LIBFST_OBJS = $(patsubst %.c,$(GSIM_BUILD_DIR)/libfst/%.o,$(notdir $(LIBFST_SRCS)))
+LIBFST_A = $(GSIM_BUILD_DIR)/libfst/libfst.a
+
+$(GSIM_BUILD_DIR)/libfst/%.o: $(LIBFST_DIR)/%.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS_LIBFST) -c $< -o $@
+
+$(LIBFST_A): $(LIBFST_OBJS)
+	ar rcs $@ $^
 
 ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
@@ -196,17 +212,21 @@ EMU_SRCS = $(EMU_MAIN_SRCS) $(EMU_GEN_SRCS)
 EMU_CFLAGS := -O1 -MMD $(addprefix -I, $(abspath $(GEN_CPP_DIR))) $(EMU_CFLAGS) # allow to overwrite optimization level
 EMU_CFLAGS += $(MODE_FLAGS) $(CFLAGS_DUT) -Wno-parentheses-equality
 EMU_CFLAGS += -fbracket-depth=2048
+EMU_CFLAGS += -DFST_WAVE -Iinclude/libfst
 #EMU_CFLAGS += -fsanitize=address -fsanitize-address-use-after-scope
 #EMU_CFLAGS += -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract
 #EMU_CFLAGS += -pg -ggdb
 ifeq ($(SIMPOINT),1)
 EMU_LDFLAGS += -lz -lzstd
 endif
+EMU_LDFLAGS += -L$(GSIM_BUILD_DIR)/libfst -lfst -lz
 
 $(foreach x, $(EMU_SRCS), $(eval \
 	$(call CXX_TEMPLATE, $(EMU_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(EMU_CFLAGS), EMU_OBJS,)))
 
-$(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS) $(EMU_LDFLAGS)))
+$(EMU_BIN): $(EMU_OBJS) $(LIBFST_A)
+	@mkdir -p $(@D) && echo + LD $@
+	@$(CXX) $^ $(EMU_CFLAGS) $(EMU_LDFLAGS) -o $@
 
 build-emu: $(EMU_BIN)
 
@@ -388,3 +408,11 @@ format-obj:
 	@clang-format -i --style=file obj/$(NAME).cpp
 
 .PHONY: clean run-internal diff-internal run diff init perf count gendoc format-obj
+
+$(EMU_EXE): $(EMU_OBJS) $(WORK_OBJS) $(LIBFST_A)
+	@mkdir -p $(@D)
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDLIBS)
+
+# LDFLAGS
+LDFLAGS ?=
+LDFLAGS += -lz
