@@ -75,13 +75,14 @@ void StmtNode::generateWhenTree(ENode* lvalue, ENode* root, std::vector<int>& su
       stmtNode->addChild(new StmtNode(OP_STMT_SEQ));
       if (enode->getChild(1)) {
         s.push(std::make_tuple(stmtNode->getChild(1), enode->getChild(1), depth + 1));
-        addDepthPath(subPath, depth, stmtNode->getChild(1)->getChildNum());
       }
       if (enode->getChildNum() >= 3 && enode->getChild(2)) {
         s.push(std::make_tuple(stmtNode->getChild(2), enode->getChild(2), depth + 1));
-        addDepthPath(subPath, depth, stmtNode->getChild(2)->getChildNum());
       }
-      if (parent) parent->addChild(stmtNode);
+      if (parent) {
+        parent->addChild(stmtNode);
+        addDepthPath(subPath, depth , parent->getChildNum() - 1);
+      }
       else stmt = stmtNode;
     } else {
       parent->addChild(new StmtNode(new ExpTree(enode->dup(), lvalue->dup()), belong));
@@ -91,12 +92,24 @@ void StmtNode::generateWhenTree(ENode* lvalue, ENode* root, std::vector<int>& su
   addChild(stmt);
 }
 
+/**
+ * @brief Merges individual expression trees from node into statement tree of a supernode
+ *
+ * Traverse simultaneously of both statement tree and expression tree, merge the expression
+ * tree node into the existing or newly created statement tree node
+ * For conditional operations, add to exists statement node if possible. Since the branches of
+ * STMT_WHEN can contain multiple statements
+ * @param tree The expression tree to be merged
+ * @param prevPath Path information within all depPrev of the node this tree belongs to
+ * @param[in/out] nodePath Path information for the current node being processed
+ * @param belong The node that this expression tree belongs to
+ */
 void StmtTree::mergeExpTree(ExpTree* tree, std::vector<int>& prevPath, std::vector<int>& nodePath, Node* belong) {
   std::vector<int> path;
   maxPath(path, prevPath, nodePath);
   std::stack<std::tuple<StmtNode*, ENode*, int, bool>> s;
-  s.push(std::make_tuple(root, tree->getRoot(), 1, true));
-  addDepthPath(nodePath, 0, 0);
+  s.push(std::make_tuple(root, tree->getRoot(), 1, true)); // Start with the root of both tree, with depth 1(the children of root StmtTree)
+  addDepthPath(nodePath, 0, 0);// The root is always index 0 of depth 0
   while (!s.empty()) {
     StmtNode* stmtNode;
     ENode* enode;
@@ -106,31 +119,36 @@ void StmtTree::mergeExpTree(ExpTree* tree, std::vector<int>& prevPath, std::vect
     s.pop();
 
     if (anyLimit && depth >= path.size()) anyLimit = false;
-    if (checkCondEq(stmtNode, enode)) { // directly merge when
+    /* For any stmtNode and enode pair. Check:
+     * A. They are both conditional node, and share the same condition : */
+    if (checkCondEq(stmtNode, enode)) { // directly merges into existing conditional nodes with matching conditions
       if (enode->getChild(1)) {
-        s.push(std::make_tuple(stmtNode->getChild(1), enode->getChild(1), depth + 1, anyLimit));
-        addDepthPath(nodePath, depth, stmtNode->getChild(1)->getChildNum());
+        s.push(std::make_tuple(stmtNode->getChild(1), enode->getChild(1), depth , anyLimit));
       }
       if (enode->getChildNum() >= 3 && enode->getChild(2)) {
-        s.push(std::make_tuple(stmtNode->getChild(2), enode->getChild(2), depth + 1, anyLimit));
-        addDepthPath(nodePath, depth, stmtNode->getChild(2)->getChildNum());
+        s.push(std::make_tuple(stmtNode->getChild(2), enode->getChild(2), depth , anyLimit));
       }
     } else {
+      /* B. The enode is conditional operation */
       if (enode->opType == OP_WHEN || enode->opType == OP_RESET) {
+        /* B1. And stmtNode is a STMT_SEQ, which potentially contains a STMT_WHEN node that meets cond A */
         if (stmtNode->type == OP_STMT_SEQ) {
           int match = -1;
           for (size_t i = 0; i < stmtNode->child.size(); i ++) {
-            if (stmtNode->getChild(i)->type == OP_STMT_WHEN &&
+            if (stmtNode->getChild(i)->type == OP_STMT_WHEN &&  /* this check is redundant */
                 checkCondEq(stmtNode->getChild(i), enode) &&
-                (!anyLimit || path[depth] <= i)) {
+                (!anyLimit || path[depth] <= i)) { // if anyLimit is set, don't insert enode beyond the dependency at current depth
               match = i;
+              // If, at any depth, the current dependency goes greater than path[depth] (e.g. path=[0,2,2,2,2], current=[0,2,3])
+              // Then we don't need to consider the path at following depth anymore
               bool nextLimit = (!anyLimit || path[depth] < i) ? false : anyLimit;
               s.push(std::make_tuple(stmtNode->getChild(i), enode, depth + 1, nextLimit));
               break;
             }
-          }
+          }/* B1a. A suitable STMT_WHEN node is found and enode is inserted into it*/
           if (match >= 0) {
             addDepthPath(nodePath, depth, match);
+            /* B1b. No suitable STMT_WHEN node is found thus a new one is created */
           } else {
             std::vector<int> subPath;
             stmtNode->generateWhenTree(tree->getlval(), enode, subPath, belong);
@@ -138,12 +156,15 @@ void StmtTree::mergeExpTree(ExpTree* tree, std::vector<int>& prevPath, std::vect
               addDepthPath(nodePath, depth + i, subPath[i]);
             }
           }
+        /* B2. StmtNode is not a SEQ. The situation is unknown */
         } else {
           TODO();
         }
+      /* C. For non-conditional operations */
       } else {
         Node* node = tree->getlval()->getNode();
         Assert(stmtNode->type == OP_STMT_SEQ, "stmtNode %d is not seq", stmtNode->type);
+        /* For non-array, first try to deduplicate it. Avoid xxx = yyy; ... ... xxx = zzz; */
         if (!node->isArray() && enode->opType != OP_INVALID) {
           for (int i = 0; i < stmtNode->getChildNum(); i ++) {
             StmtNode* child = stmtNode->getChild(i);
@@ -157,8 +178,36 @@ void StmtTree::mergeExpTree(ExpTree* tree, std::vector<int>& prevPath, std::vect
             }
           }
         }
-        stmtNode->addChild(new StmtNode(new ExpTree(enode->dup(), tree->getlval()->dup()), belong));
-        addDepthPath(nodePath, depth, stmtNode->child.size() - 1);
+        /* Insert the node to the earliest possible position to minimize dependency path.
+           Allowing more extensive conditional operations merging */
+        int start = 0; // Caculated earliest possible position
+        bool found = false;
+        if (anyLimit) {
+          /* Even path might not describing the current branch, it's always safe as long as not get out of bound */
+          start = std::min((int)stmtNode->child.size(), path[depth]);
+        }
+        /* Find the earliest non-conditional operation (NODE or SEQ) to insert */
+        for (int i = start; i < stmtNode->getChildNum(); i++) {
+          /* For STMT_Node, elevate it to a STMT_SEQ, then append  */
+          if (stmtNode->getChild(i)->type == OP_STMT_NODE) {
+            const auto tmp = stmtNode->getChild(i);
+            stmtNode->setChild(i, new StmtNode(OP_STMT_SEQ));
+            stmtNode->getChild(i)->addChild(tmp);
+            stmtNode->getChild(i)->addChild(new StmtNode(new ExpTree(enode->dup(), tree->getlval()->dup()), belong));
+            addDepthPath(nodePath, depth, i);
+            found = true;break;
+          /* For STMT_SEQ, just append */
+          }else if(stmtNode->getChild(i)->type == OP_STMT_SEQ){
+            stmtNode->getChild(i)->addChild(new StmtNode(new ExpTree(enode->dup(), tree->getlval()->dup()), belong));
+            addDepthPath(nodePath, depth, i);
+            found = true;break;
+          }
+        }
+        /* No suitable sibling found. Append to current stmtNode (must be a OP_STMT_SEQ) */
+        if (!found){
+          stmtNode->addChild(new StmtNode(new ExpTree(enode->dup(), tree->getlval()->dup()), belong));
+          addDepthPath(nodePath, depth, stmtNode->child.size() - 1);
+        }
       }
     }
   }
@@ -177,15 +226,32 @@ void StmtTree::mergeStmtTree(StmtTree* tree) {
   }
 }
 
-void prevOrderPath(Node* node, std::vector<int>& prevPath, std::map<Node*, std::vector<int>>& allPath) { // the max path of previous nodes that in the same superNode
+/**
+ * @brief for all the depPrev of a node, calculates the longest(max) path
+ *
+ * Traverses all dependencies of a node in the same superNode and calculates the longest path,
+ * storing the result in `prevPath`.
+ * A path is the dependency relation inside a StmtTree. Represented as std::vector<int>, each integer is 0-based index
+ * of the child of a OP_STMT_SEQ at a specific depth level in the StmtTree.
+ * The root node of a StmtTree, that is a OP_STMT_SEQ, is the depth 0, and it's children OP_STMT_SEQ are depth 1, etc.
+ * If there are multiple path at a given depth (branchs intrudoced by OP_STMT_WHEN), the path with greatest index is
+ * taken. This could generate false postive dependency at many situation but never false negative
+ * dependency.
+ *
+ * @param node The node to analyze
+ * @param[out] prevPath Path information of the depPrev of the node
+ * @param allPath A map of all paths. The path of depPrev(s) are read from it.
+ *
+ */
+void prevOrderPath(Node* node, std::vector<int>& prevPath, std::map<Node*, std::vector<int>>& allPath) {
   if (node->depPrev.size() == 0) return;
   for (Node* prev : node->depPrev) {
     if (prev->super != node->super) continue;
     Assert(allPath.find(prev) != allPath.end(), "path of %s not exits", prev->name.c_str());
     /* merge prevPath */
     for (size_t i = 0; i < allPath[prev].size(); i ++) {
-      if (i >= prevPath.size()) prevPath.push_back(allPath[prev][i]);
-      else if (prevPath[i] <= allPath[prev][i]) prevPath[i] = allPath[prev][i];
+      if (i >= prevPath.size()) prevPath.push_back(allPath[prev][i]); // Path of given depth doesn't exist -> insert
+      else if (prevPath[i] <= allPath[prev][i]) prevPath[i] = allPath[prev][i]; // A longer path of given depth was found -> replace
       else break;
     }
   }
@@ -354,7 +420,7 @@ void SuperNode::reorderMember() {
 void graph::generateStmtTree() {
   orderAllNodes();
   std::map<Node*, std::vector<int>> allPath; // order in seq
-  /* add when path for nodes with next = 1 */
+  /* add when path for nodes with len(next in same SN) == 1 */
   for (int superIdx = sortedSuper.size() - 1; superIdx >= 0; superIdx --) {
     SuperNode* super = sortedSuper[superIdx];
     if (super->superType != SUPER_VALID) continue;
@@ -388,8 +454,8 @@ void graph::generateStmtTree() {
     super->stmtTree = new StmtTree();
     super->stmtTree->root = new StmtNode(OP_STMT_SEQ);
     for (Node* node : super->member) {
-      std::vector<int> prevPath;
-      std::vector<int> nodePath;
+      std::vector<int> prevPath; // The max path within all depPrev node within the same supernode
+      std::vector<int> nodePath; // For node with multiple assignTree, the path of lastest visited tree
       prevOrderPath(node, prevPath, allPath);
       for (ExpTree* tree : node->assignTree) {
         super->stmtTree->mergeExpTree(tree, prevPath, nodePath, node);
