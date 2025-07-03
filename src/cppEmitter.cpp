@@ -271,7 +271,9 @@ void graph::genInterfaceInput(Node* input) {
   emitBodyLock(2, "}\n");
   emitBodyLock(2, "#endif\n");
   for (std::string inst : input->insts) {
-    emitBodyLock(2, "%s\n", inst.c_str());
+    std::string sanitized_inst = inst;
+    std::replace(sanitized_inst.begin(), sanitized_inst.end(), '$', '_');
+    emitBodyLock(2, "%s\n", sanitized_inst.c_str());
   }
   /* update nodes in the same superNode */
   std::set<int> allNext;
@@ -876,7 +878,8 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
                 access_str += format("[i%zu]", i);
               }
 
-              emitBodyLock(current_indent, "if (this->fstHandleMap.count(node_name)) fstWriterEmitValueChange(this->fstCtx, this->fstHandleMap[node_name], (uint64_t*)&%s);\n", access_str.c_str());
+              std::string code_line = format("if (this->fstHandleMap.count(node_name)) fstWriterEmitValueChange(this->fstCtx, this->fstHandleMap[node_name], (uint64_t*)&%s);", access_str.c_str());
+              emitBodyLock(current_indent, "%s\n", code_line.c_str());
               
               for (size_t i = 0; i < inst.node->dimension.size(); i++) {
                 current_indent--;
@@ -884,10 +887,9 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
               }
             } else {
               std::string fst_node_name = inst.node->name;
-              std::string cpp_var_name_sanitized = inst.node->name;
-              std::replace(cpp_var_name_sanitized.begin(), cpp_var_name_sanitized.end(), '$', '_');
-              emitBodyLock(indent + 1, "if (this->fstHandleMap.count(\"%s\")) fstWriterEmitValueChange(this->fstCtx, this->fstHandleMap[\"%s\"], (uint64_t*)&%s);\n",
-                fst_node_name.c_str(), fst_node_name.c_str(), cpp_var_name_sanitized.c_str());
+              std::replace(cpp_var_name.begin(), cpp_var_name.end(), '$', '_');
+              std::string code_line = format("if (this->fstHandleMap.count(\"%s\")) fstWriterEmitValueChange(this->fstCtx, this->fstHandleMap[\"%s\"], (uint64_t*)&%s);", fst_node_name.c_str(), fst_node_name.c_str(), cpp_var_name.c_str());
+              emitBodyLock(indent + 1, "%s\n", code_line.c_str());
             }
 
             emitBodyLock(indent, "}\n");

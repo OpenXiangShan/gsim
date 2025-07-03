@@ -18,7 +18,7 @@
 #define DUT_MEMORY mem_ram
 #define REF_MEMORY newtop__DOT__mem__DOT__ram_ext__DOT__Memory
 #define CYCLE_MAX_PERF 5000000
-#define CYCLE_MAX_SIM  11000000
+#define CYCLE_MAX_SIM  500
 #elif defined(__DUT_NutShell__)
 #define DUT_MEMORY mem$rdata_mem$mem
 #define REF_MEMORY SimTop__DOT__mem__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
@@ -284,8 +284,9 @@ int main(int argc, char** argv) {
     if (cycles % (CYCLE_MAX_SIM / (CYCLE_STEP_PERCENT * 100)) == 0 && cycles <= CYCLE_MAX_SIM) {
       auto dur = std::chrono::system_clock::now() - start;
       auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
+      long long ips = msec.count() == 0 ? 0 : cycles * 1000 / msec.count();
       fprintf(stderr, "cycles %ld (%ld ms, %ld per sec) simulation process %.2lf%% \n",
-          cycles, msec.count(), cycles * 1000 / msec.count(), (double)cycles * 100 / CYCLE_MAX_SIM);
+          cycles, msec.count(), ips, (double)cycles * 100 / CYCLE_MAX_SIM);
 #ifdef PERF
       size_t totalActives = 0;
       size_t validActives = 0;
@@ -315,9 +316,15 @@ int main(int argc, char** argv) {
       }
 #endif
 #if defined(PERF) || defined(PERF_CYCLE)
-      if (cycles >= CYCLE_MAX_PERF) return 0;
+      if (cycles >= CYCLE_MAX_PERF) break;
 #endif
-      if (cycles == CYCLE_MAX_SIM) return 0;
+      if (cycles == CYCLE_MAX_SIM) break;
     }
   }
+#ifdef GSIM
+  delete dut;
+#endif
+#if (defined(VERILATOR) || defined(GSIM_DIFF)) && defined(GSIM)
+  delete ref;
+#endif
 }
