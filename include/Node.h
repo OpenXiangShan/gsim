@@ -114,6 +114,11 @@ class Node {
 
   std::string name;  // concat the module name in order (member in structure / temp variable)
   std::string extraInfo; // ruw for memory
+  
+  // Hierarchy structure information - store path from top level to current node
+  std::vector<std::string> hierarchyPath;  // Store hierarchy path, excluding separators
+  std::vector<std::string> hierarchySeps;  // Corresponding separators (SEP_MODULE or SEP_AGGR)
+  
   int id = -1;
   NodeType type;
   int width = -1;
@@ -344,6 +349,12 @@ class Node {
   void updateHeadTail();
   bool isLocal();
   void setConstant(valInfo* info);
+  
+  // Hierarchy structure related methods
+  void setHierarchy(const std::vector<std::string>& path, const std::vector<std::string>& seps);
+  std::string getHierarchicalName(const std::string& separator = "$") const;
+  std::string getVerilatorName() const;  // Generate Verilator-style names (for REF_MEMORY)
+  std::string getGSimName() const;       // Generate GSIM-style names (for DUT_MEMORY)
 };
 
 enum SuperType {

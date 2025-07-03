@@ -4,9 +4,9 @@ GSIM accepts chirrtl, and compiles it to C++
 
 ## Prerequisites
 
-+ Install [GMP](https://gmplib.org/), [clang 16+](https://clang.llvm.org/).
++ Install [GMP](https://gmplib.org/), [clang 19(+)](https://clang.llvm.org/).
 
-## Quike Start
+## Quick Start
 
 + GSIM provides 4 RISC-V cores ready for simulation: [ysyx3](https://ysyx.oscc.cc/), [Rocket](https://github.com/chipsalliance/rocket-chip), [BOOM](https://github.com/riscv-boom/riscv-boom), [XiangShan](https://github.com/OpenXiangShan/XiangShan).
 
@@ -23,3 +23,19 @@ GSIM accepts chirrtl, and compiles it to C++
 + Run `build/gsim/gsim $(chirrtl-file)` to compile chirrtl to C++
 + Refer to `build/gsim/gsim --help` for more information
 + See [C++ harness example](https://github.com/jaypiper/simulator/blob/master/emu/emu.cpp) to know how it interacts with the emitted C++ code.
+
+## FST Waveform Generation
+
+GSIM supports FST waveform generation for debugging and analysis. You can control this feature via Makefile:
+
++ **Enable FST waveform**: Add `-DFST_WAVE` to `FST_CFLAGS` in Makefile
+  ```
+  FST_CFLAGS = -DFST_WAVE -I$(abspath include/libfst)
+  ```
+
++ **Disable FST waveform**: Remove `-DFST_WAVE` from `FST_CFLAGS`
+  ```
+  FST_CFLAGS = -I$(abspath include/libfst)
+  ```
+
+When enabled, the generated C++ model will produce `.fst` waveform files that can be viewed with tools like GTKWave.

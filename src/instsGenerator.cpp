@@ -9,6 +9,7 @@
 #include <stack>
 #include <tuple>
 #include <utility>
+#include <algorithm>
 
 #include "common.h"
 #include "graph.h"
@@ -1479,8 +1480,10 @@ valInfo* ENode::instsWriteMem(Node* node, std::string lvalue, bool isRoot) {
 
   std::string indexStr;
   if (node->isArray()) {
-    Assert(lvalue.compare(0, node->name.length(), node->name) == 0, "writer lvalue %s does not start with %s", lvalue.c_str(), node->name.c_str());
-    indexStr = lvalue.substr(node->name.length());
+    std::string sanitized_node_name = node->name;
+    std::replace(sanitized_node_name.begin(), sanitized_node_name.end(), '$', '_');
+    Assert(lvalue.compare(0, sanitized_node_name.length(), sanitized_node_name) == 0, "writer lvalue %s does not start with %s", lvalue.c_str(), sanitized_node_name.c_str());
+    indexStr = lvalue.substr(sanitized_node_name.length());
   }
   if (isSubArray(lvalue, node)) {
     std::string arraylvalue = format("%s[%s]%s", memory->name.c_str(), ChildInfo(0, valStr).c_str(), indexStr.c_str());
@@ -1592,7 +1595,9 @@ valInfo* ENode::instsExtFunc(Node* n) {
   std::string extInst = n->name + "(";
   for (size_t i = 0; i < getChildNum(); i ++) {
     if (i != 0) extInst += ", ";
-    extInst += ChildInfo(i, valStr);
+    std::string sanitized_valStr = ChildInfo(i, valStr);
+    std::replace(sanitized_valStr.begin(), sanitized_valStr.end(), '$', '_');
+    extInst += sanitized_valStr;
   }
   ret->valStr = extInst;
   return ret;
@@ -1603,6 +1608,7 @@ valInfo* allocNodeInfo(Node* n) {
   ret->width = n->width;
   ret->sign = n->sign;
   ret->valStr = n->name;
+  std::replace(ret->valStr.begin(), ret->valStr.end(), '$', '_');
   ret->typeWidth = upperPower2(n->width);
   return ret;
 }
@@ -2272,22 +2278,30 @@ std::string computeExtMod(SuperNode* super) {
             inst += ", ";
           }
           if (arg->status == CONSTANT_NODE) {
-            inst += arg->computeInfo->valStr;
+            std::string sanitized_valStr = arg->computeInfo->valStr;
+            std::replace(sanitized_valStr.begin(), sanitized_valStr.end(), '$', '_');
+            inst += sanitized_valStr;
           } else {
-            inst += arg->name + "[" + std::to_string(j) + "]";
+            std::string sanitized_name = arg->name;
+            std::replace(sanitized_name.begin(), sanitized_name.end(), '$', '_');
+            inst += sanitized_name + "[" + std::to_string(j) + "]";
           }
           funcDecl += widthUType(arg->width) + " _" + std::to_string(argIdx ++);
         }
       } else {
         funcDecl += widthUType(arg->width) + " _" + std::to_string(argIdx ++);
-        inst += arg->compute()->valStr;
+        std::string sanitized_valStr = arg->compute()->valStr;
+        std::replace(sanitized_valStr.begin(), sanitized_valStr.end(), '$', '_');
+        inst += sanitized_valStr;
       }
     } else {
       if (arg->isArray()) {
         TODO();
       } else {
         funcDecl += widthUType(arg->width) + "& _" + std::to_string(argIdx ++);
-        inst += arg->name;
+        std::string sanitized_name = arg->name;
+        std::replace(sanitized_name.begin(), sanitized_name.end(), '$', '_');
+        inst += sanitized_name;
       }
     }
   }

@@ -14,24 +14,55 @@
 
 #define CYCLE_STEP_PERCENT 1
 
+
+
+template<typename T>
+void* getDutMemory(T* dut) {
+  #if defined(__DUT_ysyx3__)
+    return (void*)&dut->mem_ram;
+  #elif defined(__DUT_NutShell__)
+    return (void*)&dut->mem_rdata_mem_mem;
+  #elif defined(__DUT_rocket__)
+    return (void*)&dut->mem_srams_mem;
+  #elif defined(__DUT_large_boom__) || defined(__DUT_small_boom__)
+    return (void*)&dut->mem_srams_mem;
+  #elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
+    return (void*)&dut->memory_ram_rdata_mem_mem;
+  #else
+    return nullptr;
+  #endif
+}
+
+template<typename T>
+void* getRefMemory(T* ref) {
+  #if defined(__DUT_ysyx3__)
+    return (void*)&ref->rootp->__PVT__newtop->__PVT__mem->__PVT__ram_ext->__PVT__Memory;
+  #elif defined(__DUT_NutShell__)
+    return (void*)&ref->rootp->__PVT__SimTop->__PVT__mem->__PVT__rdata_mem->__PVT__mem_ext->__PVT__Memory;
+  #elif defined(__DUT_rocket__)
+    return (void*)&ref->rootp->__PVT__TestHarness->__PVT__mem->__PVT__srams->__PVT__mem_ext->__PVT__Memory;
+  #elif defined(__DUT_large_boom__) || defined(__DUT_small_boom__)
+    return (void*)&ref->rootp->__PVT__TestHarness->__PVT__mem->__PVT__srams->__PVT__mem_ext->__PVT__Memory;
+  #elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
+    return (void*)&ref->rootp->__PVT__SimTop->__PVT__memory->__PVT__ram->__PVT__rdata_mem->__PVT__mem_ext->__PVT__Memory;
+  #else
+    return nullptr;
+  #endif
+}
+
+#define GET_DUT_MEMORY(dut, mem) getDutMemory(dut)
+#define GET_REF_MEMORY(ref, path) getRefMemory(ref)
+
 #if defined(__DUT_ysyx3__)
-#define DUT_MEMORY mem_ram
-#define REF_MEMORY newtop__DOT__mem__DOT__ram_ext__DOT__Memory
 #define CYCLE_MAX_PERF 5000000
-#define CYCLE_MAX_SIM  500
+#define CYCLE_MAX_SIM  11000000
 #elif defined(__DUT_NutShell__)
-#define DUT_MEMORY mem$rdata_mem$mem
-#define REF_MEMORY SimTop__DOT__mem__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 50000000
 #define CYCLE_MAX_SIM  250000000
 #elif defined(__DUT_rocket__)
-#define DUT_MEMORY mem$srams$mem
-#define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 2000000
 #define CYCLE_MAX_SIM  4200000
 #elif defined(__DUT_large_boom__) || defined(__DUT_small_boom__)
-#define DUT_MEMORY mem$srams$mem
-#define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 1000000
 #ifdef __DUT_large_boom__
 #define CYCLE_MAX_SIM  3900000
@@ -39,8 +70,6 @@
 #define CYCLE_MAX_SIM  5400000
 #endif
 #elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
-#define DUT_MEMORY memory$ram$rdata_mem$mem
-#define REF_MEMORY SimTop__DOT__memory__DOT__ram__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
 #define CYCLE_MAX_PERF 500000
 #ifdef __DUT_default_xiangshan__
 #define CYCLE_MAX_SIM  1900000
@@ -98,28 +127,26 @@ static DUT_NAME* dut;
 
 void dut_init(DUT_NAME *dut) {
 #if defined(__DUT_NutShell__)
-  dut->set_difftest$$logCtrl$$begin(0);
-  dut->set_difftest$$logCtrl$$end(0);
-  dut->set_difftest$$uart$$in$$ch(-1);
+  dut->set_difftest__uart__in__ch(-1);
 #elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
-  // dut->set_difftest$$perfCtrl$$clean(0);
-  // dut->set_difftest$$perfCtrl$$dump(0);
-  // dut->set_difftest$$logCtrl$$begin(0);
-  // dut->set_difftest$$logCtrl$$end(0);
-  // dut->set_difftest$$logCtrl$$level(0);
-  dut->set_difftest$$uart$$in$$ch(-1);
+  // dut->set_difftest__perfCtrl__clean(0);
+  // dut->set_difftest__perfCtrl__dump(0);
+  // dut->set_difftest__logCtrl__begin(0);
+  // dut->set_difftest__logCtrl__end(0);
+  // dut->set_difftest__logCtrl__level(0);
+  dut->set_difftest__uart__in__ch(-1);
 #endif
 }
 
 void dut_hook(DUT_NAME *dut) {
 #if defined(__DUT_NutShell__)
-  if (dut->get_difftest$$uart$$out$$valid()) {
-    printf("%c", dut->get_difftest$$uart$$out$$ch());
+  if (dut->get_difftest__uart__out__valid()) {
+    printf("%c", dut->get_difftest__uart__out__ch());
     fflush(stdout);
   }
 #elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
-  if (dut->get_difftest$$uart$$out$$valid()) {
-    printf("%c", dut->get_difftest$$uart$$out$$ch());
+  if (dut->get_difftest__uart__out__valid()) {
+    printf("%c", dut->get_difftest__uart__out__ch());
     fflush(stdout);
   }
 #endif
@@ -133,8 +160,9 @@ static REF_NAME* ref;
 
 void ref_init(REF_NAME *ref) {
 #if defined(__DUT_NutShell__)
-  ref->rootp->difftest_logCtrl_begin = ref->rootp->difftest_logCtrl_begin = 0;
-  ref->rootp->difftest_uart_in_valid = -1;
+  ref->difftest_perfCtrl_clean = ref->difftest_perfCtrl_dump = 0;
+  ref->difftest_uart_in_ch = -1;
+  ref->difftest_uart_in_valid = 0;
 #elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
   ref->difftest_perfCtrl_clean = ref->difftest_perfCtrl_dump = 0;
   ref->difftest_uart_in_ch = -1;
@@ -144,8 +172,8 @@ void ref_init(REF_NAME *ref) {
 
 void ref_hook(REF_NAME *ref) {
 #if defined(__DUT_NutShell__)
-  if (ref->rootp->difftest_uart_out_valid) {
-    printf("%c", ref->rootp->difftest_uart_out_ch);
+  if (ref->difftest_uart_out_valid) {
+    printf("%c", ref->difftest_uart_out_ch);
     fflush(stdout);
   }
 #elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
@@ -232,19 +260,19 @@ int main(int argc, char** argv) {
   load_program(argv[1]);
 #ifdef GSIM
   dut = new DUT_NAME();
-  memcpy(&dut->DUT_MEMORY, program, program_sz);
+  memcpy(GET_DUT_MEMORY(dut, DUT_MEMORY), program, program_sz);
   dut_init(dut);
   dut_reset();
 #endif
 #ifdef VERILATOR
   ref = new REF_NAME();
-  memcpy(&ref->rootp->REF_MEMORY, program, program_sz);
+  memcpy(GET_REF_MEMORY(ref, REF_MEMORY_PATH), program, program_sz);
   ref_init(ref);
   ref_reset();
 #endif
 #ifdef GSIM_DIFF
   ref = new REF_NAME();
-  memcpy(&ref->DUT_MEMORY, program, program_sz);
+  memcpy(GET_DUT_MEMORY(ref, DUT_MEMORY), program, program_sz);
   ref_reset();
 #endif
   close_program();
@@ -285,7 +313,7 @@ int main(int argc, char** argv) {
       auto dur = std::chrono::system_clock::now() - start;
       auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur);
       long long ips = msec.count() == 0 ? 0 : cycles * 1000 / msec.count();
-      fprintf(stderr, "cycles %ld (%ld ms, %ld per sec) simulation process %.2lf%% \n",
+      fprintf(stderr, "cycles %ld (%ld ms, %lld per sec) simulation process %.2lf%% \n",
           cycles, msec.count(), ips, (double)cycles * 100 / CYCLE_MAX_SIM);
 #ifdef PERF
       size_t totalActives = 0;

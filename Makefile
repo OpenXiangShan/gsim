@@ -24,22 +24,22 @@ else ifeq ($(dutName),large-boom)
 	NAME ?= TestHarness
 	TEST_FILE = $(NAME)-LargeBoom
 	GSIM_FLAGS += --supernode-max-size=65 --cpp-max-size-KB=4096
-	VERI_THREADS = --threads 5
+	VERI_THREADS = --threads 4
 else ifeq ($(dutName),small-boom)
 	NAME ?= TestHarness
 	TEST_FILE = $(NAME)-SmallBoom
 	GSIM_FLAGS += --supernode-max-size=90 --cpp-max-size-KB=4096
-	VERI_THREADS = --threads 5
+	VERI_THREADS = --threads 4
 else ifeq ($(dutName),minimal-xiangshan)
 	NAME ?= SimTop
 	TEST_FILE = $(NAME)-xiangshan-minimal
 	GSIM_FLAGS += --supernode-max-size=60 --cpp-max-size-KB=8192
-	VERI_THREADS = --threads 16
+	VERI_THREADS = --threads 4
 else ifeq ($(dutName),default-xiangshan)
 	NAME ?= SimTop
 	TEST_FILE = $(NAME)-xiangshan-default
 	GSIM_FLAGS += --supernode-max-size=2 --cpp-max-size-KB=8192
-	VERI_THREADS = --threads 16
+	VERI_THREADS = --threads 4
 endif
 
 ##############################################
@@ -56,6 +56,10 @@ TIME = /usr/bin/time
 LOG_FILE = $(WORK_DIR)/$(dutName).log
 
 CFLAGS_DUT = -DDUT_NAME=S$(NAME) -DDUT_HEADER=\"$(NAME).h\" -D__DUT_$(shell echo $(dutName) | tr - _)__
+
+# FST_CFLAGS = -DFST_WAVE -I$(abspath include/libfst)
+FST_CFLAGS = -I$(abspath include/libfst)
+FST_LDFLAGS = -L$(abspath $(BUILD_DIR)/gsim/libfst) -lfst -lz
 
 # $(1): object file
 # $(2): source file
@@ -166,9 +170,9 @@ $(foreach x, $(PARSER_GEN_SRCS), $(eval \
 	$(call CXX_TEMPLATE, $(PARSER_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(CXXFLAGS), GSIM_OBJS, $(PARSER_GEN_HEADER))))
 
 $(foreach x, $(GSIM_SRCS), $(eval \
-	$(call CXX_TEMPLATE, $(GSIM_BUILD_DIR)/$(basename $(x)).o, $(x), $(CXXFLAGS), GSIM_OBJS, $(PARSER_GEN_HEADER))))
+	$(call CXX_TEMPLATE, $(GSIM_BUILD_DIR)/$(basename $(x)).o, $(x), $(CXXFLAGS) $(FST_CFLAGS), GSIM_OBJS, $(PARSER_GEN_HEADER))))
 
-$(eval $(call LD_TEMPLATE, $(GSIM_BIN), $(GSIM_OBJS), $(CXXFLAGS) -lgmp))
+$(eval $(call LD_TEMPLATE, $(GSIM_BIN), $(GSIM_OBJS) $(LIBFST_A), $(CXXFLAGS) -lgmp $(FST_LDFLAGS)))
 
 build-gsim: $(GSIM_BIN)
 
@@ -188,7 +192,6 @@ $(GEN_CPP_DIR)/$(NAME)0.cpp: $(GSIM_BIN) $(FIRRTL_FILE)
 	@mkdir -p $(@D)
 	set -o pipefail && $(TIME) $(GSIM_BIN) $(GSIM_FLAGS) --dir $(@D) \
 		$(GSIM_FLAGS_EXTRA) $(FIRRTL_FILE) | tee $(BUILD_DIR)/gsim.log
-	$(SIG_COMMAND)
 
 compile: $(GEN_CPP_DIR)/$(NAME)0.cpp
 
@@ -210,16 +213,16 @@ EMU_GEN_SRCS = $(shell find $(GEN_CPP_DIR) -name "*.cpp" 2> /dev/null)
 EMU_SRCS = $(EMU_MAIN_SRCS) $(EMU_GEN_SRCS)
 
 EMU_CFLAGS := -O1 -MMD $(addprefix -I, $(abspath $(GEN_CPP_DIR))) $(EMU_CFLAGS) # allow to overwrite optimization level
-EMU_CFLAGS += $(MODE_FLAGS) $(CFLAGS_DUT) -Wno-parentheses-equality
+EMU_CFLAGS += $(MODE_FLAGS) $(CFLAGS_DUT) -Wno-parentheses-equality -Wno-unknown-warning-option
 EMU_CFLAGS += -fbracket-depth=2048
-EMU_CFLAGS += -DFST_WAVE -Iinclude/libfst
+EMU_CFLAGS += $(FST_CFLAGS)
 #EMU_CFLAGS += -fsanitize=address -fsanitize-address-use-after-scope
 #EMU_CFLAGS += -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract
 #EMU_CFLAGS += -pg -ggdb
 ifeq ($(SIMPOINT),1)
 EMU_LDFLAGS += -lz -lzstd
 endif
-EMU_LDFLAGS += -L$(GSIM_BUILD_DIR)/libfst -lfst -lz
+EMU_LDFLAGS += $(FST_LDFLAGS)
 
 $(foreach x, $(EMU_SRCS), $(eval \
 	$(call CXX_TEMPLATE, $(EMU_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(EMU_CFLAGS), EMU_OBJS,)))
@@ -260,7 +263,8 @@ VERI_GEN_MK = $(VERI_BUILD_DIR)/V$(NAME).mk
 
 VERI_CFLAGS = $(call escape_quote,$(EMU_CFLAGS) $(CFLAGS_REF))
 VERI_LDFLAGS = -O1
-VERI_VFLAGS = --top $(NAME) -Wno-lint -j 8 --cc --exe +define+RANDOMIZE_GARBAGE_ASSIGN --max-num-width 1048576 --compiler clang
+VERI_LDFLAGS += $(FST_LDFLAGS)
+VERI_VFLAGS = --top $(NAME) -Wno-lint -O0 -j 8 --cc --exe +define+RANDOMIZE_GARBAGE_ASSIGN --max-num-width 1048576 --compiler clang
 ifeq ($(SIMPOINT),1)
 VERI_LDFLAGS += -lz -lzstd
 endif
@@ -271,15 +275,18 @@ VERI_VFLAGS += $(VERI_THREADS)
 VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
 VERI_CSRCS-2 = $(EMU_GEN_SRCS)
 
-$(VERI_GEN_MK): $(VERI_VSRCS) $(VERI_CSRCS-$(MODE)) | $(EMU_MAIN_SRCS)
+$(VERI_GEN_MK): $(VERI_VSRCS) $(VERI_CSRCS-$(MODE)) $(LIBFST_A) | $(EMU_MAIN_SRCS)
 	@mkdir -p $(@D)
-	verilator $(VERI_VFLAGS) $(abspath $^ $|)
+	verilator $(VERI_VFLAGS) $(abspath $(VERI_VSRCS) $(VERI_CSRCS-$(MODE)) $|)
 
 $(VERI_BIN): | $(VERI_GEN_MK)
 	$(TIME) $(MAKE) OPT_FAST="-O1" CXX=clang++ -s -C $(VERI_BUILD_DIR) -f $(abspath $|)
 	ln -sf $(abspath $(VERI_BUILD_DIR)/V$(NAME)) $@
 
 compile-veri: $(VERI_GEN_MK)
+ifeq ($(MODE), 2)
+	$(SIG_COMMAND)
+endif
 
 run-veri-simpoint: $(VERI_BIN)
 	@echo 'Please run "$^ <gcpt> <checkpoint>" manually'
@@ -372,8 +379,8 @@ run-internal:
 	$(MAKE) MODE=0 difftest
 
 diff-internal:
-	$(MAKE) MODE=2 compile-veri
 	$(MAKE) MODE=2 compile
+	$(MAKE) MODE=2 compile-veri
 	$(MAKE) MODE=2 difftest
 
 run:

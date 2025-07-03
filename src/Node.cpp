@@ -432,3 +432,42 @@ void Node::eraseDepNext(Node* node) {
 void Node::addDepNext(Node* node) {
   depNext.insert(node);
 }
+
+// Hierarchy structure related method implementations
+void Node::setHierarchy(const std::vector<std::string>& path, const std::vector<std::string>& seps) {
+  hierarchyPath = path;
+  hierarchySeps = seps;
+}
+
+std::string Node::getHierarchicalName(const std::string& separator) const {
+  if (hierarchyPath.empty()) return name;
+  
+  std::string result;
+  for (size_t i = 0; i < hierarchyPath.size(); ++i) {
+    if (i > 0) result += separator;
+    result += hierarchyPath[i];
+  }
+  return result;
+}
+
+std::string Node::getVerilatorName() const {
+  if (hierarchyPath.empty()) return name;
+  
+  std::string result = "__PVT__";
+  for (size_t i = 0; i < hierarchyPath.size(); ++i) {
+    if (i > 0) result += "->__PVT__";
+    result += hierarchyPath[i];
+  }
+  return result;
+}
+
+std::string Node::getGSimName() const {
+  if (hierarchyPath.empty()) return name;
+  
+  std::string result;
+  for (size_t i = 0; i < hierarchyPath.size(); ++i) {
+    if (i > 0) result += "_";
+    result += hierarchyPath[i];
+  }
+  return result;
+}

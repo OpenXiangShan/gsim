@@ -33,6 +33,7 @@ FILE* sigFile = nullptr;
 static int superId = 0;
 static int activeFlagNum = 0;
 static std::set<Node*> definedNode;
+static std::set<std::string> definedVarNames;
 static std::map<int, SuperNode*> cppId2Super;
 static std::set<int> alwaysActive;
 // static std::vector<std::string> resetFuncs;
@@ -265,11 +266,7 @@ void graph::genInterfaceInput(Node* input) {
   emitFuncDecl(0, "void S%s::set_%s(%s val) {\n", name.c_str(), cpp_input_name.c_str(), widthUType(input->width).c_str());
   emitBodyLock(1, "if (%s != val) { \n", cpp_input_name.c_str());
   emitBodyLock(2, "%s = val;\n", cpp_input_name.c_str());
-  emitBodyLock(2, "#ifdef FST_WAVE\n");
-  emitBodyLock(2, "if (this->fstHandleMap.count(\"%s\")) {\n", input->name.c_str());
-  emitBodyLock(3, "fstWriterEmitValueChange(this->fstCtx, this->fstHandleMap[\"%s\"], (uint64_t*)&%s);\n", input->name.c_str(), cpp_input_name.c_str());
-  emitBodyLock(2, "}\n");
-  emitBodyLock(2, "#endif\n");
+  emitBodyLock(2, "updateFstSignal(\"%s\", &%s, %d);\n", input->name.c_str(), cpp_input_name.c_str(), input->width);
   for (std::string inst : input->insts) {
     std::string sanitized_inst = inst;
     std::replace(sanitized_inst.begin(), sanitized_inst.end(), '$', '_');
@@ -414,9 +411,15 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   genDiffSig(fp, node);
 #endif
   if (definedNode.find(node) != definedNode.end()) return;
-  definedNode.insert(node);
+  
   std::string cpp_name = node->name;
   std::replace(cpp_name.begin(), cpp_name.end(), '$', '_');
+  
+  // Check if the sanitized variable name has already been declared
+  if (definedVarNames.find(cpp_name) != definedVarNames.end()) return;
+  
+  definedNode.insert(node);
+  definedVarNames.insert(cpp_name);
   fprintf(fp, "%s %s", widthUType(node->width).c_str(), cpp_name.c_str());
   if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", upperPower2(node->depth));
   for (int dim : node->dimension) fprintf(fp, "[%d]", upperPower2(dim));
@@ -448,9 +451,14 @@ void graph::genNodeDef(FILE* fp, Node* node) {
     Assert(!node->isArray() && node->width <= BASIC_WIDTH, "%s is treated as reset (isArray: %d width: %d)", node->name.c_str(), node->isArray(), node->width);
     std::string reset_name_str = RESET_NAME(node);
     std::replace(reset_name_str.begin(), reset_name_str.end(), '$', '_');
-    fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), reset_name_str.c_str());
-    if (needInitMask) {
-      emitBodyLock(1, "%s = %s & %s;\n", reset_name_str.c_str(), reset_name_str.c_str(), bitMask(w).c_str());
+    
+    // Check if the reset variable name has already been declared
+    if (definedVarNames.find(reset_name_str) == definedVarNames.end()) {
+      definedVarNames.insert(reset_name_str);
+      fprintf(fp, "%s %s;\n", widthUType(node->width).c_str(), reset_name_str.c_str());
+      if (needInitMask) {
+        emitBodyLock(1, "%s = %s & %s;\n", reset_name_str.c_str(), reset_name_str.c_str(), bitMask(w).c_str());
+      }
     }
   }
 }
@@ -459,12 +467,16 @@ std::string graph::saveOldVal(Node* node) { // TODO: remove
   std::string ret;
   if (node->isArray()) return ret;
     /* save oldVal */
+  std::string new_basic_sanitized = newBasic(node);
+  std::replace(new_basic_sanitized.begin(), new_basic_sanitized.end(), '$', '_');
+  std::string node_name_sanitized = node->name;
+  std::replace(node_name_sanitized.begin(), node_name_sanitized.end(), '$', '_');
   if (node->fullyUpdated) {
-    emitBodyLock(0, "%s %s;\n", widthUType(node->width).c_str(), newBasic(node).c_str());
-    ret = newBasic(node);
+    emitBodyLock(0, "%s %s;\n", widthUType(node->width).c_str(), new_basic_sanitized.c_str());
+    ret = new_basic_sanitized;
   } else {
-    emitBodyLock(0, "%s %s = %s;\n", widthUType(node->width).c_str(), newBasic(node).c_str(), node->name.c_str());
-    ret = newBasic(node);
+    emitBodyLock(0, "%s %s = %s;\n", widthUType(node->width).c_str(), new_basic_sanitized.c_str(), node_name_sanitized.c_str());
+    ret = new_basic_sanitized;
   }
   return ret;
 }
@@ -472,25 +484,36 @@ std::string graph::saveOldVal(Node* node) { // TODO: remove
 std::string activateNextStr(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName) {
   std::string ret;
   std::string nodeName = node->name;
+  std::replace(nodeName.begin(), nodeName.end(), '$', '_');
   auto condName = std::string("cond_") + nodeName;
   bool opt{false};
+
+  // Sanitize oldName by replacing '$' with '_'
+  std::string oldNameSanitized = oldName;
+  std::replace(oldNameSanitized.begin(), oldNameSanitized.end(), '$', '_');
 
   if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
   std::map<uint64_t, ActiveType> bitMapInfo;
   ActiveType curMask;
   if (node->isAsyncReset()) {
-    ret += format("if (%s || (%s != %s)) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
+    ret += format("if (%s || (%s != %s)) {\n", oldNameSanitized.c_str(), nodeName.c_str(), oldNameSanitized.c_str());
   } else {
     curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
     opt = ((ACTIVE_MASK(curMask) != 0) + bitMapInfo.size()) <= 3;
     if (opt) {
-      if (node->width == 1) ret += format("bool %s = %s ^ %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
-      else ret += format("bool %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
+      if (node->width == 1) ret += format("bool %s = %s ^ %s;\n", condName.c_str(), nodeName.c_str(), oldNameSanitized.c_str());
+      else ret += format("bool %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldNameSanitized.c_str());
     }
-    else ret += format("if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
+    else ret += format("if (%s != %s) {\n", nodeName.c_str(), oldNameSanitized.c_str());
   }
   if (inStep) {
-    if (node->isReset() && node->type == NODE_REG_SRC) ret += format("%s = %s;\n", RESET_NAME(node).c_str(), newName(node).c_str());
+    if (node->isReset() && node->type == NODE_REG_SRC) {
+      std::string reset_name_sanitized = RESET_NAME(node);
+      std::replace(reset_name_sanitized.begin(), reset_name_sanitized.end(), '$', '_');
+      std::string new_name_sanitized = newName(node);
+      std::replace(new_name_sanitized.begin(), new_name_sanitized.end(), '$', '_');
+      ret += format("%s = %s;\n", reset_name_sanitized.c_str(), new_name_sanitized.c_str());
+    }
   }
   if (node->isAsyncReset()) {
     Assert(!opt, "invalid opt");
@@ -545,27 +568,39 @@ void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldN
   auto condName = std::string("cond_") + nodeName;
   bool opt{false};
 
+  // Sanitize oldName by replacing '$' with '_'
+  std::string oldNameSanitized = oldName;
+  std::replace(oldNameSanitized.begin(), oldNameSanitized.end(), '$', '_');
+
   if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
   std::map<uint64_t, ActiveType> bitMapInfo;
   ActiveType curMask;
   if (node->isAsyncReset()) {
-    emitBodyLock(indent, "if (%s || (%s != %s)) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
+    emitBodyLock(indent, "if (%s || (%s != %s)) {\n", oldNameSanitized.c_str(), nodeName.c_str(), oldNameSanitized.c_str());
     indent ++;
   } else {
     curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
     opt = ((ACTIVE_MASK(curMask) != 0) + bitMapInfo.size()) <= 3;
     if (opt) {
-      if (node->width == 1) emitBodyLock(indent, "bool %s = %s ^ %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
-      else emitBodyLock(indent, "bool %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
+      if (node->width == 1) emitBodyLock(indent, "bool %s = %s ^ %s;\n", condName.c_str(), nodeName.c_str(), oldNameSanitized.c_str());
+      else emitBodyLock(indent, "bool %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldNameSanitized.c_str());
     }
     else {
-      emitBodyLock(indent, "if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
+      emitBodyLock(indent, "if (%s != %s) {\n", nodeName.c_str(), oldNameSanitized.c_str());
       indent ++;
     }
   }
   if (inStep) {
-    if (node->isReset() && node->type == NODE_REG_SRC) emitBodyLock(indent, "%s = %s;\n", RESET_NAME(node).c_str(), newName(node).c_str());
-    emitBodyLock(indent, "%s = %s;\n", nodeName.c_str(), newName(node).c_str());
+    if (node->isReset() && node->type == NODE_REG_SRC) {
+      std::string reset_name_sanitized = RESET_NAME(node);
+      std::replace(reset_name_sanitized.begin(), reset_name_sanitized.end(), '$', '_');
+      std::string new_name_sanitized = newName(node);
+      std::replace(new_name_sanitized.begin(), new_name_sanitized.end(), '$', '_');
+      emitBodyLock(indent, "%s = %s;\n", reset_name_sanitized.c_str(), new_name_sanitized.c_str());
+    }
+    std::string new_name_sanitized = newName(node);
+    std::replace(new_name_sanitized.begin(), new_name_sanitized.end(), '$', '_');
+    emitBodyLock(indent, "%s = %s;\n", nodeName.c_str(), new_name_sanitized.c_str());
   }
   if (node->isAsyncReset()) {
     Assert(!opt, "invalid opt");
@@ -626,8 +661,12 @@ void graph::genNodeInsts(Node* node, std::string flagName, int indent) { // TODO
       for (size_t i = 0; i < newInsts.size(); i ++) {
         std::string inst = newInsts[i];
         size_t start_pos = 0;
-        std::string basicSet = node->name + " = ";
-        std::string replaceStr = newName(node) + " = ";
+        std::string node_name_sanitized = node->name;
+        std::replace(node_name_sanitized.begin(), node_name_sanitized.end(), '$', '_');
+        std::string basicSet = node_name_sanitized + " = ";
+        std::string new_name_sanitized = newName(node);
+        std::replace(new_name_sanitized.begin(), new_name_sanitized.end(), '$', '_');
+        std::string replaceStr = new_name_sanitized + " = ";
         while((start_pos = inst.find(basicSet, start_pos)) != std::string::npos) {
           inst.replace(start_pos, basicSet.length(), replaceStr);
           start_pos += replaceStr.length();
@@ -656,7 +695,11 @@ void graph::genNodeInsts(Node* node, std::string flagName, int indent) { // TODO
     }
   }
   if (!node->needActivate()) ;
-  else if(!node->isArray()) activateNext(node, node->nextNeedActivate, newName(node), true, flagName, indent);
+  else if(!node->isArray()) {
+    std::string new_name_sanitized = newName(node);
+    std::replace(new_name_sanitized.begin(), new_name_sanitized.end(), '$', '_');
+    activateNext(node, node->nextNeedActivate, new_name_sanitized, true, flagName, indent);
+  }
   else activateUncondNext(node, node->nextNeedActivate, true, flagName, indent);
 }
 
@@ -708,7 +751,9 @@ void graph::nodeDisplay(Node* member, int indent) {
       idxStr += "[i" + std::to_string(i) + "]";
     }
     std::string nameIdx = member->name + idxStr;
-    emit_display(nameIdx.c_str(), member->width, indent);
+    std::string sanitized_nameIdx = nameIdx;
+    std::replace(sanitized_nameIdx.begin(), sanitized_nameIdx.end(), '$', '_');
+    emit_display(sanitized_nameIdx.c_str(), member->width, indent);
     emitBodyLock(indent, "printf(\" \");\n");
     for (size_t i = 0; i < member->dimension.size(); i ++) {
       indent --;
@@ -716,7 +761,9 @@ void graph::nodeDisplay(Node* member, int indent) {
     }
   } else {
     if (member->anyNextActive() || member->type != NODE_SPECIAL) {
-      emit_display(member->name.c_str(), member->width, indent);
+      std::string sanitized_name = member->name;
+      std::replace(sanitized_name.begin(), sanitized_name.end(), '$', '_');
+      emit_display(sanitized_name.c_str(), member->width, indent);
     }
   }
   emitBodyLock(indent, "printf(\"\\n\");\n");
@@ -753,7 +800,11 @@ void replaceAssignEnd(std::string& inst, Node* n, std::string str) {
 
 void saveAssignBeg(std::string& inst, Node* n, int indent) {
   if (n->needActivate() && !n->isArray() && n->type != NODE_WRITER) {
-    std::string saveStr = format("%s %s = %s;\n", widthUType(n->width).c_str(), oldName(n).c_str(), n->name.c_str());
+    std::string old_name_sanitized = oldName(n);
+    std::replace(old_name_sanitized.begin(), old_name_sanitized.end(), '$', '_');
+    std::string node_name_sanitized = n->name;
+    std::replace(node_name_sanitized.begin(), node_name_sanitized.end(), '$', '_');
+    std::string saveStr = format("%s %s = %s;\n", widthUType(n->width).c_str(), old_name_sanitized.c_str(), node_name_sanitized.c_str());
     replaceAssignBeg(inst, n, saveStr);
   } else {
     replaceAssignBeg(inst, n, "");
@@ -763,7 +814,11 @@ void saveAssignBeg(std::string& inst, Node* n, int indent) {
 void activateAssignEnd(std::string& inst, Node* n, std::string flagName) {
   std::string activateStr;
   if (!n->needActivate()) ;
-  else if(!n->isArray() && n->type != NODE_WRITER) activateStr = activateNextStr(n, n->nextNeedActivate, oldName(n), true, flagName);
+  else if(!n->isArray() && n->type != NODE_WRITER) {
+    std::string old_name_sanitized = oldName(n);
+    std::replace(old_name_sanitized.begin(), old_name_sanitized.end(), '$', '_');
+    activateStr = activateNextStr(n, n->nextNeedActivate, old_name_sanitized, true, flagName);
+  }
   else activateStr = activateUncondNextStr(n, n->nextNeedActivate, true, flagName);
   replaceAssignEnd(inst, n, activateStr);
 }
@@ -778,13 +833,21 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
     for (size_t i = 1; i < super->member.size(); i ++) {
       if (!super->member[i]->needActivate()) continue;
       Node* extOut = super->member[i];
-      emitBodyLock(indent, "%s %s = %s;\n", widthUType(extOut->width).c_str(), oldName(extOut).c_str(), extOut->name.c_str());
+      std::string old_name_sanitized = oldName(extOut);
+      std::replace(old_name_sanitized.begin(), old_name_sanitized.end(), '$', '_');
+      std::string ext_out_name_sanitized = extOut->name;
+      std::replace(ext_out_name_sanitized.begin(), ext_out_name_sanitized.end(), '$', '_');
+      emitBodyLock(indent, "%s %s = %s;\n", widthUType(extOut->width).c_str(), old_name_sanitized.c_str(), ext_out_name_sanitized.c_str());
     }
     genNodeInsts(super->member[0], flagName, indent);
     for (size_t i = 1; i < super->member.size(); i ++) {
       if (!super->member[i]->needActivate()) continue;
       if (super->member[i]->isArray()) activateUncondNext(super->member[i], super->member[i]->nextActiveId, false, flagName, indent);
-      else activateNext(super->member[i], super->member[i]->nextActiveId, oldName(super->member[i]), false, flagName, indent);
+      else {
+        std::string old_name_sanitized = oldName(super->member[i]);
+        std::replace(old_name_sanitized.begin(), old_name_sanitized.end(), '$', '_');
+        activateNext(super->member[i], super->member[i]->nextActiveId, old_name_sanitized, false, flagName, indent);
+      }
     }
   } else {
     if (super->superType == SUPER_ASYNC_RESET) {
@@ -848,20 +911,15 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
           }
 
           if (definedNode.count(inst.node)) {
-            emitBodyLock(indent, "#ifdef FST_WAVE\n");
-            emitBodyLock(indent, "{\n");
-
             std::string cpp_var_name = inst.node->name;
             if (cpp_var_name.find("MPORT") != std::string::npos) {
               if (cpp_var_name.rfind("mmio$", 0) == 0) {
                 cpp_var_name.replace(0, 4, "mem");
               }
-              if (cpp_var_name.size() > 6 && cpp_var_name.substr(cpp_var_name.size() - 6) == "$MPORT") {
-                  cpp_var_name += "_1";
-              }
             }
 
             if (inst.node->isArray() || inst.node->type == NODE_WRITER) {
+              emitBodyLock(indent, "{\n");
               int current_indent = indent + 1;
               for (size_t i = 0; i < inst.node->dimension.size(); i++) {
                 emitBodyLock(current_indent, "for (int i%zu = 0; i%zu < %d; i%zu++) {\n", i, i, inst.node->dimension[i], i);
@@ -878,22 +936,18 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
                 access_str += format("[i%zu]", i);
               }
 
-              std::string code_line = format("if (this->fstHandleMap.count(node_name)) fstWriterEmitValueChange(this->fstCtx, this->fstHandleMap[node_name], (uint64_t*)&%s);", access_str.c_str());
-              emitBodyLock(current_indent, "%s\n", code_line.c_str());
+              emitBodyLock(current_indent, "updateFstSignal(node_name, &%s, %d);\n", access_str.c_str(), inst.node->width);
               
               for (size_t i = 0; i < inst.node->dimension.size(); i++) {
                 current_indent--;
                 emitBodyLock(current_indent, "}\n");
               }
+              emitBodyLock(indent, "}\n");
             } else {
               std::string fst_node_name = inst.node->name;
               std::replace(cpp_var_name.begin(), cpp_var_name.end(), '$', '_');
-              std::string code_line = format("if (this->fstHandleMap.count(\"%s\")) fstWriterEmitValueChange(this->fstCtx, this->fstHandleMap[\"%s\"], (uint64_t*)&%s);", fst_node_name.c_str(), fst_node_name.c_str(), cpp_var_name.c_str());
-              emitBodyLock(indent + 1, "%s\n", code_line.c_str());
+              emitBodyLock(indent, "updateFstSignal(\"%s\", &%s, %d);\n", fst_node_name.c_str(), cpp_var_name.c_str(), inst.node->width);
             }
-
-            emitBodyLock(indent, "}\n");
-            emitBodyLock(indent, "#endif\n");
           }
           break;
         default:
@@ -1032,7 +1086,11 @@ void graph::genStep(int subStepIdxMax) {
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->isReset() && member->type == NODE_REG_SRC) {
-        emitBodyLock(1, "%s = %s;\n", RESET_NAME(member).c_str(), member->name.c_str());
+        std::string reset_name_sanitized = RESET_NAME(member);
+        std::string member_name_sanitized = member->name;
+        std::replace(reset_name_sanitized.begin(), reset_name_sanitized.end(), '$', '_');
+        std::replace(member_name_sanitized.begin(), member_name_sanitized.end(), '$', '_');
+        emitBodyLock(1, "%s = %s;\n", reset_name_sanitized.c_str(), member_name_sanitized.c_str());
       }
     }
   }
@@ -1041,6 +1099,9 @@ void graph::genStep(int subStepIdxMax) {
   }
 
   emitBodyLock(1, "cycles ++;\n");
+  emitBodyLock(1, "#ifdef FST_WAVE\n");
+  emitBodyLock(1, "fstWriterEmitTimeChange(this->fstCtx, cycles);\n");
+  emitBodyLock(1, "#endif\n");
   emitBodyLock(0, "}\n");
 }
 
@@ -1108,6 +1169,10 @@ void graph::emitPrintf() {
 }
 
 void graph::cppEmitter() {
+  // Clear static sets for a fresh start
+  definedNode.clear();
+  definedVarNames.clear();
+  
   for (SuperNode* super : sortedSuper) {
     if (!super->instsEmpty() || super->superType == SUPER_EXTMOD || super->superType == SUPER_ASYNC_RESET) {
       super->cppId = superId ++;
@@ -1250,8 +1315,13 @@ void graph::cppEmitter() {
       std::string sanitized_name = node->name;
       std::replace(sanitized_name.begin(), sanitized_name.end(), '$', '_');
       std::string handle_name = "handle_" + sanitized_name;
-      emitBodyLock(1, "fstHandle %s = fstWriterCreateVar(this->fstCtx, %s, FST_VD_IMPLICIT, %d, \"%s\", 0u);\n",
-          handle_name.c_str(), typestr.c_str(), node->width, fst_name.c_str());
+      
+      // Check if the FST handle variable has already been declared
+      if (definedVarNames.find(handle_name) == definedVarNames.end()) {
+        definedVarNames.insert(handle_name);
+        emitBodyLock(1, "fstHandle %s = fstWriterCreateVar(this->fstCtx, %s, FST_VD_IMPLICIT, %d, \"%s\", 0u);\n",
+            handle_name.c_str(), typestr.c_str(), node->width, fst_name.c_str());
+      }
       emitBodyLock(1, "this->fstHandleMap[\"%s\"] = %s;\n", node->name.c_str(), handle_name.c_str());
     } else {
       int current_indent = 1;
@@ -1346,11 +1416,125 @@ void graph::cppEmitter() {
   fprintf(header, "void init();\n");
 
   /* activation all nodes for reset */
-  emitFuncDecl(0, "}\n");
+  emitBodyLock(1, "#ifdef FST_WAVE\n");
+  emitBodyLock(1, "fstWriterEmitTimeChange(this->fstCtx, 0);\n");
+  emitBodyLock(1, "// Emit initial values for all signals to avoid z/x states\n");
+  emitBodyLock(1, "emitAllSignalValues();\n");
+  emitBodyLock(1, "#endif\n");
+  emitBodyLock(0, "}\n");
   fprintf(header, "void activateAll();\n");
   emitFuncDecl(0, "void S%s::activateAll() {\n"
                "  memset(activeFlags, 0xff, sizeof(activeFlags));\n"
                "}\n", name.c_str());
+
+  /* FST signal update helper function */
+  fprintf(header, "template<typename T>\n");
+  fprintf(header, "inline void updateFstSignal(const std::string& signal_name, T* value_ptr, uint32_t width) {\n"
+               "#ifdef FST_WAVE\n"
+               "  if (this->fstHandleMap.count(signal_name)) {\n"
+               "    if (width <= 32) {\n"
+               "      uint32_t val = 0;\n"
+               "      if (sizeof(T) >= 4) {\n"
+               "        val = *((uint32_t*)value_ptr);\n"
+               "      } else {\n"
+               "        val = *((uint8_t*)value_ptr);\n"
+               "      }\n"
+               "      if (width < 32) {\n"
+               "        val &= ((1ULL << width) - 1);\n"
+               "      }\n"
+               "      fstWriterEmitValueChange32(this->fstCtx, this->fstHandleMap[signal_name], width, val);\n"
+               "    } else if (width <= 64) {\n"
+               "      uint64_t val = 0;\n"
+               "      if (sizeof(T) >= 8) {\n"
+               "        val = *((uint64_t*)value_ptr);\n"
+               "      } else if (sizeof(T) >= 4) {\n"
+               "        val = *((uint32_t*)value_ptr);\n"
+               "      } else {\n"
+               "        val = *((uint8_t*)value_ptr);\n"
+               "      }\n"
+               "      if (width < 64) {\n"
+               "        val &= ((1ULL << width) - 1);\n"
+               "      }\n"
+               "      fstWriterEmitValueChange64(this->fstCtx, this->fstHandleMap[signal_name], width, val);\n"
+               "    } else {\n"
+               "      // For wider signals, use Vec64 function\n"
+               "      fstWriterEmitValueChangeVec64(this->fstCtx, this->fstHandleMap[signal_name], width, (const uint64_t*)value_ptr);\n"
+               "    }\n"
+               "  }\n"
+               "#endif\n"
+               "}\n");
+
+  /* FST emit all signal values function */
+  fprintf(header, "void emitAllSignalValues();\n");
+  
+  /* Generate emitAllSignalValues function implementation */
+  emitFuncDecl(0, "void S%s::emitAllSignalValues() {\n", name.c_str());
+  emitBodyLock(1, "#ifdef FST_WAVE\n");
+  
+  // Emit values for all defined nodes
+  std::vector<Node*> all_signal_nodes;
+  for (SuperNode* super : sortedSuper) {
+    if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
+      for (Node* n : super->member) {
+        if (n->type != NODE_SPECIAL && n->type != NODE_REG_RESET && n->status == VALID_NODE &&
+            !(n->type == NODE_REG_DST && !n->regSplit) && n->type != NODE_WRITER &&
+            !(n->type == NODE_OTHERS && !n->anyNextActive() && !n->isArray())) {
+          all_signal_nodes.push_back(n);
+        }
+      }
+    }
+    if (super->superType == SUPER_EXTMOD) {
+      for (size_t i = 1; i < super->member.size(); i++) {
+        Node* n = super->member[i];
+        if (n->type != NODE_SPECIAL && n->type != NODE_REG_RESET && n->status == VALID_NODE) {
+          all_signal_nodes.push_back(n);
+        }
+      }
+    }
+  }
+  for (Node* mem : memory) {
+    if (mem->status == VALID_NODE) {
+      all_signal_nodes.push_back(mem);
+    }
+  }
+
+  // Remove duplicates and sort
+  std::sort(all_signal_nodes.begin(), all_signal_nodes.end());
+  all_signal_nodes.erase(std::unique(all_signal_nodes.begin(), all_signal_nodes.end()), all_signal_nodes.end());
+
+  for (Node* node : all_signal_nodes) {
+    if (definedNode.count(node)) {
+      std::string cpp_var_name = node->name;
+      std::replace(cpp_var_name.begin(), cpp_var_name.end(), '$', '_');
+      
+      if (node->isArray()) {
+        int current_indent = 2;
+        for (size_t i = 0; i < node->dimension.size(); i++) {
+          emitBodyLock(current_indent, "for (int i%zu = 0; i%zu < %d; i%zu++) {\n", i, i, node->dimension[i], i);
+          current_indent++;
+        }
+        
+        emitBodyLock(current_indent, "std::string node_name = \"%s\";\n", node->name.c_str());
+        std::string access_str = cpp_var_name;
+        for (size_t i = 0; i < node->dimension.size(); i++) {
+          std::string line = format("node_name += \"[\" + std::to_string(i%zu) + \"]\";\n", i);
+          emitBodyLock(current_indent, "%s", line.c_str());
+          access_str += format("[i%zu]", i);
+        }
+        emitBodyLock(current_indent, "updateFstSignal(node_name, &%s, %d);\n", access_str.c_str(), node->width);
+        
+        for (size_t i = 0; i < node->dimension.size(); i++) {
+          current_indent--;
+          emitBodyLock(current_indent, "}\n");
+        }
+      } else {
+        emitBodyLock(2, "updateFstSignal(\"%s\", &%s, %d);\n", node->name.c_str(), cpp_var_name.c_str(), node->width);
+      }
+    }
+  }
+  
+  emitBodyLock(1, "#endif\n");
+  emitBodyLock(0, "}\n");
 
    /* input/output interface */
   for (Node* node : input) {

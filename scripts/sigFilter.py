@@ -12,6 +12,7 @@ class SigFilter():
     self.fileIdx = 0
     self.varNum = 0
     self.dstFileName = sys.argv[1] + "/model/" + name + "_checkSig"
+    self.diffSigNum = 0
 
   def closeDstFile(self):
     if self.dstfp is not None:
@@ -37,6 +38,7 @@ class SigFilter():
     return int(data[startIdx : endIdx]) + 1
 
   def genDiffCode(self, modName, refName, line, mod_width, ref_width):
+    self.diffSigNum += 1
     refUName = line[3] + "_u"
     if mod_width > 128:
       num = int((ref_width + 31) / 32)
@@ -57,7 +59,7 @@ class SigFilter():
             "((unsigned _BitInt(" + str(mod_width) + "))0 - 1)")
     self.dstfp.writelines("if( display || (((" + modName + " ^ " + refName + ") & " + mask + ") != 0)) {\n" + \
                           "  ret = true;\n" + \
-                          "  std::cout << std::hex << \"" + line[2] + ": \" ")
+                          "  std::cout << std::hex << \"" + line[2].replace("$", "_") + ": \" ")
     num = int((mod_width + 63) / 64)
     for i in range(num - 1, -1, -1):
       self.dstfp.writelines(" << (uint64_t)(" + modName + " >> " + str(i * 64) + ") << '_'")
@@ -79,7 +81,7 @@ class SigFilter():
     self.dstfp.writelines(utype + " " + refNameLocal + " = " + "*(" + utype + "*)(&(" + refName + "));\n")
     self.dstfp.writelines("if (display || (" + modNameLocal + " != " + refNameLocal + ")) {\n" + \
                           "  ret = true;\n" + \
-                          "  std::cout << std::hex <<\"" + line[2] + ": \" ")
+                          "  std::cout << std::hex <<\"" + line[2].replace("$", "_") + ": \" ")
     num = int((width + 63) / 64)
     for i in range(num - 1, -1, -1):
       self.dstfp.writelines(" << (uint64_t)(" + modNameLocal + " >> " + str(i * 64) + ")")
@@ -113,7 +115,7 @@ class SigFilter():
         self.varNum += 1
         ref_width = all_sigs[line[3]]
         refName = "ref->rootp->" + line[3]
-        modName = "mod->" + line[2]
+        modName = "mod->" + line[2].replace("$", "_")
         if mod_width > ref_width:
           continue
         assert(mod_width <= ref_width), "width(" + line[2] + ") = " + str(mod_width) + ", width(" + line[3] + ") = " + str(ref_width)
@@ -142,3 +144,4 @@ if __name__ == "__main__":
   sigFilter = SigFilter(sys.argv[2])
   sigFilter.filter(sys.argv[1] + "/model/" + sys.argv[2] + "_sigs.txt",
                    sys.argv[1] + "/verilator/V" + sys.argv[2] + "___024root.h")
+  print("diff sig num: " + str(sigFilter.diffSigNum))
