@@ -326,64 +326,6 @@ bool isLastWhenCond(std::vector<int>&path, ExpTree* referTree) {
   return isLastWhenCond;
 }
 
-void growTreeFromPath(ExpTree* oldTree, std::vector<int>&path, ExpTree* referTree) {
-  ENode* referRoot = referTree->getRoot();
-  if (referRoot->opType != OP_WHEN) return ;
-
-  int endIdx = isLastWhenCond(path, referTree) ? (int)path.size() - 1 : path.size(); // the node may be when cond
-  Assert(endIdx >= 0, "invalid path");
-  if (endIdx <= 1) return;
-  ENode* newRoot = nullptr;
-  ENode* newParent = nullptr;
-  for (int idx = 0; idx < endIdx; idx ++) {
-    if (referRoot->opType != OP_WHEN || (idx + 1 == endIdx)) {
-      newParent->setChild(path[idx], oldTree->getRoot());
-      break;
-    } else {
-      ENode* when = new ENode(OP_WHEN);
-      when->width = oldTree->getRoot()->width;
-      when->sign = oldTree->getRoot()->sign;
-      when->addChild(referRoot->getChild(0)->dup());
-      when->addChild(nullptr);
-      when->addChild(nullptr);
-      if (newParent) newParent->setChild(path[idx], when);
-      else newRoot = when;
-      newParent = when;
-    }
-    if (idx + 1 < endIdx) referRoot = referRoot->getChild(path[idx + 1]);
-  }
-
-  oldTree->setRoot(newRoot);
-}
-
-void growWhenPathFromNext(Node* node) {
-  if (node->type != NODE_OTHERS) return;
-  std::set<ExpTree*> usedTrees;
-  std::vector<int> path;
-  bool isFirst = true;
-  ExpTree* referTree = nullptr;
-  for (Node* next : node->next) {
-    for (ExpTree* tree : next->assignTree) {
-      std::vector<int> currentPath;
-      getRelyPath(currentPath, node, tree);
-      if (currentPath.size() != 0) {
-        usedTrees.insert(tree);
-        if (isFirst) {
-          path = currentPath;
-          isFirst = false;
-          referTree = tree;
-        } else getCommonPath(path, referTree, currentPath, tree);
-      }
-    }
-  }
-  if (path.size() <= 1) return;
-  Assert(path[0] == 0, "the first must be root");
-
-  for (ExpTree* tree : node->assignTree) {
-    growTreeFromPath(tree, path, *usedTrees.begin());
-  }
-}
-
 void SuperNode::reorderMember() {
   std::vector<Node*> newMember;
   std::map<Node*, int> nodePrev;
@@ -439,7 +381,6 @@ void graph::generateStmtTree() {
         }
       }
       if (anyExtNext) continue;
-      growWhenPathFromNext(member);
       /* update connection */
       member->updateConnect();
     }
