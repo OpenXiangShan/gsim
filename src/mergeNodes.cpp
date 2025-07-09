@@ -153,7 +153,7 @@ void graph::mergeWhenNodes() {
           s.push(next);
         }
       }
-      if (mergeSuper.size() > 1) whenMap[mergeCond] = mergeSuper;
+      if (mergeSuper.size() > globalConfig.MergeWhenSize) whenMap[mergeCond] = mergeSuper;
     }
   }
   for (auto iter : whenMap) {
@@ -172,8 +172,46 @@ void graph::mergeWhenNodes() {
   reconnectSuper();
   detectSortedSuperLoop();
   printf("[mergeNodes-when] remove %ld superNodes (%ld -> %ld)\n", prevSuper - sortedSuper.size(), prevSuper, sortedSuper.size());
+  when2mux();
 }
 #endif
+
+
+void graph::when2mux() {
+  for (SuperNode* super : sortedSuper) {
+    if (super->superType != SUPER_VALID) continue;
+    std::map<Node*, int> whenTimes;
+    std::stack<ENode*>s;
+    std::stack<ENode*> allENodes; // parents lie beneath
+    for (Node* member : super->member) {
+      for (ExpTree* tree : member->assignTree) {
+        if (tree->getRoot()->opType != OP_WHEN) continue;
+        s.push(tree->getRoot());
+      }
+    }
+    // push all when nodes to allENodes
+    while (!s.empty()) {
+      ENode* top = s.top();
+      s.pop();
+      if (top->opType != OP_WHEN) continue;
+      if (whenTimes.find(top->getChild(0)->getNode()) == whenTimes.end()) whenTimes[top->getChild(0)->getNode()] = 0;
+      whenTimes[top->getChild(0)->getNode()]++;
+      allENodes.push(top);
+      for (ENode* child : top->child) {
+        if (child) s.push(child);
+      }
+    }
+    while (!allENodes.empty()) {
+      ENode* top = allENodes.top();
+      if (whenTimes[top->getChild(0)->getNode()] <= globalConfig.When2muxBound) {
+        if (top->getChild(1) && (top->getChild(1)->opType != OP_STMT && top->getChild(1)->opType != OP_WHEN && top->getChild(1)->opType != OP_INVALID)
+          && top->getChild(2) && (top->getChild(2)->opType != OP_STMT && top->getChild(2)->opType != OP_WHEN && top->getChild(2)->opType != OP_INVALID)) 
+        top->opType = OP_MUX;
+      }
+      allENodes.pop();
+    }
+  }
+}
 
 void graph::mergeAsyncReset() {
   std::map<Node*, SuperNode*> resetMap;

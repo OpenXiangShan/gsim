@@ -238,7 +238,6 @@ void Node::updateTreeWithNewWIdth() {
   if (resetTree) resetTree->updateWithNewWidth();
 
   for (ExpTree* tree : assignTree) {
-    tree->when2mux(width);
     tree->matchWidth(width);
   }
   if (resetTree) resetTree->matchWidth(width);

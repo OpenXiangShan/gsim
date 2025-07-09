@@ -62,6 +62,7 @@ class graph {
   void graphRefine();
   void resort();
   void detectSortedSuperLoop();
+  void when2mux();
  public:
   std::vector<Node*> allNodes;
   std::vector<Node*> input;
