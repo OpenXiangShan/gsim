@@ -132,15 +132,6 @@ void graph::aliasAnalysis() {
       Node* parent = iter.first->arrayParent;
       parent->arrayMember[iter.first->arrayIdx] = getLeafNode(false, iter.second);
     }
-    if (iter.first->type == NODE_MEM_MEMBER) {
-      Node* parent = iter.first->parent;
-      for (size_t i = 0; i < parent->member.size(); i ++) {
-        if (parent->member[i] == iter.first) {
-          parent->member[i] = getLeafNode(false, iter.second);
-          break;
-        }
-      }
-    }
   }
   removeNodesNoConnect(DEAD_NODE);
   reconnectAll();

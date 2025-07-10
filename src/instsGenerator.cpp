@@ -356,12 +356,12 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     }
   }
 
-  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_MEM_MEMBER)) {
+  if (getChild(1) && ChildInfo(1, status) == VAL_INVALID && node->type == NODE_OTHERS) {
     if (getChild(2)) computeInfo = Child(2, computeInfo);
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
   }
-  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_MEM_MEMBER)) {
+  if (getChild(2) && ChildInfo(2, status) == VAL_INVALID && node->type == NODE_OTHERS) {
     if (getChild(1)) computeInfo = Child(1, computeInfo);
     else computeInfo->status = VAL_EMPTY;
     return computeInfo;
@@ -1873,27 +1873,6 @@ valInfo* Node::compute() {
   bool needRecompute = false;
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;
-    if (type == NODE_REG_DST) {
-    } else if (type == NODE_MEM_MEMBER && mpz_sgn(ret->consVal) == 0) {
-      Node* port = parent;
-      if (port->type == NODE_READER) {
-        if (this == port->get_member(READER_EN)) {
-          port->get_member(READER_DATA)->setConstantInfoZero();
-          port->get_member(READER_ADDR)->setConstantInfoZero();
-          for (Node* next : port->get_member(READER_DATA)->next) {
-            if (next->computeInfo) addRecompute(next);
-          }
-        }
-      } else if (port->type == NODE_WRITER) {
-        if (this == port->get_member(WRITER_EN) || this == port->get_member(WRITER_MASK)) {
-          port->get_member(WRITER_ADDR)->setConstantInfoZero();
-          port->get_member(WRITER_DATA)->setConstantInfoZero();
-          if (this != port->get_member(WRITER_EN)) port->get_member(WRITER_EN)->setConstantInfoZero();
-          if (this != port->get_member(WRITER_MASK)) port->get_member(WRITER_MASK)->setConstantInfoZero();
-        }
-      }
-      needRecompute = true;
-    }
   } else if (type == NODE_REG_DST && assignTree.size() == 1 && ret->sameConstant &&
     (getSrc()->assignTree.size() == 0 || (getSrc()->status == CONSTANT_NODE && mpz_cmp(getSrc()->computeInfo->consVal, ret->assignmentCons) == 0)) && resetConsEq(ret, getSrc())) {
     ret->status = VAL_CONSTANT;

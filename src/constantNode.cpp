@@ -115,13 +115,13 @@ valInfo* ENode::consWhen(Node* node, bool isLvalue) {
       return consEMap[getChild(1)];
     }
   }
-  if (getChild(1) && ChildCons(1, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_MEM_MEMBER)) {
+  if (getChild(1) && ChildCons(1, status) == VAL_INVALID && (node->type == NODE_OTHERS)) {
     if (getChild(2)) return consEMap[getChild(2)];
     valInfo* consInfo = new valInfo(0, 0);
     consInfo->status = VAL_EMPTY;
     return consInfo;
   }
-  if (getChild(2) && ChildCons(2, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_MEM_MEMBER)) {
+  if (getChild(2) && ChildCons(2, status) == VAL_INVALID && (node->type == NODE_OTHERS)) {
     if (getChild(1)) return consEMap[getChild(1)];
     valInfo* consInfo = new valInfo(0, 0);
     consInfo->status = VAL_EMPTY;
