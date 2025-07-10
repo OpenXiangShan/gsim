@@ -204,8 +204,8 @@ void graph::when2mux() {
     while (!allENodes.empty()) {
       ENode* top = allENodes.top();
       if (whenTimes[top->getChild(0)->getNode()] <= globalConfig.When2muxBound) {
-        if (top->getChild(1) && (top->getChild(1)->opType != OP_STMT && top->getChild(1)->opType != OP_WHEN && top->getChild(1)->opType != OP_INVALID)
-          && top->getChild(2) && (top->getChild(2)->opType != OP_STMT && top->getChild(2)->opType != OP_WHEN && top->getChild(2)->opType != OP_INVALID)) 
+        if (top->getChild(1) && (top->getChild(1)->opType != OP_WHEN && top->getChild(1)->opType != OP_INVALID)
+          && top->getChild(2) && (top->getChild(2)->opType != OP_WHEN && top->getChild(2)->opType != OP_INVALID)) 
         top->opType = OP_MUX;
       }
       allENodes.pop();

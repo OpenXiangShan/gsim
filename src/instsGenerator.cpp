@@ -32,7 +32,6 @@ void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 std::string idx2Str(Node* node, int idx, int dim);
 static void recomputeAllNodes();
 
-static int stmtDepth = 0;
 int maxConcatNum = 0;
 
 static std::stack<int*> tmpStack;
@@ -388,7 +387,7 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     else if (node->sign && node->width != width) return format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), expr.c_str());
     return lvalue + " = " + expr + ";";
   };
-  if (!isSubArray(lvalue, node) && node->assignTree.size() == 1 && stmtDepth == 0 && isRoot && node->width <= 128) {
+  if (!isSubArray(lvalue, node) && node->assignTree.size() == 1 && isRoot && node->width <= 128) {
     if (!getChild(1) && getChild(2) && ChildInfo(2, opNum) >= 0 && ChildInfo(2, opNum) < 1 && ChildInfo(2, insts).size() == 0 && ChildInfo(2, status) != VAL_INVALID) {
       toMux = true;
       condStr = ChildInfo(0, valStr);
@@ -493,40 +492,6 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     }
   }
   return ret;
-}
-
-valInfo* ENode::instsStmt(Node* node, std::string lvalue, bool isRoot) {
-  if (getChildNum() == 1) {
-    computeInfo = getChild(0)->compute(node, lvalue, isRoot);
-    return computeInfo;
-  }
-  for (ENode* childNode : child) computeInfo->mergeInsts(childNode->computeInfo);
-  bool updated = false;
-  bool direct = false;
-  for (ENode* childENode : child) {
-    updated |= childENode->computeInfo->fullyUpdated;
-    direct |= childENode->computeInfo->directUpdate;
-    if (childENode->computeInfo->status == VAL_INVALID || childENode->computeInfo->status == VAL_EMPTY) continue;
-    else if (childENode->computeInfo->type == TYPE_STMT) {
-      computeInfo->valStr += childENode->computeInfo->valStr;
-    } else if (childENode->computeInfo->type == TYPE_ARRAY) {
-      computeInfo->valStr += arrayCopy(lvalue, node, childENode->computeInfo);
-    } else {
-      if (isSubArray(lvalue, node)) {
-        computeInfo->valStr += arrayCopy(lvalue, node, childENode->computeInfo);
-      } else if (node->width < width) {
-        computeInfo->valStr += format("%s = (%s & %s);", lvalue.c_str(), childENode->computeInfo->valStr.c_str(), bitMask(node->width).c_str());
-      } else if (node->sign && node->width != width) {
-        computeInfo->valStr += format("%s = %s%s;", lvalue.c_str(), Cast(width, sign).c_str(), childENode->computeInfo->valStr.c_str());
-      }
-      computeInfo->valStr += lvalue + " = " + childENode->computeInfo->valStr + ";";
-    }
-  }
-  computeInfo->opNum = -1;
-  computeInfo->type = TYPE_STMT;
-  computeInfo->fullyUpdated = updated;
-  computeInfo->directUpdate = direct;
-  return computeInfo;
 }
 
 valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
@@ -1615,11 +1580,9 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     computeInfo->setConstantByStr("0");
     return computeInfo;
   }
-  if (opType == OP_STMT) stmtDepth ++;
   for (ENode* childNode : child) {
     if (childNode) childNode->compute(n, lvalue, false);
   }
-  if (opType == OP_STMT) stmtDepth --;
   if (nodePtr) {
     if (nodePtr->isArray() && nodePtr->arraySplitted()) {
       if (getChildNum() < nodePtr->dimension.size()) {
@@ -1788,7 +1751,6 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     case OP_INDEX: instsIndex(n, lvalue, isRoot); break;
     case OP_MUX: instsMux(n, lvalue, isRoot); break;
     case OP_WHEN: instsWhen(n, lvalue, isRoot); break;
-    case OP_STMT: instsStmt(n, lvalue, isRoot); break;
     case OP_INT: instsInt(n, lvalue, isRoot); break;
     case OP_READ_MEM: instsReadMem(n, lvalue, isRoot); break;
     case OP_WRITE_MEM: instsWriteMem(n, lvalue, isRoot); break;

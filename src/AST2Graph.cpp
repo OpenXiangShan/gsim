@@ -128,17 +128,8 @@ int countEmptyENodeWhen(ENode* enode) {
   while(!s.empty()) {
     ENode* top = s.top();
     s.pop();
-    if (top->opType == OP_STMT) { /* push the first child */
-      for (ENode* childENode : top->child) {
-        if (childENode) {
-          s.push(childENode);
-          break;
-        }
-      }
-    } else {
-      for (ENode* childENode : top->child) {
-        if (childENode) s.push(childENode);
-      }
+    for (ENode* childENode : top->child) {
+      if (childENode) s.push(childENode);
     }
     if (top->opType == OP_WHEN) {
       if (!top->getChild(1)) ret ++;
@@ -1075,7 +1066,7 @@ std::pair<ExpTree*, ENode*> growWhenTrace(Node* node, ExpTree* valTree, size_t d
             when cond:
               a <= 1
     */
-    if (oldRoot->opType != OP_WHEN && oldRoot->opType != OP_STMT) {
+    if (oldRoot->opType != OP_WHEN) {
       childRoot = oldRoot;
       oldRoot = nullptr;
     }
@@ -1111,15 +1102,8 @@ std::pair<ExpTree*, ENode*> growWhenTrace(Node* node, ExpTree* valTree, size_t d
       if (valTree) node->assignTree.push_back(valTree);
       valTree = new ExpTree(newRoot);
     } else {
-      ENode* stmt = nullptr;
-      if (oldRoot->opType == OP_STMT) {
-        stmt = oldRoot;
-      } else {
-        stmt = new ENode(OP_STMT);
-        stmt->addChild(oldRoot);
-      }
-      stmt->addChild(newRoot);
-      oldParent->setChild(whenTrace[maxDepth-1].first ? 1 : 2, stmt);
+      node->assignTree.push_back(valTree->dup());
+      oldParent->setChild(whenTrace[maxDepth-1].first ? 1 : 2, newRoot);
     }
   }
   return std::make_pair(valTree, retENode);
