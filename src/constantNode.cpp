@@ -115,13 +115,13 @@ valInfo* ENode::consWhen(Node* node, bool isLvalue) {
       return consEMap[getChild(1)];
     }
   }
-  if (getChild(1) && ChildCons(1, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_MEM_MEMBER)) {
+  if (getChild(1) && ChildCons(1, status) == VAL_INVALID && (node->type == NODE_OTHERS)) {
     if (getChild(2)) return consEMap[getChild(2)];
     valInfo* consInfo = new valInfo(0, 0);
     consInfo->status = VAL_EMPTY;
     return consInfo;
   }
-  if (getChild(2) && ChildCons(2, status) == VAL_INVALID && (node->type == NODE_OTHERS || node->type == NODE_MEM_MEMBER)) {
+  if (getChild(2) && ChildCons(2, status) == VAL_INVALID && (node->type == NODE_OTHERS)) {
     if (getChild(1)) return consEMap[getChild(1)];
     valInfo* consInfo = new valInfo(0, 0);
     consInfo->status = VAL_EMPTY;
@@ -161,11 +161,6 @@ valInfo* ENode::consWhen(Node* node, bool isLvalue) {
     }
   }
   return ret;
-}
-
-valInfo* ENode::consStmt(Node* node, bool isLvalue) {
-  if (getChildNum() == 1) return getChild(0)->computeConstant(node, isLvalue);
-  return new valInfo(width, sign);
 }
 
 valInfo* ENode::consGroup(Node* node, bool isLvalue) {
@@ -732,7 +727,6 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
     case OP_INDEX: ret = consIndex(isLvalue); break;
     case OP_MUX: ret = consMux(isLvalue); break;
     case OP_WHEN: ret = consWhen(node, isLvalue); break;
-    case OP_STMT: ret = consStmt(node, isLvalue); break;
     case OP_GROUP: ret = consGroup(node, isLvalue); break;
     case OP_INT: ret = consInt(isLvalue); break;
     case OP_READ_MEM: ret = consReadMem(isLvalue); break;
@@ -1187,12 +1181,6 @@ void ExpTree::removeConstant() {
     } else {
       ENode* childENode = parent ? parent->getChild(idx) : root;
       if (childENode) s.push(std::make_tuple(childENode, parent, idx));
-    }
-    if (parent && parent->opType == OP_STMT) {
-      parent->child.erase(
-      std::remove_if(parent->child.begin(), parent->child.end(), [](ENode* enode){ return enode == nullptr; }),
-        parent->child.end()
-      );
     }
   }
 }

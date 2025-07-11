@@ -120,17 +120,8 @@ void fillEmptyENodeWhen(ENode* newENode, ENode* oldENode) {
   while(!s.empty()) {
     ENode* top = s.top();
     s.pop();
-    if (top->opType == OP_STMT) { /* push the first child */
-      for (ENode* childENode : top->child) {
-        if (childENode) {
-          s.push(childENode);
-          break;
-        }
-      }
-    } else {
-      for (ENode* childENode : top->child) {
-        if (childENode) s.push(childENode);
-      }
+    for (ENode* childENode : top->child) {
+      if (childENode) s.push(childENode);
     }
     if (top->opType == OP_WHEN) {
       if (!top->getChild(1)) top->setChild(1, oldENode->dup());
@@ -153,6 +144,27 @@ ExpTree* mergeWhenTree(ExpTree* tree1, ExpTree* tree2) {
     fillEmptyWhen(tree2, tree1->getRoot());
     return tree2;
   }
+  bool canMerge = true;
+  bool mergeIndi = false;
+  std::queue<std::pair<ENode*, ENode*>> enodeQueue;
+  enodeQueue.push((std::make_pair(tree1->getRoot(), tree2->getRoot())));
+  while (!enodeQueue.empty()) {
+    ENode* enode1, *enode2;
+    std::tie(enode1, enode2) = enodeQueue.front();
+    enodeQueue.pop();
+    if (enode1->opType == OP_WHEN && enode2->opType == OP_WHEN) {
+      if (subTreeEq(enode1->getChild(0), enode2->getChild(0))) {
+        if (enode1->getChild(1) && enode2->getChild(1)) enodeQueue.push(std::make_pair(enode1->getChild(1), enode2->getChild(1)));
+        if (enode1->getChild(2) && enode2->getChild(2)) enodeQueue.push(std::make_pair(enode1->getChild(2), enode2->getChild(2)));
+        mergeIndi = true;
+      } else {
+        if (mergeIndi) canMerge = false;
+        else Assert(enodeQueue.empty(), "should not reach here");
+      }
+    }
+  }
+
+  if (!canMerge) return nullptr;
 
   std::queue<std::tuple<ENode*, ENode*, ENode*, int>> s;
   s.push((std::make_tuple(tree1->getRoot(), tree2->getRoot(), nullptr, -1)));
@@ -170,13 +182,8 @@ ExpTree* mergeWhenTree(ExpTree* tree1, ExpTree* tree2) {
         if (!enode2->getChild(2) && enode1->getChild(2)) enode2->setChild(2, enode1->getChild(2));
         ret = tree2;
       } else {
-        if (ret) { // already merged some nodes
-          ENode* enode = new ENode(OP_STMT);
-          enode->addChild(enode1);
-          enode->addChild(enode2);
-          parent2->setChild(idx2, enode);
-          ret = tree2;
-        } else Assert(s.empty(), "should not reach here");
+        if (ret) Panic();
+        else Assert(s.empty(), "should not reach here");
       }
     } else {
       if (ret) fillEmptyENodeWhen(enode2, enode1);

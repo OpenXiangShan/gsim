@@ -13,8 +13,8 @@ void ExpTree::when2mux(int width) {
     s.pop();
     if (top->opType != OP_WHEN) continue;
     /* TODO: optimize invalid */
-    if (top->getChild(1) && (top->getChild(1)->opType != OP_STMT && top->getChild(1)->opType != OP_WHEN && top->getChild(1)->opType != OP_INVALID)
-      && top->getChild(2) && (top->getChild(2)->opType != OP_STMT && top->getChild(2)->opType != OP_WHEN && top->getChild(2)->opType != OP_INVALID)) {
+    if (top->getChild(1) && (top->getChild(1)->opType != OP_WHEN && top->getChild(1)->opType != OP_INVALID)
+      && top->getChild(2) && (top->getChild(2)->opType != OP_WHEN && top->getChild(2)->opType != OP_INVALID)) {
       whenNodes.insert(top);
       for (ENode* child : top->child) s.push(child);
     } else {
@@ -41,10 +41,10 @@ void ExpTree::matchWidth(int width) {
   while (!s.empty()) {
     ENode* top = s.top();
     s.pop();
-    for (size_t i = top->opType == OP_STMT ? 0 : 1; i < top->getChildNum(); i ++) {
+    for (size_t i = 1; i < top->getChildNum(); i ++) {
       ENode* child = top->getChild(i);
       if (child) {
-        if (child->opType == OP_WHEN || child->opType == OP_STMT || child->opType == OP_RESET) {
+        if (child->opType == OP_WHEN || child->opType == OP_RESET) {
           s.push(child);
           child->width = width;
         }

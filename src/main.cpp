@@ -26,6 +26,8 @@ Config::Config() {
   cppMaxSizeKB = -1;
   sep_module = "$";
   sep_aggr = "$$";
+  MergeWhenSize = 5;
+  When2muxBound = 2;
 }
 Config globalConfig;
 
@@ -69,6 +71,8 @@ static char* parseCommandLine(int argc, char** argv) {
       {"cpp-max-size-KB", required_argument, nullptr, 0},
       {"sep-mod", required_argument, nullptr, 0},
       {"sep-aggr", required_argument, nullptr, 0},
+      {"when-size", required_argument, nullptr, 0},
+      {"when2mux-bound", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -83,6 +87,8 @@ static char* parseCommandLine(int argc, char** argv) {
                 case 4: sscanf(optarg, "%d", &globalConfig.cppMaxSizeKB); break;
                 case 5: globalConfig.sep_module = optarg; break;
                 case 6: globalConfig.sep_aggr = optarg; break;
+                case 7: sscanf(optarg, "%d", &globalConfig.MergeWhenSize); break;
+                case 8: sscanf(optarg, "%d", &globalConfig.When2muxBound); break;
                 case 0:
                 default: printUsage(argv[0]); exit(EXIT_SUCCESS);
               }

@@ -25,12 +25,6 @@ clockVal* ENode::clockCompute() {
   clockVal* childVal = nullptr;
   clockVal* ret = nullptr;
   switch (opType) {
-    case OP_WHEN:
-      childVal = getChild(1)->clockCompute();
-      ret = getChild(2)->clockCompute();
-      Assert(childVal->isInvalid || ret->isInvalid, "invalid clock");
-      if (ret->isInvalid) ret = childVal;
-      break;
     case OP_ASUINT:
     case OP_ASSINT:
     case OP_ASCLOCK:
@@ -69,6 +63,7 @@ clockVal* ENode::clockCompute() {
       } else Panic();
       break;
     case OP_MUX: {
+    case OP_WHEN:
       ENode* cond = getChild(0);
       ENode* neg = new ENode(OP_NOT);
       neg->addChild(cond);

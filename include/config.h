@@ -8,6 +8,8 @@ struct Config {
   uint32_t cppMaxSizeKB;
   std::string sep_module;
   std::string sep_aggr;
+  int MergeWhenSize;
+  int When2muxBound;
   Config();
 };
 

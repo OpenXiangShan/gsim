@@ -90,49 +90,12 @@ void Node::updateDep(){ // only reg_src can reach here
   }
 }
 
-/* construct superNodes for all memory_member in the port the (member) belongs to */
-static void memSuper(Node* member) {
-  Node* port = member->parent;
-  Node* memory = port->parent;
-  SuperNode* super = new SuperNode();
-
-  if (port->type == NODE_READER) {
-    /* merge addr & en & clk*/
-    super->add_member(port->get_member(READER_ADDR));
-    super = new SuperNode();
-    super->add_member(port->get_member(READER_EN));
-    /* data */
-    super = new SuperNode();
-    super->add_member(port->get_member(READER_DATA));
-    super = new SuperNode();
-    super->add_member(port->get_member(READER_CLK));
-  } else if (port->type == NODE_WRITER) {
-    for (Node* n : port->member)
-      super->add_member(n);
-  } else if (port->type == NODE_READWRITER) {
-    super->add_member(port->get_member(READWRITER_ADDR));
-    super->add_member(port->get_member(READWRITER_EN));
-    super->add_member(port->get_member(READWRITER_WDATA));
-    super->add_member(port->get_member(READWRITER_WMASK));
-    super->add_member(port->get_member(READWRITER_WMODE));
-    if (memory->rlatency >= 1) super = new SuperNode();
-    super->add_member(port->get_member(READWRITER_RDATA));
-    super = new SuperNode();
-    super->add_member(port->get_member(READWRITER_CLK));
-  } else {
-    Panic();
-  }
-}
-
 void Node::constructSuperNode() {
   if (super) return;
   switch (type) {
     case NODE_INVALID:
     case NODE_MEMORY:
       Panic();
-    case NODE_MEM_MEMBER:
-      memSuper(this);
-      break;
     case NODE_EXT: {
       super = new SuperNode(this);
       super->superType = SUPER_EXTMOD;

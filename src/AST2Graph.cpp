@@ -128,17 +128,8 @@ int countEmptyENodeWhen(ENode* enode) {
   while(!s.empty()) {
     ENode* top = s.top();
     s.pop();
-    if (top->opType == OP_STMT) { /* push the first child */
-      for (ENode* childENode : top->child) {
-        if (childENode) {
-          s.push(childENode);
-          break;
-        }
-      }
-    } else {
-      for (ENode* childENode : top->child) {
-        if (childENode) s.push(childENode);
-      }
+    for (ENode* childENode : top->child) {
+      if (childENode) s.push(childENode);
     }
     if (top->opType == OP_WHEN) {
       if (!top->getChild(1)) ret ++;
@@ -680,292 +671,6 @@ static inline TypeInfo* visitMemType(graph* g, PNode* dataType) {
   TYPE_CHECK(dataType, 1, 1, P_DATATYPE);
   return visitType(g, dataType->getChild(0), NODE_INVALID);
 }
-/*
-mem_depth: Depth "=>" INT   { $$ = newNode(P_DEPTH, synlineno(), $3, 0); }
-*/
-static inline int visitMemDepth(PNode* depth) {
-  TYPE_CHECK(depth, 0, 0, P_DEPTH);
-  return p_stoi(depth->name.c_str());
-}
-/*
-mem_rlatency: ReadLatency "=>" INT  { $$ = newNode(P_RLATENCT, synlineno(), $3, 0); }
-*/
-static inline int visitReadLatency(PNode* latency) {
-  TYPE_CHECK(latency, 0, 0, P_RLATENCT);
-  return p_stoi(latency->name.c_str());
-}
-/*
-mem_wlatency: WriteLatency "=>" INT { $$ = newNode(P_WLATENCT, synlineno(), $3, 0); }
-*/
-static inline int visitWriteLatency(PNode* latency) {
-  TYPE_CHECK(latency, 0, 0, P_WLATENCT);
-  return p_stoi(latency->name.c_str());
-}
-/*
-mem_ruw: ReadUnderwrite "=>" Ruw { $$ = newNode(P_RUW, synlineno(), $3, 0); }
-*/
-static inline void visitRUW(PNode* ruw) {
-  TYPE_CHECK(ruw, 0, 0, P_RUW);
-  Assert(ruw->name == "undefined", "IMPLEMENT ME");
-}
-
-static inline Node* add_member(Node* parent, std::string name, int idx, int width, int sign) {
-  Node* member = allocNode(NODE_MEM_MEMBER, prefixName(SEP_AGGR, name));
-  member->setType(width, sign);
-  parent->set_member(idx, member);
-  return member;
-}
-/*
-mem_reader Reader "=>" ALLID  { $$ = $1; $$->append(newNode(P_READER, synlineno(), $4, 0));}
-*/
-static inline Node* visitReader(PNode* reader, int width, int depth, bool sign, std::string suffix, Node* node) {
-  TYPE_CHECK(reader, 0, 0, P_READER);
-
-  prefix_append(SEP_MODULE, reader->name);
-
-  Node* ret = allocNode(NODE_READER, topPrefix(), reader->lineno);
-
-  for (int i = 0; i < READER_MEMBER_NUM; i ++) { // resize member vector
-    ret->add_member(nullptr);
-  }
-
-  add_member(ret, "addr" + suffix, READER_ADDR, upperLog2(depth), false);
-  add_member(ret, "en" + suffix, READER_EN, 1, false);
-  Node* clk = add_member(ret, "clk" + suffix, READER_CLK, 1, false);
-  clk->isClock = true;
-  Node* data = add_member(ret, "data" + suffix, READER_DATA, width, sign);
-  if (node) {
-    data->dimension.insert(data->dimension.end(), node->dimension.begin(), node->dimension.end());
-  }
-
-  prefix_pop();
-
-  return ret;
-}
-/*
-mem_writer Writer "=>" ALLID    { $$ = $1; $$->append(newNode(P_WRITER, synlineno(), $4, 0));}
-*/
-static inline Node* visitWriter(PNode* writer, int width, int depth, bool sign, std::string suffix, Node* node) {
-  TYPE_CHECK(writer, 0, 0, P_WRITER);
-
-  prefix_append(SEP_MODULE, writer->name);
-
-  Node* ret = allocNode(NODE_WRITER, topPrefix(), writer->lineno);
-
-  for (int i = 0; i < WRITER_MEMBER_NUM; i ++) {
-    ret->add_member(nullptr);
-  }
-
-  add_member(ret, "addr" + suffix, WRITER_ADDR, upperLog2(depth), false);
-  add_member(ret, "en" + suffix, WRITER_EN, 1, false);
-  Node* clk = add_member(ret, "clk" + suffix, WRITER_CLK, 1, false);
-  clk->isClock = true;
-  Node* data = add_member(ret, "data" + suffix, WRITER_DATA, width, sign);
-  Node* mask = add_member(ret, "mask" + suffix, WRITER_MASK, 1, false);
-  if (node) {
-    data->dimension.insert(data->dimension.end(), node->dimension.begin(), node->dimension.end());
-    mask->dimension.insert(mask->dimension.end(), node->dimension.begin(), node->dimension.end());
-  }
-
-  prefix_pop();
-
-  return ret;
-}
-/*
-mem_readwriter Readwriter "=>" ALLID  { $$ = $1; $$->append(newNode(P_READWRITER, synlineno(), $4, 0));}
-*/
-static inline Node* visitReadWriter(PNode* readWriter, int width, int depth, bool sign, std::string suffix, Node* node) {
-  TYPE_CHECK(readWriter, 0, 0, P_READWRITER);
-
-  prefix_append(SEP_MODULE, readWriter->name);
-
-  Node* ret = allocNode(NODE_READWRITER, topPrefix(), readWriter->lineno);
-
-  for (int i = 0; i < READWRITER_MEMBER_NUM; i ++) {
-    ret->add_member(nullptr);
-  }
-
-  add_member(ret, "addr" + suffix, READWRITER_ADDR, upperLog2(depth), false);
-  add_member(ret, "en" + suffix, READWRITER_EN, 1, false);
-  Node* clk = add_member(ret, "clk" + suffix, READWRITER_CLK, 1, false);
-  clk->isClock = true;
-  Node* rdata = add_member(ret, "rdata" + suffix, READWRITER_RDATA, width, sign);
-  Node* wdata = add_member(ret, "wdata" + suffix, READWRITER_WDATA, width, sign);
-  Node* wmask = add_member(ret, "wmask" + suffix, READWRITER_WMASK, 1, false);
-  add_member(ret, "wmode" + suffix, READWRITER_WMODE, 1, false);
-  if (node) {
-    rdata->dimension.insert(rdata->dimension.end(), node->dimension.begin(), node->dimension.end());
-    wdata->dimension.insert(wdata->dimension.end(), node->dimension.begin(), node->dimension.end());
-    wmask->dimension.insert(wmask->dimension.end(), node->dimension.begin(), node->dimension.end());
-  }
-
-  prefix_pop();
-
-  return ret;
-}
-
-Node* visitMemPort(PNode* port, int depth, int width, bool sign, std::string suffix, Node* node) {
-  Node* portNode = nullptr;
-  switch(port->type) {
-    case P_READER: portNode = visitReader(port, width, depth, sign, suffix, node); break;
-    case P_WRITER: portNode = visitWriter(port, width, depth, sign, suffix, node); break;
-    case P_READWRITER: portNode = visitReadWriter(port, width, depth, sign, suffix, node); break;
-    default: Panic();
-  }
-  return portNode;
-}
-
-void memoryAlias(Node* origin, Node* alias) {
-  Assert(origin->type == alias->type, "type not match %s(%d) %s(%d)", origin->name.c_str(), origin->type, alias->name.c_str(), alias->type);
-  Assert(origin->member.size() == alias->member.size(), "member not match");
-
-  for(size_t i = 0; i < origin->member.size(); i ++) {
-    if (alias->type == NODE_READER && i == READER_DATA) continue;
-    if (alias->type == NODE_WRITER && i == WRITER_DATA) continue;
-    if (alias->type == NODE_WRITER && i == WRITER_MASK) continue;
-    if (alias->type == NODE_READWRITER && i == READWRITER_RDATA) continue;
-    if (alias->type == NODE_READWRITER && i == READWRITER_WDATA) continue;
-    if (alias->type == NODE_READWRITER && i == READWRITER_WMASK) continue;
-    alias->member[i]->valTree = new ExpTree(new ENode(origin->member[i]), alias->member[i]);
-  }
-}
-
-void addOriginMember(Node* originPort, PNode* port) {
-  for (Node* member : originPort->member) member->type = NODE_OTHERS;
-  Node* originMember;
-  switch(port->type) {
-    case P_READER:
-      originMember = originPort->get_member(READER_ADDR);
-      addSignal(originMember->name, originMember);
-      originMember = originPort->get_member(READER_EN);
-      addSignal(originMember->name, originMember);
-      originMember = originPort->get_member(READER_CLK);
-      addSignal(originMember->name, originMember);
-      break;
-    case P_WRITER:
-      originMember = originPort->get_member(WRITER_ADDR);
-      addSignal(originMember->name, originMember);
-      originMember = originPort->get_member(WRITER_EN);
-      addSignal(originMember->name, originMember);
-      originMember = originPort->get_member(WRITER_CLK);
-      addSignal(originMember->name, originMember);
-      break;
-    case P_READWRITER:
-      originMember = originPort->get_member(READWRITER_ADDR);
-      addSignal(originMember->name, originMember);
-      originMember = originPort->get_member(READWRITER_EN);
-      addSignal(originMember->name, originMember);
-      originMember = originPort->get_member(READWRITER_CLK);
-      addSignal(originMember->name, originMember);
-      originMember = originPort->get_member(READWRITER_WMODE);
-      addSignal(originMember->name, originMember);
-      break;
-    default:
-      Panic();
-  }
-}
-/*
-memory: Mem ALLID ':' info INDENT mem_compulsory mem_optional mem_ruw DEDENT { $$ = newNode(P_MEMORY, synlineno(), $4, $2, 0); $$->appendChildList($6); $$->appendChild($8); $$->appendChildList($7); }
-mem_compulsory: mem_datatype mem_depth mem_rlatency mem_wlatency { $$ = new PList(); $$->append(4, $1, $2, $3, $4); }
-mem_optional: mem_reader mem_writer mem_readwriter { $$ = $1; $$->concat($2); $$->concat($3); }
-*/
-void visitMemory(graph* g, PNode* mem) {
-  TYPE_CHECK(mem, 5, INT32_MAX, P_MEMORY);
-  prefix_append(SEP_MODULE, mem->name);
-  TypeInfo* info = visitMemType(g, mem->getChild(0));
-  int depth = visitMemDepth(mem->getChild(1));
-  int rlatency = visitReadLatency(mem->getChild(2));
-  int wlatency = visitWriteLatency(mem->getChild(3));
-  visitRUW(mem->getChild(4));
-
-  moduleInstances.insert(topPrefix());
-
-  if (info->isAggr()) {
-    std::vector<Node*> allSubMem;
-    for (auto entry : info->aggrMember) {
-      Node* node = entry.first;
-      node->type = NODE_MEMORY;
-      allSubMem.push_back(node);
-      g->memory.push_back(node);
-      node->set_memory(depth, rlatency, wlatency);
-    }
-    for (int i = 5; i < mem->getChildNum(); i ++) {
-      // AggrParentNode* parent = new AggrParentNode(prefixName(SEP_AGGR, mem->getChild(i)->name));
-      /* data & mask is unused */
-      Node* originPort = visitMemPort(mem->getChild(i), depth, 0, 0, "", NULL);
-      addOriginMember(originPort, mem->getChild(i));
-      std::map<Node*, Node*>allSubPort;
-      /* create all ports */
-      for (auto node : allSubMem) {
-        std::string suffix = replacePrefix(topPrefix(), "", node->name).c_str();
-        Node* portNode = visitMemPort(mem->getChild(i), depth, node->width, node->sign, suffix, node);
-        node->add_member(portNode);
-        allSubPort[node] = portNode;
-        for (Node* member : portNode->member) {
-          addSignal(member->name, member);
-        }
-        /* create alias */
-        memoryAlias(originPort, portNode);
-      }
-      /* create aggr parent */
-      for (AggrParentNode* parent : info->aggrParent) {
-        if (parent->member.size() == 0) continue;
-        std::string suffix = replacePrefix(topPrefix(), "", parent->name);
-        PNode* memPort = mem->getChild(i);
-        if (memPort->type == P_READER) { // data only
-          AggrParentNode* portAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "data" + suffix));
-          for (auto entry : parent->member) {
-            portAggr->addMember(allSubPort[entry.first]->get_member(READER_DATA), entry.second);
-          }
-          addDummy(portAggr->name, portAggr);
-
-        } else if (memPort->type == P_WRITER) {
-          AggrParentNode* maskAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "mask" + suffix));
-          AggrParentNode* dataAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "data" + suffix));
-          for (auto entry : parent->member) {
-            maskAggr->addMember(allSubPort[entry.first]->get_member(WRITER_MASK), entry.second);
-            dataAggr->addMember(allSubPort[entry.first]->get_member(WRITER_DATA), entry.second);
-          }
-          addDummy(maskAggr->name, maskAggr);
-          addDummy(dataAggr->name, dataAggr);
-
-        } else if (memPort->type == P_READWRITER) {
-          AggrParentNode* wmaskAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "wmask" + suffix));
-          AggrParentNode* rdataAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "rdata" + suffix));
-          AggrParentNode* wdataAggr = new AggrParentNode(prefixName(SEP_MODULE, memPort->name + SEP_AGGR + "wdata" + suffix));
-          for (auto entry : parent->member) {
-            wmaskAggr->addMember(allSubPort[entry.first]->get_member(READWRITER_WMASK), entry.second);
-            rdataAggr->addMember(allSubPort[entry.first]->get_member(READWRITER_RDATA), entry.second);
-            wdataAggr->addMember(allSubPort[entry.first]->get_member(READWRITER_RDATA), entry.second);
-          }
-          addDummy(wmaskAggr->name, wmaskAggr);
-          addDummy(rdataAggr->name, rdataAggr);
-          addDummy(wdataAggr->name, wdataAggr);
-        }
-      }
-    }
-
-  } else {
-    Node* memNode = allocNode(NODE_MEMORY, topPrefix(), mem->lineno);
-    g->memory.push_back(memNode);
-    memNode->updateInfo(info);
-
-    memNode->set_memory(depth, rlatency, wlatency);
-
-    for (int i = 5; i < mem->getChildNum(); i ++) {
-      PNode* port = mem->getChild(i);
-      Node* portNode = visitMemPort(port, depth, info->width, info->sign, "", memNode);
-      memNode->add_member(portNode);
-      for (Node* member : portNode->member) {
-        addSignal(member->name, member);
-      }
-    }
-
-
-  }
-  prefix_pop();
-
-}
 
 static Node* allocAddrNode(graph* g, Node* port) {
   ENode* addr_enode = port->memTree->getRoot()->getChild(0);
@@ -1052,7 +757,6 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
   }
 }
 
-// TODO: Comb memory support
 static void visitChirrtlMemory(graph* g, PNode* mem) {
   assert(mem->type == P_SEQ_MEMORY || mem->type == P_COMB_MEMORY);
   prefix_append(SEP_MODULE, mem->name);
@@ -1362,7 +1066,7 @@ std::pair<ExpTree*, ENode*> growWhenTrace(Node* node, ExpTree* valTree, size_t d
             when cond:
               a <= 1
     */
-    if (oldRoot->opType != OP_WHEN && oldRoot->opType != OP_STMT) {
+    if (oldRoot->opType != OP_WHEN) {
       childRoot = oldRoot;
       oldRoot = nullptr;
     }
@@ -1398,15 +1102,8 @@ std::pair<ExpTree*, ENode*> growWhenTrace(Node* node, ExpTree* valTree, size_t d
       if (valTree) node->assignTree.push_back(valTree);
       valTree = new ExpTree(newRoot);
     } else {
-      ENode* stmt = nullptr;
-      if (oldRoot->opType == OP_STMT) {
-        stmt = oldRoot;
-      } else {
-        stmt = new ENode(OP_STMT);
-        stmt->addChild(oldRoot);
-      }
-      stmt->addChild(newRoot);
-      oldParent->setChild(whenTrace[maxDepth-1].first ? 1 : 2, stmt);
+      node->assignTree.push_back(valTree->dup());
+      oldParent->setChild(whenTrace[maxDepth-1].first ? 1 : 2, newRoot);
     }
   }
   return std::make_pair(valTree, retENode);
@@ -1734,7 +1431,6 @@ void visitStmt(graph* g, PNode* stmt) {
     case P_REG_DEF: visitRegDef(g, stmt, P_REG_DEF); break;
     case P_REG_RESET_DEF: visitRegDef(g, stmt, P_REG_RESET_DEF); break;
     case P_INST: visitInst(g, stmt); break;
-    case P_MEMORY: visitMemory(g, stmt); break;
     case P_SEQ_MEMORY : visitChirrtlMemory(g, stmt); break;
     case P_COMB_MEMORY: visitChirrtlMemory(g, stmt); break;
     case P_READ:
@@ -1786,7 +1482,6 @@ void updatePrevNext(Node* n) {
     case NODE_REG_DST:
     case NODE_SPECIAL:
     case NODE_OUT:
-    case NODE_MEM_MEMBER:
     case NODE_OTHERS:
     case NODE_READER:
     case NODE_WRITER:

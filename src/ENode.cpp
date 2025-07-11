@@ -65,9 +65,6 @@ void ENode::usedBitWithFixRoot(int rootWidth) {
       childBits.push_back(rootWidth);
       childBits.push_back(rootWidth);
       break;
-    case OP_STMT:
-      for (size_t i = 0; i < getChildNum(); i ++) childBits.push_back(rootWidth);
-      break;
     case OP_READ_MEM:
       childBits.push_back(Child(0, width));
       break;

@@ -13,7 +13,7 @@ static std::map<PNodeType, const char*> pname = {
   {P_INTMOD, "P_INTMOD"},     {P_PORTS, "P_PORTS"},             {P_INPUT, "P_INPUT"},                 {P_OUTPUT, "P_OUTPUT"},
   {P_WIRE_DEF, "P_WIRE_DEF"}, {P_REG_DEF, "P_REG_DEF"},         {P_REG_RESET_DEF, "P_REG_RESET_DEF"}, {P_INST, "P_INST"},
   {P_NODE, "P_NODE"},         {P_CONNECT, "P_CONNECT"},         {P_PAR_CONNECT, "P_PAR_CONNECT"},     {P_WHEN, "P_WHEN"},
-  {P_MEMORY, "P_MEMORY"},     {P_SEQ_MEMORY, "P_SEQ_MEMORY"},   {P_COMB_MEMORY, "P_COMB_MEMORY"},     {P_WRITE, "P_WRITE"},
+  {P_SEQ_MEMORY, "P_SEQ_MEMORY"},   {P_COMB_MEMORY, "P_COMB_MEMORY"},     {P_WRITE, "P_WRITE"},
   {P_READ, "P_READ"},         {P_INFER, "P_INFER"},             {P_MPORT, "P_MPORT"},                 {P_READER, "P_READER"},
   {P_WRITER, "P_WRITER"},     {P_READWRITER, "P_READWRITER"},   {P_RUW, "P_RUW"},                     {P_RLATENCT, "P_RLATENCT"},
   {P_WLATENCT, "P_WLATENCT"}, {P_DATATYPE, "P_DATATYPE"},       {P_DEPTH, "P_DEPTH"},                 {P_REF, "P_REF"},
@@ -57,7 +57,7 @@ static std::map<OPType, const char*> OP2Name = {
   {OP_SHR, "shr"}, {OP_HEAD, "head"}, {OP_TAIL, "tail"}, {OP_BITS, "bits"}, {OP_INDEX_INT, "index_int"},
   {OP_INDEX, "index"}, {OP_WHEN, "when"}, {OP_PRINTF, "printf"}, {OP_ASSERT, "assert"}, {OP_INT, "int"},
   {OP_READ_MEM, "readMem"}, {OP_WRITE_MEM, "writeMem"}, {OP_INFER_MEM, "inferMem"},
-  {OP_RESET, "reset"}, {OP_STMT, "stmts"}, {OP_SEXT, "sext"}, {OP_BITS_NOSHIFT, "bits_noshift"},
+  {OP_RESET, "reset"}, {OP_SEXT, "sext"}, {OP_BITS_NOSHIFT, "bits_noshift"},
   {OP_GROUP, "group"}, {OP_EXIT, "exit"}, {OP_EXT_FUNC, "ext_func"},
   {OP_STMT_SEQ, "stmt_seq"}, {OP_STMT_WHEN, "stmt_when"}, {OP_STMT_NODE, "stmt_node"}
 };
@@ -65,7 +65,7 @@ static std::map<OPType, const char*> OP2Name = {
 static std::map<NodeType, const char*> NodeType2Name = {
   {NODE_INVALID, "invalid"}, {NODE_REG_SRC, "reg_src"}, {NODE_REG_DST, "reg_dst"}, {NODE_SPECIAL, "special"},
   {NODE_INP, "inp"}, {NODE_OUT, "out"}, {NODE_MEMORY, "memory"}, {NODE_READER, "reader"},
-  {NODE_WRITER, "writer"}, {NODE_READWRITER, "readwriter"}, {NODE_MEM_MEMBER, "mem_member"},
+  {NODE_WRITER, "writer"}, {NODE_READWRITER, "readwriter"},
   {NODE_OTHERS, "others"}, {NODE_REG_RESET, "reg_reset"}, {NODE_EXT, "ext"}, {NODE_EXT_IN, "ext_in"},
   {NODE_EXT_OUT, "ext_out"}
 };

@@ -104,7 +104,6 @@ size_t countOpsInTree(ExpTree* tree) {
           resetOp ++;
           break;
         case OP_ANDR: case OP_ORR: case OP_XORR:
-        case OP_STMT:
         case OP_EXIT:
         case OP_PRINTF:
         case OP_ASSERT:
