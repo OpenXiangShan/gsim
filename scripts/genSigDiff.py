@@ -2,7 +2,7 @@ import sys
 import os
 import re
 class SigFilter():
-  def __init__(self, name):
+  def __init__(self, name, dir):
     self.srcfp = None
     self.reffp = None
     self.dstfp = None
@@ -10,7 +10,7 @@ class SigFilter():
     self.numPerFile = 10000
     self.fileIdx = 0
     self.varNum = 0
-    self.dstFileName = "obj/" + name + "/" + name + "_checkSig"
+    self.dstFileName = dir + "/" + name + "_checkSig"
 
   def closeDstFile(self):
     if self.dstfp is not None:
@@ -20,12 +20,9 @@ class SigFilter():
   def newDstFile(self):
     self.closeDstFile()
     self.dstfp = open(self.dstFileName + str(self.fileIdx) + ".cpp", "w")
-    self.dstfp.writelines("#include <iostream>\n#include <gmp.h>\n#include <" + self.name + ".h>\n#include \"top_ref.h\"\n")
+    self.dstfp.writelines("#include <iostream>\n#include <" + self.name + ".h>\n#include \"top_ref.h\"\n")
     self.dstfp.writelines("bool checkSig" + str(self.fileIdx) + "(bool display, Diff" + self.name + "* ref, S" + self.name + "* mod) {\n")
     self.dstfp.writelines("bool ret = false;\n")
-    self.dstfp.writelines("mpz_t tmp1;\nmpz_init(tmp1);\n \
-mpz_t tmp2;\nmpz_init(tmp2);\n \
-mpz_t tmp3;\nmpz_init(tmp3);\n")
     self.fileIdx += 1
     self.varNum = 0
 
@@ -44,9 +41,11 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
       match = re.search(r'((uint[0-9]*_t)|mpz_t)(.*)width =', line)
       if match:
         line = line.strip(" ;\n")
-        line = re.split(' |\[|;', line)
-        width = line[-1]
+        line = re.split(r' |\[|;', line)
+        width = line[-4]
+        width = width.strip(",")
         all_sigs[line[1]] = int(width)
+        # print("add sig " + line[1] + " width " + width)
     self.newDstFile()
 
     for line in self.srcfp.readlines():
@@ -123,5 +122,6 @@ mpz_t tmp3;\nmpz_init(tmp3);\n")
     self.dstfp.close()
 
 if __name__ == "__main__":
-  sigFilter = SigFilter(sys.argv[1])
-  sigFilter.filter("obj/" + sys.argv[1] + "_sigs.txt", "emu/obj_" + sys.argv[2] + "/top_ref.h")
+  dir = "build/" + sys.argv[1] + "/model/"
+  sigFilter = SigFilter(sys.argv[2], dir)
+  sigFilter.filter("build/" + sys.argv[1] + "/model/" + sys.argv[2] + "_sigs.txt", "emu/" + sys.argv[3] + "/top_ref.h")
