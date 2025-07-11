@@ -32,7 +32,6 @@ enum PNodeType{
   P_CONNECT,
   P_PAR_CONNECT,
   P_WHEN,
-  P_MEMORY,
   P_SEQ_MEMORY,
   P_COMB_MEMORY,
   P_WRITE,

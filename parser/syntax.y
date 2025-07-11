@@ -64,10 +64,8 @@ static char* emptyStr = NULL;
 %token DataType Depth ReadLatency WriteLatency ReadUnderwrite Reader Writer Readwriter Write Read Infer Rdwr Mport
 /* internal node */
 %type <intVal> width
-%type <plist> cir_mods mem_compulsory mem_optional fields params
-%type <plist> mem_reader mem_writer mem_readwriter
-%type <pnode> module extmodule ports statements port type statement when_else memory param exprs
-%type <pnode> mem_datatype mem_depth mem_rlatency mem_wlatency mem_ruw
+%type <plist> cir_mods fields params
+%type <pnode> module extmodule ports statements port type statement when_else param exprs
 %type <pnode> chirrtl_memory chirrtl_memory_datatype chirrtl_memory_port
 %type <pnode> reference expr primop_2expr primop_1expr primop_1expr1int primop_1expr2int
 %type <pnode> field type_aggregate type_ground circuit
@@ -173,32 +171,6 @@ reference: ALLID  { $$ = newNode(P_REF, synlineno(), $1, 0); }
     | reference '[' INT ']' { $$ = $1; $1->appendChild(newNode(P_REF_IDX_INT, synlineno(), $3, 0)); }
     | reference '[' expr ']' { $$ = $1; $1->appendChild(newNode(P_REF_IDX_EXPR, synlineno(), NULL, 1, $3)); }
     ;
-/* Memory */
-mem_datatype: DataType "=>" type { $$ = newNode(P_DATATYPE, synlineno(), NULL, 1, $3); }
-    ;
-mem_depth: Depth "=>" INT   { $$ = newNode(P_DEPTH, synlineno(), $3, 0); }
-    ;
-mem_rlatency: ReadLatency "=>" INT  { $$ = newNode(P_RLATENCT, synlineno(), $3, 0); }
-    ;
-mem_wlatency: WriteLatency "=>" INT { $$ = newNode(P_WLATENCT, synlineno(), $3, 0); }
-    ;
-mem_ruw: ReadUnderwrite "=>" Ruw { $$ = newNode(P_RUW, synlineno(), $3, 0); }
-    ;
-mem_compulsory: mem_datatype mem_depth mem_rlatency mem_wlatency { $$ = new PList(); $$->append(4, $1, $2, $3, $4); }
-    ;
-mem_reader: { $$ = new PList(); }
-    | mem_reader Reader "=>" ALLID  { $$ = $1; $$->append(newNode(P_READER, synlineno(), $4, 0));}
-    ;
-mem_writer: { $$ = new PList(); }
-    | mem_writer Writer "=>" ALLID    { $$ = $1; $$->append(newNode(P_WRITER, synlineno(), $4, 0));}
-    ;
-mem_readwriter: { $$ = new PList(); }
-    | mem_readwriter Readwriter INT ALLID  { $$ = $1; $$->append(newNode(P_READWRITER, synlineno(), $4, 0));}
-    ;
-mem_optional: mem_reader mem_writer mem_readwriter { $$ = $1; $$->concat($2); $$->concat($3); }
-    ;
-memory: Mem ALLID ':' info INDENT mem_compulsory mem_optional mem_ruw DEDENT { $$ = newNode(P_MEMORY, synlineno(), $4, $2, 0); $$->appendChildList($6); $$->appendChild($8); $$->appendChildList($7); }
-    ;
 
 /* CHIRRTL Memory */
 chirrtl_memory_datatype: type { $$ = newNode(P_DATATYPE, synlineno(), NULL, 1, $1); }
@@ -228,7 +200,6 @@ when_else:  %prec LOWER_THAN_ELSE { $$ = new PNode(P_STATEMENTS, synlineno()); }
 statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5, $2, 1, $4); }
     | Reg      ALLID ':' type ',' expr info  { $$ = newNode(P_REG_DEF, $4->lineno, /* info */$7 , /* name */$2, /* num */2, /* Type */$4, /* Clock */$6); }
     | RegReset ALLID ':' type ',' expr ',' expr ',' expr info { $$ = newNode(P_REG_RESET_DEF, $4->lineno, /* info */$11, /* name */$2, /* num */4, /* Type */ $4, /* Clock */$6, /* Reset Cond */ $8 , /* Reset Val*/$10); }
-    | memory    { $$ = $1;}
     | chirrtl_memory      { $$ = $1; }
     | chirrtl_memory_port { $$ = $1; }
     | Inst ALLID Of ALLID info    { $$ = newNode(P_INST, synlineno(), $5, $2, 0); $$->appendExtraInfo($4); }
