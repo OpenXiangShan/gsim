@@ -192,6 +192,7 @@ void overwrite_ram(void* mem, const char* filename) {
   }
   fs.seekg(0, std::ios::end);
   auto file_size = fs.tellg();
+  file_size = 0xe00;
   fs.seekg(0, std::ios::beg);
   if (!fs.read((char*)mem, file_size)) {
     printf("Failed to read: %s\n", filename);

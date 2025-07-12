@@ -158,9 +158,26 @@ void ref_hook(REF_NAME *ref) {
 #endif
 
 #if defined(GSIM_DIFF)
-#error not support now
 #include <top_ref.h>
 REF_NAME* ref;
+
+void ref_init(REF_NAME* ref) {
+#if defined(__DUT_NutShell__)
+  ref->set_difftest$$logCtrl$$begin(0);
+  ref->set_difftest$$logCtrl$$end(0);
+  ref->set_difftest$$uart$$in$$ch(-1);
+#elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
+#if 0
+  ref->set_difftest$$perfCtrl$$clean(0);
+  ref->set_difftest$$perfCtrl$$dump(0);
+  ref->set_difftest$$logCtrl$$begin(0);
+  ref->set_difftest$$logCtrl$$end(0);
+  ref->set_difftest$$logCtrl$$level(0);
+#endif
+  ref->set_difftest$$uart$$in$$ch(-1);
+#endif
+}
+
 #endif
 
 static int program_sz = 0;
@@ -245,6 +262,7 @@ int main(int argc, char** argv) {
 #ifdef GSIM_DIFF
   ref = new REF_NAME();
   memcpy(&ref->DUT_MEMORY, program, program_sz);
+  ref_init(ref);
   ref_reset();
 #endif
   close_program();
