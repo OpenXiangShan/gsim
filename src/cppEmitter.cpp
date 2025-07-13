@@ -377,7 +377,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || (node->status != VALID_NODE)) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
   if (node->type == NODE_WRITER) return;
-  if (node->type == NODE_OTHERS && !node->anyNextActive() && !node->isArray()) return;
+  if (node->isLocal()) return;
 #if defined(GSIM_DIFF) || defined(VERILATOR_DIFF)
   genDiffSig(fp, node);
 #endif
@@ -575,7 +575,7 @@ void graph::genNodeInsts(Node* node, std::string flagName, int indent) { // TODO
   std::string oldnode;
   if (node->insts.size()) {
     /* local variables */
-    if (node->status == VALID_NODE && node->type == NODE_OTHERS && !node->anyNextActive() && !node->isArray()) {
+    if (node->isLocal()) {
       emitBodyLock(indent, "%s %s;\n", widthUType(node->width).c_str(), node->name.c_str());
     }
     if (node->isArray() && !node->fullyUpdated && node->anyNextActive()) emitBodyLock(2, "bool %s = false;\n", ASSIGN_INDI(node).c_str());
@@ -729,7 +729,7 @@ void activateAssignEnd(std::string& inst, Node* n, std::string flagName) {
 }
 
 bool Node::isLocal() { // TODO: isArray is OK
-  return status == VALID_NODE && type == NODE_OTHERS && !anyNextActive() && !isArray();
+  return status == VALID_NODE && type == NODE_OTHERS && !anyNextActive() && !isArray() && !isReset();
 }
 
 void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { // current indent = 2
