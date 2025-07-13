@@ -54,7 +54,6 @@ enum OPType {
   OP_INDEX,
 /* when, may be replaced by mux */
   OP_WHEN,
-  OP_STMT,
 /* special */
   OP_PRINTF,
   OP_ASSERT,
