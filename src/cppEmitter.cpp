@@ -553,7 +553,7 @@ void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldN
   if (!opt) emitBodyLock(indent - 1, "}\n");
 }
 
-void graph::activateUncondNext(Node* node, std::set<int>activateId, bool inStep, std::string flagName, int indent) {
+void graph::activateUncondNext(Node* node, std::set<int>& activateId, bool inStep, std::string flagName, int indent) {
   std::map<uint64_t, ActiveType> bitMapInfo;
   auto curMask = activeSet2bitMap(activateId, bitMapInfo, node->super->cppId);
   if (ACTIVE_MASK(curMask) != 0) emitBodyLock(indent, "%s |= 0x%lx; // %s\n", flagName.c_str(), ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
