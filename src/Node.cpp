@@ -217,7 +217,6 @@ bool Node::needActivate() {
 }
 
 void Node::updateActivate() {
-  if (isReset()) nextActiveId.insert(ACTIVATE_ALL);
   for (Node* nextNode : next) {
     if (nextNode->super != super) {
       if (nextNode->super->cppId != -1)
