@@ -210,8 +210,9 @@ void graph::usedBits() {
   }
 
 /* NOTE: reset cond & reset val tree*/
-
+  int updateNum = 0;
   for (Node* node : visitedNodes) {
+    updateNum += node->usedBit != node->width;
     node->width = node->usedBit;
     for (ExpTree* tree : node->assignTree) tree->getRoot()->updateWidth();
     if (node->resetTree) node->resetTree->getRoot()->updateWidth();
@@ -221,6 +222,7 @@ void graph::usedBits() {
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) node->updateTreeWithNewWIdth();
   }
+  printf("[usedBits] update %d nodes, total %ld nodes\n", updateNum, countNodes());
 }
 
 void Node::updateTreeWithNewWIdth() {
