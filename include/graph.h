@@ -56,7 +56,6 @@ class graph {
   void constantMemory();
   void orderAllNodes();
   void genDiffSig(FILE* fp, Node* node);
-  void removeDeadReg();
   void graphCoarsen();
   void graphInitPartition();
   void graphRefine();
