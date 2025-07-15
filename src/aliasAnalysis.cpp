@@ -106,7 +106,7 @@ void graph::aliasAnalysis() {
         if (interNode == enode->getNode()) aliasENode = enode->mergeSubTree(aliasMap[interNode]);
         else aliasENode = aliasMap[interNode]->dup();
       }
-      if (member->isArrayMember && aliasENode->getNode()->isArray() && !aliasENode->getNode()->arraySplitted()) {
+      if (aliasENode->getNode()->isArray() && !aliasENode->getNode()->arraySplitted()) {
         /* do not alias array member to */
       } else if (member->isArray() && (member->arraySplitted() ^ aliasENode->getNode()->arraySplitted())) {
 
@@ -127,12 +127,7 @@ void graph::aliasAnalysis() {
   for (Node* reg : regsrc) {
     if (reg->resetTree) reg->resetTree->replace(aliasMap, reg->isArray());
   }
-  for (auto iter : aliasMap) {
-    if(iter.first->isArrayMember) {
-      Node* parent = iter.first->arrayParent;
-      parent->arrayMember[iter.first->arrayIdx] = getLeafNode(false, iter.second);
-    }
-  }
+
   removeNodesNoConnect(DEAD_NODE);
   reconnectAll();
   printf("[aliasAnalysis] remove %ld alias (%ld -> %ld)\n", aliasNum, totalNodes, totalNodes - aliasNum);

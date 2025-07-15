@@ -162,7 +162,6 @@ class Node {
   bool isClock = false;
   ResetType reset = UNCERTAIN;
   AsReset asReset = EMPTY;
-  bool isArrayMember = false;
   bool inAggr = false;
 /* used for visitWhen in AST2Graph */
 

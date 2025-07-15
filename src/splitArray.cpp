@@ -307,7 +307,6 @@ void ExpTree::updateWithSplittedArray(Node* node, Node* array) {
 }
 
 void graph::splitArrayNode(Node* node) {
-  splittedArray.insert(node);
   node->status = DEAD_NODE;
   /* remove prev connection */
   for (Node* prev : node->depPrev) prev->eraseNext(node);
@@ -441,18 +440,7 @@ void graph::splitArray() {
   Assert(partialVisited.size() == 0, "partial is not empty!");
   printf("[splitArray] split %d arrays\n", num);
   splitOptionalArray();
-  /* treat arrayMember with no arrayNext as normal nodes, update assignTree */
-  /* with arrayNext can also be updated */
-  std::set<Node*> checkNodes;
-  for (Node* node : splittedArray) {
-    for (Node* member : node->arrayMember) {
-      for (Node* next : member->next) {
-        checkNodes.insert(next);
-        if (next->isArray()) member->isArrayMember = true;
-      }
-      checkNodes.insert(member);
-    }
-  }
+
   supersrc.erase(
     std::remove_if(supersrc.begin(), supersrc.end(), [](const SuperNode* n) {return n->member[0]->status == DEAD_NODE; }),
     supersrc.end()

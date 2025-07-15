@@ -77,7 +77,6 @@ class graph {
   /* used after toposort */
   std::vector<SuperNode*> sortedSuper;
   std::vector<SuperNode*> uintReset;
-  std::set<Node*> splittedArray;
   std::vector<std::string> extDecl;
   std::string name;
   int nodeNum = 0;

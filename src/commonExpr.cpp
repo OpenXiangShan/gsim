@@ -176,14 +176,6 @@ void graph::commonExpr() {
       if (member->resetTree) member->resetTree->replace(aliasMap);
     }
   }
-/* apdate arrayMember */
-  for (Node* array: splittedArray) {
-    for (size_t i = 0; i < array->arrayMember.size(); i ++) {
-      if (array->arrayMember[i] && aliasMap.find(array->arrayMember[i]) != aliasMap.end()) {
-        array->arrayMember[i] = aliasMap[array->arrayMember[i]];
-      }
-    }
-  }
 
 /* update connection */
   removeNodesNoConnect(DEAD_NODE);

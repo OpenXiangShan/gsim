@@ -217,12 +217,6 @@ void graph::usedBits() {
     if (node->resetTree) node->resetTree->getRoot()->updateWidth();
   }
 
-  for (Node* node : splittedArray) {
-    int width = 0;
-    for (Node* member : node->arrayMember) width = MAX(width, member->width);
-    node->width = width;
-  }
-
   for (Node* mem : memory) mem->width = mem->usedBit;
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) node->updateTreeWithNewWIdth();

@@ -154,13 +154,6 @@ std::string strReplace(std::string s, std::string oldStr, std::string newStr) {
   return s;
 }
 
-std::string arrayMemberName(Node* node, std::string suffix) {
-  Assert(node->isArrayMember, "invalid type %d %s", node->type, node->name.c_str());
-  std::string ret = strReplace(node->name, "[", "__");
-  ret = strReplace(ret, "]", "__") + "$" + suffix;
-  return ret;
-}
-
 void graph::genNodeInit(Node* node, int mode) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || node->status != VALID_NODE) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
@@ -282,8 +275,6 @@ void graph::genDiffSig(FILE* fp, Node* node) {
   std::string originName = node->name;
   if (node->type == NODE_MEMORY){
 
-  } else if (node->isArrayMember) {
-    allNames.insert(node->name);
   } else if (node->isArray()) {
     int num = node->arrayEntryNum();
     std::vector<std::string> suffix(num);
@@ -329,8 +320,6 @@ void graph::genDiffSig(FILE* fp, Node* node) {
   std::string originName = node->name;
   if (node->type == NODE_MEMORY){
 
-  } else if (node->isArrayMember) {
-    allNames[node->name] = node->name;
   } else if (node->isArray() && node->arrayEntryNum() == 1) {
     std::string verilatorSuffix, diffSuffix;
     for (size_t i = 0; i < node->dimension.size(); i ++) {

@@ -253,8 +253,7 @@ void srcUpdateDst(Node* node) {
 
 static bool isSubArray(std::string name, Node* node) {
   size_t count = countArrayIndex(name);
-  Assert(node->isArrayMember || count <= node->dimension.size(), "invalid array %s in %s", name.c_str(), node->name.c_str());
-  if (node->isArrayMember) return false;
+  Assert(count <= node->dimension.size(), "invalid array %s in %s", name.c_str(), node->name.c_str());
   return node->dimension.size() != count;
 }
 
@@ -2178,11 +2177,6 @@ valInfo* Node::computeArray() {
 
 void Node::updateIsRoot() {
   if (anyExtEdge() || next.size() != 1 || isReset() || isExt()) nodeIsRoot = true;
-  if (isArrayMember) {
-    for (Node* nextNode : next) {
-      if (nextNode->isArray()) nodeIsRoot = true;
-    }
-  }
   for (Node* prevNode : prev) {
     if (prevNode->type == NODE_REG_SRC && !prevNode->regSplit && prevNode->getDst()->super == super) {
       nodeIsRoot = true;

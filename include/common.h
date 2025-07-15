@@ -117,8 +117,7 @@ class ArrayMemberList;
 
 enum ResetType { UNCERTAIN, ASYRESET, UINTRESET, ZERO_RESET };
 
-std::string arrayMemberName(Node* node, std::string suffix);
-#define newBasic(node) (node->isArrayMember ? arrayMemberName(node, "new") : (node->name + "$new"))
+#define newBasic(node) (node->name + "$new")
 #define newName(node) newBasic(node)
 #define oldName(node) (node->name + "$old$" + std::to_string(node->id))
 #define ASSIGN_LABLE std::string("ASSIGN$$$LABEL")
