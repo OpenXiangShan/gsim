@@ -519,7 +519,7 @@ void visitModule(graph* g, PNode* module) {
 extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$ = newNode(P_EXTMOD, synlineno(), $4, $2, 1, $6); $$->appendChildList($8);}
 */
 void visitExtModule(graph* g, PNode* module) {
-  TYPE_CHECK(module, 1, 1, P_EXTMOD);
+  TYPE_CHECK(module, 2, 2, P_EXTMOD);
 
   if (module->getExtra(0) == CLOCK_GATE_NAME) { // ClockGate
     PNode* ports = module->getChild(0);
@@ -559,6 +559,16 @@ void visitExtModule(graph* g, PNode* module) {
       }
       for (AggrParentNode* dummy : portInfo->aggrParent) {
         addDummy(dummy->name, dummy);
+      }
+    }
+    /* params */
+    PNode* params = module->getChild(1);
+    for (int i = 0; i < params->getChildNum(); i ++) {
+      PNode* param = params->getChild(i);
+      if (param->type == P_PARAM_INT) {
+        extNode->paramsInt.push_back(p_stoi(param->getExtra(0).c_str()));
+      } else {
+        Assert(0, "Invalid type %d for ext param", param->type);
       }
     }
     /* construct valTree for every output and NODE_EXT */

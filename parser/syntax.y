@@ -64,8 +64,8 @@ static char* emptyStr = NULL;
 %token DataType Depth ReadLatency WriteLatency ReadUnderwrite Reader Writer Readwriter Write Read Infer Rdwr Mport
 /* internal node */
 %type <intVal> width
-%type <plist> cir_mods fields params
-%type <pnode> module extmodule ports statements port type statement when_else param exprs
+%type <plist> cir_mods fields
+%type <pnode> module extmodule ports statements port type statement when_else param exprs params
 %type <pnode> chirrtl_memory chirrtl_memory_datatype chirrtl_memory_port
 %type <pnode> reference expr primop_2expr primop_1expr primop_1expr1int primop_1expr2int
 %type <pnode> field type_aggregate type_ground circuit
@@ -235,13 +235,13 @@ module: opt_public Module ALLID ':' info INDENT ports statements DEDENT { $$ = n
 ext_defname:                       { $$ = ""; }
     | Defname '=' ALLID            { $$ = $3; }
     ;
-params:                            { $$ = new PList(); }
-    | params param                 { $$ = $1; $$->append($2); }
+params:                            { $$ = new PNode(P_PARAMS); }
+    | params param                 { $$ = $1; $$->appendChild($2); }
     ;
-param: Parameter ALLID '=' String  {  }
-    | Parameter ALLID '=' INT      {  }
+param: Parameter ALLID '=' String  { $$ = newNode(P_PARAM_STR, synlineno(), $2, 0); $$->appendExtraInfo($4); }
+    | Parameter ALLID '=' INT      { $$ = newNode(P_PARAM_INT, synlineno(), $2, 0); $$->appendExtraInfo($4); }
     ;
-extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$ = newNode(P_EXTMOD, synlineno(), $4, $2, 1, $6); $$->appendExtraInfo($7); }
+extmodule: Extmodule ALLID ':' info INDENT ports ext_defname params DEDENT  { $$ = newNode(P_EXTMOD, synlineno(), $4, $2, 2, $6, $8); $$->appendExtraInfo($7); }
     ;
 intmodule: Intmodule ALLID ':' info INDENT ports Intrinsic '=' ALLID params DEDENT	{ TODO(); }
 		;
