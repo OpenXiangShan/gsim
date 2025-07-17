@@ -33,15 +33,9 @@ ENode* ENode::mergeSubTree(ENode* newSubTree) {
   return ret;
 }
 
-Node* getLeafNode(bool isArray, ENode* enode) {
-  if (!enode->getNode()) return nullptr;
-  Node* node = enode->getNode();
-  return node;
-}
-
 void ExpTree::replace(std::map<Node*, ENode*>& aliasMap, bool isArray) {
   std::stack<ENode*> s;
-  Node* leafNode = getLeafNode(isArray, getRoot());
+  Node* leafNode = getRoot()->getNode();
   if(aliasMap.find(leafNode) != aliasMap.end()) {
     int width = getRoot()->width;
     if (leafNode == getRoot()->getNode())
@@ -60,15 +54,10 @@ void ExpTree::replace(std::map<Node*, ENode*>& aliasMap, bool isArray) {
     for (size_t i = 0; i < top->getChildNum(); i ++) {
       if (!top->getChild(i)) continue;
       s.push(top->getChild(i));
-      if (!top->getChild(i)->getNode()) continue;
-      Node* replaceNode = getLeafNode(isArray, top->getChild(i));
+      Node* replaceNode = top->getChild(i)->getNode();
+      if (!replaceNode) continue;
       if (aliasMap.find(replaceNode) != aliasMap.end()) {
-        ENode* newChild;
-        if (replaceNode != top->getChild(i)->getNode()) { // splitted array member
-          newChild = aliasMap[replaceNode]->dup();
-        } else {
-          newChild = top->getChild(i)->mergeSubTree(aliasMap[replaceNode]);
-        }
+        ENode* newChild = top->getChild(i)->mergeSubTree(aliasMap[replaceNode]);
         newChild->width = top->getChild(i)->width;
         top->setChild(i, newChild);
       }
@@ -94,7 +83,7 @@ void graph::aliasAnalysis() {
       ENode* enode = member->isAlias();
       if (!enode) continue;
       aliasNum ++;
-      Node* interNode = getLeafNode(member->isArray(), enode);//->getNode();
+      Node* interNode = enode->getNode();
       ENode* aliasENode = enode;
       if (aliasMap.find(interNode) != aliasMap.end()) {
         if (interNode == enode->getNode()) aliasENode = enode->mergeSubTree(aliasMap[interNode]);

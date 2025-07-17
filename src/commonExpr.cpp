@@ -10,18 +10,9 @@ static std::map<Node*, uint64_t> nodeId;
 static std::map<Node*, Node*> realValueMap;
 static std::map<Node*, Node*> aliasMap;
 
-Node* getLeafNode(bool isArray, ENode* enode);
 
 uint64_t ENode::keyHash() {
-  if (nodePtr) {
-    Node* node = getLeafNode(true, this);
-    if (node) {
-      Assert(nodeId.find(node) != nodeId.end(), "node %s not found status %d type %d", node->name.c_str(), node->status, node->type);
-      return nodeId[node];
-    } else {
-      return nodePtr->id;
-    }
-  }
+  if (nodePtr) return nodePtr->id;
   else return opType * width;
 }
 
