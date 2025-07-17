@@ -294,8 +294,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
       pairNum *= node->dimension[i];
     }
     for (size_t i = 0; i < suffix.size(); i ++) {
-      if (!node->arraySplitted() || node->getArrayMember(i)->name == diffNodeName + suffix[i])
-        allNames.insert(diffNodeName + suffix[i]);
+      allNames.insert(diffNodeName + suffix[i]);
     }
   } else {
     allNames.insert(diffNodeName);
@@ -326,7 +325,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
       if (node->type != NODE_REG_DST) diffSuffix += "[0]";
       verilatorSuffix += "_0";
     }
-    if (!nameExist(originName + verilatorSuffix) && (!node->arraySplitted() || node->getArrayMember(0)->status == VALID_NODE))
+    if (!nameExist(originName + verilatorSuffix))
       allNames[diffNodeName + diffSuffix] = verilatorName + verilatorSuffix;
   } else if (node->isArray()) {
     int num = node->arrayEntryNum();
@@ -350,8 +349,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
     }
     for (size_t i = 0; i < suffix.size(); i ++) {
       if (!nameExist(originName + verilatorSuffix[i])) {
-        if (!node->arraySplitted() || node->getArrayMember(i)->name == diffNodeName + suffix[i])
-          allNames[diffNodeName + suffix[i]] = verilatorName + verilatorSuffix[i];
+        allNames[diffNodeName + suffix[i]] = verilatorName + verilatorSuffix[i];
       }
     }
   } else {

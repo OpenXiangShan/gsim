@@ -1583,27 +1583,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     if (childNode) childNode->compute(n, lvalue, false);
   }
   if (nodePtr) {
-    if (nodePtr->isArray() && nodePtr->arraySplitted()) {
-      if (getChildNum() < nodePtr->dimension.size()) {
-        int beg, end;
-        std::tie(beg, end) = getIdx(nodePtr);
-        computeInfo = allocNodeInfo(nodePtr);
-        computeInfo->beg = beg;
-        computeInfo->end = end;
-        for (ENode* childENode : child)
-          computeInfo->valStr += childENode->computeInfo->valStr;
-        if (!IS_INVALID_LVALUE(lvalue)) {
-          for (size_t i = 0; i < nodePtr->dimension.size() - getChildNum(); i ++) {
-            computeInfo->valStr += "[i" + std::to_string(i) + "]";
-          }
-        }
-        computeInfo->opNum = 0;
-      } else {
-        int idx = getArrayIndex(nodePtr);
-        MUX_DEBUG(printf("node %s %s\n", nodePtr->name.c_str(), nodePtr->getArrayMember(idx)->name.c_str()));
-        computeInfo = nodePtr->getArrayMember(idx)->compute()->dup();
-      }
-    } else if (nodePtr->isArray()) {
+    if (nodePtr->isArray()) {
       computeInfo = allocNodeInfo(nodePtr);
       if (child.size() != 0 && computeInfo->status == VAL_VALID) { // TODO: constant array representation
         for (ENode* childENode : child)

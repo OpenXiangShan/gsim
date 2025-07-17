@@ -237,7 +237,6 @@ public:
   std::vector<int> getDim();
   clockVal* clockCompute();
   ResetType inferReset();
-  ArrayMemberList* getArrayMember(Node* node);
   void display(int depth = 1);
   uint64_t keyHash();
   NodeComponent* inferComponent(Node* node);
@@ -310,7 +309,7 @@ public:
     void getRelyNodes(std::set<Node*>& allNodes);
     void updateWithSplittedNode();
     void clearComponent();
-    void updateWithSplittedArray(Node* node, Node* array);
+    void updateWithSplittedArray(Node* node, Node* array, std::vector<Node*>& arrayMember);
     bool isReadTree();
     ExpTree* dup();
 };
@@ -448,16 +447,6 @@ public:
   void merge(NodeList* newList) {
     if (!newList) return;
     nodes.insert(nodes.end(), newList->nodes.begin(), newList->nodes.end());
-  }
-};
-
-class ArrayMemberList {
-public:
-  std::vector<Node*> member;
-  std::vector<int> idx;
-  void add_member(Node* n, int _idx) {
-    member.push_back(n);
-    idx.push_back(_idx);
   }
 };
 

@@ -17,16 +17,8 @@ void Node::updateConnect() {
     q.pop();
     Node* prevNode = top->getNode();
     if (prevNode) {
-      if (prevNode->isArray() && prevNode->arraySplitted()) {
-        ArrayMemberList* list = top->getArrayMember(prevNode);
-        for (Node* arrayMember : list->member) {
-          addPrev(arrayMember);
-          arrayMember->addNext(this);
-        }
-      } else {
-        addPrev(prevNode);
-        prevNode->addNext(this);
-      }
+      addPrev(prevNode);
+      prevNode->addNext(this);
     }
     for (size_t i = 0; i < top->getChildNum(); i ++) {
       if (top->getChild(i)) q.push(top->getChild(i));

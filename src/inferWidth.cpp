@@ -21,13 +21,8 @@ void ENode::inferWidth() {
     if (enode) enode->inferWidth();
   }
   if (nodePtr) {
-    Node* realNode = nodePtr;
-    if(nodePtr->isArray() && nodePtr->arraySplitted()) {
-      ArrayMemberList* list = getArrayMember(nodePtr);
-      realNode = list->member[0];
-    }
-    setWidth(realNode->width, realNode->sign);
-    isClock = realNode->isClock;
+    setWidth(nodePtr->width, nodePtr->sign);
+    isClock = nodePtr->isClock;
   } else {
     isClock = false;
     switch (opType) {
@@ -185,10 +180,6 @@ void ENode::clearWidth() {
 }
 
 void Node::clearWidth() {
-  if (isArray() && arraySplitted()) {
-    Panic();
-    for (Node* member : arrayMember) member->clearWidth();
-  }
   for (ExpTree* tree : assignTree) {
     tree->getRoot()->clearWidth();
     tree->getlval()->clearWidth();
@@ -202,9 +193,6 @@ inverse topological order or [infer all encountered nodes]
 */
 void Node::inferWidth() {
   if (type == NODE_INVALID) return;
-  if (isArray() && arraySplitted()) {
-    for (Node* member : arrayMember) member->inferWidth();
-  }
   if (resetTree) resetTree->getRoot()->inferWidth();
 
   for (ExpTree* tree : assignTree) tree->getRoot()->inferWidth();

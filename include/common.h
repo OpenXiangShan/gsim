@@ -113,7 +113,6 @@ class ExpTree;
 class SuperNode;
 class valInfo;
 class clockVal;
-class ArrayMemberList;
 
 enum ResetType { UNCERTAIN, ASYRESET, UINTRESET, ZERO_RESET };
 

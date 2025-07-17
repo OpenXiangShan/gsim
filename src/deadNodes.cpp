@@ -14,16 +14,7 @@ void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes) {
     ENode* top = s.top();
     s.pop();
     Node* prevNode = top->getNode();
-    if (prevNode) {
-      if (prevNode->isArray() && prevNode->arraySplitted()) {
-        ArrayMemberList* list = top->getArrayMember(prevNode);
-        for (Node* arrayMember : list->member) {
-          allNodes.insert(arrayMember);
-        }
-      } else {
-        allNodes.insert(prevNode);
-      }
-    }
+    if (prevNode) allNodes.insert(prevNode);
     for (size_t i = 0; i < top->getChildNum(); i ++) {
       if (top->getChild(i)) s.push(top->getChild(i));
     }

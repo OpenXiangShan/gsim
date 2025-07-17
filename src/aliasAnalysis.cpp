@@ -36,12 +36,6 @@ ENode* ENode::mergeSubTree(ENode* newSubTree) {
 Node* getLeafNode(bool isArray, ENode* enode) {
   if (!enode->getNode()) return nullptr;
   Node* node = enode->getNode();
-  if (node->isArray() && node->arraySplitted()) {
-    int beg, end;
-    std::tie(beg, end) = enode->getIdx(node);
-    if (beg < 0 || (isArray && enode->getChildNum() != node->dimension.size())) return node;
-    else return node->getArrayMember(beg);
-  }
   return node;
 }
 
@@ -106,14 +100,8 @@ void graph::aliasAnalysis() {
         if (interNode == enode->getNode()) aliasENode = enode->mergeSubTree(aliasMap[interNode]);
         else aliasENode = aliasMap[interNode]->dup();
       }
-      if (aliasENode->getNode()->isArray() && !aliasENode->getNode()->arraySplitted()) {
-        /* do not alias array member to */
-      } else if (member->isArray() && (member->arraySplitted() ^ aliasENode->getNode()->arraySplitted())) {
-
-      } else {
-        member->status = DEAD_NODE;
-        aliasMap[member] = aliasENode;
-      }
+      member->status = DEAD_NODE;
+      aliasMap[member] = aliasENode;
     }
   }
   /* update valTree */
