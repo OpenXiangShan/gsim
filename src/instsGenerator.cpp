@@ -2198,6 +2198,10 @@ std::string computeExtMod(SuperNode* super) {
   std::string funcDecl = "void " + funcName + "(";
   std::string inst = funcName + "(";
   int argIdx = 0;
+  for (int param : super->member[0]->paramsInt) {
+    funcDecl += "int _" + std::to_string(argIdx ++) + ", ";
+    inst += std::to_string(param) + ", ";
+  }
   for (size_t i = 0; i < super->member[0]->member.size(); i ++) {
     Node* arg = super->member[0]->member[i];
     if (i != 0) {

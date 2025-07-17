@@ -153,6 +153,7 @@ Node* Node::dup(NodeType _type, std::string _name) {
   duplicate->reset = reset;
   duplicate->lineno = lineno;
   for (int dim : dimension) duplicate->dimension.push_back(dim);
+  for (int param : paramsInt) duplicate->paramsInt.push_back(param);
 
   return duplicate;
 }
