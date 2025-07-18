@@ -283,7 +283,7 @@ public:
     }
     void display(int depth = 1);
     /* used in alias */
-    void replace(std::map<Node*, ENode*>& aliasMap, bool isArray);
+    void replace(std::map<Node*, ENode*>& aliasMap);
     /* used in mergeRegister */
     void replace(Node* oldNode, ENode* newENode);
     /* used in commonExpr */

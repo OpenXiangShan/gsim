@@ -33,15 +33,12 @@ ENode* ENode::mergeSubTree(ENode* newSubTree) {
   return ret;
 }
 
-void ExpTree::replace(std::map<Node*, ENode*>& aliasMap, bool isArray) {
+void ExpTree::replace(std::map<Node*, ENode*>& aliasMap) {
   std::stack<ENode*> s;
-  Node* leafNode = getRoot()->getNode();
-  if(aliasMap.find(leafNode) != aliasMap.end()) {
+  Node* node = getRoot()->getNode();
+  if(aliasMap.find(node) != aliasMap.end()) {
     int width = getRoot()->width;
-    if (leafNode == getRoot()->getNode())
-      setRoot(getRoot()->mergeSubTree(aliasMap[leafNode]));
-    else
-      setRoot(aliasMap[leafNode]->dup());
+    setRoot(getRoot()->mergeSubTree(aliasMap[node]));
     getRoot()->width = width;
   }
   s.push(getRoot());
@@ -80,14 +77,13 @@ void graph::aliasAnalysis() {
     totalNodes += super->member.size();
     for (Node* member : super->member) {
       if (member->status != VALID_NODE) continue;
-      ENode* enode = member->isAlias();
+      ENode* enode = member->isAlias(); // may be a[0]
       if (!enode) continue;
       aliasNum ++;
-      Node* interNode = enode->getNode();
+      Node* aliasNode = enode->getNode();
       ENode* aliasENode = enode;
-      if (aliasMap.find(interNode) != aliasMap.end()) {
-        if (interNode == enode->getNode()) aliasENode = enode->mergeSubTree(aliasMap[interNode]);
-        else aliasENode = aliasMap[interNode]->dup();
+      if (aliasMap.find(aliasNode) != aliasMap.end()) {
+        aliasENode = enode->mergeSubTree(aliasMap[aliasNode]);
       }
       member->status = DEAD_NODE;
       aliasMap[member] = aliasENode;
@@ -97,12 +93,9 @@ void graph::aliasAnalysis() {
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == DEAD_NODE) continue;
-      for (ExpTree* tree : member->assignTree) tree->replace(aliasMap, member->isArray());
+      for (ExpTree* tree : member->assignTree) tree->replace(aliasMap);
+      if (member->resetTree) member->resetTree->replace(aliasMap);
     }
-  }
-
-  for (Node* reg : regsrc) {
-    if (reg->resetTree) reg->resetTree->replace(aliasMap, reg->isArray());
   }
 
   removeNodesNoConnect(DEAD_NODE);
