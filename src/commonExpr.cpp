@@ -12,7 +12,7 @@ static std::map<Node*, Node*> aliasMap;
 
 
 uint64_t ENode::keyHash() {
-  if (nodePtr) return nodePtr->id;
+  if (nodePtr) return nodeId.find(nodePtr) != nodeId.end() ? nodeId[nodePtr] : nodePtr->id;
   else return opType * width;
 }
 
