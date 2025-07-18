@@ -10,18 +10,9 @@ static std::map<Node*, uint64_t> nodeId;
 static std::map<Node*, Node*> realValueMap;
 static std::map<Node*, Node*> aliasMap;
 
-Node* getLeafNode(bool isArray, ENode* enode);
 
 uint64_t ENode::keyHash() {
-  if (nodePtr) {
-    Node* node = getLeafNode(true, this);
-    if (node) {
-      Assert(nodeId.find(node) != nodeId.end(), "node %s not found status %d type %d", node->name.c_str(), node->status, node->type);
-      return nodeId[node];
-    } else {
-      return nodePtr->id;
-    }
-  }
+  if (nodePtr) return nodeId.find(nodePtr) != nodeId.end() ? nodeId[nodePtr] : nodePtr->id;
   else return opType * width;
 }
 
@@ -174,14 +165,6 @@ void graph::commonExpr() {
       if (member->status == DEAD_NODE) continue;
       for (ExpTree* tree : member->assignTree) tree->replace(aliasMap);
       if (member->resetTree) member->resetTree->replace(aliasMap);
-    }
-  }
-/* apdate arrayMember */
-  for (Node* array: splittedArray) {
-    for (size_t i = 0; i < array->arrayMember.size(); i ++) {
-      if (array->arrayMember[i] && aliasMap.find(array->arrayMember[i]) != aliasMap.end()) {
-        array->arrayMember[i] = aliasMap[array->arrayMember[i]];
-      }
     }
   }
 

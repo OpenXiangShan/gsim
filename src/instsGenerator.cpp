@@ -253,8 +253,7 @@ void srcUpdateDst(Node* node) {
 
 static bool isSubArray(std::string name, Node* node) {
   size_t count = countArrayIndex(name);
-  Assert(node->isArrayMember || count <= node->dimension.size(), "invalid array %s in %s", name.c_str(), node->name.c_str());
-  if (node->isArrayMember) return false;
+  Assert(count <= node->dimension.size(), "invalid array %s in %s", name.c_str(), node->name.c_str());
   return node->dimension.size() != count;
 }
 
@@ -1584,27 +1583,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
     if (childNode) childNode->compute(n, lvalue, false);
   }
   if (nodePtr) {
-    if (nodePtr->isArray() && nodePtr->arraySplitted()) {
-      if (getChildNum() < nodePtr->dimension.size()) {
-        int beg, end;
-        std::tie(beg, end) = getIdx(nodePtr);
-        computeInfo = allocNodeInfo(nodePtr);
-        computeInfo->beg = beg;
-        computeInfo->end = end;
-        for (ENode* childENode : child)
-          computeInfo->valStr += childENode->computeInfo->valStr;
-        if (!IS_INVALID_LVALUE(lvalue)) {
-          for (size_t i = 0; i < nodePtr->dimension.size() - getChildNum(); i ++) {
-            computeInfo->valStr += "[i" + std::to_string(i) + "]";
-          }
-        }
-        computeInfo->opNum = 0;
-      } else {
-        int idx = getArrayIndex(nodePtr);
-        MUX_DEBUG(printf("node %s %s\n", nodePtr->name.c_str(), nodePtr->getArrayMember(idx)->name.c_str()));
-        computeInfo = nodePtr->getArrayMember(idx)->compute()->dup();
-      }
-    } else if (nodePtr->isArray()) {
+    if (nodePtr->isArray()) {
       computeInfo = allocNodeInfo(nodePtr);
       if (child.size() != 0 && computeInfo->status == VAL_VALID) { // TODO: constant array representation
         for (ENode* childENode : child)
@@ -2178,11 +2157,6 @@ valInfo* Node::computeArray() {
 
 void Node::updateIsRoot() {
   if (anyExtEdge() || next.size() != 1 || isReset() || isExt()) nodeIsRoot = true;
-  if (isArrayMember) {
-    for (Node* nextNode : next) {
-      if (nextNode->isArray()) nodeIsRoot = true;
-    }
-  }
   for (Node* prevNode : prev) {
     if (prevNode->type == NODE_REG_SRC && !prevNode->regSplit && prevNode->getDst()->super == super) {
       nodeIsRoot = true;

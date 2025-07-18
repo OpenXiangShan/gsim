@@ -17,28 +17,7 @@ void ENode::passWidthToChild() {
   std::vector<int>childBits;
   if (nodePtr) {
     Node* node = nodePtr;
-    if (node->isArray() && node->arraySplitted()) {
-        auto range = this->getIdx(nodePtr);
-        if (range.first < 0) {
-          range.first = 0;
-          range.second = node->arrayMember.size() - 1;
-        }
-        for (int i = range.first; i <= range.second; i ++) {
-          Node* member = node->getArrayMember(i);
-          if (usedBit > member->usedBit) {
-            member->update_usedBit(usedBit);
-            if (member->type == NODE_REG_SRC) {
-              if (member->usedBit != member->getDst()->usedBit) {
-                checkNodes.push_back(member->getDst());
-                member->getDst()->usedBit = member->usedBit;
-              }
-            }
-            checkNodes.push_back(member);
-          }
-        }
-    } else {
-      if (usedBit > node->usedBit) checkNodes.push_back(node);
-    }
+    if (usedBit > node->usedBit) checkNodes.push_back(node);
     node->update_usedBit(usedBit);
     if (node->type == NODE_REG_SRC) {
       if (node->usedBit != node->getDst()->usedBit) {
@@ -210,23 +189,19 @@ void graph::usedBits() {
   }
 
 /* NOTE: reset cond & reset val tree*/
-
+  int updateNum = 0;
   for (Node* node : visitedNodes) {
+    updateNum += node->usedBit != node->width;
     node->width = node->usedBit;
     for (ExpTree* tree : node->assignTree) tree->getRoot()->updateWidth();
     if (node->resetTree) node->resetTree->getRoot()->updateWidth();
-  }
-
-  for (Node* node : splittedArray) {
-    int width = 0;
-    for (Node* member : node->arrayMember) width = MAX(width, member->width);
-    node->width = width;
   }
 
   for (Node* mem : memory) mem->width = mem->usedBit;
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) node->updateTreeWithNewWIdth();
   }
+  printf("[usedBits] update %d nodes, total %ld nodes\n", updateNum, countNodes());
 }
 
 void Node::updateTreeWithNewWIdth() {

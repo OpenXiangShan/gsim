@@ -154,7 +154,6 @@ class Node {
 /* used for instGerator */
   valInfo* computeInfo = nullptr;
 /* used for splitted array */
-  std::vector<Node*>arrayMember;
   int arrayIdx = -1;
   Node* arrayParent = nullptr;
 /* used for reg & memory */
@@ -162,7 +161,6 @@ class Node {
   bool isClock = false;
   ResetType reset = UNCERTAIN;
   AsReset asReset = EMPTY;
-  bool isArrayMember = false;
   bool inAggr = false;
 /* used for visitWhen in AST2Graph */
 
@@ -250,14 +248,7 @@ class Node {
   bool isArray() {
     return dimension.size() != 0;
   }
-  bool arraySplitted() {
-    return arrayMember.size() != 0;
-  }
   void addArrayVal(ExpTree* val);
-  Node* getArrayMember(int idx) {
-    Assert(idx < (int)arrayMember.size(), "idx %d out of bound [0, %ld) in %s", idx, arrayMember.size(), name.c_str());
-    return arrayMember[idx];
-  }
   void set_super(SuperNode* _super) {
     super = _super;
   }

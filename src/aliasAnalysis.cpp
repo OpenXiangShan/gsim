@@ -33,27 +33,12 @@ ENode* ENode::mergeSubTree(ENode* newSubTree) {
   return ret;
 }
 
-Node* getLeafNode(bool isArray, ENode* enode) {
-  if (!enode->getNode()) return nullptr;
-  Node* node = enode->getNode();
-  if (node->isArray() && node->arraySplitted()) {
-    int beg, end;
-    std::tie(beg, end) = enode->getIdx(node);
-    if (beg < 0 || (isArray && enode->getChildNum() != node->dimension.size())) return node;
-    else return node->getArrayMember(beg);
-  }
-  return node;
-}
-
-void ExpTree::replace(std::map<Node*, ENode*>& aliasMap, bool isArray) {
+void ExpTree::replace(std::map<Node*, ENode*>& aliasMap) {
   std::stack<ENode*> s;
-  Node* leafNode = getLeafNode(isArray, getRoot());
-  if(aliasMap.find(leafNode) != aliasMap.end()) {
+  Node* node = getRoot()->getNode();
+  if(aliasMap.find(node) != aliasMap.end()) {
     int width = getRoot()->width;
-    if (leafNode == getRoot()->getNode())
-      setRoot(getRoot()->mergeSubTree(aliasMap[leafNode]));
-    else
-      setRoot(aliasMap[leafNode]->dup());
+    setRoot(getRoot()->mergeSubTree(aliasMap[node]));
     getRoot()->width = width;
   }
   s.push(getRoot());
@@ -66,15 +51,10 @@ void ExpTree::replace(std::map<Node*, ENode*>& aliasMap, bool isArray) {
     for (size_t i = 0; i < top->getChildNum(); i ++) {
       if (!top->getChild(i)) continue;
       s.push(top->getChild(i));
-      if (!top->getChild(i)->getNode()) continue;
-      Node* replaceNode = getLeafNode(isArray, top->getChild(i));
+      Node* replaceNode = top->getChild(i)->getNode();
+      if (!replaceNode) continue;
       if (aliasMap.find(replaceNode) != aliasMap.end()) {
-        ENode* newChild;
-        if (replaceNode != top->getChild(i)->getNode()) { // splitted array member
-          newChild = aliasMap[replaceNode]->dup();
-        } else {
-          newChild = top->getChild(i)->mergeSubTree(aliasMap[replaceNode]);
-        }
+        ENode* newChild = top->getChild(i)->mergeSubTree(aliasMap[replaceNode]);
         newChild->width = top->getChild(i)->width;
         top->setChild(i, newChild);
       }
@@ -97,42 +77,27 @@ void graph::aliasAnalysis() {
     totalNodes += super->member.size();
     for (Node* member : super->member) {
       if (member->status != VALID_NODE) continue;
-      ENode* enode = member->isAlias();
+      ENode* enode = member->isAlias(); // may be a[0]
       if (!enode) continue;
       aliasNum ++;
-      Node* interNode = getLeafNode(member->isArray(), enode);//->getNode();
+      Node* aliasNode = enode->getNode();
       ENode* aliasENode = enode;
-      if (aliasMap.find(interNode) != aliasMap.end()) {
-        if (interNode == enode->getNode()) aliasENode = enode->mergeSubTree(aliasMap[interNode]);
-        else aliasENode = aliasMap[interNode]->dup();
+      if (aliasMap.find(aliasNode) != aliasMap.end()) {
+        aliasENode = enode->mergeSubTree(aliasMap[aliasNode]);
       }
-      if (member->isArrayMember && aliasENode->getNode()->isArray() && !aliasENode->getNode()->arraySplitted()) {
-        /* do not alias array member to */
-      } else if (member->isArray() && (member->arraySplitted() ^ aliasENode->getNode()->arraySplitted())) {
-
-      } else {
-        member->status = DEAD_NODE;
-        aliasMap[member] = aliasENode;
-      }
+      member->status = DEAD_NODE;
+      aliasMap[member] = aliasENode;
     }
   }
   /* update valTree */
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == DEAD_NODE) continue;
-      for (ExpTree* tree : member->assignTree) tree->replace(aliasMap, member->isArray());
+      for (ExpTree* tree : member->assignTree) tree->replace(aliasMap);
+      if (member->resetTree) member->resetTree->replace(aliasMap);
     }
   }
 
-  for (Node* reg : regsrc) {
-    if (reg->resetTree) reg->resetTree->replace(aliasMap, reg->isArray());
-  }
-  for (auto iter : aliasMap) {
-    if(iter.first->isArrayMember) {
-      Node* parent = iter.first->arrayParent;
-      parent->arrayMember[iter.first->arrayIdx] = getLeafNode(false, iter.second);
-    }
-  }
   removeNodesNoConnect(DEAD_NODE);
   reconnectAll();
   printf("[aliasAnalysis] remove %ld alias (%ld -> %ld)\n", aliasNum, totalNodes, totalNodes - aliasNum);

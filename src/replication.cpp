@@ -5,7 +5,6 @@
 
 /* non-negative if node is replicated and -1 if node is not */
 static std::map<Node*, int> opNum;
-Node* getLeafNode(bool isArray, ENode* enode);
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
 
 void ExpTree::replace(Node* oldNode, Node* newNode) {
@@ -16,7 +15,7 @@ void ExpTree::replace(Node* oldNode, Node* newNode) {
   while(!s.empty()) {
     ENode* top = s.top();
     s.pop();
-    if (top->getNode() && getLeafNode(true, top) == oldNode) {
+    if (top->getNode() == oldNode) {
       top->nodePtr = newNode;
       top->child.clear();
     }
@@ -35,15 +34,15 @@ int Node::repOpCount() {
   while (!s.empty()) {
     ENode* top = s.top();
     s.pop();
-    if (top->nodePtr) {
-      Node* leafNode = getLeafNode(true, top);
-      if (leafNode->isArray()) {
+    Node* node = top->getNode();
+    if (node) {
+      if (node->isArray()) {
         for (ENode* child : top->child) {
           if (child->width > BASIC_WIDTH) return -1;
           else ret ++;
         }
       }
-      if (opNum[leafNode] >= 0) ret += opNum[leafNode];
+      if (opNum[node] >= 0) ret += opNum[node];
       continue;
     }
     else if (top->opType == OP_INT) continue;

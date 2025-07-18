@@ -31,7 +31,6 @@ static std::set<Node*> uniqueReinfer;
 ExpTree* dupSplittedTree(ExpTree* tree, Node* regold, Node* regnew);
 ExpTree* dupTreeWithBits(ExpTree* tree, int hi, int lo);
 void addReInfer(Node* node);
-Node* getLeafNode(bool isArray, ENode* enode);
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
 
 NodeComponent* spaceComp(int width) {
@@ -195,7 +194,7 @@ bool enodeNeedReplace(ENode* enode, NodeComponent* comp) {
 NodeComponent* ENode::inferComponent(Node* n) {
   if (nodePtr) {
     for (ENode* childENode : child) childENode->inferComponent(n);
-    Node* node = getLeafNode(true, this);
+    Node* node = getNode();
     if (node->isArray() || node->sign) {
       NodeComponent* ret = spaceComp(node->width);
       componentEMap[this] = ret;
@@ -468,7 +467,7 @@ void ExpTree::replaceAndUpdateWidth(Node* oldNode, Node* newNode) {
     ENode* top = s.top();
     s.pop();
     if (!top->nodePtr && top->opType != OP_INT) top->width = -1; // clear width
-    if (top->getNode() && getLeafNode(true, top) == oldNode) {
+    if (top->getNode() == oldNode) {
       top->nodePtr = newNode;
       top->child.clear();
     }
