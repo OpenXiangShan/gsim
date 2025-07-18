@@ -26,6 +26,7 @@ jobs:
         uses: YosysHQ/setup-oss-cad-suite@v3
         with:
             version: "2025-04-24"
+            github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Enlarge swap
         if: matrix.dutName == 'minimal-xiangshan'
         run: |
@@ -68,6 +69,7 @@ jobs:
         uses: YosysHQ/setup-oss-cad-suite@v3
         with:
             version: "2025-04-24"
+            github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Check resources
         run: |
           echo "nproc = `nproc`"
