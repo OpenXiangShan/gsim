@@ -865,7 +865,7 @@ void graph::genResetActivation(SuperNode* super, bool isUIntReset, int indent, i
 
 void graph::genResetAll() {
   std::vector<SuperNode*> resetSuper;
-  for (SuperNode* super : uintReset) {
+  for (SuperNode* super : allReset) {
     if (super->resetNode->status == CONSTANT_NODE) {
       Assert(mpz_sgn(super->resetNode->computeInfo->consVal) == 0, "reset %s is always true", super->resetNode->name.c_str());
       continue;

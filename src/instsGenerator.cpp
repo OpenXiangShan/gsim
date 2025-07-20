@@ -2226,7 +2226,7 @@ void graph::instsGenerator() {
       super->stmtTree->compute(super->insts);
     }
   }
-  for (SuperNode* super : uintReset) {
+  for (SuperNode* super : allReset) {
     super->stmtTree->compute(super->insts);
   }
 

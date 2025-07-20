@@ -195,7 +195,6 @@ bool sortOrderCmp(Node* n1, Node* n2) {
 void graph::essentPartition(){
   size_t totalSuper = sortedSuper.size();
   size_t phaseSuper = sortedSuper.size();
-  mergeAsyncReset();
   mergeResetAll();
   printf("[mergeNodes-reset] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
 

@@ -172,7 +172,6 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
 
-  // FUNC_WRAPPER(g->mergeNodes(), "MergeNodes");
   FUNC_WRAPPER(g->graphPartition(), "graphPartition");
 
   FUNC_WRAPPER(g->replicationOpt(), "Replication");

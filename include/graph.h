@@ -42,14 +42,12 @@ class graph {
   void reconnectSuper();
   void reconnectAll();
   void resetAnalysis();
-  /* defined in mergeNodes */
+  /* graphPartition */
   void mergeWhenNodes();
-  void mergeAsyncReset();
   void mergeResetAll();
   void mergeOut1();
   void mergeIn1();
   void mergeSublings();
-  void mergeNear();
   void splitArrayNode(Node* node);
   void checkNodeSplit(Node* node);
   void splitOptionalArray();
@@ -76,7 +74,7 @@ class graph {
   std::vector<SuperNode*> supersrc;
   /* used after toposort */
   std::vector<SuperNode*> sortedSuper;
-  std::vector<SuperNode*> uintReset;
+  std::vector<SuperNode*> allReset;
   std::vector<std::string> extDecl;
   std::string name;
   int nodeNum = 0;
@@ -93,7 +91,6 @@ class graph {
   void splitArray();
   void removeDeadNodes();
   void aliasAnalysis();
-  void mergeNodes();
   size_t countNodes();
   void removeEmptySuper();
   void removeNodes(NodeStatus status);

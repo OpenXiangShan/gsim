@@ -7,7 +7,6 @@
 #include "common.h"
 #define MAX_NODES_PER_SUPER 7000
 #define MAX_SUBLINGS 30
-#define MAX_NEAR_NUM 50
 
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
 
@@ -213,28 +212,6 @@ void graph::when2mux() {
   }
 }
 
-void graph::mergeAsyncReset() {
-  std::map<Node*, SuperNode*> resetMap;
-  for (Node* reg : regsrc) {
-    if (reg->reset != ASYRESET) continue;
-    std::set<Node*> prev;
-    Assert(reg->resetTree->getRoot()->opType == OP_RESET, "invalid resetTree");
-    getENodeRelyNodes(reg->resetTree->getRoot()->getChild(0), prev);
-    Assert(prev.size() == 1, "multiple prevReset %s", reg->name.c_str());
-    Node* condNode = *prev.begin();
-    SuperNode* condSuper;
-    if (resetMap.find(condNode) == resetMap.end()) {
-      condSuper = condNode->super;
-      condSuper->superType = SUPER_ASYNC_RESET;
-      resetMap[condNode] = condSuper;
-      condSuper->resetNode = condNode;
-      condNode->setAsyncReset();
-    } else {
-      condSuper = resetMap[condNode];
-    }
-  }
-}
-
 void graph::mergeResetAll() {
   std::map<Node*, std::pair<SuperNode*, SuperNode*>> resetSuper; // node as uint / async reset
   for (Node* reg : regsrc) {
@@ -278,12 +255,14 @@ void graph::mergeResetAll() {
     SuperNode* uintSuper = iter.second.first;
     SuperNode* asyncSuper = iter.second.second;
     if (uintSuper->member.size() != 0) {
-      uintReset.push_back(uintSuper);
+      allReset.push_back(uintSuper);
       iter.first->setUIntReset();
     }
     if (asyncSuper->member.size() != 0) {
-      uintReset.push_back(asyncSuper);
+      allReset.push_back(asyncSuper);
       iter.first->setAsyncReset();
+      iter.first->super->superType = SUPER_ASYNC_RESET;
+      iter.first->super->resetNode = asyncSuper->resetNode;
     }
   }
 }
@@ -433,50 +412,4 @@ void graph::mergeSublings() {
   }
   removeEmptySuper();
   reconnectSuper();
-}
-
-void graph::mergeNear() {
-  for (size_t i = 1; i < sortedSuper.size(); i ++) {
-    SuperNode* prevSuper = sortedSuper[i - 1];
-    SuperNode* curSuper = sortedSuper[i];
-    if (prevSuper->superType != SUPER_VALID || curSuper->superType != SUPER_VALID) continue;
-    if (prevSuper->member.size() + curSuper->member.size() <= MAX_NEAR_NUM) {
-      for (Node* node : prevSuper->member) {
-        node->super = curSuper;
-      }
-      curSuper->member.insert(curSuper->member.begin(), prevSuper->member.begin(), prevSuper->member.end());
-      prevSuper->member.clear();
-    }
-  }
-  removeEmptySuper();
-  reconnectSuper();
-}
-
-void graph::mergeNodes() {
-  size_t totalSuper = sortedSuper.size();
-  size_t phaseSuper = sortedSuper.size();
-
-  mergeAsyncReset();
-  mergeResetAll();
-  printf("[mergeNodes-reset] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
-
-  phaseSuper = sortedSuper.size();
-  mergeOut1();
-  printf("[mergeNodes-out1] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
-
-  phaseSuper = sortedSuper.size();
-  mergeIn1();
-  printf("[mergeNodes-in1] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
-
-  phaseSuper = sortedSuper.size();
-  mergeSublings();
-  printf("[mergeNodes-subling] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
-
-  phaseSuper = sortedSuper.size();
-  mergeNear();
-  printf("[mergeNodes-near-%d] remove %ld superNodes (%ld -> %ld)\n", MAX_NEAR_NUM, phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
-
-  phaseSuper = sortedSuper.size();
-  printf("[mergeNodes] remove %ld superNodes (%ld -> %ld)\n", totalSuper - phaseSuper, totalSuper, phaseSuper);
-
 }

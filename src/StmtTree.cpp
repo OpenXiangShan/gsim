@@ -415,7 +415,7 @@ void graph::generateStmtTree() {
       allPath[node] = nodePath;
     }
   }
-  for (SuperNode* super : uintReset) {
+  for (SuperNode* super : allReset) {
     super->stmtTree = new StmtTree();
     super->stmtTree->root = new StmtNode(OP_STMT_SEQ);
     for (Node* node : super->member) {
