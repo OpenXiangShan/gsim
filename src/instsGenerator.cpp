@@ -34,16 +34,6 @@ static void recomputeAllNodes();
 
 int maxConcatNum = 0;
 
-static std::stack<int*> tmpStack;
-static void tmp_push() {
-  tmpStack.push(localTmpNum);
-}
-
-static void tmp_pop() {
-  localTmpNum = tmpStack.top();
-  tmpStack.pop();
-}
-
 static std::priority_queue<Node*, std::vector<Node*>, ordercmp> recomputeQueue;
 static std::set<Node*> uniqueRecompute;
 
@@ -1760,16 +1750,11 @@ valInfo* Node::compute() {
     status = CONSTANT_NODE;
     return computeInfo;
   }
-  tmp_push();
   localTmpNum = &super->localTmpNum;
   MUX_DEBUG(printf("compute %s lcoalTmp %d\n", name.c_str(), *localTmpNum));
   MUX_DEBUG(display());
 
-  if (isArray()) {
-    valInfo* ret = computeArray();
-    tmp_pop();
-    return ret;
-  }
+  if (isArray()) return computeArray();
 
   if (assignTree.size() == 0) {
     computeInfo = new valInfo();
@@ -1782,7 +1767,6 @@ valInfo* Node::compute() {
     computeInfo->sign = sign;
     computeInfo->typeWidth = upperPower2(width);
     computeInfo->opNum = 0;
-    tmp_pop();
     return computeInfo;
   }
 
@@ -1850,7 +1834,6 @@ valInfo* Node::compute() {
       ret->insts.push_back(inst);
     }
   }
-  tmp_pop();
   MUX_DEBUG(printf("compute [%s(%d), %d] = %s status %d %p ret=%p retInst=%ld\n", name.c_str(), type, ret->status, ret->valStr.c_str(), status, this, ret, ret->insts.size()));
   if (needRecompute) recomputeAllNodes();
   return ret;
