@@ -36,7 +36,7 @@ static std::map<std::string, PNode*> moduleMap;
 /* prefix trace. module1, module1$module2 module1$a_b_c...*/
 static std::stack<std::string> prefixTrace;
 static std::map<std::string, Node*> allSignals;
-static std::map<std::string, AggrParentNode*> allDummy; // CHECK: any other dummy nodes ?
+static std::map<std::string, AggrParentNode*> allAggr; // CHECK: any other aggr nodes ?
 static std::vector<std::pair<bool, Node*>> whenTrace;
 static std::set<std::string> moduleInstances;
 
@@ -61,7 +61,7 @@ static inline Node* allocNode(NodeType type = NODE_OTHERS, std::string name = ""
 
 static inline void addSignal(std::string s, Node* n) {
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
-  Assert(allDummy.find(s) == allDummy.end(), "Signal %s is already in allDummy\n", s.c_str());
+  Assert(allAggr.find(s) == allAggr.end(), "Signal %s is already in allAggr\n", s.c_str());
   allSignals[s] = n;
   n->whenDepth = whenTrace.size();
   // printf("add signal %s\n", s.c_str());
@@ -72,20 +72,20 @@ static inline Node* getSignal(std::string s) {
   return allSignals[s];  
 }
 
-static inline void addDummy(std::string s, AggrParentNode* n) {
+static inline void addAggr(std::string s, AggrParentNode* n) {
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
-  Assert(allDummy.find(s) == allDummy.end(), "Node %s is already in allDummy\n", s.c_str());
-  allDummy[s] = n;
-  // printf("add dummy %s\n", s.c_str());
+  Assert(allAggr.find(s) == allAggr.end(), "Node %s is already in allAggr\n", s.c_str());
+  allAggr[s] = n;
+  // printf("add aggr %s\n", s.c_str());
 }
 
-static inline AggrParentNode* getDummy(std::string s) {
-  Assert(allDummy.find(s) != allDummy.end(), "Node %s is not in allDummy\n", s.c_str());
-  return allDummy[s];
+static inline AggrParentNode* getAggr(std::string s) {
+  Assert(allAggr.find(s) != allAggr.end(), "Node %s is not in allAggr\n", s.c_str());
+  return allAggr[s];
 }
 
 static inline bool isAggr(std::string s) {
-  if (allDummy.find(s) != allDummy.end()) return true;
+  if (allAggr.find(s) != allAggr.end()) return true;
   if (allSignals.find(s) != allSignals.end()) return false;
   Assert(0, "%s is not added\n", s.c_str());
 }
@@ -270,8 +270,8 @@ void visitTopPorts(graph* g, PNode* ports) {
       if (node->type == NODE_INP) g->input.push_back(node);
       else if (node->type == NODE_OUT) g->output.push_back(node);
     }
-    for (AggrParentNode* dummy : info->aggrParent) {
-      addDummy(dummy->name, dummy);
+    for (AggrParentNode* aggr : info->aggrParent) {
+      addAggr(aggr->name, aggr);
     }
   }
 }
@@ -348,7 +348,7 @@ ASTExpTree* visitReference(graph* g, PNode* expr) {
   ASTExpTree* ret = nullptr;
 
   if (isAggr(name)) { // add all signals and their names into aggr
-    AggrParentNode* parent = getDummy(name);
+    AggrParentNode* parent = getAggr(name);
     ret = new ASTExpTree(true, parent->size());
     ret->setAnyParent(parent);
     // point the root of aggrTree to parent member
@@ -507,8 +507,8 @@ void visitModule(graph* g, PNode* module) {
       Node* node = entry.first;
       addSignal(node->name, node);
     }
-    for (AggrParentNode* dummy : portInfo->aggrParent) {
-      addDummy(dummy->name, dummy);
+    for (AggrParentNode* aggr : portInfo->aggrParent) {
+      addAggr(aggr->name, aggr);
     }
   }
 
@@ -557,8 +557,8 @@ void visitExtModule(graph* g, PNode* module) {
         } else extNode->add_member(entry.first);
         addSignal(entry.first->name, entry.first);
       }
-      for (AggrParentNode* dummy : portInfo->aggrParent) {
-        addDummy(dummy->name, dummy);
+      for (AggrParentNode* aggr : portInfo->aggrParent) {
+        addAggr(aggr->name, aggr);
       }
     }
     /* construct valTree for every output and NODE_EXT */
@@ -594,7 +594,7 @@ void visitWireDef(graph* g, PNode* wire) {
   for (auto entry : info->aggrMember) {
     addSignal(entry.first->name, entry.first);
   }
-  for (AggrParentNode* dummy : info->aggrParent) addDummy(dummy->name, dummy);
+  for (AggrParentNode* aggr : info->aggrParent) addAggr(aggr->name, aggr);
   if (!info->isAggr()) {
     Node* node = allocNode(NODE_OTHERS, topPrefix(), wire->lineno);
     node->updateInfo(info);
@@ -643,8 +643,8 @@ void visitRegDef(graph* g, PNode* reg, PNodeType type) {
     src->resetCond = new ExpTree(cond, src);
     src->resetVal = new ExpTree(new ENode(src), src);
   }
-  // only src dummy nodes are in allDummy
-  for (AggrParentNode* dummy : info->aggrParent) addDummy(dummy->name, dummy);
+  // only src aggr nodes are in allAggr
+  for (AggrParentNode* aggr : info->aggrParent) addAggr(aggr->name, aggr);
   
   prefix_pop();
 
@@ -753,7 +753,7 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
       Node* memberNode = getSignal(prefixName(SEP_MODULE, port->name) + memberSuffix);
       parent->addMember(memberNode, entry.second);
     }
-    addDummy(parent->name, parent);
+    addAggr(parent->name, parent);
   }
 }
 
@@ -837,7 +837,7 @@ AggrParentNode* allocNodeFromAggr(graph* g, AggrParentNode* parent) {
     addSignal(node->name, node);
     ret->addMember(node, entry.second);
   }
-  /* alloc all dummy nodes, and connect them to real nodes stored in allSignals */
+  /* alloc all aggr nodes, and connect them to real nodes stored in allSignals */
   for (AggrParentNode* aggrMember : parent->parent) {
     // create new aggr node
     AggrParentNode* aggrNode = new AggrParentNode(replacePrefix(oldPrefix, topPrefix(), aggrMember->name));
@@ -847,10 +847,10 @@ AggrParentNode* allocNodeFromAggr(graph* g, AggrParentNode* parent) {
     }
     // the children of aggrMember are earlier than it
     for (AggrParentNode* parent : aggrMember->parent) {
-      aggrNode->addParent(getDummy(replacePrefix(oldPrefix, topPrefix(), parent->name)));
+      aggrNode->addParent(getAggr(replacePrefix(oldPrefix, topPrefix(), parent->name)));
     }
 
-    addDummy(aggrNode->name, aggrNode);
+    addAggr(aggrNode->name, aggrNode);
     ret->addParent(aggrNode);
   }
   return ret;
@@ -891,7 +891,7 @@ void visitNode(graph* g, PNode* node) {
       std::vector<int> dims = exp->getAggr(i)->getDim();
       aggrNode->member[i].first->dimension.insert(aggrNode->member[i].first->dimension.end(), dims.begin(), dims.end());
     }
-    addDummy(aggrNode->name, aggrNode);
+    addAggr(aggrNode->name, aggrNode);
   } else {
     Node* n = allocNode(NODE_OTHERS, topPrefix(), node->lineno);
     std::vector<int> dims = exp->getExpRoot()->getDim();
@@ -1554,11 +1554,7 @@ graph* AST2Graph(PNode* root) {
   Assert(topModule, "Top module can not be NULL\n");
   visitTopModule(g, topModule);
 
-/* infer memory port */
-
-  for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
-  }
-
+/* infer memory port (NODE_INFER) */
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     Node* node = it->second;
     if (node->type == NODE_INFER || node->type == NODE_READER) {
