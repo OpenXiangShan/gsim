@@ -260,14 +260,11 @@ void graph::genInterfaceInput(Node* input) {
 }
 
 void graph::genInterfaceOutput(Node* output) {
-  /* TODO: fix constant output which is not exists in sortedsuper */
-  if (std::find(sortedSuper.begin(), sortedSuper.end(), output->super) == sortedSuper.end()) return;
-  // TODO: constant output
   emitFuncDecl(0, "%s S%s::get_%s() {\n"
                "  return %s;\n"
                "}\n",
                widthUType(output->width).c_str(), name.c_str(),
-               output->name.c_str(), output->name.c_str());
+               output->name.c_str(), output->status == CONSTANT_NODE ? output->computeInfo->valStr.c_str() : output->name.c_str());
 }
 
 void graph::genHeaderEnd(FILE* fp) {

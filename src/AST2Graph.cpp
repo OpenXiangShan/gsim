@@ -1675,7 +1675,7 @@ graph* AST2Graph(PNode* root) {
   }
   for (auto it : allSignals) {
     if ((it.second->type == NODE_OTHERS || it.second->type == NODE_READER || it.second->type == NODE_WRITER || it.second->type == NODE_READWRITER ||
-        it.second->type == NODE_SPECIAL || it.second->type == NODE_EXT || it.second->type == NODE_EXT_IN || it.second->type == NODE_EXT_OUT)
+        it.second->type == NODE_SPECIAL || it.second->type == NODE_EXT || it.second->type == NODE_EXT_IN || it.second->type == NODE_EXT_OUT || it.second->type == NODE_OUT)
         && it.second->super->prev.size() == 0) {
       g->supersrc.push_back(it.second->super);
     }
