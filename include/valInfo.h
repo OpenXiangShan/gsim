@@ -20,7 +20,6 @@ public:
   int opNum = 0;
   valStatus status = VAL_VALID;
   valType type = TYPE_NORMAL;
-  std::vector<std::string> insts;
   mpz_t consVal;
   int width = 0;
   bool sign = 0;
@@ -41,10 +40,6 @@ public:
     width = _width;
     sign = _sign;
     typeWidth = upperPower2(_width);
-  }
-  void mergeInsts(valInfo* newInfo) {
-    insts.insert(insts.end(), newInfo->insts.begin(), newInfo->insts.end());
-    newInfo->insts.clear();
   }
   void setConsStr() {
     if (mpz_sgn(consVal) >= 0) {

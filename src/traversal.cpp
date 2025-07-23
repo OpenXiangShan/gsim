@@ -71,7 +71,7 @@ static std::map<NodeType, const char*> NodeType2Name = {
 };
 
 static std::map<NodeStatus, const char*> NodeStatus2Name = {
-  {VALID_NODE, "valid"}, {DEAD_NODE, "dead"}, {CONSTANT_NODE, "constant"}, {MERGED_NODE, "merged"},
+  {VALID_NODE, "valid"}, {DEAD_NODE, "dead"}, {CONSTANT_NODE, "constant"},
   {REPLICATION_NODE, "replication"}, {SPLITTED_NODE, "splitted"}
 };
 

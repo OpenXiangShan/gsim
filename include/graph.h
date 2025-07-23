@@ -17,14 +17,12 @@ class graph {
 
   FILE* genHeaderStart();
   void genNodeDef(FILE* fp, Node* node);
-  void genNodeInsts(Node* node, std::string flagName, int indent);
   void genInterfaceInput(Node* input);
   void genInterfaceOutput(Node* output);
   void genStep(int subStepIdxMax);
   void genHeaderEnd(FILE* fp);
   int genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string flagName, int indent);
   int genNodeStepEnd(SuperNode* node, int indent);
-  void genNodeInit(Node* node, int mode);
   void genMemInit(Node* node);
   void nodeDisplay(Node* member, int indent);
   void genMemRead(FILE* fp);
@@ -36,6 +34,7 @@ class graph {
   void genResetDef(SuperNode* super, bool isUIntReset, int indent);
   void genResetActivation(SuperNode* super, bool isUIntReset, int indent, int resetId);
   void genResetDecl(FILE* fp);
+  int translateInst(InstInfo inst, int indent, std::string flagName);
   void genSuperEval(SuperNode* super, std::string flagName, int indent);
   std::string saveOldVal(Node* node);
   void removeNodesNoConnect(NodeStatus status);

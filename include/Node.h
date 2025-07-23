@@ -34,7 +34,6 @@ enum NodeStatus{
   VALID_NODE,
   DEAD_NODE,
   CONSTANT_NODE,
-  MERGED_NODE,
   REPLICATION_NODE,
   SPLITTED_NODE,
   EMPTY_REG  /* reg_src or reg_dst that are empty, which means that regNext represets the whole register */
@@ -102,7 +101,6 @@ public:
 };
 
 class Node {
-  void finalConnect(std::string lvalue, valInfo* info);
   static int counter;
  public:
 
@@ -173,10 +171,6 @@ class Node {
 /* used in cppEmitter */
   std::set<int> nextActiveId;
   std::set<int> nextNeedActivate;
-
-  std::vector<std::string> insts;
-  std::vector<std::string> resetInsts;
-  std::vector<std::string> initInsts;
 
   void updateInfo(TypeInfo* info);
   void setType(int _width, bool _sign) {
@@ -297,10 +291,7 @@ class Node {
   void addUpdateTree();
   void constructSuperNode(); // alloc superNode for every node
   void constructSuperConnect(); // connect superNode
-  valInfo* compute(); // compute node
-  valInfo* computeArray();
   valInfo* computeConstantArray();
-  void recompute();
   void recomputeConstant();
   void passWidthToPrev();
   void splitArray();
@@ -396,7 +387,6 @@ public:
   int cppId = -1;
   SuperType superType = SUPER_VALID;
   Node* resetNode = nullptr;
-  int localTmpNum = 0;
   SuperNode() {
     id = counter ++;
   }
