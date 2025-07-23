@@ -46,7 +46,10 @@ void graph::detectLoop() {
     } else if (states[top] == EXPANDED) {
       states[top] = VISITED;
       s.pop();
-    } 
+    } else if (states[top] == VISITED) {
+      top->display();
+      Assert(0, "already visited %p\n", top);
+    }
   }
   std::cout << "NO Loop!\n";
 }
