@@ -165,7 +165,6 @@ class Node {
   size_t whenDepth = 0;
 
 /* used in instsGenerator */
-  bool fullyUpdated = true;
   bool nodeIsRoot = false;
 
 /* used in cppEmitter */

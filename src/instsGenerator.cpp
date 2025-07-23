@@ -365,7 +365,6 @@ valInfo* ENode::instsWhen(Node* node, std::string lvalue, bool isRoot) {
     ret->opNum = -1;
     ret->type = TYPE_STMT;
     ret->directUpdate = false;
-    if (trueStr.length() == 0 || falseStr.length() == 0 || !ChildInfo(1, fullyUpdated) || !ChildInfo(2, fullyUpdated)) ret->fullyUpdated = false;
   }
 
   /* update sameConstant and assignCons*/
@@ -1425,7 +1424,6 @@ valInfo* ENode::instsReset(Node* node, std::string lvalue, bool isRoot) {
     ret = format("%s = %s;", lvalue.c_str(), resetVal->valStr.c_str());
   }
   computeInfo->valStr = format("if %s { %s }", addBracket(ChildInfo(0, valStr)).c_str(), ret.c_str());
-  computeInfo->fullyUpdated = false;
   computeInfo->opNum = -1;
   computeInfo->type = TYPE_STMT;
   computeInfo->sameConstant = resetVal->sameConstant;
@@ -1550,7 +1548,6 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       computeInfo->opNum = 1;
     }
 
-    computeInfo->setFullyUpdated();
     MUX_DEBUG(printf("  %p(node) width %d info->width %d status %d val %s sameConstant %d opNum %d instsNum %ld %p\n", this, width, computeInfo->width, computeInfo->status, computeInfo->valStr.c_str(), computeInfo->sameConstant, computeInfo->opNum, computeInfo->insts.size(), computeInfo));
     for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
       if (computeInfo->memberInfo[i]) {

@@ -30,7 +30,6 @@ public:
   std::vector<valInfo*> memberInfo;
   bool sameConstant = false;
   mpz_t assignmentCons;
-  bool fullyUpdated = true;
   bool directUpdate = true;
 
   valInfo(int _width = 0, bool _sign = 0) {
@@ -83,7 +82,6 @@ public:
     ret->typeWidth = typeWidth;
     ret->sign = sign;
     ret->consLength = consLength;
-    ret->fullyUpdated = fullyUpdated;
     mpz_set(ret->assignmentCons, assignmentCons);
     ret->sameConstant = sameConstant;
 
@@ -93,12 +91,7 @@ public:
     }
     return ret;
   }
-  void setFullyUpdated() {
-    fullyUpdated = true;
-    for (valInfo* info : memberInfo) {
-      if (info) info->setFullyUpdated();
-    }
-  }
+
   valInfo* dupWithCons() {
     valInfo* ret = dup();
     mpz_set(ret->assignmentCons, assignmentCons);
