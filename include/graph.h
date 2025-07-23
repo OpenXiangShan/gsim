@@ -36,7 +36,6 @@ class graph {
   void genResetDecl(FILE* fp);
   int translateInst(InstInfo inst, int indent, std::string flagName);
   void genSuperEval(SuperNode* super, std::string flagName, int indent);
-  std::string saveOldVal(Node* node);
   void removeNodesNoConnect(NodeStatus status);
   void reconnectSuper();
   void reconnectAll();

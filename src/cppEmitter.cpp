@@ -131,12 +131,6 @@ std::string updateActiveStr(int idx, uint64_t mask, std::string& cond, int uniqu
   return format("*(uint64_t*)&%s |= -(uint64_t)%s & 0x%lx;", activeFlags.c_str(), cond.c_str(), mask, activeFlags.c_str());
 }
 
-std::string strRepeat(std::string str, int times) {
-  std::string ret;
-  for (int i = 0; i < times; i ++) ret += str;
-  return ret;
-}
-
 static void inline includeLib(FILE* fp, std::string lib, bool isStd) {
   std::string format = isStd ? "#include <%s>\n" : "#include \"%s\"\n";
   fprintf(fp, format.c_str(), lib.c_str());
@@ -302,14 +296,6 @@ void graph::genDiffSig(FILE* fp, Node* node) {
   std::string originName = node->name;
   if (node->type == NODE_MEMORY){
 
-  } else if (node->isArray() && node->arrayEntryNum() == 1) {
-    std::string verilatorSuffix, diffSuffix;
-    for (size_t i = 0; i < node->dimension.size(); i ++) {
-      if (node->type != NODE_REG_DST) diffSuffix += "[0]";
-      verilatorSuffix += "_0";
-    }
-    if (!nameExist(originName + verilatorSuffix))
-      allNames[diffNodeName + diffSuffix] = verilatorName + verilatorSuffix;
   } else if (node->isArray()) {
     int num = node->arrayEntryNum();
     std::vector<std::string> suffix(num);
@@ -386,96 +372,11 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   }
 }
 
-std::string graph::saveOldVal(Node* node) { // TODO: remove
-  std::string ret;
-  if (node->isArray()) return ret;
-    /* save oldVal */
-  if (node->fullyUpdated) {
-    emitBodyLock(0, "%s %s;\n", widthUType(node->width).c_str(), newBasic(node).c_str());
-    ret = newBasic(node);
-  } else {
-    emitBodyLock(0, "%s %s = %s;\n", widthUType(node->width).c_str(), newBasic(node).c_str(), node->name.c_str());
-    ret = newBasic(node);
-  }
-  return ret;
-}
-
-std::string activateNextStr(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName) {
-  std::string ret;
-  std::string nodeName = node->name;
-  auto condName = std::string("cond_") + nodeName;
-  bool opt{false};
-
-  if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
-  std::map<uint64_t, ActiveType> bitMapInfo;
-  ActiveType curMask;
-  if (node->isAsyncReset()) {
-    ret += format("if (%s || (%s != %s)) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
-  } else {
-    curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
-    opt = ((ACTIVE_MASK(curMask) != 0) + bitMapInfo.size()) <= 3;
-    if (opt) {
-      if (node->width == 1) ret += format("bool %s = %s ^ %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
-      else ret += format("bool %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
-    }
-    else ret += format("if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
-  }
-  if (inStep) {
-    if (node->isReset() && node->type == NODE_REG_SRC) ret += format("%s = %s;\n", RESET_NAME(node).c_str(), newName(node).c_str());
-  }
-  if (node->isAsyncReset()) {
-    Assert(!opt, "invalid opt");
-    ret += "activateAll();\n";
-    ret += format("%s = -1;\n", flagName.c_str());
-  } else {
-    if (ACTIVE_MASK(curMask) != 0) {
-      if (opt) ret += format("%s |= -(uint%d_t)%s & 0x%lx; // %s\n", flagName.c_str(), ACTIVE_WIDTH, condName.c_str() ,ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
-      else ret += format("%s |= 0x%lx; // %s\n", flagName.c_str(), ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
-    }
-    for (auto iter : bitMapInfo) {
-      auto str = opt ? updateActiveStr(iter.first, ACTIVE_MASK(iter.second), condName, ACTIVE_UNIQUE(iter.second)) : updateActiveStr(iter.first, ACTIVE_MASK(iter.second));
-      ret += format("%s // %s\n", str.c_str(), ACTIVE_COMMENT(iter.second).c_str());
-    }
-  #ifdef PERF
-    #if ENABLE_ACTIVATOR
-    for (int id : nextNodeId) {
-      fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\nactivator[%d][%d] ++;\n",
-                  id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
-    }
-    #endif
-    if (inStep) ret += "isActivateValid = true;\n";
-  #endif
-  }
-  if (!opt) ret += "}\n";
-  return ret;
-}
-
-static std::string activateUncondNextStr(Node* node, std::set<int>activateId, bool inStep, std::string flagName) {
-  std::string ret;
-  std::map<uint64_t, ActiveType> bitMapInfo;
-  auto curMask = activeSet2bitMap(activateId, bitMapInfo, node->super->cppId);
-  if (ACTIVE_MASK(curMask) != 0) ret += format("%s |= 0x%lx; // %s\n", flagName.c_str(), ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
-  for (auto iter : bitMapInfo) {
-    ret += format("%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
-  }
-#ifdef PERF
-  #if ENABLE_ACTIVATOR
-  for (int id : activateId) {
-    fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\n activator[%d][%d] ++;\n",
-                id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
-  }
-  #endif
-  if (inStep) ret += "isActivateValid = true;\n";
-#endif
-  return ret;
-}
-
 void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName, int indent) {
   std::string nodeName = node->name;
   auto condName = std::string("cond_") + nodeName;
   bool opt{false};
 
-  if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
   std::map<uint64_t, ActiveType> bitMapInfo;
   ActiveType curMask;
   if (node->isAsyncReset()) {
@@ -608,37 +509,6 @@ int graph::genNodeStepEnd(SuperNode* node, int indent) {
     emitBodyLock(-- indent, "}\n");
   }
   return indent;
-}
-
-void replaceAssignBeg(std::string& inst, Node* n, std::string str) {
-  size_t pos;
-  while ((pos = inst.find(ASSIGN_BEG(n))) != std::string::npos) {
-    inst.replace(pos, ASSIGN_BEG(n).length(), str);
-  }
-}
-
-void replaceAssignEnd(std::string& inst, Node* n, std::string str) {
-  size_t pos;
-  while ((pos = inst.find(ASSIGN_END(n))) != std::string::npos) {
-    inst.replace(pos, ASSIGN_END(n).length(), str);
-  }
-}
-
-void saveAssignBeg(std::string& inst, Node* n, int indent) {
-  if (n->needActivate() && !n->isArray() && n->type != NODE_WRITER) {
-    std::string saveStr = format("%s %s = %s;\n", widthUType(n->width).c_str(), oldName(n).c_str(), n->name.c_str());
-    replaceAssignBeg(inst, n, saveStr);
-  } else {
-    replaceAssignBeg(inst, n, "");
-  }
-}
-
-void activateAssignEnd(std::string& inst, Node* n, std::string flagName) {
-  std::string activateStr;
-  if (!n->needActivate()) ;
-  else if(!n->isArray() && n->type != NODE_WRITER) activateStr = activateNextStr(n, n->nextNeedActivate, oldName(n), true, flagName);
-  else activateStr = activateUncondNextStr(n, n->nextNeedActivate, true, flagName);
-  replaceAssignEnd(inst, n, activateStr);
 }
 
 bool Node::isLocal() { // TODO: isArray is OK

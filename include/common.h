@@ -119,10 +119,6 @@ enum ResetType { UNCERTAIN, ASYRESET, UINTRESET, ZERO_RESET };
 #define newBasic(node) (node->name + "$new")
 #define newName(node) newBasic(node)
 #define oldName(node) (node->name + "$old$" + std::to_string(node->id))
-#define ASSIGN_LABLE std::string("ASSIGN$$$LABEL")
-#define ASSIGN_INDI(node) (node->name + "$$UPDATE")
-#define ASSIGN_BEG(node) (node ? (node->name + std::to_string(node->id) + "$$BEG ") : "")
-#define ASSIGN_END(node) (node ? (node->name + std::to_string(node->id) + "$$END ") : "")
 
 #include "opFuncs.h"
 #include "debug.h"
