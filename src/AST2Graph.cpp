@@ -565,11 +565,7 @@ void visitExtModule(graph* g, PNode* module) {
     PNode* params = module->getChild(1);
     for (int i = 0; i < params->getChildNum(); i ++) {
       PNode* param = params->getChild(i);
-      if (param->type == P_PARAM_INT) {
-        extNode->paramsInt.push_back(p_stoi(param->getExtra(0).c_str()));
-      } else {
-        Assert(0, "Invalid type %d for ext param", param->type);
-      }
+      extNode->params.push_back(std::make_pair(param->type == P_PARAM_INT, param->getExtra(0)));
     }
     /* construct valTree for every output and NODE_EXT */
     /* in -> ext */
@@ -1675,7 +1671,7 @@ graph* AST2Graph(PNode* root) {
   }
   for (auto it : allSignals) {
     if ((it.second->type == NODE_OTHERS || it.second->type == NODE_READER || it.second->type == NODE_WRITER || it.second->type == NODE_READWRITER ||
-        it.second->type == NODE_SPECIAL || it.second->type == NODE_EXT || it.second->type == NODE_EXT_IN || it.second->type == NODE_EXT_OUT)
+        it.second->type == NODE_SPECIAL || it.second->type == NODE_EXT || it.second->type == NODE_EXT_IN || it.second->type == NODE_EXT_OUT || it.second->type == NODE_OUT)
         && it.second->super->prev.size() == 0) {
       g->supersrc.push_back(it.second->super);
     }

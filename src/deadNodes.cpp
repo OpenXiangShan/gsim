@@ -98,6 +98,7 @@ void graph::removeDeadNodes() {
 
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) {
+      if (node->type == NODE_INP || node->type == NODE_OUT) continue;
       if (visited.find(node) == visited.end()) {
         node->status = DEAD_NODE;
       }
@@ -113,10 +114,7 @@ void graph::removeDeadNodes() {
     std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
         regsrc.end()
   );
-  input.erase(
-    std::remove_if(input.begin(), input.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
-    input.end()
-  );
+
   for (size_t i = 0; i < memory.size(); i ++) {
     Node* mem = memory[i];
     mem->member.erase(
