@@ -2199,7 +2199,7 @@ std::string computeExtMod(SuperNode* super) {
   std::string inst = funcName + "(";
   int argIdx = 0;
   for (auto param : super->member[0]->params) {
-    funcDecl += (param.first ? "int _" : "char* _") + std::to_string(argIdx ++) + ", ";
+    funcDecl += (param.first ? "int _" : "const char* _") + std::to_string(argIdx ++) + ", ";
     inst += param.second + ", ";
   }
 
