@@ -20,7 +20,6 @@ public:
   int opNum = 0;
   valStatus status = VAL_VALID;
   valType type = TYPE_NORMAL;
-  std::vector<std::string> insts;
   mpz_t consVal;
   int width = 0;
   bool sign = 0;
@@ -31,7 +30,6 @@ public:
   std::vector<valInfo*> memberInfo;
   bool sameConstant = false;
   mpz_t assignmentCons;
-  bool fullyUpdated = true;
   bool directUpdate = true;
 
   valInfo(int _width = 0, bool _sign = 0) {
@@ -41,10 +39,6 @@ public:
     width = _width;
     sign = _sign;
     typeWidth = upperPower2(_width);
-  }
-  void mergeInsts(valInfo* newInfo) {
-    insts.insert(insts.end(), newInfo->insts.begin(), newInfo->insts.end());
-    newInfo->insts.clear();
   }
   void setConsStr() {
     if (mpz_sgn(consVal) >= 0) {
@@ -88,7 +82,6 @@ public:
     ret->typeWidth = typeWidth;
     ret->sign = sign;
     ret->consLength = consLength;
-    ret->fullyUpdated = fullyUpdated;
     mpz_set(ret->assignmentCons, assignmentCons);
     ret->sameConstant = sameConstant;
 
@@ -98,12 +91,7 @@ public:
     }
     return ret;
   }
-  void setFullyUpdated() {
-    fullyUpdated = true;
-    for (valInfo* info : memberInfo) {
-      if (info) info->setFullyUpdated();
-    }
-  }
+
   valInfo* dupWithCons() {
     valInfo* ret = dup();
     mpz_set(ret->assignmentCons, assignmentCons);

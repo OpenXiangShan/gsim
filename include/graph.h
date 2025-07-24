@@ -17,14 +17,12 @@ class graph {
 
   FILE* genHeaderStart();
   void genNodeDef(FILE* fp, Node* node);
-  void genNodeInsts(Node* node, std::string flagName, int indent);
   void genInterfaceInput(Node* input);
   void genInterfaceOutput(Node* output);
   void genStep(int subStepIdxMax);
   void genHeaderEnd(FILE* fp);
   int genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string flagName, int indent);
   int genNodeStepEnd(SuperNode* node, int indent);
-  void genNodeInit(Node* node, int mode);
   void genMemInit(Node* node);
   void nodeDisplay(Node* member, int indent);
   void genMemRead(FILE* fp);
@@ -36,27 +34,24 @@ class graph {
   void genResetDef(SuperNode* super, bool isUIntReset, int indent);
   void genResetActivation(SuperNode* super, bool isUIntReset, int indent, int resetId);
   void genResetDecl(FILE* fp);
+  int translateInst(InstInfo inst, int indent, std::string flagName);
   void genSuperEval(SuperNode* super, std::string flagName, int indent);
-  std::string saveOldVal(Node* node);
   void removeNodesNoConnect(NodeStatus status);
   void reconnectSuper();
   void reconnectAll();
   void resetAnalysis();
-  /* defined in mergeNodes */
+  /* graphPartition */
   void mergeWhenNodes();
-  void mergeAsyncReset();
   void mergeResetAll();
   void mergeOut1();
   void mergeIn1();
   void mergeSublings();
-  void mergeNear();
   void splitArrayNode(Node* node);
   void checkNodeSplit(Node* node);
   void splitOptionalArray();
   void constantMemory();
   void orderAllNodes();
   void genDiffSig(FILE* fp, Node* node);
-  void removeDeadReg();
   void graphCoarsen();
   void graphInitPartition();
   void graphRefine();
@@ -77,8 +72,7 @@ class graph {
   std::vector<SuperNode*> supersrc;
   /* used after toposort */
   std::vector<SuperNode*> sortedSuper;
-  std::vector<SuperNode*> uintReset;
-  std::set<Node*> splittedArray;
+  std::vector<SuperNode*> allReset;
   std::vector<std::string> extDecl;
   std::string name;
   int nodeNum = 0;
@@ -95,7 +89,6 @@ class graph {
   void splitArray();
   void removeDeadNodes();
   void aliasAnalysis();
-  void mergeNodes();
   size_t countNodes();
   void removeEmptySuper();
   void removeNodes(NodeStatus status);

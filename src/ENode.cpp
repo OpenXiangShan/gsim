@@ -339,17 +339,7 @@ return right value of connected node
                     or return the array itself if the index is not determined or it represent multiple members
 */
 Node* ENode::getConnectNode() {
-  /* not array */
-  if (!nodePtr || !nodePtr->isArray()) {
-    return nodePtr;
-  }
-  /* un-splitted array */
-  if (!nodePtr->arraySplitted()) return nodePtr;
-  /* splitted array */
-  int begin, end;
-  std::tie(begin, end) = getIdx(nodePtr);
-  if (begin < 0 || begin != end) return nodePtr;
-  return nodePtr->getArrayMember(begin);
+  return nodePtr;
 }
 
 ENode* ENode::dup() {
@@ -386,18 +376,4 @@ int ENode::getArrayIndex(Node* node) {
   if (fixNum < node->dimension.size()) TODO();
 
   return idx;
-}
-
-ArrayMemberList* ENode::getArrayMember(Node* node) {
-  Assert(nodePtr, "empty node");
-  Assert(nodePtr == node, "lvalue not match %s != %s", nodePtr->name.c_str(), node->name.c_str());
-  Assert(child.size() <= node->dimension.size(), "%s index out of bound", node->name.c_str());
-  ArrayMemberList* ret = new ArrayMemberList();
-  int begin, end;
-  std::tie(begin, end) = getIdx(nodePtr);
-  if (begin < 0) TODO();
-  for (int i = begin; i <= end; i ++) {
-    ret->add_member(node->getArrayMember(i), i);
-  }
-  return ret;
 }

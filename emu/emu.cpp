@@ -76,6 +76,8 @@ void SDCardHelper(uint8_t setAddr, uint32_t addr, uint8_t ren, uint32_t& data) {
   data = 0;
 }
 
+void PrintCommitIDModule(uint8_t _0, uint64_t _1, uint8_t _2) { }
+
 extern "C" void flash_read(unsigned int addr, unsigned long long* data){
   printf("WARNING: Trying to invoke flash_read\n");
 }

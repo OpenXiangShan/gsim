@@ -17,16 +17,8 @@ void Node::updateConnect() {
     q.pop();
     Node* prevNode = top->getNode();
     if (prevNode) {
-      if (prevNode->isArray() && prevNode->arraySplitted()) {
-        ArrayMemberList* list = top->getArrayMember(prevNode);
-        for (Node* arrayMember : list->member) {
-          addPrev(arrayMember);
-          arrayMember->addNext(this);
-        }
-      } else {
-        addPrev(prevNode);
-        prevNode->addNext(this);
-      }
+      addPrev(prevNode);
+      prevNode->addNext(this);
     }
     for (size_t i = 0; i < top->getChildNum(); i ++) {
       if (top->getChild(i)) q.push(top->getChild(i));
@@ -232,7 +224,7 @@ void Node::updateActivate() {
   }
   if (type == NODE_WRITER) {
     for (Node* port : parent->member) {
-      if (port->type == NODE_READER && (port->status == VALID_NODE || port->status == MERGED_NODE) && port->super->cppId != -1)
+      if (port->type == NODE_READER && port->status == VALID_NODE  && port->super->cppId != -1)
         nextActiveId.insert(port->super->cppId);
     }
   }
@@ -242,7 +234,7 @@ void Node::updateActivate() {
         if (port->parent->extraInfo != "new") nextActiveId.insert(super->cppId);
       }
       else if ((port->type == NODE_READER || port->type == NODE_READWRITER)
-         && (port->status == VALID_NODE || port->status == MERGED_NODE) && port->super->cppId != -1)
+         && port->status == VALID_NODE && port->super->cppId != -1)
         nextActiveId.insert(port->super->cppId);
     }
   }

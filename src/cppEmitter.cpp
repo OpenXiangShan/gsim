@@ -131,12 +131,6 @@ std::string updateActiveStr(int idx, uint64_t mask, std::string& cond, int uniqu
   return format("*(uint64_t*)&%s |= -(uint64_t)%s & 0x%lx;", activeFlags.c_str(), cond.c_str(), mask, activeFlags.c_str());
 }
 
-std::string strRepeat(std::string str, int times) {
-  std::string ret;
-  for (int i = 0; i < times; i ++) ret += str;
-  return ret;
-}
-
 static void inline includeLib(FILE* fp, std::string lib, bool isStd) {
   std::string format = isStd ? "#include <%s>\n" : "#include \"%s\"\n";
   fprintf(fp, format.c_str(), lib.c_str());
@@ -152,27 +146,6 @@ std::string strReplace(std::string s, std::string oldStr, std::string newStr) {
     s.replace(pos, oldStr.length(), newStr);
   }
   return s;
-}
-
-std::string arrayMemberName(Node* node, std::string suffix) {
-  Assert(node->isArrayMember, "invalid type %d %s", node->type, node->name.c_str());
-  std::string ret = strReplace(node->name, "[", "__");
-  ret = strReplace(ret, "]", "__") + "$" + suffix;
-  return ret;
-}
-
-void graph::genNodeInit(Node* node, int mode) {
-  if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || node->status != VALID_NODE) return;
-  if (node->type == NODE_REG_DST && !node->regSplit) return;
-  for (std::string inst : node->initInsts) {
-    std::stringstream ss(inst);
-    std::string s;
-    while (getline(ss, s, '\n')) {
-      bool init0 = (s.find("= 0x0;") != std::string::npos);
-      bool emit = ((mode == 0) && init0) || ((mode == 1) && !init0) || (mode == 2);
-      if (emit) { emitBodyLock(1, "%s\n", strReplace(s, ASSIGN_LABLE, "").c_str()); }
-    }
-  }
 }
 
 FILE* graph::genHeaderStart() {
@@ -242,9 +215,6 @@ void graph::genInterfaceInput(Node* input) {
   emitFuncDecl(0, "void S%s::set_%s(%s val) {\n", name.c_str(), input->name.c_str(), widthUType(input->width).c_str());
   emitBodyLock(1, "if (%s != val) { \n", input->name.c_str());
   emitBodyLock(2, "%s = val;\n", input->name.c_str());
-  for (std::string inst : input->insts) {
-    emitBodyLock(2, "%s\n", inst.c_str());
-  }
   /* update nodes in the same superNode */
   std::set<int> allNext;
   for (Node* next : input->next) {
@@ -279,8 +249,6 @@ void graph::genDiffSig(FILE* fp, Node* node) {
   std::string originName = node->name;
   if (node->type == NODE_MEMORY){
 
-  } else if (node->isArrayMember) {
-    allNames.insert(node->name);
   } else if (node->isArray()) {
     int num = node->arrayEntryNum();
     std::vector<std::string> suffix(num);
@@ -300,8 +268,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
       pairNum *= node->dimension[i];
     }
     for (size_t i = 0; i < suffix.size(); i ++) {
-      if (!node->arraySplitted() || node->getArrayMember(i)->name == diffNodeName + suffix[i])
-        allNames.insert(diffNodeName + suffix[i]);
+      allNames.insert(diffNodeName + suffix[i]);
     }
   } else {
     allNames.insert(diffNodeName);
@@ -326,16 +293,6 @@ void graph::genDiffSig(FILE* fp, Node* node) {
   std::string originName = node->name;
   if (node->type == NODE_MEMORY){
 
-  } else if (node->isArrayMember) {
-    allNames[node->name] = node->name;
-  } else if (node->isArray() && node->arrayEntryNum() == 1) {
-    std::string verilatorSuffix, diffSuffix;
-    for (size_t i = 0; i < node->dimension.size(); i ++) {
-      if (node->type != NODE_REG_DST) diffSuffix += "[0]";
-      verilatorSuffix += "_0";
-    }
-    if (!nameExist(originName + verilatorSuffix) && (!node->arraySplitted() || node->getArrayMember(0)->status == VALID_NODE))
-      allNames[diffNodeName + diffSuffix] = verilatorName + verilatorSuffix;
   } else if (node->isArray()) {
     int num = node->arrayEntryNum();
     std::vector<std::string> suffix(num);
@@ -358,8 +315,7 @@ void graph::genDiffSig(FILE* fp, Node* node) {
     }
     for (size_t i = 0; i < suffix.size(); i ++) {
       if (!nameExist(originName + verilatorSuffix[i])) {
-        if (!node->arraySplitted() || node->getArrayMember(i)->name == diffNodeName + suffix[i])
-          allNames[diffNodeName + suffix[i]] = verilatorName + verilatorSuffix[i];
+        allNames[diffNodeName + suffix[i]] = verilatorName + verilatorSuffix[i];
       }
     }
   } else {
@@ -394,7 +350,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
       int indent = 1;
       int dims = node->dimension.size();
       for (int i = 0; i < dims; i ++) {
-        emitBodyLock(indent++, "for (int i%d = 0; i%d < %d; i%d ++) {\n", i, i, node->dimension[i], i);
+        emitBodyLock(indent ++, "for (int i%d = 0; i%d < %d; i%d ++) {\n", i, i, node->dimension[i], i);
       }
       emitBodyLock(indent, "%s", node->name.c_str());
       for (int i = 0; i < dims; i ++) { emitBodyLock(0, "[i%d]", i); }
@@ -413,101 +369,15 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   }
 }
 
-std::string graph::saveOldVal(Node* node) { // TODO: remove
-  std::string ret;
-  if (node->isArray()) return ret;
-    /* save oldVal */
-  if (node->fullyUpdated) {
-    emitBodyLock(0, "%s %s;\n", widthUType(node->width).c_str(), newBasic(node).c_str());
-    ret = newBasic(node);
-  } else {
-    emitBodyLock(0, "%s %s = %s;\n", widthUType(node->width).c_str(), newBasic(node).c_str(), node->name.c_str());
-    ret = newBasic(node);
-  }
-  return ret;
-}
-
-std::string activateNextStr(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName) {
-  std::string ret;
-  std::string nodeName = node->name;
-  auto condName = std::string("cond_") + nodeName;
-  bool opt{false};
-
-  if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
-  std::map<uint64_t, ActiveType> bitMapInfo;
-  ActiveType curMask;
-  if (node->isAsyncReset()) {
-    ret += format("if (%s || (%s != %s)) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
-  } else {
-    curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
-    opt = ((ACTIVE_MASK(curMask) != 0) + bitMapInfo.size()) <= 3;
-    if (opt) {
-      if (node->width == 1) ret += format("bool %s = %s ^ %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
-      else ret += format("bool %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
-    }
-    else ret += format("if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
-  }
-  if (inStep) {
-    if (node->isReset() && node->type == NODE_REG_SRC) ret += format("%s = %s;\n", RESET_NAME(node).c_str(), newName(node).c_str());
-  }
-  if (node->isAsyncReset()) {
-    Assert(!opt, "invalid opt");
-    ret += "activateAll();\n";
-    ret += format("%s = -1;\n", flagName.c_str());
-  } else {
-    if (ACTIVE_MASK(curMask) != 0) {
-      if (opt) ret += format("%s |= -(uint%d_t)%s & 0x%lx; // %s\n", flagName.c_str(), ACTIVE_WIDTH, condName.c_str() ,ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
-      else ret += format("%s |= 0x%lx; // %s\n", flagName.c_str(), ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
-    }
-    for (auto iter : bitMapInfo) {
-      auto str = opt ? updateActiveStr(iter.first, ACTIVE_MASK(iter.second), condName, ACTIVE_UNIQUE(iter.second)) : updateActiveStr(iter.first, ACTIVE_MASK(iter.second));
-      ret += format("%s // %s\n", str.c_str(), ACTIVE_COMMENT(iter.second).c_str());
-    }
-  #ifdef PERF
-    #if ENABLE_ACTIVATOR
-    for (int id : nextNodeId) {
-      fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\nactivator[%d][%d] ++;\n",
-                  id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
-    }
-    #endif
-    if (inStep) ret += "isActivateValid = true;\n";
-  #endif
-  }
-  if (!opt) ret += "}\n";
-  return ret;
-}
-
-static std::string activateUncondNextStr(Node* node, std::set<int>activateId, bool inStep, std::string flagName) {
-  std::string ret;
-  std::map<uint64_t, ActiveType> bitMapInfo;
-  auto curMask = activeSet2bitMap(activateId, bitMapInfo, node->super->cppId);
-  if (ACTIVE_MASK(curMask) != 0) ret += format("%s |= 0x%lx; // %s\n", flagName.c_str(), ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
-  for (auto iter : bitMapInfo) {
-    ret += format("%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
-  }
-#ifdef PERF
-  #if ENABLE_ACTIVATOR
-  for (int id : activateId) {
-    fprintf(fp, "if (activator[%d].find(%d) == activator[%d].end()) activator[%d][%d] = 0;\n activator[%d][%d] ++;\n",
-                id, node->super->cppId, id, id, node->super->cppId, id, node->super->cppId);
-  }
-  #endif
-  if (inStep) ret += "isActivateValid = true;\n";
-#endif
-  return ret;
-}
-
 void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName, int indent) {
   std::string nodeName = node->name;
   auto condName = std::string("cond_") + nodeName;
   bool opt{false};
 
-  if (node->isArray() && node->arrayEntryNum() == 1) nodeName += strRepeat("[0]", node->dimension.size());
   std::map<uint64_t, ActiveType> bitMapInfo;
   ActiveType curMask;
   if (node->isAsyncReset()) {
-    emitBodyLock(indent, "if (%s || (%s != %s)) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
-    indent ++;
+    emitBodyLock(indent ++, "if (%s || (%s != %s)) {\n", oldName.c_str(), nodeName.c_str(), oldName.c_str());
   } else {
     curMask = activeSet2bitMap(nextNodeId, bitMapInfo, node->super->cppId);
     opt = ((ACTIVE_MASK(curMask) != 0) + bitMapInfo.size()) <= 3;
@@ -516,8 +386,7 @@ void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldN
       else emitBodyLock(indent, "bool %s = %s != %s;\n", condName.c_str(), nodeName.c_str(), oldName.c_str());
     }
     else {
-      emitBodyLock(indent, "if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
-      indent ++;
+      emitBodyLock(indent ++, "if (%s != %s) {\n", nodeName.c_str(), oldName.c_str());
     }
   }
   if (inStep) {
@@ -547,7 +416,7 @@ void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldN
     if (inStep && node->type != NODE_EXT_OUT) emitBodyLock(indent, "isActivateValid = true;\n");
   #endif
   }
-  if (!opt) emitBodyLock(indent - 1, "}\n");
+  if (!opt) emitBodyLock(-- indent, "}\n");
 }
 
 void graph::activateUncondNext(Node* node, std::set<int>& activateId, bool inStep, std::string flagName, int indent) {
@@ -568,60 +437,10 @@ void graph::activateUncondNext(Node* node, std::set<int>& activateId, bool inSte
 #endif
 }
 
-void graph::genNodeInsts(Node* node, std::string flagName, int indent) { // TODO: remove
-  std::string oldnode;
-  if (node->insts.size()) {
-    /* local variables */
-    if (node->isLocal()) {
-      emitBodyLock(indent, "%s %s;\n", widthUType(node->width).c_str(), node->name.c_str());
-    }
-    if (node->isArray() && !node->fullyUpdated && node->anyNextActive()) emitBodyLock(2, "bool %s = false;\n", ASSIGN_INDI(node).c_str());
-    std::vector<std::string> newInsts(node->insts);
-    /* save oldVal */
-    if (node->needActivate() && !node->isArray()) {
-      oldnode = saveOldVal(node);
-      for (size_t i = 0; i < newInsts.size(); i ++) {
-        std::string inst = newInsts[i];
-        size_t start_pos = 0;
-        std::string basicSet = node->name + " = ";
-        std::string replaceStr = newName(node) + " = ";
-        while((start_pos = inst.find(basicSet, start_pos)) != std::string::npos) {
-          inst.replace(start_pos, basicSet.length(), replaceStr);
-          start_pos += replaceStr.length();
-        }
-        newInsts[i] = inst;
-      }
-    }
-    /* display all insts */
-    std::string indiStr;
-    if (!node->fullyUpdated && node->isArray() && node->anyNextActive()) {
-      indiStr = format("\n%s = true;\n", ASSIGN_INDI(node).c_str());
-    } else if (node->type == NODE_WRITER) { // activate all readers
-      indiStr += "\n";
-      std::set<int> allReaderId;
-      for (Node* port : node->parent->member) {
-        if (port->type == NODE_READER && (port->status == VALID_NODE || port->status == MERGED_NODE)) allReaderId.insert(port->super->cppId);
-      }
-      std::map<uint64_t, ActiveType> bitMapInfo;
-      activeSet2bitMap(allReaderId, bitMapInfo, -1);
-      for (auto iter : bitMapInfo) {
-        indiStr += format("%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
-      }
-    }
-    for (std::string inst : newInsts) {
-      emitBodyLock(indent, "%s\n", strReplace(inst, ASSIGN_LABLE, indiStr).c_str());
-    }
-  }
-  if (!node->needActivate()) ;
-  else if(!node->isArray()) activateNext(node, node->nextNeedActivate, newName(node), true, flagName, indent);
-  else activateUncondNext(node, node->nextNeedActivate, true, flagName, indent);
-}
-
 int graph::genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string flagName, int indent) {
   nodeNum ++;
   if (!isAlwaysActive(node->cppId)) {
-    emitBodyLock(indent, "if(unlikely(%s & 0x%lx)) { // id=%d\n", flagName.c_str(), mask, idx);
-    indent ++;
+    emitBodyLock(indent ++, "if(unlikely(%s & 0x%lx)) { // id=%d\n", flagName.c_str(), mask, idx);
   }
   int id;
   uint64_t newMask;
@@ -655,21 +474,18 @@ void graph::nodeDisplay(Node* member, int indent) {
 
   if (member->status != VALID_NODE) return;
   if (member->type == NODE_WRITER) return;
-  indent ++;
   emitBodyLock(indent, "printf(\"%%ld %d %s: \", cycles);\n", member->super->cppId, member->name.c_str());
   if (member->dimension.size() != 0) {
     std::string idxStr;
     for (size_t i = 0; i < member->dimension.size(); i ++) {
-      emitBodyLock(indent, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, member->dimension[i], i);
-      indent ++;
+      emitBodyLock(indent ++, "for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, member->dimension[i], i);
       idxStr += "[i" + std::to_string(i) + "]";
     }
     std::string nameIdx = member->name + idxStr;
     emit_display(nameIdx.c_str(), member->width, indent);
     emitBodyLock(indent, "printf(\" \");\n");
     for (size_t i = 0; i < member->dimension.size(); i ++) {
-      indent --;
-      emitBodyLock(indent, "}\n");
+      emitBodyLock(-- indent, "}\n");
     }
   } else {
     if (member->anyNextActive() || member->type != NODE_SPECIAL) {
@@ -677,7 +493,6 @@ void graph::nodeDisplay(Node* member, int indent) {
     }
   }
   emitBodyLock(indent, "printf(\"\\n\");\n");
-  indent --;
 }
 
 int graph::genNodeStepEnd(SuperNode* node, int indent) {
@@ -688,45 +503,42 @@ int graph::genNodeStepEnd(SuperNode* node, int indent) {
 #endif
 
   if(!isAlwaysActive(node->cppId)) {
-    emitBodyLock(indent, "}\n");
-    indent --;
+    emitBodyLock(-- indent, "}\n");
   }
   return indent;
 }
 
-void replaceAssignBeg(std::string& inst, Node* n, std::string str) {
-  size_t pos;
-  while ((pos = inst.find(ASSIGN_BEG(n))) != std::string::npos) {
-    inst.replace(pos, ASSIGN_BEG(n).length(), str);
-  }
-}
-
-void replaceAssignEnd(std::string& inst, Node* n, std::string str) {
-  size_t pos;
-  while ((pos = inst.find(ASSIGN_END(n))) != std::string::npos) {
-    inst.replace(pos, ASSIGN_END(n).length(), str);
-  }
-}
-
-void saveAssignBeg(std::string& inst, Node* n, int indent) {
-  if (n->needActivate() && !n->isArray() && n->type != NODE_WRITER) {
-    std::string saveStr = format("%s %s = %s;\n", widthUType(n->width).c_str(), oldName(n).c_str(), n->name.c_str());
-    replaceAssignBeg(inst, n, saveStr);
-  } else {
-    replaceAssignBeg(inst, n, "");
-  }
-}
-
-void activateAssignEnd(std::string& inst, Node* n, std::string flagName) {
-  std::string activateStr;
-  if (!n->needActivate()) ;
-  else if(!n->isArray() && n->type != NODE_WRITER) activateStr = activateNextStr(n, n->nextNeedActivate, oldName(n), true, flagName);
-  else activateStr = activateUncondNextStr(n, n->nextNeedActivate, true, flagName);
-  replaceAssignEnd(inst, n, activateStr);
-}
-
 bool Node::isLocal() { // TODO: isArray is OK
   return status == VALID_NODE && type == NODE_OTHERS && !anyNextActive() && !isArray() && !isReset();
+}
+
+int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
+  switch (inst.infoType) {
+    case SUPER_INFO_IF:
+      emitBodyLock(indent ++, "%s\n", inst.inst.c_str());
+      break;
+    case SUPER_INFO_ELSE:
+      emitBodyLock(indent - 1,  "%s\n", inst.inst.c_str());
+      break;
+    case SUPER_INFO_DEDENT:
+      emitBodyLock(--indent, "%s\n", inst.inst.c_str());
+      break;
+    case SUPER_INFO_STR:
+      emitBodyLock(indent, "%s\n", inst.inst.c_str());
+      break;
+    case SUPER_INFO_ASSIGN_BEG:
+      if (inst.node->isLocal() || inst.node->isArray() || inst.node->type == NODE_WRITER) break;
+      emitBodyLock(indent, "%s %s = %s;\n", widthUType(inst.node->width).c_str(), oldName(inst.node).c_str(), inst.node->name.c_str());
+      break;
+    case SUPER_INFO_ASSIGN_END:
+      if (inst.node->isLocal() || !inst.node->needActivate()) break;
+      if (inst.node->isArray() || inst.node->type == NODE_WRITER) activateUncondNext(inst.node, inst.node->nextActiveId, false, flagName, indent);
+      else activateNext(inst.node, inst.node->nextActiveId, oldName(inst.node), false, flagName, indent);
+      break;
+    default:
+      break;
+  }
+  return indent;
 }
 
 void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { // current indent = 2
@@ -737,7 +549,9 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
       Node* extOut = super->member[i];
       emitBodyLock(indent, "%s %s = %s;\n", widthUType(extOut->width).c_str(), oldName(extOut).c_str(), extOut->name.c_str());
     }
-    genNodeInsts(super->member[0], flagName, indent);
+    for (InstInfo inst : super->insts) {
+      indent = translateInst(inst, indent, flagName);
+    }
     for (size_t i = 1; i < super->member.size(); i ++) {
       if (!super->member[i]->needActivate()) continue;
       if (super->member[i]->isArray()) activateUncondNext(super->member[i], super->member[i]->nextActiveId, false, flagName, indent);
@@ -754,39 +568,13 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
       }
     }
     for (InstInfo inst : super->insts) {
-      switch (inst.infoType) {
-        case SUPER_INFO_IF:
-          emitBodyLock(indent, "%s\n", inst.inst.c_str());
-          indent ++;
-          break;
-        case SUPER_INFO_ELSE:
-          emitBodyLock(indent - 1,  "%s\n", inst.inst.c_str());
-          break;
-        case SUPER_INFO_DEDENT:
-          indent --;
-          emitBodyLock(indent, "%s\n", inst.inst.c_str());
-          break;
-        case SUPER_INFO_STR:
-          emitBodyLock(indent, "%s\n", inst.inst.c_str());
-          break;
-        case SUPER_INFO_ASSIGN_BEG:
-          if (inst.node->isLocal() || inst.node->isArray() || inst.node->type == NODE_WRITER) break;
-          emitBodyLock(indent, "%s %s = %s;\n", widthUType(inst.node->width).c_str(), oldName(inst.node).c_str(), inst.node->name.c_str());
-          break;
-        case SUPER_INFO_ASSIGN_END:
-          if (inst.node->isLocal() || !inst.node->needActivate()) break;
-          if (inst.node->isArray() || inst.node->type == NODE_WRITER) activateUncondNext(inst.node, inst.node->nextActiveId, false, flagName, indent);
-          else activateNext(inst.node, inst.node->nextActiveId, oldName(inst.node), false, flagName, indent);
-          break;
-        default:
-          break;
-      }
+      indent = translateInst(inst, indent, flagName);
     }
     if (super->superType == SUPER_ASYNC_RESET) emitBodyLock(indent, "subReset%d();\n", super2ResetId[super->resetNode].second);
     emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
-    emitBodyLock(indent, "if (cycles >= LOG_START && cycles <= LOG_END) {\n");
+    emitBodyLock(indent ++, "if (cycles >= LOG_START && cycles <= LOG_END) {\n");
     for (Node* n : super->member) nodeDisplay(n, indent);
-    emitBodyLock(indent, "}\n");
+    emitBodyLock(-- indent, "}\n");
     emitBodyLock(indent, "#endif\n");
   }
 }
@@ -805,16 +593,14 @@ int graph::genActivate() {
       int offset = idx % ACTIVE_WIDTH;
       if (offset == 0) {
         if (prevActiveWhole) {
-          indent --;
-          emitBodyLock(indent, "}\n");
+          emitBodyLock(--indent, "}\n");
         }
         prevActiveWhole = true;
         for (int j = 0; j < ACTIVE_WIDTH && idx + j < superId; j ++) {
           if (isAlwaysActive(idx + j)) prevActiveWhole = false;
         }
         if (prevActiveWhole) {
-          bool newFile = __emitSrc(indent, true, false, nextFuncDef.c_str(), "if(unlikely(activeFlags[%d] != 0)) {\n", id);
-          indent ++;
+          bool newFile = __emitSrc(indent ++, true, false, nextFuncDef.c_str(), "if(unlikely(activeFlags[%d] != 0)) {\n", id);
           if (newFile) {
             nextFuncDef = format("void S%s::subStep%d()", name.c_str(), ++ nextSubStepIdx);
           }
@@ -828,25 +614,22 @@ int graph::genActivate() {
       genSuperEval(super, flagName, indent);
       indent = genNodeStepEnd(super, indent);
     }
-    indent --;
-    emitBodyLock(indent, "}\n");
-    if (prevActiveWhole) emitBodyLock(indent, "}\n");
+    emitBodyLock(--indent, "}\n");
+    if (prevActiveWhole) emitBodyLock(--indent, "}\n");
 
     return nextSubStepIdx - 1; // return the maxinum subStepIdx currently used
 }
 
 void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
-  emitBodyLock(indent, "void S%s::subReset%d(){ // %s reset\n", name.c_str(), resetFuncNum, isUIntReset ? "uint" : "async");
+  emitBodyLock(indent ++, "void S%s::subReset%d(){ // %s reset\n", name.c_str(), resetFuncNum, isUIntReset ? "uint" : "async");
   if (super2ResetId.find(super->resetNode) != super2ResetId.end()) {
     super2ResetId[super->resetNode] = std::make_pair(-1, -1);
   }
   if (isUIntReset) super2ResetId[super->resetNode].first = resetFuncNum;
   else super2ResetId[super->resetNode].second = resetFuncNum;
-  indent ++;
   resetFuncNum ++;
   std::string resetName = super->resetNode->type == NODE_REG_SRC ? RESET_NAME(super->resetNode).c_str() : super->resetNode->name.c_str();
-  emitBodyLock(indent, "if(unlikely(%s)) {\n", resetName.c_str());
-  indent ++;
+  emitBodyLock(indent ++, "if(unlikely(%s)) {\n", resetName.c_str());
   std::set<int> allNext;
   for (size_t i = 0; i < super->member.size(); i ++) {
     Node* node = super->member[i];
@@ -868,8 +651,12 @@ void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
   for (InstInfo inst : super->insts) {
     switch (inst.infoType) {
       case SUPER_INFO_IF:
-      case SUPER_INFO_ELSE:
+        emitBodyLock(indent ++, "%s\n", inst.inst.c_str());
+        break;
       case SUPER_INFO_DEDENT:
+        emitBodyLock(--indent, "%s\n", inst.inst.c_str());
+        break;
+      case SUPER_INFO_ELSE:
       case SUPER_INFO_STR:
         emitBodyLock(indent, "%s\n", inst.inst.c_str());
         break;
@@ -877,8 +664,7 @@ void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
         break;
     }
   }
-  indent --;
-  emitBodyLock(indent, "}\n");
+  emitBodyLock(-- indent, "}\n");
 }
 
 void graph::genResetActivation(SuperNode* super, bool isUIntReset, int indent, int resetId) {
@@ -887,7 +673,7 @@ void graph::genResetActivation(SuperNode* super, bool isUIntReset, int indent, i
 
 void graph::genResetAll() {
   std::vector<SuperNode*> resetSuper;
-  for (SuperNode* super : uintReset) {
+  for (SuperNode* super : allReset) {
     if (super->resetNode->status == CONSTANT_NODE) {
       Assert(mpz_sgn(super->resetNode->computeInfo->consVal) == 0, "reset %s is always true", super->resetNode->name.c_str());
       continue;
@@ -898,6 +684,7 @@ void graph::genResetAll() {
 
   emitFuncDecl(0, "void S%s::resetAll(){\n", name.c_str());
   for (size_t i = 0; i < resetSuper.size(); i ++) {
+    if (resetSuper[i]->superType == SUPER_ASYNC_RESET) continue;
     genResetActivation(resetSuper[i], true, 1, i);
   }
   emitBodyLock(0, "}\n");
@@ -1086,12 +873,6 @@ void graph::cppEmitter() {
 
   emitBodyLock(0, "// initialize registers with reset value 0 to overwrite the rand() results\n" );
   emitBodyLock(1, "memset(&_var_start, 0, &_var_end - &_var_start);\n");
-  for (SuperNode* super : sortedSuper) {
-    if (super->superType != SUPER_VALID && super->superType != SUPER_ASYNC_RESET) continue;
-    for (Node* member : super->member) {
-      genNodeInit(member, 0);
-    }
-  }
 
   emitBodyLock(0, "#else\n" // RANDOMIZE_INIT
                "  memset(&_var_start, 0, &_var_end - &_var_start);\n"
@@ -1099,13 +880,6 @@ void graph::cppEmitter() {
 
   fprintf(header, "S%s();\n", name.c_str());
   fprintf(header, "void init();\n");
-
-  for (SuperNode* super : sortedSuper) {
-    if (super->superType != SUPER_VALID && super->superType != SUPER_ASYNC_RESET) continue;
-    for (Node* member : super->member) {
-      genNodeInit(member, 1);
-    }
-  }
 
   emitBodyLock(0, "}\n");
 

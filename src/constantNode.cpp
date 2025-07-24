@@ -641,31 +641,7 @@ valInfo* ENode::computeConstant(Node* node, bool isLvalue) {
   }
   valInfo* ret;
   if (nodePtr) {
-    if (nodePtr->isArray() && nodePtr->arraySplitted()) {
-      if (getChildNum() < nodePtr->dimension.size()) {
-        int beg, end;
-        std::tie(beg, end) = getIdx(nodePtr);
-        if (beg >= 0 && beg == end) {
-          ret = nodePtr->getArrayMember(beg)->computeConstant()->dup();
-        } else {
-          ret = new valInfo(width, sign);
-          ret->beg = beg;
-          ret->end = end;
-          ret->width = nodePtr->width;
-          ret->sign = nodePtr->sign;
-          if (ret->beg >= 0) {
-            for (int i = ret->beg; i <= ret->end; i ++) {
-              Node* member = nodePtr->getArrayMember(i);
-              member->computeConstant();
-              ret->memberInfo.push_back(consMap[member]);
-            }
-          }
-        }
-      } else {
-        int idx = getArrayIndex(nodePtr);
-        ret = nodePtr->getArrayMember(idx)->computeConstant()->dup();
-      }
-    } else if (nodePtr->isArray()) {
+    if (nodePtr->isArray()) {
       int beg, end;
       std::tie(beg, end) = getIdx(nodePtr);
       ret = nodePtr->computeConstant()->dup(beg, end);

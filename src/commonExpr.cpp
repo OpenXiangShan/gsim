@@ -4,24 +4,15 @@
 
 #define MAX_COMMON_NEXT 5
 
-static std::map<uint64_t, std::set<Node*>> exprId;
-static std::map<uint64_t, std::set<Node*>> exprVisitedNodes;
+static std::map<uint64_t, std::vector<Node*>> exprId;
+
 static std::map<Node*, uint64_t> nodeId;
 static std::map<Node*, Node*> realValueMap;
 static std::map<Node*, Node*> aliasMap;
 
-Node* getLeafNode(bool isArray, ENode* enode);
 
 uint64_t ENode::keyHash() {
-  if (nodePtr) {
-    Node* node = getLeafNode(true, this);
-    if (node) {
-      Assert(nodeId.find(node) != nodeId.end(), "node %s not found status %d type %d", node->name.c_str(), node->status, node->type);
-      return nodeId[node];
-    } else {
-      return nodePtr->id;
-    }
-  }
+  if (nodePtr) return nodeId.find(nodePtr) != nodeId.end() ? nodeId[nodePtr] : nodePtr->id;
   else return opType * width;
 }
 
@@ -60,7 +51,6 @@ bool checkENodeEq(ENode* enode1, ENode* enode2) {
   for (size_t i = 0; i < enode1->values.size(); i ++) {
     if (enode1->values[i] != enode2->values[i]) return false;
   }
-  // if (enode1->opType == OP_INDEX_INT && enode1->values[0] != enode2->values[0]) return false;
   return true;
 }
 
@@ -120,33 +110,33 @@ void graph::commonExpr() {
       // if (node->next.size() == 1) continue;
       uint64_t key = node->keyHash();
       if (exprId.find(key) == exprId.end()) {
-        exprId[key] = std::set<Node*>();
+        exprId[key] = std::vector<Node*>();
       }
-      exprId[key].insert(node);
+      exprId[key].push_back(node);
       nodeId[node] = key;
     }
   }
 
   std::map<Node*, std::vector<Node*>> uniqueNodes;
+  std::map<uint64_t, std::vector<Node*>> key2UniqueNodes;
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) {
       uint64_t key = nodeId[node];
-      if (exprId[key].size() <= 1) { // hash slot with only one member
+      if (exprId[key].size() <= 1) { // slot with only one member
         realValueMap[node] = node;
         uniqueNodes[node] = std::vector<Node*>(1, node);
         continue;
       }
-      for (Node* elseNode : exprVisitedNodes[key]) {
-        if (elseNode == node) continue;
-        if (uniqueNodes.find(elseNode) != uniqueNodes.end() && checkNodeEq(node, elseNode)) {
-          uniqueNodes[elseNode].push_back(node);
-          realValueMap[node] = elseNode;
+      for (Node* unique : key2UniqueNodes[key]) {
+        if (uniqueNodes.find(unique) != uniqueNodes.end() && checkNodeEq(node, unique)) {
+          uniqueNodes[unique].push_back(node);
+          realValueMap[node] = unique;
         }
       }
       if (realValueMap.find(node) == realValueMap.end()) {
         realValueMap[node] = node;
         uniqueNodes[node] = std::vector<Node*>(1, node);
-        exprVisitedNodes[key].insert(node);
+        key2UniqueNodes[key].push_back(node);
       }
     }
   }
@@ -174,14 +164,6 @@ void graph::commonExpr() {
       if (member->status == DEAD_NODE) continue;
       for (ExpTree* tree : member->assignTree) tree->replace(aliasMap);
       if (member->resetTree) member->resetTree->replace(aliasMap);
-    }
-  }
-/* apdate arrayMember */
-  for (Node* array: splittedArray) {
-    for (size_t i = 0; i < array->arrayMember.size(); i ++) {
-      if (array->arrayMember[i] && aliasMap.find(array->arrayMember[i]) != aliasMap.end()) {
-        array->arrayMember[i] = aliasMap[array->arrayMember[i]];
-      }
     }
   }
 

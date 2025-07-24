@@ -34,7 +34,6 @@ enum NodeStatus{
   VALID_NODE,
   DEAD_NODE,
   CONSTANT_NODE,
-  MERGED_NODE,
   REPLICATION_NODE,
   SPLITTED_NODE,
   EMPTY_REG  /* reg_src or reg_dst that are empty, which means that regNext represets the whole register */
@@ -102,7 +101,6 @@ public:
 };
 
 class Node {
-  void finalConnect(std::string lvalue, valInfo* info);
   static int counter;
  public:
 
@@ -154,7 +152,6 @@ class Node {
 /* used for instGerator */
   valInfo* computeInfo = nullptr;
 /* used for splitted array */
-  std::vector<Node*>arrayMember;
   int arrayIdx = -1;
   Node* arrayParent = nullptr;
 /* used for reg & memory */
@@ -162,23 +159,17 @@ class Node {
   bool isClock = false;
   ResetType reset = UNCERTAIN;
   AsReset asReset = EMPTY;
-  bool isArrayMember = false;
   bool inAggr = false;
 /* used for visitWhen in AST2Graph */
 
   size_t whenDepth = 0;
 
 /* used in instsGenerator */
-  bool fullyUpdated = true;
   bool nodeIsRoot = false;
 
 /* used in cppEmitter */
   std::set<int> nextActiveId;
   std::set<int> nextNeedActivate;
-
-  std::vector<std::string> insts;
-  std::vector<std::string> resetInsts;
-  std::vector<std::string> initInsts;
 
   void updateInfo(TypeInfo* info);
   void setType(int _width, bool _sign) {
@@ -250,14 +241,7 @@ class Node {
   bool isArray() {
     return dimension.size() != 0;
   }
-  bool arraySplitted() {
-    return arrayMember.size() != 0;
-  }
   void addArrayVal(ExpTree* val);
-  Node* getArrayMember(int idx) {
-    Assert(idx < (int)arrayMember.size(), "idx %d out of bound [0, %ld) in %s", idx, arrayMember.size(), name.c_str());
-    return arrayMember[idx];
-  }
   void set_super(SuperNode* _super) {
     super = _super;
   }
@@ -306,10 +290,7 @@ class Node {
   void addUpdateTree();
   void constructSuperNode(); // alloc superNode for every node
   void constructSuperConnect(); // connect superNode
-  valInfo* compute(); // compute node
-  valInfo* computeArray();
   valInfo* computeConstantArray();
-  void recompute();
   void recomputeConstant();
   void passWidthToPrev();
   void splitArray();
@@ -405,7 +386,6 @@ public:
   int cppId = -1;
   SuperType superType = SUPER_VALID;
   Node* resetNode = nullptr;
-  int localTmpNum = 0;
   SuperNode() {
     id = counter ++;
   }

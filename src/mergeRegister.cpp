@@ -5,7 +5,6 @@
 #include "common.h"
 #include <stack>
 #include <tuple>
-Node* getLeafNode(bool isArray, ENode* enode);
 
 void ExpTree::replace(Node* oldNode, ENode* newENode) {
   std::stack<std::tuple<ENode*, ENode*, int>> s;
@@ -19,7 +18,7 @@ void ExpTree::replace(Node* oldNode, ENode* newENode) {
     int idx;
     std::tie(top, parent, idx) = s.top();
     s.pop();
-    if (top->getNode() && getLeafNode(true, top) == oldNode) {
+    if (top->getNode() && top->getNode() == oldNode) {
       if (parent) parent->setChild(idx, newENode);
       else setRoot(newENode);
     }
@@ -40,7 +39,7 @@ void ExpTree::removeSelfAssignMent(Node* node) {
     s.pop();
     if (top->opType == OP_WHEN) {
       for (size_t i = 1; i < top->getChildNum(); i ++) {
-        if (top->child[i] && node == getLeafNode(true, top->child[i])) top->child[i] = nullptr;
+        if (node == top->child[i]->nodePtr) top->child[i] = nullptr;
       }
     }
     for (ENode* child : top->child) {

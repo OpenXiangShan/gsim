@@ -71,7 +71,7 @@ static std::map<NodeType, const char*> NodeType2Name = {
 };
 
 static std::map<NodeStatus, const char*> NodeStatus2Name = {
-  {VALID_NODE, "valid"}, {DEAD_NODE, "dead"}, {CONSTANT_NODE, "constant"}, {MERGED_NODE, "merged"},
+  {VALID_NODE, "valid"}, {DEAD_NODE, "dead"}, {CONSTANT_NODE, "constant"},
   {REPLICATION_NODE, "replication"}, {SPLITTED_NODE, "splitted"}
 };
 
@@ -121,6 +121,20 @@ void SuperNode::display() {
   }
   printf("[stmtTree]\n");
   if (stmtTree) stmtTree->display();
+#if 0
+  for (SuperNode* nextNode : next) {
+    printf("    super-next %d\n", nextNode->id);
+  }
+  for (SuperNode* nextNode : depNext) {
+    if (next.find(nextNode) == next.end()) printf("    super-depNext %d\n", nextNode->id);
+  }
+  for (SuperNode* prevNode : prev) {
+    printf("    super-prev %d\n", prevNode->id);
+  }
+  for (SuperNode* prevNode : depPrev) {
+    if (prev.find(prevNode) == prev.end()) printf("    super-depPrev %d\n", prevNode->id);
+  }
+#endif
 }
 
 
@@ -138,10 +152,16 @@ void Node::display() {
   }
 #if 0
   for (Node* nextNode : next) {
-    printf("    next %p %s\n", nextNode, nextNode->name.c_str());
+    printf("    next %p (super %d) %s\n", nextNode, nextNode->super->id, nextNode->name.c_str());
+  }
+  for (Node* nextNode : depNext) {
+    if (next.find(nextNode) == next.end()) printf("    depNext %d %s\n", nextNode->super->id, nextNode->name.c_str());
   }
   for (Node* prevNode : prev) {
-    printf("    prev %p %s\n", prevNode, prevNode->name.c_str());
+    printf("    prev %p (super %d) %s\n", prevNode, prevNode->super->id, prevNode->name.c_str());
+  }
+  for (Node* prevNode : depPrev) {
+    if (prev.find(prevNode) == prev.end()) printf("    depPrev %d %s\n", prevNode->super->id, prevNode->name.c_str());
   }
 #endif
 }

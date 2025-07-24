@@ -3,7 +3,6 @@
 #include "common.h"
 /* detect and optimize some specific patterns */
 /* behind constantAnalysis */
-Node* getLeafNode(bool isArray, ENode* enode);
 /* pattern 1:
   oneHot = dshl(1, shift)
   _T_0 = bits(oneHot, 0, 0)
