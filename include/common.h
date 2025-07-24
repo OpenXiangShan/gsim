@@ -36,6 +36,8 @@
 #define MIN(a, b) ((a >= b) ? b : a)
 #define ABS(a) (a >= 0 ? a : -a)
 #define ROUNDUP(a, sz) ((((uintptr_t)a) + (sz) - 1) & ~((sz) - 1))
+#define BITMASK(bits) ((1ull << (bits)) - 1)
+#define BITS(x, hi, lo) (((x) >> (lo)) & BITMASK((hi) - (lo) + 1)) // similar to x[hi:lo] in verilog
 
 #define nodeType(node) widthUType(node->width)
 
