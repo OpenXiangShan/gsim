@@ -1523,7 +1523,6 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
         computeInfo->opNum = 1;
         computeInfo->width = width;
       } else if (sign && nodePtr->nodeIsRoot && computeInfo->width < (int)widthBits(width)) {
-        printf("nodePtr %s\n", nodePtr->name.c_str());
         int shift = widthBits(width) - computeInfo->width;
         computeInfo->valStr = format("(%s(%s%s %s) %s)",
                                     Cast(width, true).c_str(),
