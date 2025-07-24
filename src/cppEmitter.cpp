@@ -687,6 +687,7 @@ void graph::genResetAll() {
 
   emitFuncDecl(0, "void S%s::resetAll(){\n", name.c_str());
   for (size_t i = 0; i < resetSuper.size(); i ++) {
+    if (resetSuper[i]->superType == SUPER_ASYNC_RESET) continue;
     genResetActivation(resetSuper[i], true, 1, i);
   }
   emitBodyLock(0, "}\n");
