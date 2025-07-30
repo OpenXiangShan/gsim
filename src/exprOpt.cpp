@@ -4,18 +4,7 @@
 
 void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 
-void Node::fillArrayInvalid(ExpTree* tree) {
-  int beg, end;
-  std::tie(beg, end) = tree->getlval()->getIdx(this);
-    bool canBeInvalid = true;
-    for (int i = beg; i <= end; i ++) {
-      if (invalidIdx.find(i) == invalidIdx.end()) canBeInvalid = false;
-    }
-    if (canBeInvalid) fillEmptyWhen(tree, new ENode(OP_INVALID));
-}
-
 void Node::invalidArrayOptimize() {
-  if (invalidIdx.size() == 0) return;
   if (!isArray()) return;
   if (type != NODE_OTHERS) return;
   /* can compute in AST2Graph and pass using member variable */
@@ -29,7 +18,7 @@ void Node::invalidArrayOptimize() {
       allIdx.insert(i);
     }
   }
-  for (ExpTree* tree : assignTree) fillArrayInvalid(tree);
+  for (ExpTree* tree : assignTree) fillEmptyWhen(tree, new ENode(OP_INVALID));
 }
 
 bool checkENodeEq(ENode* enode1, ENode* enode2);

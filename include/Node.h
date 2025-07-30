@@ -124,11 +124,13 @@ class Node {
   std::set<Node*> depPrev;
   std::set<Node*> depNext;
   std::vector <ExpTree*> assignTree;
+  /* only used in AST2Graph */
   ExpTree* valTree = nullptr;
   ExpTree* memTree = nullptr;
+  /* for registers */
   ExpTree* resetCond = nullptr;  // valid in reg_src
   ExpTree* resetVal = nullptr;   // valid in reg_src, used in AST2Graph
-  std::set<int> invalidIdx;
+  /* for extmodule */
   std::vector<std::pair<bool, std::string>> params; // <isInt, value>
   SuperNode* super = nullptr;
 /* used for memory */
@@ -306,7 +308,6 @@ class Node {
   valInfo* computeConstant();
   valInfo* computeRegConstant();
   void invalidArrayOptimize();
-  void fillArrayInvalid(ExpTree* tree);
   uint64_t keyHash();
   NodeComponent* inferComponent();
   NodeComponent* reInferComponent();

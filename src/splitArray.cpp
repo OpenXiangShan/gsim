@@ -424,7 +424,6 @@ void graph::splitArray() {
       splitArrayNode(node);
       /* add into s and visitedSet */
       for (Node* member : splitArrayMap[node]) {
-        // if (!member->valTree) continue;
         times[member] = 0;
         for (Node* prev : member->prev) {
           if (fullyVisited.find(prev) != fullyVisited.end()) {
