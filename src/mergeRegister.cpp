@@ -61,17 +61,6 @@ Node* laterNode(Node* node1, Node* node2) {
   return node1;
 }
 
-void graph::orderAllNodes() {
-  int order = 1;
-  for (size_t i = 0; i < sortedSuper.size(); i ++) {
-    sortedSuper[i]->order = i;
-    for (size_t j = 0; j < sortedSuper[i]->member.size(); j ++) {
-      sortedSuper[i]->member[j]->orderInSuper = j;
-      sortedSuper[i]->member[j]->order = order ++;
-    }
-  }
-}
-
 // void graph::mergeRegister() {
 //   orderAllNodes();
 //   int num = 0;
