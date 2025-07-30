@@ -42,8 +42,8 @@ else ifeq ($(dutName),default-xiangshan)
 	VERI_THREADS = --threads 16
 endif
 
-DIFF_VERSION ?= ysyx3
-REF_GSIM_DIR = emu/$(DIFF_VERSION)
+DIFF_VERSION ?= default-xiangshan
+REF_GSIM_DIR = diff/$(DIFF_VERSION)
 ##############################################
 ### Global Settings
 ##############################################
@@ -103,7 +103,7 @@ else
 	EMU_CFLAGS += -I$(REF_GSIM_DIR) -DREF_NAME=Diff$(NAME)
 	SIG_COMMAND = python3 scripts/genSigDiff.py $(dutName) $(NAME) $(DIFF_VERSION)
 	target ?= run-emu
-	EMU_SRCS += $(shell find emu/$(DIFF_VERSION) -name "*.cpp" 2> /dev/null)
+	EMU_SRCS += $(shell find diff/$(DIFF_VERSION) -name "*.cpp" 2> /dev/null)
 endif
 
 # Pass from outside Design or internal Default
@@ -365,6 +365,8 @@ init:
 	cd ready-to-run && bash init.sh
 
 gen-ref:
+	rm -rf $(REF_GSIM_DIR)
+	mkdir -p $(REF_GSIM_DIR)
 	bash scripts/genReference.sh $(NAME) $(dutName) $(DIFF_VERSION)
 
 perf: $(target)
