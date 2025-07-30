@@ -780,7 +780,7 @@ void graph::cppEmitter() {
         alwaysActive.insert(super->cppId);
       }
 #if 0
-      if (super->member.size() == 1 && super->member[0]->ops < 1) {
+      if (super->member.size() == 1) {
         alwaysActive.insert(super->cppId);
         printf("alwaysActive %d\n", super->cppId);
       }

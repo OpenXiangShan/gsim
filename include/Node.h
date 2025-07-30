@@ -93,13 +93,6 @@ class AggrParentNode {  // virtual type_aggregate node, used for aggregate conne
   }
 };
 
-class ExprValue {
-public:
-  std::vector<PNode*> ops;
-  std::vector<Node*> operands;
-  std::string consVal;
-};
-
 class Node {
   static int counter;
  public:
@@ -120,7 +113,6 @@ class Node {
   std::vector<int> dimension;
   int order = -1;
   int orderInSuper = -1;
-  int ops = 0;
   int lineno = -1;
   /* adjacent */
   std::set<Node*> next;
