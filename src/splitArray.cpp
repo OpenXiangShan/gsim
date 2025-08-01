@@ -424,7 +424,6 @@ void graph::splitArray() {
       splitArrayNode(node);
       /* add into s and visitedSet */
       for (Node* member : splitArrayMap[node]) {
-        // if (!member->valTree) continue;
         times[member] = 0;
         for (Node* prev : member->prev) {
           if (fullyVisited.find(prev) != fullyVisited.end()) {
@@ -466,18 +465,17 @@ Node* Node::arrayMemberNode(int idx) {
   std::string memberName = name;
   size_t i;
   for (i = 0; i < index.size(); i ++) {
-    if (inAggr) memberName += "__" + std::to_string(index[i]);
-    else memberName += "_" + std::to_string(index[i]);
+    memberName += "_" + std::to_string(index[i]);
   }
 
   if (nameExist(memberName)) {
-    changeName(memberName, memberName + "_0");
+    std::string newName = memberName + "_0";
+    Assert(!nameExist(newName), "%s already exist", newName.c_str());
+    changeName(memberName, newName);
   }
 
   Node* member = new Node(type);
   member->name = memberName;
-  member->arrayIdx = idx;
-  member->arrayParent = this;
   member->clock = clock;
   member->reset = reset;
   member->setType(width, sign);

@@ -124,4 +124,4 @@ class SigFilter():
 if __name__ == "__main__":
   dir = "build/" + sys.argv[1] + "/model/"
   sigFilter = SigFilter(sys.argv[2], dir)
-  sigFilter.filter("build/" + sys.argv[1] + "/model/" + sys.argv[2] + "_sigs.txt", "emu/" + sys.argv[3] + "/top_ref.h")
+  sigFilter.filter("build/" + sys.argv[1] + "/model/" + sys.argv[2] + "_sigs.txt", "diff/" + sys.argv[3] + "/top_ref.h")

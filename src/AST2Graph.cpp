@@ -176,7 +176,6 @@ TypeInfo* visitFields(graph* g, PNode* fields, NodeType parentType) {
     if (!fieldInfo->isAggr()) { // The type of field is ground
       Node* fieldNode = allocNode(curType, prefixName(SEP_AGGR, field->name), fields->lineno);
       fieldNode->updateInfo(fieldInfo);
-      fieldNode->inAggr = true;
       info->add(fieldNode, field->type == P_FLIP_FIELD);
     } else { // The type of field is aggregate
       info->mergeInto(fieldInfo);
@@ -928,7 +927,6 @@ void visitConnect(graph* g, PNode* connect) {
           int beg, end;
           std::tie(beg, end) = ref->getAggr(i)->getIdx(node);
           if (beg < 0) TODO();
-          for (int i = beg; i <= end; i ++) node->invalidIdx.insert(i);
         }
       } else if (!node->valTree) node->valTree = valTree;
     }
@@ -956,12 +954,6 @@ void visitConnect(graph* g, PNode* connect) {
     ExpTree* valTree = new ExpTree(exp->getExpRoot(), ref->getExpRoot());
     if (node->isArray()) {
       node->addArrayVal(valTree);
-      if (exp->isInvalid()) {
-        int beg, end;
-        std::tie(beg, end) = ref->getExpRoot()->getIdx(node);
-        if (beg < 0) TODO();
-        for (int i = beg; i <= end; i ++) node->invalidIdx.insert(i);
-      }
     } else {
       // Override all prefix nodes in the prev assignTree.
       if (!exp->isInvalid()) node->assignTree.clear();

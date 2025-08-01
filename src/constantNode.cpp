@@ -1182,7 +1182,7 @@ void graph::constantAnalysis() {
     }
   }
 
-  /* update valTree */
+  /* update assignTree */
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == CONSTANT_NODE) {

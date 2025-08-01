@@ -121,7 +121,7 @@ std::string updateActiveStr(int idx, uint64_t mask, std::string& cond, int uniqu
   auto activeFlags = std::string("activeFlags[") + std::to_string(idx) + std::string("]");
 
   if (mask <= MAX_U8) {
-    if (uniqueId >= 0) return format("%s |= %s %s;", activeFlags.c_str(), cond.c_str(), shiftBits(uniqueId, ShiftDir::Left).c_str());
+    if (uniqueId >= 0) return format("%s |= %s%s;", activeFlags.c_str(), cond.c_str(), shiftBits(uniqueId, ShiftDir::Left).c_str());
     else return format("%s |= -(uint8_t)%s & 0x%lx;", activeFlags.c_str(), cond.c_str(), mask, activeFlags.c_str());
   }
   if (mask <= MAX_U16)
@@ -780,7 +780,7 @@ void graph::cppEmitter() {
         alwaysActive.insert(super->cppId);
       }
 #if 0
-      if (super->member.size() == 1 && super->member[0]->ops < 1) {
+      if (super->member.size() == 1) {
         alwaysActive.insert(super->cppId);
         printf("alwaysActive %d\n", super->cppId);
       }

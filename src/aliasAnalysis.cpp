@@ -89,7 +89,7 @@ void graph::aliasAnalysis() {
       aliasMap[member] = aliasENode;
     }
   }
-  /* update valTree */
+  /* update assignTree */
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == DEAD_NODE) continue;

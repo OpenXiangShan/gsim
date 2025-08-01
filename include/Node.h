@@ -93,13 +93,6 @@ class AggrParentNode {  // virtual type_aggregate node, used for aggregate conne
   }
 };
 
-class ExprValue {
-public:
-  std::vector<PNode*> ops;
-  std::vector<Node*> operands;
-  std::string consVal;
-};
-
 class Node {
   static int counter;
  public:
@@ -120,7 +113,6 @@ class Node {
   std::vector<int> dimension;
   int order = -1;
   int orderInSuper = -1;
-  int ops = 0;
   int lineno = -1;
   /* adjacent */
   std::set<Node*> next;
@@ -132,18 +124,20 @@ class Node {
   std::set<Node*> depPrev;
   std::set<Node*> depNext;
   std::vector <ExpTree*> assignTree;
+  SuperNode* super = nullptr;
+  std::vector<Node*> member;
+  /* for extmodule */
+  std::vector<std::pair<bool, std::string>> params; // <isInt, value>
+  /* only used in AST2Graph */
   ExpTree* valTree = nullptr;
-  ExpTree* memTree = nullptr;
+  /* for registers in AST2Graph*/
   ExpTree* resetCond = nullptr;  // valid in reg_src
   ExpTree* resetVal = nullptr;   // valid in reg_src, used in AST2Graph
-  std::set<int> invalidIdx;
-  std::vector<std::pair<bool, std::string>> params; // <isInt, value>
-  SuperNode* super = nullptr;
-/* used for memory */
+  /* used for memory in AST2Graph*/
   int rlatency;
   int wlatency;
   int depth;
-  std::vector<Node*> member;
+  ExpTree* memTree = nullptr;
   Node* parent = nullptr;
 /* used for registers */
   Node* regNext = nullptr;
@@ -151,9 +145,6 @@ class Node {
   bool regSplit = true;
 /* used for instGerator */
   valInfo* computeInfo = nullptr;
-/* used for splitted array */
-  int arrayIdx = -1;
-  Node* arrayParent = nullptr;
 /* used for reg & memory */
   Node* clock = nullptr;
   bool isClock = false;
@@ -161,7 +152,6 @@ class Node {
   AsReset asReset = EMPTY;
   bool inAggr = false;
 /* used for visitWhen in AST2Graph */
-
   size_t whenDepth = 0;
 
 /* used in instsGenerator */
@@ -314,7 +304,6 @@ class Node {
   valInfo* computeConstant();
   valInfo* computeRegConstant();
   void invalidArrayOptimize();
-  void fillArrayInvalid(ExpTree* tree);
   uint64_t keyHash();
   NodeComponent* inferComponent();
   NodeComponent* reInferComponent();
@@ -371,7 +360,6 @@ class SuperNode {
 private:
   static int counter;  // initialize to 1
 public:
-  std::string name;
   /* adjacent superNodes */
   std::set<SuperNode*> prev;
   std::set<SuperNode*> next;

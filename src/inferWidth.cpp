@@ -188,7 +188,7 @@ void Node::clearWidth() {
 }
 
 /*
-infer width of node and all ENodes in valTree
+infer width of node and all ENodes in assignTree
 inverse topological order or [infer all encountered nodes]
 */
 void Node::inferWidth() {

@@ -61,3 +61,14 @@ void graph::removeEmptySuper() {
     sortedSuper.end()
   );
 }
+
+void graph::orderAllNodes() {
+  int order = 1;
+  for (size_t i = 0; i < sortedSuper.size(); i ++) {
+    sortedSuper[i]->order = i;
+    for (size_t j = 0; j < sortedSuper[i]->member.size(); j ++) {
+      sortedSuper[i]->member[j]->orderInSuper = j;
+      sortedSuper[i]->member[j]->order = order ++;
+    }
+  }
+}

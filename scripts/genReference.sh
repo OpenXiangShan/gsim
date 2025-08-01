@@ -1,6 +1,6 @@
 NAME=$1
 DIR=build/$2
-REF_DIR=emu/$3
+REF_DIR=diff/$3
 
 rm -rf $REF_DIR
 mkdir -p $REF_DIR
