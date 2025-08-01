@@ -475,7 +475,6 @@ Node* Node::arrayMemberNode(int idx) {
 
   Node* member = new Node(type);
   member->name = memberName;
-  member->arrayParent = this;
   member->clock = clock;
   member->reset = reset;
   member->setType(width, sign);

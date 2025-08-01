@@ -145,8 +145,6 @@ class Node {
   bool regSplit = true;
 /* used for instGerator */
   valInfo* computeInfo = nullptr;
-/* used for splitted array */
-  Node* arrayParent = nullptr;
 /* used for reg & memory */
   Node* clock = nullptr;
   bool isClock = false;
