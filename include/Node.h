@@ -124,20 +124,20 @@ class Node {
   std::set<Node*> depPrev;
   std::set<Node*> depNext;
   std::vector <ExpTree*> assignTree;
-  /* only used in AST2Graph */
-  ExpTree* valTree = nullptr;
-  ExpTree* memTree = nullptr;
-  /* for registers */
-  ExpTree* resetCond = nullptr;  // valid in reg_src
-  ExpTree* resetVal = nullptr;   // valid in reg_src, used in AST2Graph
+  SuperNode* super = nullptr;
+  std::vector<Node*> member;
   /* for extmodule */
   std::vector<std::pair<bool, std::string>> params; // <isInt, value>
-  SuperNode* super = nullptr;
-/* used for memory */
+  /* only used in AST2Graph */
+  ExpTree* valTree = nullptr;
+  /* for registers in AST2Graph*/
+  ExpTree* resetCond = nullptr;  // valid in reg_src
+  ExpTree* resetVal = nullptr;   // valid in reg_src, used in AST2Graph
+  /* used for memory in AST2Graph*/
   int rlatency;
   int wlatency;
   int depth;
-  std::vector<Node*> member;
+  ExpTree* memTree = nullptr;
   Node* parent = nullptr;
 /* used for registers */
   Node* regNext = nullptr;
