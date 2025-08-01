@@ -146,7 +146,6 @@ class Node {
 /* used for instGerator */
   valInfo* computeInfo = nullptr;
 /* used for splitted array */
-  int arrayIdx = -1;
   Node* arrayParent = nullptr;
 /* used for reg & memory */
   Node* clock = nullptr;
