@@ -176,7 +176,6 @@ TypeInfo* visitFields(graph* g, PNode* fields, NodeType parentType) {
     if (!fieldInfo->isAggr()) { // The type of field is ground
       Node* fieldNode = allocNode(curType, prefixName(SEP_AGGR, field->name), fields->lineno);
       fieldNode->updateInfo(fieldInfo);
-      fieldNode->inAggr = true;
       info->add(fieldNode, field->type == P_FLIP_FIELD);
     } else { // The type of field is aggregate
       info->mergeInto(fieldInfo);
