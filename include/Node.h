@@ -152,7 +152,6 @@ class Node {
   AsReset asReset = EMPTY;
   bool inAggr = false;
 /* used for visitWhen in AST2Graph */
-
   size_t whenDepth = 0;
 
 /* used in instsGenerator */
@@ -361,7 +360,6 @@ class SuperNode {
 private:
   static int counter;  // initialize to 1
 public:
-  std::string name;
   /* adjacent superNodes */
   std::set<SuperNode*> prev;
   std::set<SuperNode*> next;
