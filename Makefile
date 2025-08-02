@@ -50,7 +50,7 @@ REF_GSIM_DIR = diff/$(DIFF_VERSION)
 
 BUILD_DIR ?= build
 WORK_DIR = $(BUILD_DIR)/$(dutName)
-CXX = clang++
+CXX ?= clang++
 
 SHELL := /bin/bash
 TIME = /usr/bin/time
@@ -259,7 +259,7 @@ $(VERI_GEN_MK): $(VERI_VSRCS) $(VERI_CSRCS-$(MODE)) | $(EMU_MAIN_SRCS)
 	verilator $(VERI_VFLAGS) $(abspath $^ $|)
 
 $(VERI_BIN): | $(VERI_GEN_MK)
-	$(TIME) $(MAKE) OPT_FAST="-O1" CXX=clang++ -s -C $(VERI_BUILD_DIR) -f $(abspath $|)
+	$(TIME) $(MAKE) OPT_FAST="-O1" CXX=$(CXX) -s -C $(VERI_BUILD_DIR) -f $(abspath $|)
 	ln -sf $(abspath $(VERI_BUILD_DIR)/V$(NAME)) $@
 
 compile-veri: $(VERI_GEN_MK)

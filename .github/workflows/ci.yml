@@ -16,12 +16,8 @@ jobs:
           python-version: 3.x
       - name: Install dependencies
         run: |
-          sudo apt install -y flex bison libfl-dev
+          sudo apt install -y flex bison libfl-dev clang-19
       # Since ubuntu 2404 doesn't comes with llvm >= 19
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-            version: "20.1.4"
       - name: Install verilator
         uses: YosysHQ/setup-oss-cad-suite@v3
         with:
@@ -45,7 +41,7 @@ jobs:
       - name: Run ${{ matrix.dutName }} (difftest with verilator)
         run: |
           sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
-          make -j `nproc` diff dutName=${{ matrix.dutName }}
+          make CXX=clang++-19 -j `nproc` diff dutName=${{ matrix.dutName }}
 
 
   bolt-ysyx3:
@@ -61,10 +57,6 @@ jobs:
         run: |
           sudo apt install -y flex bison libfl-dev
       # Since ubuntu 2404 doesn't comes with llvm >= 19
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-            version: "20.1.4"
       - name: Install verilator
         uses: YosysHQ/setup-oss-cad-suite@v3
         with:
@@ -81,4 +73,4 @@ jobs:
       - name: Run ysyx3 (with bolt)
         run: |
           sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
-          make -j `nproc` bolt dutName=ysyx3
+          make CXX=clang++-19 -j `nproc` bolt dutName=ysyx3
