@@ -249,7 +249,10 @@ VERI_LDFLAGS += -lz -lzstd
 endif
 VERI_VFLAGS += -Mdir $(VERI_BUILD_DIR) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)"
 VERI_VFLAGS += $(VERI_THREADS)
-#VERI_VFLAGS += --trace-fst
+ifeq ($(V_WAVE),1)
+VERI_VFLAGS += --trace-fst
+VERI_CFLAGS += -DV_WAVE
+endif
 
 VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
 VERI_CSRCS-2 = $(EMU_GEN_SRCS)
