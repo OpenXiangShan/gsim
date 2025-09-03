@@ -1,0 +1,66 @@
+name: build-and-release
+
+on:
+  push:
+    branches: ["**"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build gsim
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Install base dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make flex bison libgmp-dev
+
+      - name: Install LLVM toolchain (>=19)
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "20.1.4"
+
+      - name: Build gsim
+        run: |
+          make -j"$(nproc)" build-gsim
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gsim-${{ runner.os }}-${{ github.sha }}
+          path: build/gsim/gsim
+
+  release:
+    name: Release on master
+    needs: build
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gsim-${{ runner.os }}-${{ github.sha }}
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: master-${{ github.sha }}
+          name: gsim ${{ github.sha }}
+          body: ${{ github.event.head_commit.message }}
+          files: |
+            dist/gsim
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
