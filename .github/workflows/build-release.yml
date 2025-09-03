@@ -1,0 +1,83 @@
+name: build-and-release
+
+on:
+  push:
+    branches: ["**"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build gsim
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Install base dependencies
+        run: |
+          sudo apt-get update
+          # flex provides the scanner; libfl-dev provides FlexLexer.h and libfl
+          sudo apt-get install -y make flex bison g++ libfl-dev libgmp-dev libc6-dev file
+
+      - name: Install LLVM toolchain (>=19)
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "20.1.4"
+
+      - name: Build gsim (static)
+        run: |
+          make -j"$(nproc)" STATIC=1 build-gsim
+
+      - name: Verify fully static binary
+        run: |
+          file build/gsim/gsim
+          # ldd prints "not a dynamic executable" for static binaries
+          ldd build/gsim/gsim 2>&1 | tee /dev/stderr | grep -q "not a dynamic executable"
+
+      - name: Smoke test help
+        run: |
+          ./build/gsim/gsim -h >/dev/null
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gsim-${{ runner.os }}-${{ github.sha }}
+          path: build/gsim/gsim
+
+  release:
+    name: Release on master
+    needs: build
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gsim-${{ runner.os }}-${{ github.sha }}
+          path: dist
+
+      - name: Set release info
+        id: release_info
+        run: |
+          echo "date=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+          echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: master-${{ github.sha }}
+          name: gsim ${{ steps.release_info.outputs.date }} ${{ steps.release_info.outputs.sha }}
+          body: ${{ github.event.head_commit.message }}
+          files: |
+            dist/gsim
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

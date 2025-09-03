@@ -60,7 +60,9 @@ static void printUsage(const char* ProgName) {
 static char* parseCommandLine(int argc, char** argv) {
   if (argc <= 1) {
     printUsage(argv[0]);
-    exit(EXIT_SUCCESS);
+    std::cout.flush();
+    fflush(nullptr);
+    _exit(EXIT_SUCCESS); // avoid running atexit/destructors which crash in full-static
   }
 
   const struct option Table[] = {
@@ -90,14 +92,16 @@ static char* parseCommandLine(int argc, char** argv) {
                 case 7: sscanf(optarg, "%d", &globalConfig.MergeWhenSize); break;
                 case 8: sscanf(optarg, "%d", &globalConfig.When2muxBound); break;
                 case 0:
-                default: printUsage(argv[0]); exit(EXIT_SUCCESS);
+                default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }
               break;
       case 1: return optarg; // InputFileName
       case 'd': globalConfig.EnableDumpGraph = true; break;
       default: {
         printUsage(argv[0]);
-        exit(EXIT_SUCCESS);
+        std::cout.flush();
+        fflush(nullptr);
+        _exit(EXIT_SUCCESS);
       }
     }
   }
