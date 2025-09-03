@@ -21,16 +21,26 @@ jobs:
         run: |
           sudo apt-get update
           # flex provides the scanner; libfl-dev provides FlexLexer.h and libfl
-          sudo apt-get install -y make flex bison libfl-dev libgmp-dev
+          sudo apt-get install -y make flex bison g++ libfl-dev libgmp-dev libc6-dev file
 
       - name: Install LLVM toolchain (>=19)
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: "20.1.4"
 
-      - name: Build gsim
+      - name: Build gsim (static)
         run: |
-          make -j"$(nproc)" build-gsim
+          make -j"$(nproc)" STATIC=1 build-gsim
+
+      - name: Verify fully static binary
+        run: |
+          file build/gsim/gsim
+          # ldd prints "not a dynamic executable" for static binaries
+          ldd build/gsim/gsim 2>&1 | tee /dev/stderr | grep -q "not a dynamic executable"
+
+      - name: Smoke test help
+        run: |
+          ./build/gsim/gsim -h >/dev/null
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

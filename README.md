@@ -20,6 +20,7 @@ GSIM accepts chirrtl, and compiles it to C++
 ## Usage
 
 + Run `make build-gsim` to build GSIM
++ Build a static binary locally with `make STATIC=1 build-gsim` (CI artifacts are built statically).
 + Run `build/gsim/gsim $(chirrtl-file)` to compile chirrtl to C++
 + Refer to `build/gsim/gsim --help` for more information
 + See [C++ harness example](https://github.com/jaypiper/simulator/blob/master/emu/emu.cpp) to know how it interacts with the emitted C++ code.

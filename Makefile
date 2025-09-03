@@ -80,7 +80,7 @@ endef
 define LD_TEMPLATE =
 $(1): $(2)
 	@mkdir -p $$(@D) && echo + LD $$@
-	@$(CXX) $$^ $(3) -o $$@
+	@$(CXX) $(LDFLAGS) $$^ $(3) -o $$@
 endef
 
 ifeq ($(PERF),1)
@@ -151,6 +151,12 @@ endif
 
 ifeq ($(DEBUG),1)
 	CXXFLAGS += -DDEBUG
+endif
+
+# Optional: build static binary (enable with `make STATIC=1 build-gsim`)
+ifeq ($(STATIC),1)
+# Link libstdc++ and libgcc statically; attempt full static if available
+LDFLAGS += -static -static-libstdc++ -static-libgcc
 endif
 
 $(PARSER_BUILD_DIR)/%.cc:  $(PARSER_DIR)/%.y
