@@ -20,7 +20,8 @@ jobs:
       - name: Install base dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make flex bison libgmp-dev
+          # flex provides the scanner; libfl-dev provides FlexLexer.h and libfl
+          sudo apt-get install -y make flex bison libfl-dev libgmp-dev
 
       - name: Install LLVM toolchain (>=19)
         uses: KyleMayes/install-llvm-action@v2
@@ -54,11 +55,17 @@ jobs:
           name: gsim-${{ runner.os }}-${{ github.sha }}
           path: dist
 
+      - name: Set release info
+        id: release_info
+        run: |
+          echo "date=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+          echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: master-${{ github.sha }}
-          name: gsim ${{ github.sha }}
+          name: gsim ${{ steps.release_info.outputs.date }} ${{ steps.release_info.outputs.sha }}
           body: ${{ github.event.head_commit.message }}
           files: |
             dist/gsim
