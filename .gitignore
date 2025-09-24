@@ -14,5 +14,4 @@ data/
 doc/html
 *.out
 *.data*
-*.txt
 emu/obj*
