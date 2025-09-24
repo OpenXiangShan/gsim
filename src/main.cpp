@@ -13,6 +13,41 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include "circt/Dialect/SV/SVDialect.h"
+#include "circt/Dialect/SV/SVOps.h"
+#include "circt/Dialect/HW/HWDialect.h"
+#include "circt/Dialect/HW/HWOps.h"
+#include "circt/Dialect/Comb/CombDialect.h"
+#include "circt/Dialect/Comb/CombOps.h"
+#include "circt/Dialect/Seq/SeqDialect.h"
+#include "circt/Dialect/Seq/SeqOps.h"
+#include "circt/Dialect/Emit/EmitDialect.h"
+#include "circt/Dialect/Emit/EmitOps.h"
+#include "circt/Dialect/OM/OMDialect.h"
+#include "circt/Dialect/OM/OMOps.h"
+#include "mlir/IR/AsmState.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/Parser/Parser.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
+
+
+using namespace mlir;
+using namespace circt::hw;
+using namespace circt::sv;
+using namespace circt::comb;
+using namespace circt::seq;
+using namespace circt::emit;
+using namespace circt::om;
+
+
+static llvm::cl::opt<std::string>
+    inputFile(llvm::cl::Positional, llvm::cl::Required,
+              llvm::cl::desc("<input .mlir file>"));
 
 PNode* parseFIR(char *strbuf);
 void preorder_traversal(PNode* root);
@@ -131,6 +166,45 @@ static char* readFile(const char *InputFileName, size_t &size, size_t &mapSize) 
  * @return exit state.
  */
 int main(int argc, char** argv) {
+
+  llvm::cl::ParseCommandLineOptions(argc, argv, "CIRCT HW walk example\n");
+
+  // 1. 创建 MLIR 上下文并注册 HW 方言
+  MLIRContext context;
+  context.loadDialect<HWDialect>();
+  context.loadDialect<SVDialect>();
+  context.loadDialect<CombDialect>();
+  context.loadDialect<SeqDialect>();
+  context.loadDialect<EmitDialect>();
+  context.loadDialect<OMDialect>();
+
+  // 2. 把文件读进 SourceMgr
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileOrErr =
+      llvm::MemoryBuffer::getFile(inputFile);
+  if (std::error_code ec = fileOrErr.getError()) {
+    llvm::errs() << "Cannot open '" << inputFile << "': " << ec.message() << "\n";
+    return 1;
+  }
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(*fileOrErr), SMLoc());
+
+  // 3. 解析成 ModuleOp
+  OwningOpRef<ModuleOp> module = parseSourceFile<ModuleOp>(sourceMgr, &context);
+  if (!module) {
+    llvm::errs() << "Error parsing " << inputFile << "\n";
+    return 1;
+  }
+
+  // 4. 遍历模块内所有操作（含嵌套）
+  module->walk([&](Operation *op) {
+    // 只打印 HW 方言的操作，可按需要过滤
+    if (isa<HWDialect>(op->getDialect()))
+      llvm::outs() << "HW op: " << op->getName() << " at "
+                   << op->getLoc() << "\n";
+  });
+
+  return 0;
+
   TIMER_START(total);
   graph* g = NULL;
   static int dumpIdx = 0;
