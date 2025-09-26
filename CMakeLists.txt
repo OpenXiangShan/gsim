@@ -65,7 +65,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "-fexceptions -fn
 target_link_libraries(${PROJECT_NAME} PRIVATE ${GMP_LIB} Threads::Threads)
 target_link_libraries(${PROJECT_NAME} PRIVATE MLIRIR MLIRParser MLIRPass MLIRSupport 
                                               CIRCTHW CIRCTComb CIRCTSV CIRCTSeq CIRCTEmit CIRCTOM
-                                              LLVMSupport LLVMCore)
+                                              LLVMSupport)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
