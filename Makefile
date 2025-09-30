@@ -125,59 +125,11 @@ difftest: $(target)$(SIMPOINT_VAR)
 ### Building GSIM
 ##############################################
 
-GSIM_BUILD_DIR = $(BUILD_DIR)/gsim
-GSIM_BIN = $(GSIM_BUILD_DIR)/gsim
-
-PARSER_DIR = parser
-LEXICAL_NAME = lexical
-SYNTAX_NAME = syntax
-PARSER_BUILD_DIR = $(GSIM_BUILD_DIR)/$(PARSER_DIR)
-PARSER_GEN_SRCS = $(foreach x, $(LEXICAL_NAME) $(SYNTAX_NAME), $(PARSER_BUILD_DIR)/$(x).cc)
-PARSER_GEN_HEADER = $(PARSER_BUILD_DIR)/$(SYNTAX_NAME).hh
-GSIM_SRCS = $(foreach x, src $(PARSER_DIR), $(wildcard $(x)/*.cpp))
-
-GSIM_INC_DIR = include $(PARSER_DIR)/include $(PARSER_BUILD_DIR)
-# NOTE:
-# 1) pthread symbols (pthread_create / pthread_join) were missing at link stage;
-#    with clang this is solved by adding -pthread to both compile & link flags.
-# 2) If you still see "DWARF error: invalid or unhandled FORM value: 0x25" from ld
-#    your binutils (ld) may be older than the DWARF version emitted by clang-19.
-#    You can force DWARF v4 by building with: make DWARF4=1 ... (see conditional below).
-CXXFLAGS += -ggdb -O3 -MMD $(addprefix -I,$(GSIM_INC_DIR)) -Wall -Werror --std=c++17 -pthread
-
-ifeq ($(DWARF4),1)
-	CXXFLAGS += -gdwarf-4
-endif
-
-ifeq ($(DEBUG),1)
-	CXXFLAGS += -DDEBUG
-endif
-
-# Optional: build static binary (enable with `make STATIC=1 build-gsim`)
-ifeq ($(STATIC),1)
-# Link libstdc++ and libgcc statically; attempt full static if available
-LDFLAGS += -static -static-libstdc++ -static-libgcc
-endif
-
-$(PARSER_BUILD_DIR)/%.cc:  $(PARSER_DIR)/%.y
-	@mkdir -p $(@D)
-	bison -v -d $< -o $@
-
-$(PARSER_BUILD_DIR)/%.cc: $(PARSER_DIR)/%.l
-	@mkdir -p $(@D)
-	flex -Cf -o $@ $<
-
-$(PARSER_GEN_HEADER): $(PARSER_BUILD_DIR)/$(SYNTAX_NAME).cc
-
-$(foreach x, $(PARSER_GEN_SRCS), $(eval \
-	$(call CXX_TEMPLATE, $(PARSER_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(CXXFLAGS), GSIM_OBJS, $(PARSER_GEN_HEADER))))
-
-$(foreach x, $(GSIM_SRCS), $(eval \
-	$(call CXX_TEMPLATE, $(GSIM_BUILD_DIR)/$(basename $(x)).o, $(x), $(CXXFLAGS), GSIM_OBJS, $(PARSER_GEN_HEADER))))
-
-$(eval $(call LD_TEMPLATE, $(GSIM_BIN), $(GSIM_OBJS), $(CXXFLAGS) -lgmp))
+GSIM_BIN = $(BUILD_DIR)/gsim
 
 build-gsim: $(GSIM_BIN)
+	@echo "Please build gsim with CMAKE first."
+
 
 # Dependency
 -include $(GSIM_OBJS:.o=.d)
