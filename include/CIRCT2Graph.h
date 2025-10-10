@@ -17,6 +17,8 @@
 #include "circt/Dialect/OM/OMDialect.h"
 #include "circt/Dialect/OM/OMOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "llvm/ADT/DenseMap.h"
 #include <map>
 using namespace mlir;
 using namespace circt;
@@ -30,10 +32,11 @@ class CIRCT2Graph {
  private:
   graph* g;
   hw::HWModuleOp topModule;
-  std::unordered_map<mlir::Value, Node*> valueNodeMap;
+  llvm::DenseMap<mlir::Value, Node*> valueNodeMap;
 
   void processInputPort();
   void processOperations();
+  void processConstantOp(hw::ConstantOp constantOp);
 };
 
 #endif

@@ -1,3 +1,6 @@
 [submodule "ready-to-run"]
 	path = ready-to-run
 	url = git@github.com:jaypiper/gsim-ready-to-run.git
+[submodule "circt"]
+	path = circt
+	url = git@github.com:llvm/circt.git
