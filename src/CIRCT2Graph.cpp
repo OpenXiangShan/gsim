@@ -31,10 +31,17 @@ void CIRCT2Graph::processIoPort() {
 void CIRCT2Graph::processInputPort(hw::PortInfo portInfo) {
     Assert(portInfo.isInput(),"");
     // 创建 typeInfo
-    TypeInfo* typeInfo = new TypeInfo();
-    typeInfo->set_sign(portInfo.type.isSignedInteger());
-    typeInfo->set_width(portInfo.type.getIntOrFloatBitWidth());
-    typeInfo->set_reset(UNCERTAIN);
+    auto typeInfo = std::make_unique<TypeInfo>();
+    if (isa<seq::ClockType>(portInfo.type)) {
+      typeInfo->set_sign(false);
+      typeInfo->set_width(1);
+      typeInfo->set_clock(true);
+      typeInfo->set_reset(UNCERTAIN);
+    } else {
+      typeInfo->set_sign(portInfo.type.isSignedInteger());
+      typeInfo->set_width(portInfo.type.getIntOrFloatBitWidth());
+      typeInfo->set_reset(UNCERTAIN);
+    }
     // 创建 node
     Node* node = new Node(NODE_INP); 
     node->name = portInfo.getName();
