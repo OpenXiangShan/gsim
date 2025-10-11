@@ -8,16 +8,28 @@
 
 graph* CIRCT2Graph::generateGraph() {
   g = new graph();
-  processInputPort();
+  processIoPort();
   processOperations();
   return g;
 }
 
-void CIRCT2Graph::processInputPort() {
-  size_t inputPortIdx = 0;
-  for(size_t i = 0; i < topModule.getNumPorts(); i++) {
-    auto portInfo = topModule.getPort(i);
-    if(portInfo.isOutput()) continue;
+/// For each Input and Output port of TopModule. Generate NODE_IND and NODE_OUT
+void CIRCT2Graph::processIoPort() {
+  auto portList = topModule.getPortList();
+  for (auto& p : portList) {
+    //std::cout<< p.getName().str() << " "<< std::endl;
+    if (p.isInput()) {
+      processInputPort(p);
+    }else if (p.isOutput()) {
+      processOutputPort(p);
+    }else{ //InOut is not supproted!
+      Panic();
+    }
+  }
+}
+
+void CIRCT2Graph::processInputPort(hw::PortInfo portInfo) {
+    Assert(portInfo.isInput(),"");
     // 创建 typeInfo
     TypeInfo* typeInfo = new TypeInfo();
     typeInfo->set_sign(portInfo.type.isSignedInteger());
@@ -25,15 +37,28 @@ void CIRCT2Graph::processInputPort() {
     typeInfo->set_reset(UNCERTAIN);
     // 创建 node
     Node* node = new Node(NODE_INP); 
-    node->name = topModule.getPortName(i).str();
-    node->updateInfo(typeInfo);
+    node->name = portInfo.getName();
+    node->updateInfo(typeInfo.get());
     // 将 node 添加到图中
     g->input.push_back(node);
     // 将 value-node 关系添加到 map 中
-    mlir::Value portValue = topModule.getBodyRegion().front().getArgument(inputPortIdx);
+    mlir::Value portValue = topModule.getBodyRegion().front().getArgument(portInfo.argNum);
     valueNodeMap[portValue] = node;
-    inputPortIdx++;
-  }
+}
+
+void CIRCT2Graph::processOutputPort(hw::PortInfo portInfo) {
+  Assert(portInfo.isOutput(),"");
+
+  auto typeInfo = std::make_unique<TypeInfo>();
+  typeInfo->set_sign(portInfo.type.isSignedInteger());
+  typeInfo->set_width(portInfo.type.getIntOrFloatBitWidth());
+  typeInfo->set_reset(UNCERTAIN);
+
+  Node* node = new Node(NODE_OUT);
+  node->name = portInfo.getName();
+  node->updateInfo(typeInfo.get());
+
+  g->output.push_back(node);
 }
 
 void CIRCT2Graph::processOperations() {
