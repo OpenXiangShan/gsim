@@ -34,8 +34,11 @@ class CIRCT2Graph {
   hw::HWModuleOp topModule;
   llvm::DenseMap<mlir::Value, Node*> valueNodeMap;
 
-  void processInputPort();
+  void processIoPort();
+  void processInputPort(hw::PortInfo port);
+  void processOutputPort(hw::PortInfo port);
   void processOperations();
+  void processOutputOp(hw::OutputOp op);
   void processConstantOp(hw::ConstantOp constantOp);
 };
 

@@ -6,6 +6,8 @@
 #include "llvm/Support/Casting.h"
 #include "mlir/IR/Block.h"
 
+using llvm::dyn_cast;
+
 graph* CIRCT2Graph::generateGraph() {
   g = new graph();
   processIoPort();
@@ -75,14 +77,33 @@ void CIRCT2Graph::processOperations() {
 
   for (auto& op : body->getOperations()) {
     // GRH: add more operation in this branch
-    if (auto constantOp = llvm::dyn_cast<hw::ConstantOp>(op)) {
+    if (auto constantOp = dyn_cast<hw::ConstantOp>(op)) {
       processConstantOp(constantOp);
-    } else {
+    } else if (auto outputOp = dyn_cast<hw::OutputOp>(op)) {
+      processOutputOp(outputOp);
+    }else {
       Assert(false, "Unsupported operation: %s", op.getName().getStringRef().str().c_str());
     }
   }
 }
 
+/// hw.output sig1,sig2 : i1,i8
+/// Connect signals to the output of a module
+/// Order is defined by the hw.module's declaration
+void CIRCT2Graph::processOutputOp(hw::OutputOp op) {
+  auto operands = op.getOperands();
+  auto output_node_it = g->output.begin(); // C++ 17 doesn't have zip.
+  for (auto operand : operands) {
+    auto* node = *output_node_it;
+    auto* refNode = new ENode(valueNodeMap[operand]); // The node assigned to output
+    auto* expTree = new ExpTree(refNode, node);
+    node->assignTree.push_back(expTree);
+    ++output_node_it;
+  }
+}
+
+
+/// hw.constant 2 : i3
 void CIRCT2Graph::processConstantOp(hw::ConstantOp constantOp) {
   auto intType = llvm::dyn_cast<IntegerType>(constantOp.getType());
   Assert(intType, "hw.constant expects integer result type");
