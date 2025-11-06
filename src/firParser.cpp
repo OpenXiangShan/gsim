@@ -20,6 +20,46 @@ static std::condition_variable cv;
 static PList **lists;
 static PNode *globalRoot;
 
+static const char* moduleHeaderKeywords[] = {
+  "module ",
+  "public module ",
+  "private module ",
+  "protected module ",
+  "extmodule ",
+  "public extmodule ",
+  "private extmodule ",
+  "protected extmodule ",
+  "intmodule ",
+  "public intmodule ",
+  "private intmodule ",
+  "protected intmodule "
+};
+
+static inline bool startsWithKeyword(const char* str, const char* keyword) {
+  size_t len = strlen(keyword);
+  return strncmp(str, keyword, len) == 0;
+}
+
+static char* findNextModuleMarker(char* start) {
+  if (!start) return nullptr;
+  char* cursor = start;
+  while (true) {
+    char* newline = strchr(cursor, '\n');
+    if (!newline) return nullptr;
+    char* after = newline + 1;
+    if (after[0] == '\0') return nullptr;
+    if (after[0] == ' ' && after[1] == ' ') {
+      char* tokenStart = after + 2;
+      for (const char* keyword : moduleHeaderKeywords) {
+        if (startsWithKeyword(tokenStart, keyword)) {
+          return newline;
+        }
+      }
+    }
+    cursor = newline + 1;
+  }
+}
+
 void parseFunc(char *strbuf, int tid) {
   while (true) {
     std::unique_lock lk(m);
@@ -57,30 +97,41 @@ PNode* parseFIR(char *strbuf) {
 
   // create tasks
   char *prev = strbuf;
-  char *next = strstr(prev, "\n  module ");
   int next_lineno = 1;
   int id = 0;
   int modules = 0;
-  while (true) {
-    int prev_lineno = next_lineno;
-    bool isEnd = false;
-    for (int i = 0; i < MODULES_PER_TASK; i ++) {
-      next ++;
-      next = strstr(next, "\n  module ");
-      modules ++;
-      isEnd = (next == NULL);
-      if (isEnd) break;
-    }
-    if (!isEnd) {
-      assert(next[0] == '\n');
-      next[0] = '\0';
-      for (char *q = prev; (q = strchr(q, '\n')) != NULL; next_lineno ++, q ++);
-      next_lineno ++; // '\0' is overwritten originally from '\n', so count it
-    }
-    taskQueue->push_back(TaskRecord{prev - strbuf, strlen(prev) + 1, prev_lineno, id});
+
+  std::vector<char*> moduleMarkers;
+  char* marker = findNextModuleMarker(prev);
+  while (marker) {
+    moduleMarkers.push_back(marker);
+    marker = findNextModuleMarker(marker + 1);
+  }
+  modules = moduleMarkers.size();
+
+  if (moduleMarkers.empty()) {
+    taskQueue->push_back(TaskRecord{prev - strbuf, strlen(prev) + 1, next_lineno, id});
     id ++;
-    if (isEnd) break;
-    prev = next + 1;
+  } else {
+    size_t idx = 0;
+    while (idx < moduleMarkers.size()) {
+      int prev_lineno = next_lineno;
+      size_t nextIdx = idx + MODULES_PER_TASK;
+      bool isEnd = nextIdx >= moduleMarkers.size();
+      char* split = nullptr;
+      if (!isEnd) {
+        split = moduleMarkers[nextIdx];
+        assert(split[0] == '\n');
+        split[0] = '\0';
+        for (char *q = prev; (q = strchr(q, '\n')) != NULL; next_lineno ++, q ++);
+        next_lineno ++; // '\0' is overwritten originally from '\n', so count it
+      }
+      taskQueue->push_back(TaskRecord{prev - strbuf, strlen(prev) + 1, prev_lineno, id});
+      id ++;
+      if (isEnd) break;
+      prev = split + 1;
+      idx = nextIdx;
+    }
   }
   printf("[Parser] using %d threads to parse %d modules with %d tasks\n",
       NR_THREAD, modules, id);
