@@ -437,10 +437,9 @@ valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
     std::string lstr = ChildInfo(0, valStr);
     std::string rstr = ChildInfo(1, valStr);
     int resWidth = width;
-    if (sign) { // signed extension
+    bool signedOp = sign && ChildInfo(0, sign) && ChildInfo(1, sign);
+    if (signedOp) { // signed extension
       int width = MAX(resWidth, MAX(ChildInfo(0, width), ChildInfo(1, width)));
-      assert(ChildInfo(0, sign));
-      assert(ChildInfo(1, sign));
 
       int lshiftBits = widthBits(width) - ChildInfo(0, width);
       if (lshiftBits == 0 || ChildInfo(0, status) == VAL_CONSTANT)
@@ -456,10 +455,10 @@ valInfo* ENode::instsAdd(Node* node, std::string lvalue, bool isRoot) {
     }
 
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
-    if (sign) {
+    if (signedOp) {
       ret->valStr = "(" + lstr + " + " + rstr + ")";
     } else {
-      ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " + " + rstr + ")";
+      ret->valStr = "(" + upperCast(width, ChildInfo(0, width), signedOp) + lstr + " + " + rstr + ")";
       if (width <= MAX(ChildInfo(0, width), ChildInfo(1, width))) {
         ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
       }

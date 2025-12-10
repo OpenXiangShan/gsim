@@ -105,6 +105,7 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>mux                     { return token::Mux; }
 <normal>validif                 { return token::Validif; }
 <normal>cat[(]                 { parenthesis_num ++; return token::Cat; }
+<normal>cat                    { return token::Cat; }
 <normal>old                     { yylval->typeRUW = "old"; return token::Ruw; }
 <normal>new                     { yylval->typeRUW = "new"; return token::Ruw; }
 <normal>undefined               { yylval->typeRUW = "undefined"; return token::Ruw; }
@@ -152,6 +153,7 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>parameter               { return token::Parameter; }
 <normal>intmodule               { return token::Intmodule; }
 <normal>intrinsic               { return token::Intrinsic; }
+<normal>layerblock              { return token::Layerblock; }
 <normal>FIRRTL                  { return token::Firrtl; }
 <normal>version                 { return token::Version; }
 <normal>circuit                 { return token::Circuit; }

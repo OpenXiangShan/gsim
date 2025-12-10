@@ -30,6 +30,23 @@ static char* emptyStr = NULL;
     #define synlineno() scanner->lineno()
     #define yylex(x) scanner->lex(x)
     // #define yylex(x) scanner->lex_debug(x)
+
+    static PNode* buildCatNodes(int lineno, PNode* first, PNode* second, PNode* tailList) {
+      std::vector<PNode*> catArgs;
+      if (first) catArgs.push_back(first);
+      if (second) catArgs.push_back(second);
+      if (tailList) {
+        for (auto child : tailList->child) {
+          if (child) catArgs.push_back(child);
+        }
+      }
+      if (catArgs.empty()) return nullptr;
+      PNode* catNode = catArgs[0];
+      for (size_t idx = 1; idx < catArgs.size(); ++idx) {
+        catNode = newNode(P_2EXPR, lineno, "cat", 2, catNode, catArgs[idx]);
+      }
+      return catNode;
+    }
 }
 
 %union {
@@ -63,16 +80,16 @@ static char* emptyStr = NULL;
 %token RightArrow "=>"
 %token Leftarrow "<-"
 %token DataType Depth ReadLatency WriteLatency ReadUnderwrite Reader Writer Readwriter Write Read Infer Rdwr Mport
-%token Layer
+%token Layer Layerblock
 %token Cat
 /* internal node */
 %type <intVal> width
 %type <plist> cir_mods fields
-%type <pnode> module extmodule ports statements port type statement when_else param exprs params layer_decl layer_children layer_output layer_block cat_tail
+%type <pnode> module extmodule ports statements port type statement when_else param exprs params layer_decl layer_children layer_output layer_block cat_tail layerblock_stmt
 %type <pnode> chirrtl_memory chirrtl_memory_datatype chirrtl_memory_port
 %type <pnode> reference expr primop_2expr primop_1expr primop_1expr1int primop_1expr2int
 %type <pnode> field type_aggregate type_ground circuit
-%type <strVal> info ALLID ext_defname
+%type <strVal> info ALLID ext_defname intrinsic_params intrinsic_param_list intrinsic_param
 /* %token <pnode> */
 
 %nonassoc LOWER_THAN_ELSE
@@ -173,21 +190,8 @@ expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, synlineno(), $
     | primop_1expr  { $$ = $1; }
     | primop_1expr1int  { $$ = $1; }
     | primop_1expr2int  { $$ = $1; }
-    | Cat expr ',' expr cat_tail ')' {
-        std::vector<PNode*> catArgs;
-        catArgs.push_back($2);
-        catArgs.push_back($4);
-        if ($5) {
-            for (auto child : $5->child) {
-                if (child) catArgs.push_back(child);
-            }
-        }
-        PNode* catNode = catArgs[0];
-        for (size_t idx = 1; idx < catArgs.size(); ++idx) {
-            catNode = newNode(P_2EXPR, synlineno(), "cat", 2, catNode, catArgs[idx]);
-        }
-        $$ = catNode;
-      }
+    | Cat expr ',' expr cat_tail ')' { $$ = buildCatNodes(synlineno(), $2, $4, $5); }
+    | Cat '(' expr ',' expr cat_tail ')' { $$ = buildCatNodes(synlineno(), $3, $5, $6); }
     ;
 reference: ALLID  { $$ = newNode(P_REF, synlineno(), $1, 0); }
     | reference '.' ALLID  { $$ = $1; $1->appendChild(newNode(P_REF_DOT, synlineno(), $3, 0)); }
@@ -209,6 +213,22 @@ chirrtl_memory_port: Write Mport ALLID '=' ALLID '[' expr ']' ',' expr info { $$
                    | Infer Mport ALLID '=' ALLID '[' expr ']' ',' expr info { $$ = newNode(P_INFER, synlineno(), /* Info */ $11, /* Name */ $3, 2, /* Addr */ $7, /* clock */ $10); $$->appendExtraInfo(/* MemName */$5); }
                    | Rdwr Mport ALLID '=' ALLID '[' expr ']' ',' expr info { $$ = newNode(P_READWRITER, synlineno(), /* Info */ $11, /* Name */ $3, 2, /* Addr */ $7, /* clock */ $10); $$->appendExtraInfo(/* MemName */$5); }
                    ;
+
+intrinsic_params:
+    { $$ = NULL; }
+    | '<' intrinsic_param_list '>' { $$ = $2; }
+    ;
+
+intrinsic_param_list:
+    intrinsic_param { $$ = $1; }
+    | intrinsic_param_list ',' intrinsic_param { $$ = $1 ? $1 : $3; }
+    ;
+
+intrinsic_param:
+    ID '=' String { $$ = (strcmp($1, "format") == 0) ? $3 : NULL; }
+    | ID '=' INT { $$ = NULL; }
+    | ID '=' ID { $$ = NULL; }
+    ;
 
 /* statements */
 references:
@@ -241,6 +261,16 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5
     | Printf '(' expr ',' expr ',' String exprs ')' info    { $$ = newNode(P_PRINTF, synlineno(), $10, NULL, 3, $3, $5, $8); $$->appendExtraInfo($7); }
     | Assert '(' expr ',' expr ',' expr ',' String ')' ':' ALLID info { $$ = newNode(P_ASSERT, synlineno(), $13, $12, 3, $3, $5, $7); $$->appendExtraInfo($9); }
     | Assert '(' expr ',' expr ',' expr ',' String ')' info { $$ = newNode(P_ASSERT, synlineno(), $11, NULL, 3, $3, $5, $7); $$->appendExtraInfo($9); }
+    | Intrinsic '(' ALLID intrinsic_params ',' expr ',' expr ',' expr ')' info {
+        if (strcmp($3, "circt_chisel_ifelsefatal") == 0) {
+          const char* msg = $4 ? $4 : $3;
+          $$ = newNode(P_ASSERT, synlineno(), $12, NULL, 3, $6, $8, $10);
+          $$->appendExtraInfo(msg);
+        } else {
+          $$ = NULL;
+        }
+      }
+    | layerblock_stmt { $$ = $1; }
     | Skip info { $$ = NULL; }
     ;
 /* module definitions */
@@ -307,6 +337,10 @@ cir_mods:                       { $$ = new PList(); }
 
 layer_decl:
     Layer ALLID ',' ALLID layer_output ':' info layer_block { $$ = NULL; }
+    ;
+
+layerblock_stmt:
+    Layerblock ALLID ':' info INDENT statements DEDENT { $$ = $6; }
     ;
 
 layer_output:

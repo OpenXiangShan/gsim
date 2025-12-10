@@ -26,6 +26,7 @@ int p_stoi(const char* str);
 TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType);
 ASTExpTree* visitExpr(graph* g, PNode* expr);
 void visitStmts(graph* g, PNode* stmts);
+void visitWhenStmts(graph* g, PNode* stmts);
 void visitWhen(graph* g, PNode* when);
 void removeDummyDim(graph* g);
 ENode* getWhenEnode(ExpTree* valTree, int depth);
@@ -1207,7 +1208,8 @@ void visitWhenPrintf(graph* g, PNode* print) {
 
 void visitWhenAssert(graph* g, PNode* ass) {
   TYPE_CHECK(ass, 3, 3, P_ASSERT);
-  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, ass->name), ass->lineno);
+  std::string assertName = ass->name.empty() ? format("ASSERT_%d", ass->lineno) : ass->name;
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, assertName), ass->lineno);
 
   ASTExpTree* pred = visitExpr(g, ass->getChild(1));
   ASTExpTree* en = visitExpr(g, ass->getChild(2));
@@ -1240,7 +1242,8 @@ void visitWhenAssert(graph* g, PNode* ass) {
 
 void visitWhenStop(graph* g, PNode* stop) {
   TYPE_CHECK(stop, 2, 2, P_STOP);
-  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stop->name), stop->lineno);
+  std::string stopName = stop->name.empty() ? format("STOP_%d", stop->lineno) : stop->name;
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stopName), stop->lineno);
 
   ASTExpTree* exp = visitExpr(g, stop->getChild(1));
 
@@ -1285,6 +1288,7 @@ void visitWhenStmt(graph* g, PNode* stmt) {
     case P_WRITE :
     case P_READWRITER:
     case P_INFER : visitChirrtlMemPort(g, stmt); break;
+    case P_STATEMENTS: visitWhenStmts(g, stmt); break;
     default: printf("Invalid type %d %d\n", stmt->type, stmt->lineno); Panic();
   }
 }
@@ -1359,7 +1363,8 @@ void visitStop(graph* g, PNode* stop) {
   enode->addChild(exp->getExpRoot());
   enode->strVal = stop->getExtra(0);
 
-  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stop->name), stop->lineno);
+  std::string stopName = stop->name.empty() ? format("STOP_%d", stop->lineno) : stop->name;
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stopName), stop->lineno);
   n->valTree = new ExpTree(enode, new ENode(n));
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
@@ -1371,7 +1376,8 @@ void visitStop(graph* g, PNode* stop) {
 */
 void visitAssert(graph* g, PNode* ass) {
   TYPE_CHECK(ass, 3, 3, P_ASSERT);
-  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, ass->name), ass->lineno);
+  std::string assertName = ass->name.empty() ? format("ASSERT_%d", ass->lineno) : ass->name;
+  Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, assertName), ass->lineno);
 
   ASTExpTree* pred = visitExpr(g, ass->getChild(1));
   ASTExpTree* en = visitExpr(g, ass->getChild(2));
@@ -1444,6 +1450,7 @@ void visitStmt(graph* g, PNode* stmt) {
     case P_PRINTF: visitPrintf(g, stmt); break;
     case P_ASSERT: visitAssert(g, stmt); break;
     case P_STOP: visitStop(g, stmt); break;
+    case P_STATEMENTS: visitStmts(g, stmt); break;
     default:
       printf("invalid stmt type %d in lineno %d\n", stmt->type, stmt->lineno);
       Panic();
