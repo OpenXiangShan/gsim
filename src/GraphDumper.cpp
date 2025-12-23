@@ -1,4 +1,7 @@
 #include "common.h"
+#include <set>
+#include <map>
+#include <vector>
 
 class GraphDumper {
  public:
@@ -14,7 +17,7 @@ class GraphDumper {
 
   std::string& fixName(std::string& Name);
 
- private:
+private:
   const graph* Root;
 
   std::ostream& os;
@@ -59,7 +62,68 @@ void GraphDumper::dump(const SuperNode* N) {
   os << "\t}\n";
 }
 
+static std::string nodeTypeToStr(NodeType t) {
+  switch (t) {
+    case NODE_INVALID: return "NODE_INVALID";
+    case NODE_REG_SRC: return "NODE_REG_SRC";
+    case NODE_REG_DST: return "NODE_REG_DST";
+    case NODE_SPECIAL: return "NODE_SPECIAL";
+    case NODE_INP: return "NODE_INP";
+    case NODE_OUT: return "NODE_OUT";
+    case NODE_MEMORY: return "NODE_MEMORY";
+    case NODE_READER: return "NODE_READER";
+    case NODE_WRITER: return "NODE_WRITER";
+    case NODE_READWRITER: return "NODE_READWRITER";
+    case NODE_INFER: return "NODE_INFER";
+    case NODE_OTHERS: return "NODE_OTHERS";
+    case NODE_REG_RESET: return "NODE_REG_RESET";
+    case NODE_EXT_IN: return "NODE_EXT_IN";
+    case NODE_EXT_OUT: return "NODE_EXT_OUT";
+    case NODE_EXT: return "NODE_EXT";
+    default: return "NODE_UNKNOWN";
+  }
+}
+
+class GraphJsonDumper {
+ public:
+  GraphJsonDumper(std::ostream& os) : os(os) {}
+  void dump(const graph* g) {
+    const auto& supers = g->sortedSuper.empty() ? g->supersrc : g->sortedSuper;
+    std::set<std::pair<std::string, std::string>> edges;
+    os << "{\n  \"nodes\": [\n";
+    bool firstNode = true;
+    for (const SuperNode* super : supers) {
+      for (const Node* node : super->member) {
+        if (!firstNode) os << ",\n";
+        firstNode = false;
+        os << "    {\"name\": \"" << node->name << "\", "
+           << "\"type\": \"" << nodeTypeToStr(node->type) << "\", "
+           << "\"super\": " << super->id << "}";
+        for (const Node* next : node->next) edges.insert({node->name, next->name});
+      }
+    }
+    os << "\n  ],\n  \"edges\": [\n";
+    bool firstEdge = true;
+    for (const auto& e : edges) {
+      if (!firstEdge) os << ",\n";
+      firstEdge = false;
+      os << "    [\"" << e.first << "\", \"" << e.second << "\"]";
+    }
+    os << "\n  ]\n}\n";
+  }
+
+ private:
+  std::ostream& os;
+};
+
 void graph::dump(std::string FileName) {
-  std::ofstream ofs{globalConfig.OutputDir + "/" + this->name + "_" + FileName + ".dot"};
-  GraphDumper(ofs).dump(this);
+  std::string prefix = globalConfig.OutputDir + "/" + this->name + "_" + FileName;
+  {
+    std::ofstream ofs(prefix + ".dot");
+    GraphDumper(ofs).dump(this);
+  }
+  {
+    std::ofstream ofs(prefix + ".json");
+    GraphJsonDumper(ofs).dump(this);
+  }
 }
