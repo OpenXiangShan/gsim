@@ -985,6 +985,14 @@ valInfo* Node::computeConstant() {
     return computeInfo;
   }
 
+  // External modules (including DiffExt*) are side-effectful; keep their inputs alive.
+  if (isExt()) {
+    valInfo* ret = new valInfo(width, sign);
+    ret->status = VAL_INVALID;
+    consMap[this] = ret;
+    return ret;
+  }
+
   Assert(status != DEAD_NODE, "compute constant deadNode %s\n", name.c_str());
   if (width == 0) {
     status = CONSTANT_NODE;
