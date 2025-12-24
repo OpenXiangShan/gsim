@@ -5,6 +5,7 @@ struct Config {
   bool EnableDumpGraph;
   bool DumpGraphDot;
   bool DumpGraphJson;
+  bool DumpAssignTree;
   std::string OutputDir;
   int SuperNodeMaxSize;
   uint32_t cppMaxSizeKB;

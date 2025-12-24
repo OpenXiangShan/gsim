@@ -272,10 +272,16 @@ public:
     ENode* getRoot() {
       return root;
     }
+    ENode* getRoot() const {
+      return root;
+    }
     void setRoot(ENode* _root) {
       root = _root;
     }
     ENode* getlval() {
+      return lvalue;
+    }
+    ENode* getlval() const {
       return lvalue;
     }
     void setlval(ENode* _lvalue) {
