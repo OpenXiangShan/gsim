@@ -8,6 +8,7 @@
 #include "common.h"
 #include "graph.h"
 
+#include <sstream>
 #include <getopt.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -21,6 +22,8 @@ void inferAllWidth();
 
 Config::Config() {
   EnableDumpGraph = false;
+  DumpGraphDot = true;
+  DumpGraphJson = true;
   OutputDir = ".";
   SuperNodeMaxSize = 35;
   cppMaxSizeKB = -1;
@@ -28,17 +31,41 @@ Config::Config() {
   sep_aggr = "$$";
   MergeWhenSize = 5;
   When2muxBound = 2;
+  LogLevel = 0;
 }
 Config globalConfig;
+
+static std::set<std::string> parseStageList(const std::string& arg) {
+  std::set<std::string> stages;
+  std::stringstream ss(arg);
+  std::string token;
+  while (std::getline(ss, token, ',')) {
+    if (!token.empty()) stages.insert(token);
+  }
+  return stages;
+}
+
+static inline bool shouldDumpStage(const std::string& name) {
+  return globalConfig.DumpStages.empty() || globalConfig.DumpStages.count(name);
+}
 
 
 #define FUNC_WRAPPER_INTERNAL(func, name, dumpCond) \
   do { \
+    if (globalConfig.LogLevel > 0 && strlen(name) != 0) { \
+      fprintf(stderr, "[GSIM] %s begin\n", name); \
+      fflush(stderr); \
+    } \
     struct timeval start = getTime(); \
     func; \
     struct timeval end = getTime(); \
-    showTime("{" #func "}", start, end); \
-    if (dumpCond && globalConfig.EnableDumpGraph) g->dump(std::to_string(dumpIdx ++) + name); \
+    const char* label = strlen(name) ? name : "{" #func "}"; \
+    showTime(label, start, end); \
+    if (globalConfig.LogLevel > 0 && strlen(name) != 0) { \
+      fprintf(stderr, "[GSIM] %s done\n", name); \
+      fflush(stderr); \
+    } \
+    if (dumpCond && globalConfig.EnableDumpGraph && shouldDumpStage(name)) g->dump(std::to_string(dumpIdx ++) + name); \
   } while(0)
 
 #define FUNC_TIMER(func)         FUNC_WRAPPER_INTERNAL(func, "", false)
@@ -54,6 +81,12 @@ static void printUsage(const char* ProgName) {
             << "      --cpp-max-size-KB=[num]      Specify the maximum size (approximate) of a generated C++ file.\n"
             << "      --sep-mod=[str]              Specify the seperator for submodule (default: $).\n"
             << "      --sep-aggr=[str]             Specify the seperator for aggregate member (default: $$).\n"
+            << "      --when-size=[num]            Bound for merging nested when blocks (default: 5).\n"
+            << "      --when2mux-bound=[num]       Bound for converting when to mux (default: 2).\n"
+            << "      --log-level=[0|1|2]          Verbosity for additional logs.\n"
+            << "      --dump-json                  Dump graphs in JSON (disable dot unless --dump-dot is also set).\n"
+            << "      --dump-dot                   Dump graphs in DOT (disable json unless --dump-json is also set).\n"
+            << "      --dump-stages=a,b,c          Dump only the listed stages (e.g., Init,TopoSort,AliasAnalysis).\n"
             ;
 }
 
@@ -65,6 +98,22 @@ static char* parseCommandLine(int argc, char** argv) {
     _exit(EXIT_SUCCESS); // avoid running atexit/destructors which crash in full-static
   }
 
+  enum LongOptionIndex {
+    OPT_HELP = 0,
+    OPT_DUMP,
+    OPT_DIR,
+    OPT_SUPER_MAX,
+    OPT_CPP_MAX,
+    OPT_SEP_MOD,
+    OPT_SEP_AGGR,
+    OPT_WHEN_SIZE,
+    OPT_WHEN2MUX,
+    OPT_LOG_LEVEL,
+    OPT_DUMP_JSON,
+    OPT_DUMP_DOT,
+    OPT_DUMP_STAGES,
+  };
+
   const struct option Table[] = {
       {"help", no_argument, nullptr, 'h'},
       {"dump", no_argument, nullptr, 'd'},
@@ -75,28 +124,62 @@ static char* parseCommandLine(int argc, char** argv) {
       {"sep-aggr", required_argument, nullptr, 0},
       {"when-size", required_argument, nullptr, 0},
       {"when2mux-bound", required_argument, nullptr, 0},
+      {"log-level", required_argument, nullptr, 0},
+      {"dump-json", no_argument, nullptr, 0},
+      {"dump-dot", no_argument, nullptr, 0},
+      {"dump-stages", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
+  bool explicitJson = false;
+  bool explicitDot = false;
   int Option{0};
   int option_index;
   while ((Option = getopt_long(argc, argv, "-h", Table, &option_index)) != -1) {
     switch (Option) {
       case 0: switch (option_index) {
-                case 1: globalConfig.EnableDumpGraph = true; break;
-                case 2: globalConfig.OutputDir = optarg; break;
-                case 3: sscanf(optarg, "%d", &globalConfig.SuperNodeMaxSize); break;
-                case 4: sscanf(optarg, "%d", &globalConfig.cppMaxSizeKB); break;
-                case 5: globalConfig.sep_module = optarg; break;
-                case 6: globalConfig.sep_aggr = optarg; break;
-                case 7: sscanf(optarg, "%d", &globalConfig.MergeWhenSize); break;
-                case 8: sscanf(optarg, "%d", &globalConfig.When2muxBound); break;
-                case 0:
+                case OPT_DUMP:
+                  globalConfig.EnableDumpGraph = true;
+                  globalConfig.DumpGraphDot = true;
+                  globalConfig.DumpGraphJson = true;
+                  explicitJson = explicitDot = false;
+                  break;
+                case OPT_DIR: globalConfig.OutputDir = optarg; break;
+                case OPT_SUPER_MAX: sscanf(optarg, "%d", &globalConfig.SuperNodeMaxSize); break;
+                case OPT_CPP_MAX: sscanf(optarg, "%d", &globalConfig.cppMaxSizeKB); break;
+                case OPT_SEP_MOD: globalConfig.sep_module = optarg; break;
+                case OPT_SEP_AGGR: globalConfig.sep_aggr = optarg; break;
+                case OPT_WHEN_SIZE: sscanf(optarg, "%d", &globalConfig.MergeWhenSize); break;
+                case OPT_WHEN2MUX: sscanf(optarg, "%d", &globalConfig.When2muxBound); break;
+                case OPT_LOG_LEVEL: sscanf(optarg, "%d", &globalConfig.LogLevel); break;
+                case OPT_DUMP_JSON:
+                  globalConfig.EnableDumpGraph = true;
+                  globalConfig.DumpGraphJson = true;
+                  explicitJson = true;
+                  if (!explicitDot) globalConfig.DumpGraphDot = false;
+                  break;
+                case OPT_DUMP_DOT:
+                  globalConfig.EnableDumpGraph = true;
+                  globalConfig.DumpGraphDot = true;
+                  explicitDot = true;
+                  if (!explicitJson) globalConfig.DumpGraphJson = false;
+                  break;
+                case OPT_DUMP_STAGES:
+                  globalConfig.EnableDumpGraph = true;
+                  globalConfig.DumpStages = parseStageList(optarg);
+                  break;
+                case OPT_HELP:
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }
               break;
       case 1: return optarg; // InputFileName
-      case 'd': globalConfig.EnableDumpGraph = true; break;
+      case 'd':
+        globalConfig.EnableDumpGraph = true;
+        globalConfig.DumpGraphDot = true;
+        globalConfig.DumpGraphJson = true;
+        explicitJson = false;
+        explicitDot = false;
+        break;
       default: {
         printUsage(argv[0]);
         std::cout.flush();

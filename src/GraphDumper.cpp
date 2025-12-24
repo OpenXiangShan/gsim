@@ -118,11 +118,11 @@ class GraphJsonDumper {
 
 void graph::dump(std::string FileName) {
   std::string prefix = globalConfig.OutputDir + "/" + this->name + "_" + FileName;
-  {
+  if (globalConfig.DumpGraphDot) {
     std::ofstream ofs(prefix + ".dot");
     GraphDumper(ofs).dump(this);
   }
-  {
+  if (globalConfig.DumpGraphJson) {
     std::ofstream ofs(prefix + ".json");
     GraphJsonDumper(ofs).dump(this);
   }
