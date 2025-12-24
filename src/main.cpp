@@ -25,6 +25,7 @@ Config::Config() {
   DumpGraphDot = true;
   DumpGraphJson = true;
   DumpAssignTree = false;
+  DumpConstStatus = false;
   OutputDir = ".";
   SuperNodeMaxSize = 35;
   cppMaxSizeKB = -1;
@@ -89,6 +90,7 @@ static void printUsage(const char* ProgName) {
             << "      --dump-dot                   Dump graphs in DOT (disable json unless --dump-json is also set).\n"
             << "      --dump-stages=a,b,c          Dump only the listed stages (e.g., Init,TopoSort,AliasAnalysis).\n"
             << "      --dump-assign-tree           Include assignTree structure in JSON dump (can be large).\n"
+            << "      --dump-const-status          Dump per-node constant-analysis status before removing constants.\n"
             ;
 }
 
@@ -115,6 +117,7 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_DUMP_DOT,
     OPT_DUMP_STAGES,
     OPT_DUMP_ASSIGN_TREE,
+    OPT_DUMP_CONST_STATUS,
   };
 
   const struct option Table[] = {
@@ -132,6 +135,7 @@ static char* parseCommandLine(int argc, char** argv) {
       {"dump-dot", no_argument, nullptr, 0},
       {"dump-stages", required_argument, nullptr, 0},
       {"dump-assign-tree", no_argument, nullptr, 0},
+      {"dump-const-status", no_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -174,6 +178,9 @@ static char* parseCommandLine(int argc, char** argv) {
                   break;
                 case OPT_DUMP_ASSIGN_TREE:
                   globalConfig.DumpAssignTree = true;
+                  break;
+                case OPT_DUMP_CONST_STATUS:
+                  globalConfig.DumpConstStatus = true;
                   break;
                 case OPT_HELP:
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
@@ -252,7 +259,9 @@ int main(int argc, char** argv) {
 
   FUNC_TIMER(g->splitNodes());
 
-  FUNC_TIMER(g->removeDeadNodes());
+  if (globalConfig.EnableDumpGraph && shouldDumpStage("AfterSplitNodes")) g->dump(std::to_string(dumpIdx ++) + "AfterSplitNodes");
+
+  FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes1");
 
   FUNC_WRAPPER(g->constantAnalysis(), "ConstantAnalysis");
 

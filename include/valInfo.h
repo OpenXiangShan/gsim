@@ -9,7 +9,8 @@ enum valStatus {
   VAL_VALID,
   VAL_CONSTANT,
   VAL_FINISH /* for printf/assert*/ ,
-  VAL_INVALID
+  VAL_INVALID,
+  VAL_EXT
 };
 enum valType {TYPE_NORMAL = 0, TYPE_ARRAY, TYPE_STMT};
 class valInfo {

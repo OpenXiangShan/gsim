@@ -34,6 +34,16 @@ void graph::reconnectSuper() {
 }
 
 void graph::removeNodesNoConnect(NodeStatus status) {
+  if (globalConfig.LogLevel > 1) {
+    for (SuperNode* super : sortedSuper) {
+      for (Node* n : super->member) {
+        if (n->status == status) {
+          fprintf(stderr, "[RemoveNodes] remove status=%d name=%s type=%d super=%d\n",
+                  status, n->name.c_str(), n->type, super->id);
+        }
+      }
+    }
+  }
   for (SuperNode* super : sortedSuper) {
     super->member.erase(
       std::remove_if(super->member.begin(), super->member.end(), [status](const Node* n){ return n->status == status; }),

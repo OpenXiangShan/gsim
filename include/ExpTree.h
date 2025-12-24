@@ -303,7 +303,7 @@ public:
       return getRoot()->opType == OP_INVALID;
     }
     bool isConstant();
-    void removeConstant();
+    void removeConstant(const char* ownerName = nullptr);
     void removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::set<ENode*>& visited);
     uint64_t keyHash();
     void removeSelfAssignMent(Node* node);

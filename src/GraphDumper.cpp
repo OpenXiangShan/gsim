@@ -63,6 +63,31 @@ void GraphDumper::dump(const SuperNode* N) {
   os << "\t}\n";
 }
 
+static std::string jsonEscape(const std::string& in) {
+  std::string out;
+  out.reserve(in.size() + 8);
+  for (unsigned char c : in) {
+    switch (c) {
+      case '\"': out += "\\\""; break;
+      case '\\': out += "\\\\"; break;
+      case '\b': out += "\\b"; break;
+      case '\f': out += "\\f"; break;
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
+      default:
+        if (c < 0x20) {
+          char buf[7];
+          snprintf(buf, sizeof(buf), "\\u%04x", c);
+          out += buf;
+        } else {
+          out += c;
+        }
+    }
+  }
+  return out;
+}
+
 static std::string nodeTypeToStr(NodeType t) {
   switch (t) {
     case NODE_INVALID: return "NODE_INVALID";
@@ -157,7 +182,7 @@ class GraphJsonDumper {
       for (const Node* node : super->member) {
         if (!firstNode) os << ",\n";
         firstNode = false;
-        os << "    {\"name\": \"" << node->name << "\", "
+        os << "    {\"name\": \"" << jsonEscape(node->name) << "\", "
            << "\"type\": \"" << nodeTypeToStr(node->type) << "\", "
            << "\"super\": " << super->id;
         if (globalConfig.DumpAssignTree) {
@@ -233,7 +258,7 @@ class GraphJsonDumper {
          << ", \"isClock\": " << (enode->isClock ? 1 : 0)
          << ", \"reset\": " << static_cast<int>(enode->reset);
       if (enode->nodePtr) {
-        os << ", \"node\": \"" << enode->nodePtr->name << "\"";
+        os << ", \"node\": \"" << jsonEscape(enode->nodePtr->name) << "\"";
       }
       if (!enode->values.empty()) {
         os << ", \"values\": [";
@@ -244,7 +269,7 @@ class GraphJsonDumper {
         os << "]";
       }
       if (!enode->strVal.empty()) {
-        os << ", \"strVal\": \"" << enode->strVal << "\"";
+        os << ", \"strVal\": \"" << jsonEscape(enode->strVal) << "\"";
       }
       os << ", \"children\": [";
       bool firstChild = true;
