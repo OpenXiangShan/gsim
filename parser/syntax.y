@@ -221,7 +221,17 @@ intrinsic_params:
 
 intrinsic_param_list:
     intrinsic_param { $$ = $1; }
-    | intrinsic_param_list ',' intrinsic_param { $$ = $1 ? $1 : $3; }
+    | intrinsic_param_list ',' intrinsic_param
+        {
+            /* Propagate whichever intrinsic_param is non-NULL.
+             * If both are non-NULL (e.g., multiple 'format' params), prefer the last one. */
+            if ($1 && $3)
+                $$ = $3;
+            else if ($1)
+                $$ = $1;
+            else
+                $$ = $3;
+        }
     ;
 
 intrinsic_param:
