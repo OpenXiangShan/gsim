@@ -191,8 +191,6 @@ static char* parseCommandLine(int argc, char** argv) {
         globalConfig.EnableDumpGraph = true;
         globalConfig.DumpGraphDot = true;
         globalConfig.DumpGraphJson = true;
-        explicitJson = false;
-        explicitDot = false;
         break;
       default: {
         printUsage(argv[0]);
