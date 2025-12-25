@@ -277,6 +277,9 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5
           $$ = newNode(P_ASSERT, synlineno(), $13, NULL, 3, $6, $8, $10);
           $$->appendExtraInfo(msg);
         } else {
+          // TODO: Returning NULL for unrecognized intrinsics could lead to issues if the parser
+          // or AST processing doesn't properly handle NULL statement nodes. Consider returning
+          // a skip/nop node instead or ensure all call sites handle NULL properly.
           $$ = NULL;
         }
       }
