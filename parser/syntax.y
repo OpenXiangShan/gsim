@@ -190,8 +190,22 @@ expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, synlineno(), $
     | primop_1expr  { $$ = $1; }
     | primop_1expr1int  { $$ = $1; }
     | primop_1expr2int  { $$ = $1; }
-    | Cat expr ',' expr cat_tail ')' { $$ = buildCatNodes(synlineno(), $2, $4, $5); }
-    | Cat '(' expr ',' expr cat_tail ')' { $$ = buildCatNodes(synlineno(), $3, $5, $6); }
+    | Cat expr ',' expr cat_tail ')' {
+          PNode* node = buildCatNodes(synlineno(), $2, $4, $5);
+          if (!node) {
+            yyerror("invalid empty Cat expression");
+            node = new PNode(P_EXPRS, synlineno());
+          }
+          $$ = node;
+      }
+    | Cat '(' expr ',' expr cat_tail ')' {
+          PNode* node = buildCatNodes(synlineno(), $3, $5, $6);
+          if (!node) {
+            yyerror("invalid empty Cat expression");
+            node = new PNode(P_EXPRS, synlineno());
+          }
+          $$ = node;
+      }
     ;
 reference: ALLID  { $$ = newNode(P_REF, synlineno(), $1, 0); }
     | reference '.' ALLID  { $$ = $1; $1->appendChild(newNode(P_REF_DOT, synlineno(), $3, 0)); }
