@@ -85,7 +85,7 @@ static char* emptyStr = NULL;
 /* internal node */
 %type <intVal> width
 %type <plist> cir_mods fields
-%type <pnode> module extmodule ports statements port type statement when_else param exprs params layer_decl layer_children layer_output layer_block cat_tail layerblock_stmt
+%type <pnode> module extmodule ports statements port type statement when_else param exprs params layer_decl layer_children layer_output layer_block cat_tail layerblock_stmt intrinsic_extra
 %type <pnode> chirrtl_memory chirrtl_memory_datatype chirrtl_memory_port
 %type <pnode> reference expr primop_2expr primop_1expr primop_1expr1int primop_1expr2int
 %type <pnode> field type_aggregate type_ground circuit
@@ -261,10 +261,10 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5
     | Printf '(' expr ',' expr ',' String exprs ')' info    { $$ = newNode(P_PRINTF, synlineno(), $10, NULL, 3, $3, $5, $8); $$->appendExtraInfo($7); }
     | Assert '(' expr ',' expr ',' expr ',' String ')' ':' ALLID info { $$ = newNode(P_ASSERT, synlineno(), $13, $12, 3, $3, $5, $7); $$->appendExtraInfo($9); }
     | Assert '(' expr ',' expr ',' expr ',' String ')' info { $$ = newNode(P_ASSERT, synlineno(), $11, NULL, 3, $3, $5, $7); $$->appendExtraInfo($9); }
-    | Intrinsic '(' ALLID intrinsic_params ',' expr ',' expr ',' expr ')' info {
+    | Intrinsic '(' ALLID intrinsic_params ',' expr ',' expr ',' expr intrinsic_extra ')' info {
         if (strcmp($3, "circt_chisel_ifelsefatal") == 0) {
           const char* msg = $4 ? $4 : $3;
-          $$ = newNode(P_ASSERT, synlineno(), $12, NULL, 3, $6, $8, $10);
+          $$ = newNode(P_ASSERT, synlineno(), $13, NULL, 3, $6, $8, $10);
           $$->appendExtraInfo(msg);
         } else {
           $$ = NULL;
@@ -346,6 +346,11 @@ layerblock_stmt:
 layer_output:
     { $$ = NULL; }
     | ',' String { $$ = NULL; }
+    ;
+
+intrinsic_extra:
+    { $$ = NULL; }
+    | ',' expr intrinsic_extra { $$ = $3 ? $3 : $2; }
     ;
 
 layer_children:
