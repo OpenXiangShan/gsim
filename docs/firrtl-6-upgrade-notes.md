@@ -19,4 +19,3 @@
 
 ### 当前状态
 - `make rocket-test -j1` 在 FIRRTL 6.7 输入上已可正常生成 `build/rocket/*.cpp`，日志见 `build/rocket/gsim.log`。
-<END_PATCH>***
