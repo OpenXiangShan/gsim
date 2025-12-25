@@ -161,16 +161,30 @@ static char* parseCommandLine(int argc, char** argv) {
                 case OPT_WHEN2MUX: sscanf(optarg, "%d", &globalConfig.When2muxBound); break;
                 case OPT_LOG_LEVEL: sscanf(optarg, "%d", &globalConfig.LogLevel); break;
                 case OPT_DUMP_JSON:
+                  if (explicitDot) {
+                    fprintf(stderr, "Error: --dump-json and --dump-dot cannot be used together.\n");
+                    printUsage(argv[0]);
+                    std::cout.flush();
+                    fflush(nullptr);
+                    _exit(EXIT_FAILURE);
+                  }
                   globalConfig.EnableDumpGraph = true;
                   globalConfig.DumpGraphJson = true;
                   explicitJson = true;
-                  if (!explicitDot) globalConfig.DumpGraphDot = false;
+                  globalConfig.DumpGraphDot = false;
                   break;
                 case OPT_DUMP_DOT:
+                  if (explicitJson) {
+                    fprintf(stderr, "Error: --dump-json and --dump-dot cannot be used together.\n");
+                    printUsage(argv[0]);
+                    std::cout.flush();
+                    fflush(nullptr);
+                    _exit(EXIT_FAILURE);
+                  }
                   globalConfig.EnableDumpGraph = true;
                   globalConfig.DumpGraphDot = true;
                   explicitDot = true;
-                  if (!explicitJson) globalConfig.DumpGraphJson = false;
+                  globalConfig.DumpGraphJson = false;
                   break;
                 case OPT_DUMP_STAGES:
                   globalConfig.EnableDumpGraph = true;
