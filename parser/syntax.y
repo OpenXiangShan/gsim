@@ -193,7 +193,7 @@ expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, synlineno(), $
     | Cat expr ',' expr cat_tail ')' {
           PNode* node = buildCatNodes(synlineno(), $2, $4, $5);
           if (!node) {
-            yyerror("invalid empty Cat expression");
+            error("invalid empty Cat expression");
             node = new PNode(P_EXPRS, synlineno());
           }
           $$ = node;
@@ -201,7 +201,7 @@ expr: IntType width '(' ')'     { $$ = newNode(P_EXPR_INT_NOINIT, synlineno(), $
     | Cat '(' expr ',' expr cat_tail ')' {
           PNode* node = buildCatNodes(synlineno(), $3, $5, $6);
           if (!node) {
-            yyerror("invalid empty Cat expression");
+            error("invalid empty Cat expression");
             node = new PNode(P_EXPRS, synlineno());
           }
           $$ = node;
