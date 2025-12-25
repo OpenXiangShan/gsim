@@ -95,7 +95,6 @@ public:
       mpz_mul_2exp(val, val, ele->hi - lo + 1);
       mpz_add(val, val, ele->val);
       hi += ele->hi + 1;
-      sign = sign || ele->sign;
       updateWidth();
     }
   }
