@@ -22,8 +22,8 @@ void inferAllWidth();
 
 Config::Config() {
   EnableDumpGraph = false;
-  DumpGraphDot = true;
-  DumpGraphJson = true;
+  DumpGraphDot = false;
+  DumpGraphJson = false;
   DumpAssignTree = false;
   DumpConstStatus = false;
   OutputDir = ".";
