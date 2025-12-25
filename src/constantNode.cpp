@@ -600,6 +600,11 @@ valInfo* ENode::consInt(bool isLvalue) {
   std::string str;
   int base;
   std::tie(base, str) = firStrBase(strVal);
+  bool needSigned = sign || (!str.empty() && str[0] == '-');
+  if (needSigned) {
+    sign = true;
+    ret->sign = true;
+  }
   ret->setConstantByStr(str, base);
   return ret;
 }
@@ -1183,6 +1188,7 @@ void ExpTree::removeConstant(const char* ownerName) {
         top->nodePtr = nullptr;
         top->opType = OP_INT;
         top->child.clear();
+        top->sign = consEMap[top]->sign;
         top->strVal = mpz_get_str(NULL, 10, consEMap[top]->consVal);
       }
     } else if ((top->opType == OP_MUX || top->opType == OP_WHEN) && enodeConstant(top->getChild(0))) {
@@ -1275,7 +1281,7 @@ void graph::constantAnalysis() {
           fprintf(stderr, "[ConstantAnalysis] mark constant: %s status=%d\n", member->name.c_str(), member->computeInfo ? member->computeInfo->status : -1);
         }
         member->assignTree.clear();
-        ENode* enode = allocIntEnode(member->width, mpz_get_str(NULL, 10, member->computeInfo->consVal));
+        ENode* enode = allocIntEnode(member->width, mpz_get_str(NULL, 10, member->computeInfo->consVal), member->sign);
         enode->computeInfo = member->computeInfo;
         member->assignTree.push_back(new ExpTree(enode, member));
         if (member->type == NODE_SPECIAL) { // set to NODE_OTHERS to enable removeDeadNode
@@ -1304,7 +1310,7 @@ void graph::constantAnalysis() {
         } else if (!member->isArray() && (i < member->assignTree.size() - 1) && (info->status == VAL_INVALID || info->status == VAL_CONSTANT)) {
           ENode* enode;
           if (info->status == VAL_CONSTANT) {
-            enode = allocIntEnode(info->width, mpz_get_str(NULL, 10, info->consVal));
+            enode = allocIntEnode(info->width, mpz_get_str(NULL, 10, info->consVal), info->sign);
           } else {
             enode = new ENode(OP_INVALID);
           }

@@ -91,10 +91,13 @@ void ExpTree::matchWidth(int width) {
   }
 }
 
-ENode* allocIntEnode(int width, std::string val) {
+ENode* allocIntEnode(int width, std::string val, bool sign) {
   ENode* ret = new ENode(OP_INT);
   ret->width = width;
   ret->strVal = val;
+  // If the caller knows this literal is signed, keep the tag; otherwise
+  // infer sign from a leading '-'.
+  ret->sign = sign || (!val.empty() && val[0] == '-');
   return ret;
 }
 

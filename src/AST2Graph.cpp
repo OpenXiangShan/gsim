@@ -303,6 +303,9 @@ ASTExpTree* visitIntInit(graph* g, PNode* expr) {
   ASTExpTree* ret = new ASTExpTree(false);
   ret->getExpRoot()->strVal = expr->getExtra(0);
   ret->setType(expr->width, expr->sign);
+  if (!ret->getExpRoot()->strVal.empty() && ret->getExpRoot()->strVal[0] == '-') {
+    ret->getExpRoot()->sign = true;
+  }
   ret->setOp(OP_INT);
   return ret;
 }

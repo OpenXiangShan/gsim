@@ -262,7 +262,7 @@ NodeComponent* ENode::inferComponent(Node* n) {
       int base;
       std::tie(base, str) = firStrBase(strVal);
       ret = new NodeComponent();
-      ret->addElementAll(new NodeElement(str, base, width-1, 0));
+      ret->addElementAll(new NodeElement(str, base, width-1, 0, sign));
       break;
     }
     case OP_HEAD:
