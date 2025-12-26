@@ -272,10 +272,16 @@ public:
     ENode* getRoot() {
       return root;
     }
+    ENode* getRoot() const {
+      return root;
+    }
     void setRoot(ENode* _root) {
       root = _root;
     }
     ENode* getlval() {
+      return lvalue;
+    }
+    ENode* getlval() const {
       return lvalue;
     }
     void setlval(ENode* _lvalue) {
@@ -297,7 +303,7 @@ public:
       return getRoot()->opType == OP_INVALID;
     }
     bool isConstant();
-    void removeConstant();
+    void removeConstant(const char* ownerName = nullptr);
     void removeDummyDim(std::map<Node*, std::vector<int>>& arrayMap, std::set<ENode*>& visited);
     uint64_t keyHash();
     void removeSelfAssignMent(Node* node);
@@ -450,6 +456,6 @@ public:
   }
 };
 
-ENode* allocIntEnode(int width, std::string val);
+ENode* allocIntEnode(int width, std::string val, bool sign = false);
 
 #endif

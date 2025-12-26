@@ -39,6 +39,11 @@ bool anyOuterEdge(Node* node) {
 }
 
 void graph::removeDeadNodes() {
+  static int passId = 0;
+  const int curPass = passId ++;
+  if (globalConfig.LogLevel > 1) {
+    fprintf(stderr, "[RemoveDeadNodes] pass %d start\n", curPass);
+  }
   std::set<Node*> visited;
   std::stack<Node*> s;
   auto add = [&visited, &s](Node* node) {
@@ -51,7 +56,7 @@ void graph::removeDeadNodes() {
   for (Node* special : specialNodes) add(special);
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
-      if (member->type == NODE_EXT) add(member);
+      if (member->type == NODE_EXT || member->type == NODE_EXT_IN || member->type == NODE_EXT_OUT) add(member);
     }
   }
   while (!s.empty()) {
@@ -81,6 +86,10 @@ void graph::removeDeadNodes() {
     for (Node* node : super->member) {
       if (node->type == NODE_INP || node->type == NODE_OUT) continue;
       if (visited.find(node) == visited.end()) {
+        if (globalConfig.LogLevel > 1) {
+          fprintf(stderr, "[RemoveDeadNodes] pass %d mark dead: %s type=%d super=%d line=%d\n",
+                  curPass, node->name.c_str(), node->type, super->id, __LINE__);
+        }
         node->status = DEAD_NODE;
       }
     }
@@ -115,5 +124,8 @@ void graph::removeDeadNodes() {
 
   printf("[removeDeadNodes] remove %ld deadNodes (%ld -> %ld)\n", totalNodes - optimizedNodes, totalNodes, optimizedNodes);
   printf("[removeDeadNodes] remove %ld superNodes (%ld -> %ld)\n", totalSuper - optimizedSuper, totalSuper, optimizedSuper);
+  if (globalConfig.LogLevel > 1) {
+    fprintf(stderr, "[RemoveDeadNodes] pass %d done (removed %ld nodes)\n", curPass, totalNodes - optimizedNodes);
+  }
 
 }

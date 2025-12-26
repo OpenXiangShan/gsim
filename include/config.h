@@ -3,6 +3,10 @@
 
 struct Config {
   bool EnableDumpGraph;
+  bool DumpGraphDot;
+  bool DumpGraphJson;
+  bool DumpAssignTree;
+  bool DumpConstStatus;
   std::string OutputDir;
   int SuperNodeMaxSize;
   uint32_t cppMaxSizeKB;
@@ -10,6 +14,8 @@ struct Config {
   std::string sep_aggr;
   int MergeWhenSize;
   int When2muxBound;
+  int LogLevel;
+  std::set<std::string> DumpStages;
   Config();
 };
 

@@ -98,12 +98,14 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>Analog                  { yylval->typeGround = "Analog";     return token::anaType; }
 <normal>Fixed                   { yylval->typeGround = "Fixed";      return token::FixedType; }
 <normal>flip                    { return token::Flip;}
-<normal>(add|sub|mul|div|rem|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat)[(] { parenthesis_num++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E2OP; }
+<normal>(add|sub|mul|div|rem|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor)[(] { parenthesis_num++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E2OP; }
 <normal>(asUInt|asSInt|asClock|asAsyncReset|cvt|neg|not|andr|orr|xorr)[(] { parenthesis_num ++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1OP; }
 <normal>(pad|shl|shr|head|tail)[(]   { parenthesis_num ++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1I1OP; }
 <normal>bits[(]                 { parenthesis_num ++; yylval->typeOP = "bits"; return token::E1I2OP; }
 <normal>mux                     { return token::Mux; }
 <normal>validif                 { return token::Validif; }
+<normal>cat[(]                 { parenthesis_num ++; return token::Cat; }
+<normal>cat                    { return token::Cat; }
 <normal>old                     { yylval->typeRUW = "old"; return token::Ruw; }
 <normal>new                     { yylval->typeRUW = "new"; return token::Ruw; }
 <normal>undefined               { yylval->typeRUW = "undefined"; return token::Ruw; }
@@ -151,9 +153,11 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>parameter               { return token::Parameter; }
 <normal>intmodule               { return token::Intmodule; }
 <normal>intrinsic               { return token::Intrinsic; }
+<normal>layerblock              { return token::Layerblock; }
 <normal>FIRRTL                  { return token::Firrtl; }
 <normal>version                 { return token::Version; }
 <normal>circuit                 { return token::Circuit; }
+<normal>layer                   { return token::Layer; }
 <normal>connect                 { return token::Connect; }
 <normal>public                  { return token::Public; }
 <normal>define                  { return token::Define; }

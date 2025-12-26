@@ -16,3 +16,4 @@ doc/html
 *.data*
 *.txt
 emu/obj*
+playground/

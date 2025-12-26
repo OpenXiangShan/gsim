@@ -408,4 +408,8 @@ gendoc:
 format-obj:
 	@clang-format -i --style=file obj/$(NAME).cpp
 
+rocket-test: $(GSIM_BIN)
+	mkdir -p $(BUILD_DIR)/rocket
+	set -o pipefail && $(GSIM_BIN) --supernode-max-size=15 --cpp-max-size-KB=8192 --sep-mod=__DOT__ --sep-aggr=__DOT__ --dir $(BUILD_DIR)/rocket playground/Rocket-SimTop.fir | tee $(BUILD_DIR)/rocket/gsim.log
+
 .PHONY: clean run-internal diff-internal run diff init perf count gendoc format-obj

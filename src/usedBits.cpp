@@ -157,6 +157,14 @@ void graph::usedBits() {
       if (port->type == NODE_READER) checkNodes.push_back(port);
     }
   }
+  // EXT/EXT_IN/EXT_OUT are externally visible interfaces and must retain full width
+  for (SuperNode* super : sortedSuper) {
+    for (Node* node : super->member) {
+      if (node->type == NODE_EXT || node->type == NODE_EXT_IN || node->type == NODE_EXT_OUT) {
+        checkNodes.push_back(node);
+      }
+    }
+  }
 
   for (Node* node: checkNodes) {
     node->usedBit = node->width;

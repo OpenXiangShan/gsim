@@ -10,6 +10,7 @@
 #include <stack>
 #include <tuple>
 #include <utility>
+#include <fstream>
 
 #include "common.h"
 #include "graph.h"
@@ -35,6 +36,31 @@ struct computeOrder {
 
 static std::priority_queue<Node*, std::vector<Node*>, computeOrder> recomputeQueue;
 static std::set<Node*> uniqueRecompute;
+
+static std::string jsonEscape(const std::string& in) {
+  std::string out;
+  out.reserve(in.size() + 8);
+  for (unsigned char c : in) {
+    switch (c) {
+      case '\"': out += "\\\""; break;
+      case '\\': out += "\\\\"; break;
+      case '\b': out += "\\b"; break;
+      case '\f': out += "\\f"; break;
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
+      default:
+        if (c < 0x20) {
+          char buf[7];
+          snprintf(buf, sizeof(buf), "\\u%04x", c);
+          out += buf;
+        } else {
+          out += c;
+        }
+    }
+  }
+  return out;
+}
 
 static void addRecompute(Node* node) {
   if (uniqueRecompute.find(node) == uniqueRecompute.end()) {
@@ -574,6 +600,11 @@ valInfo* ENode::consInt(bool isLvalue) {
   std::string str;
   int base;
   std::tie(base, str) = firStrBase(strVal);
+  bool needSigned = sign || (!str.empty() && str[0] == '-');
+  if (needSigned) {
+    sign = true;
+    ret->sign = true;
+  }
   ret->setConstantByStr(str, base);
   return ret;
 }
@@ -985,6 +1016,17 @@ valInfo* Node::computeConstant() {
     return computeInfo;
   }
 
+  // External modules (including DiffExt*) are side-effectful; keep their inputs alive.
+  if (isExt()) {
+    valInfo* ret = new valInfo(width, sign);
+    ret->status = VAL_EXT;
+    if (globalConfig.LogLevel > 1) {
+      fprintf(stderr, "[ConstEval] %s treated as EXT (line=%d)\n", name.c_str(), __LINE__);
+    }
+    consMap[this] = ret;
+    return ret;
+  }
+
   Assert(status != DEAD_NODE, "compute constant deadNode %s\n", name.c_str());
   if (width == 0) {
     status = CONSTANT_NODE;
@@ -999,11 +1041,24 @@ valInfo* Node::computeConstant() {
   }
   if (assignTree.size() == 0) {
     valInfo* ret = new valInfo(width, sign);
+    bool feedsExt = false;
+    for (Node* nxt : next) {
+      if (nxt->isExt()) { feedsExt = true; break; }
+    }
     if (type == NODE_OTHERS) {
-      status = CONSTANT_NODE;
-      ret->setConstantByStr("0");
+      if (feedsExt) {
+        ret->status = VAL_EXT;
+        status = VALID_NODE;
+      } else {
+        status = CONSTANT_NODE;
+        ret->setConstantByStr("0");
+      }
     } else if (type == NODE_REG_DST) {
       ret->status = VAL_EMPTY;
+    }
+    if (globalConfig.LogLevel > 1) {
+      fprintf(stderr, "[ConstEval] %s assignTree empty -> status=%d feedsExt=%d type=%d line=%d\n",
+              name.c_str(), ret->status, feedsExt, type, __LINE__);
     }
     consMap[this] = ret;
     return ret;
@@ -1014,7 +1069,26 @@ valInfo* Node::computeConstant() {
     valInfo* info = tree->getRoot()->computeConstant(this, false);
     if ((info->status != VAL_INVALID && info->status != VAL_EMPTY) || (i == (assignTree.size() - 1) && !ret)) ret = info;
   }
+  if (globalConfig.LogLevel > 1) {
+    fprintf(stderr, "[ConstEval] %s aggregate assignTree status=%d sameConst=%d line=%d\n",
+            name.c_str(), ret ? ret->status : -1, ret ? ret->sameConstant : 0, __LINE__);
+  }
+  bool feedsExt = false;
+  for (Node* nxt : next) {
+    if (nxt->isExt()) { feedsExt = true; break; }
+  }
+  if (feedsExt && (ret->status == VAL_INVALID || ret->status == VAL_EMPTY || ret->status == VAL_VALID)) {
+    if (globalConfig.LogLevel > 1) {
+      fprintf(stderr, "[ConstEval] %s feeds EXT -> promote to VAL_EXT (prevStatus=%d line=%d)\n",
+              name.c_str(), ret->status, __LINE__);
+    }
+    ret->status = VAL_EXT;
+  }
   if (type == NODE_OTHERS && (ret->status == VAL_INVALID || ret->status == VAL_EMPTY)) {
+    if (globalConfig.LogLevel > 1) {
+      fprintf(stderr, "[ConstEval] %s type=NODE_OTHERS default to const 0 (prevStatus=%d line=%d)\n",
+              name.c_str(), ret->status, __LINE__);
+    }
     ret->setConstantByStr("0");
   }
   if (ret->status == VAL_CONSTANT) {
@@ -1082,7 +1156,14 @@ static bool enodeConstant(ENode* enode) {
   return consEMap.find(enode) != consEMap.end() && consEMap[enode]->status == VAL_CONSTANT;
 }
 
-void ExpTree::removeConstant() {
+void ExpTree::removeConstant(const char* ownerName) {
+  auto logChange = [&](const char* reason, const ENode* target, int line) {
+    if (globalConfig.LogLevel > 1) {
+      fprintf(stderr, "[RemoveConstant] %s: %s (op=%d width=%d line=%d)\n",
+              ownerName ? ownerName : "(unknown)", reason,
+              target ? target->opType : -1, target ? target->width : -1, line);
+    }
+  };
   std::stack<std::tuple<ENode*, ENode*, int>> s;
   Assert(getRoot(), "emptyRoot");
   s.push(std::make_tuple(getRoot(), nullptr, 0));
@@ -1096,6 +1177,7 @@ void ExpTree::removeConstant() {
     ENode* enodePtr = nullptr;
 
     if (enodeConstant(top)) {
+      logChange("fold enode to constant", top, __LINE__);
       if (parent && parent->opType == OP_INDEX) {
           Assert(parent->child.size() == 1, "opIndex with child %ld\n", top->child.size());
           parent->opType = OP_INDEX_INT;
@@ -1106,20 +1188,27 @@ void ExpTree::removeConstant() {
         top->nodePtr = nullptr;
         top->opType = OP_INT;
         top->child.clear();
+        top->sign = consEMap[top]->sign;
         top->strVal = mpz_get_str(NULL, 10, consEMap[top]->consVal);
       }
     } else if ((top->opType == OP_MUX || top->opType == OP_WHEN) && enodeConstant(top->getChild(0))) {
+      valInfo* condInfo = consEMap[top->getChild(0)];
+      bool condZero = condInfo && condInfo->status == VAL_CONSTANT && (mpz_cmp_ui(condInfo->consVal, 0) == 0);
+      logChange(condZero ? "prune mux/when with const 0 cond" : "prune mux/when with const non-zero cond", top, __LINE__);
       valInfo* info = consEMap[top->getChild(0)];
       if (mpz_cmp_ui(info->consVal, 0) == 0) updateNewChild(parent, top->getChild(2), idx);
       else updateNewChild(parent, top->getChild(1), idx);
       remove = true;
     } else if (top->opType == OP_WHEN && (enodePtr = whenChildInvalid(top))) {
+      logChange("prune when with invalid child", top, __LINE__);
       updateNewChild(parent, enodePtr, idx);
       remove = true;
     } else if ((top->opType == OP_MUX || top->opType == OP_WHEN) && top->width == 1 && isConsNoZero(top->getChild(1)) && isConsZero(top->getChild(2))) {
+      logChange("prune mux/when with true/false constant branches", top, __LINE__);
       updateNewChild(parent, top->getChild(0), idx);
       remove = true;
     } else if (top->opType == OP_OR && (isConsZero(top->getChild(0)) || isConsZero(top->getChild(1)))) {
+      logChange("simplify or with constant operand", top, __LINE__);
       if (isConsZero(top->getChild(0))) {
         ENode* newChild = top->getChild(1);
         if (top->width > top->getChild(1)->width) {
@@ -1142,9 +1231,11 @@ void ExpTree::removeConstant() {
       remove = true;
     } else if (top->opType == OP_AND) {
       if (enodeConstant(top->getChild(0)) && top->getChild(0)->width == top->getChild(1)->width && allOnes(consEMap[top->getChild(0)]->consVal, top->getChild(0)->width)) {
+        logChange("simplify and with all-ones lhs", top, __LINE__);
         updateNewChild(parent, top->getChild(1), idx);
         remove = true;
       } else if (enodeConstant(top->getChild(1)) && top->getChild(0)->width == top->getChild(1)->width && allOnes(consEMap[top->getChild(1)]->consVal, top->getChild(1)->width)) {
+        logChange("simplify and with all-ones rhs", top, __LINE__);
         updateNewChild(parent, top->getChild(0), idx);
         remove = true;
       }
@@ -1186,8 +1277,11 @@ void graph::constantAnalysis() {
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == CONSTANT_NODE) {
+        if (globalConfig.LogLevel > 0 || globalConfig.DumpConstStatus) {
+          fprintf(stderr, "[ConstantAnalysis] mark constant: %s status=%d\n", member->name.c_str(), member->computeInfo ? member->computeInfo->status : -1);
+        }
         member->assignTree.clear();
-        ENode* enode = allocIntEnode(member->width, mpz_get_str(NULL, 10, member->computeInfo->consVal));
+        ENode* enode = allocIntEnode(member->width, mpz_get_str(NULL, 10, member->computeInfo->consVal), member->sign);
         enode->computeInfo = member->computeInfo;
         member->assignTree.push_back(new ExpTree(enode, member));
         if (member->type == NODE_SPECIAL) { // set to NODE_OTHERS to enable removeDeadNode
@@ -1202,21 +1296,37 @@ void graph::constantAnalysis() {
       for (size_t i = 0; i < member->assignTree.size(); i ++) {
         ExpTree* tree = member->assignTree[i];
         valInfo* info = tree->getRoot()->computeConstant(member, false);
+        if (globalConfig.LogLevel > 1) {
+          fprintf(stderr, "[ConstantAnalysis] %s assignTree[%zu/%zu] eval status=%d sameConst=%d width=%d line=%d\n",
+                  member->name.c_str(), i, member->assignTree.size(), info->status, info->sameConstant, info->width, __LINE__);
+        }
         if (info->status == VAL_EMPTY) {
+          if (globalConfig.LogLevel > 1) {
+            fprintf(stderr, "[ConstantAnalysis] %s assignTree[%zu/%zu] removed (VAL_EMPTY, line=%d)\n",
+                    member->name.c_str(), i, member->assignTree.size(), __LINE__);
+          }
           member->assignTree.erase(member->assignTree.begin() + i);
           i --;
         } else if (!member->isArray() && (i < member->assignTree.size() - 1) && (info->status == VAL_INVALID || info->status == VAL_CONSTANT)) {
           ENode* enode;
           if (info->status == VAL_CONSTANT) {
-            enode = allocIntEnode(info->width, mpz_get_str(NULL, 10, info->consVal));
+            enode = allocIntEnode(info->width, mpz_get_str(NULL, 10, info->consVal), info->sign);
           } else {
             enode = new ENode(OP_INVALID);
+          }
+          if (globalConfig.LogLevel > 1) {
+            fprintf(stderr, "[ConstantAnalysis] %s assignTree[%zu/%zu] replaced with filler (status=%d line=%d)\n",
+                    member->name.c_str(), i, member->assignTree.size(), info->status, __LINE__);
           }
           fillEmptyWhen(member->assignTree[i+1], enode);
           member->assignTree.erase(member->assignTree.begin() + i);
           i --;
         } else {
-          tree->removeConstant();
+          if (globalConfig.LogLevel > 1) {
+            fprintf(stderr, "[ConstantAnalysis] %s assignTree[%zu/%zu] keep tree and fold constants (status=%d sameConst=%d line=%d)\n",
+                    member->name.c_str(), i, member->assignTree.size(), info->status, info->sameConstant, __LINE__);
+          }
+          tree->removeConstant(member->name.c_str());
         }
       }
       member->assignTree.erase(
@@ -1225,9 +1335,28 @@ void graph::constantAnalysis() {
         member->assignTree.end()
       );
       if (member->resetTree) {
-        member->resetTree->removeConstant();
+        std::string resetTag = member->name + ".reset";
+        member->resetTree->removeConstant(resetTag.c_str());
       }
     }
+  }
+
+  if (globalConfig.DumpConstStatus) {
+    std::string path = globalConfig.OutputDir + "/" + name + "_ConstStatus.json";
+    std::ofstream ofs(path);
+    ofs << "{\n  \"nodes\": [\n";
+    bool first = true;
+    for (SuperNode* super : sortedSuper) {
+      for (Node* member : super->member) {
+        auto it = consMap.find(member);
+        if (it == consMap.end()) continue;
+        if (!first) ofs << ",\n";
+        first = false;
+        ofs << "    {\"name\": \"" << jsonEscape(member->name) << "\", "
+            << "\"valStatus\": " << it->second->status << "}";
+      }
+    }
+    ofs << "\n  ]\n}\n";
   }
 
   removeNodes(CONSTANT_NODE);

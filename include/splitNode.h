@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <tuple>
 #include "common.h"
+#include "opFuncs.h"
 class NodeElement;
 bool compMergable(NodeElement* ele1, NodeElement* ele2);
 
@@ -17,6 +18,7 @@ public:
   Node* node = nullptr;
   mpz_t val;
   int hi, lo;
+  bool sign = false;
   std::set<std::tuple<Node*, int, int, OPLevel>> referNodes;
   OPLevel referType;
   NodeElement(ElementType type = ELE_EMPTY, Node* _node = nullptr, int _hi = -1, int _lo = -1) {
@@ -29,12 +31,13 @@ public:
       referNodes.insert(std::make_tuple(_node, _hi, _lo, OPL_BITS));
     }
   }
-  NodeElement(std::string str, int base = 16, int _hi = -1, int _lo = -1) {
+  NodeElement(std::string str, int base = 16, int _hi = -1, int _lo = -1, bool _sign = false) {
     mpz_init(val);
     mpz_set_str(val, str.c_str(), base);
     hi = _hi;
     lo = _lo;
     eleType = ELE_INT;
+    sign = _sign;
     updateWidth();
   }
   void updateWidth() {
@@ -45,6 +48,9 @@ public:
     mpz_mul_2exp(mask, mask, hi - lo + 1);
     mpz_sub_ui(mask, mask, 1);
     mpz_and(val, val, mask);
+    if (sign) {
+      s_asSInt(val, val, hi - lo + 1);
+    }
     hi = hi - lo;
     lo = 0;
   }
@@ -55,6 +61,7 @@ public:
     ret->node = node;
     ret->hi = hi;
     ret->lo = lo;
+    ret->sign = sign;
     ret->referNodes.insert(referNodes.begin(), referNodes.end());
     return ret;
   }

@@ -245,9 +245,11 @@ void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
             }
           }
         } else if (val->node) {
-          ENode* clockENode = new ENode(val->node);
-          clockENode->width = val->node->width;
-          clockMember->assignTree[0]->setRoot(clockENode);
+          if (!clockMember->assignTree.empty()) {
+            ENode* clockENode = new ENode(val->node);
+            clockENode->width = val->node->width;
+            clockMember->assignTree[0]->setRoot(clockENode);
+          }
         } else {
           for (Node* member : node->member)
             member->setConstantZero(0);
