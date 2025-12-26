@@ -169,6 +169,10 @@ FILE* graph::genHeaderStart() {
   fprintf(header, "//#define ENABLE_LOG\n");
   fprintf(header, "//#define RANDOMIZE_INIT\n");
 
+  fprintf(header, "\n#ifndef FST_WAVE\n");
+  fprintf(header, "#define FST_WAVE %d\n", globalConfig.TraceFst ? 1 : 0);
+  fprintf(header, "#endif\n\n");
+
   fprintf(header, "\n#define gAssert(cond, ...) do {"
                      "if (!(cond)) {"
                        "fprintf(stderr, \"\\33[1;31m\");"
