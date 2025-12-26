@@ -511,6 +511,8 @@ void 		fstUtilityFreeEnumTable(struct fstETab *etab); /* must use to free fstETa
 
 #endif
 
+#ifdef GSIM_FST_IMPL
+
 /* ==== fastlz.h ==== */
 /*
   FastLZ - lightning-fast lossless compression library
@@ -6028,7 +6030,6 @@ char *tchn_handle_nam;
 
 fstEnumHandle max_enumhandle;
 };
-
 
 static int fstWriterFseeko(struct fstWriterContext *xc, FILE *stream, fst_off_t offset, int whence)
 {
@@ -12397,7 +12398,6 @@ if(s)
 return(et);
 }
 
-
 void fstUtilityFreeEnumTable(struct fstETab *etab)
 {
 if(etab)
@@ -12411,5 +12411,6 @@ if(etab)
 #ifdef __cplusplus
 }
 #endif
+#endif /* GSIM_FST_IMPL */
 
 #endif /* GSIM_FST_H */
