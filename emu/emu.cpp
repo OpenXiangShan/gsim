@@ -14,41 +14,68 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifdef GSIM
+#include "gsimFst.h"
+#endif
 
 #define CYCLE_STEP_PERCENT 1
 
 #if defined(__DUT_ysyx3__)
 #define DUT_MEMORY mem$ram
 #define REF_MEMORY newtop__DOT__mem__DOT__ram_ext__DOT__Memory
+#ifndef CYCLE_MAX_PERF
 #define CYCLE_MAX_PERF 5000000
+#endif
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  11000000
+#endif
 #elif defined(__DUT_NutShell__)
 #define DUT_MEMORY mem$rdata_mem$mem
 #define REF_MEMORY SimTop__DOT__mem__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
+#ifndef CYCLE_MAX_PERF
 #define CYCLE_MAX_PERF 50000000
+#endif
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  250000000
+#endif
 #elif defined(__DUT_rocket__)
 #define DUT_MEMORY mem$srams$mem
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
+#ifndef CYCLE_MAX_PERF
 #define CYCLE_MAX_PERF 2000000
+#endif
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  4200000
+#endif
 #elif defined(__DUT_large_boom__) || defined(__DUT_small_boom__)
 #define DUT_MEMORY mem$srams$mem
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
+#ifndef CYCLE_MAX_PERF
 #define CYCLE_MAX_PERF 1000000
+#endif
 #ifdef __DUT_large_boom__
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  3900000
+#endif
 #else
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  5400000
+#endif
 #endif
 #elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
 #define DUT_MEMORY memory$ram$rdata_mem$mem
 #define REF_MEMORY SimTop__DOT__memory__DOT__ram__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
+#ifndef CYCLE_MAX_PERF
 #define CYCLE_MAX_PERF 500000
+#endif
 #ifdef __DUT_default_xiangshan__
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  1900000
+#endif
 #else
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  3400000
+#endif
 #endif
 
 // unused blackbox
@@ -377,5 +404,17 @@ int main(int argc, char** argv) {
     }
   }
   flush_waveform_if_needed();
+#if defined(GSIM)
+  if (dut) {
+    /* Explicitly close FST to ensure profiling dump is printed */
+    if (dut->fstCtx) {
+      fstWriterFlushContext(dut->fstCtx);
+      fstWriterClose(dut->fstCtx);
+      dut->fstCtx = nullptr;
+    }
+    delete dut;
+    dut = nullptr;
+  }
+#endif
   return 0;
 }
