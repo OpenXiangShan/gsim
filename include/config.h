@@ -1,6 +1,10 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <cstddef>
+#include <set>
+#include <string>
+
 struct Config {
   bool EnableDumpGraph;
   bool DumpGraphDot;
@@ -8,6 +12,8 @@ struct Config {
   bool DumpAssignTree;
   bool DumpConstStatus;
   bool TraceFst;
+  size_t FstMaxArrayElems;
+  bool TraceFstNoNext;
   std::string OutputDir;
   int SuperNodeMaxSize;
   uint32_t cppMaxSizeKB;
