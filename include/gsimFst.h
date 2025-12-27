@@ -5311,7 +5311,7 @@ void **JenkinsIns(void *base_i, const unsigned char *mem, uint32_t length, uint3
 /* these defines have a large impact on writer speed when a model has a */
 /* huge number of symbols.  as a default, use 128MB and increment when  */
 /* every 1M signals are defined.                                        */
-#define FST_BREAK_SIZE                  (1UL << 27)
+#define FST_BREAK_SIZE                  (1UL << 29) /* increase block size to reduce flush frequency */
 #define FST_BREAK_ADD_SIZE              (1UL << 22)
 #define FST_BREAK_SIZE_MAX              (1UL << 31)
 #define FST_ACTIVATE_HUGE_BREAK         (1000000)
@@ -5335,7 +5335,50 @@ void **JenkinsIns(void *base_i, const unsigned char *mem, uint32_t length, uint3
 #endif
 
 #if defined(FST_MACOSX) || defined(__MINGW32__) || defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__NetBSD__)
+/* Use buffered I/O by default to reduce flush overhead; define FST_FORCE_UNBUFFERED_IO to force unbuffered */
+#ifdef FST_FORCE_UNBUFFERED_IO
 #define FST_UNBUFFERED_IO
+#endif
+#endif
+
+/* Optional flush profiling (enabled when env FST_PROFILE_FLUSH is set) */
+#ifdef FST_PROFILE_FLUSH
+#include <time.h>
+static struct {
+    uint64_t count;
+    uint64_t ns_total;
+    uint64_t ns_vals;
+    uint64_t ns_time;
+    uint64_t ns_tail;
+    int dump_done;
+    int enable; /* -1 unknown, 0 disabled, 1 enabled */
+} fst_flush_prof = {0, 0, 0, 0, 0, 0, -1};
+static inline uint64_t fst_prof_ns_diff(const struct timespec *a, const struct timespec *b) {
+    return (uint64_t)(b->tv_sec - a->tv_sec) * 1000000000ULL + (uint64_t)(b->tv_nsec - a->tv_nsec);
+}
+static inline int fst_prof_enabled(void) {
+    if (fst_flush_prof.enable < 0) {
+        const char *env = getenv("FST_PROFILE_FLUSH");
+        fst_flush_prof.enable = 1;
+        if (env && env[0] == '0') {
+            fst_flush_prof.enable = 0;
+        }
+    }
+    return fst_flush_prof.enable;
+}
+static inline void fst_prof_dump(void) {
+    if (fst_flush_prof.dump_done) return;
+    /* make sure env is sampled once before dumping */
+    int enabled = fst_prof_enabled();
+    fprintf(stderr, "[fst-prof] enabled=%d flushes=%" PRIu64 " total=%.3fs vals=%.3fs timech=%.3fs tail=%.3fs\n",
+            enabled,
+            fst_flush_prof.count,
+            (double)fst_flush_prof.ns_total / 1e9,
+            (double)fst_flush_prof.ns_vals / 1e9,
+            (double)fst_flush_prof.ns_time / 1e9,
+            (double)fst_flush_prof.ns_tail / 1e9);
+    fst_flush_prof.dump_done = 1;
+}
 #endif
 
 #ifdef __GNUC__
@@ -6425,7 +6468,7 @@ if(xc)
 
         destlen = xc->maxvalpos;
         dmem = (unsigned char *)malloc(compressBound(destlen));
-        rc = compress2(dmem, &destlen, xc->curval_mem, xc->maxvalpos, 4); /* was 9...which caused performance drag on traces with many signals */
+        rc = compress2(dmem, &destlen, xc->curval_mem, xc->maxvalpos, 1); /* lowered level to reduce flush CPU cost */
 
         fputc(FST_BL_SKIP, xc->handle);                 /* temporarily tag the section, use FST_BL_VCDATA on finalize */
         xc->section_start = ftello(xc->handle);
@@ -6475,6 +6518,10 @@ static void fstWriterFlushContextPrivate(void *ctx)
 {
 #ifdef FST_DEBUG
 int cnt = 0;
+#endif
+#ifdef FST_PROFILE_FLUSH
+struct timespec _fst_t0, _fst_t1, _fst_t2, _fst_t3;
+if(fst_prof_enabled()) clock_gettime(CLOCK_MONOTONIC, &_fst_t0);
 #endif
 unsigned int i;
 unsigned char *vchg_mem;
@@ -6819,6 +6866,9 @@ JudyHSFreeArray(&PJHSArray, NULL);
 #endif
 
 free(packmem); packmem = NULL; /* packmemlen = 0; */ /* scan-build */
+#ifdef FST_PROFILE_FLUSH
+if(fst_prof_enabled()) clock_gettime(CLOCK_MONOTONIC, &_fst_t1);
+#endif
 
 prevpos = 0; zerocnt = 0;
 free(scratchpad); scratchpad = NULL;
@@ -6932,7 +6982,7 @@ if(tmem)
         {
         unsigned long destlen = tlen;
         unsigned char *dmem = (unsigned char *)malloc(compressBound(destlen));
-        int rc = compress2(dmem, &destlen, tmem, tlen, 9);
+        int rc = compress2(dmem, &destlen, tmem, tlen, 1);
 
         if((rc == Z_OK) && (((fst_off_t)destlen) < tlen))
                 {
@@ -6953,6 +7003,9 @@ if(tmem)
 xc->tchn_cnt = xc->tchn_idx = 0;
 fstWriterFseeko(xc, xc->tchn_handle, 0, SEEK_SET);
 fstFtruncate(fileno(xc->tchn_handle), 0);
+#ifdef FST_PROFILE_FLUSH
+if(fst_prof_enabled()) clock_gettime(CLOCK_MONOTONIC, &_fst_t2);
+#endif
 
 /* write block trailer */
 endpos = ftello(xc->handle);
@@ -7000,6 +7053,27 @@ if(!xc2->skip_writing_section_hdr)
 fflush(xc->handle);
 
 xc->already_in_flush = 0;
+
+#ifdef FST_PROFILE_FLUSH
+if(fst_prof_enabled()) {
+    clock_gettime(CLOCK_MONOTONIC, &_fst_t3);
+    uint64_t _ns_vals = fst_prof_ns_diff(&_fst_t0, &_fst_t1);
+    uint64_t _ns_time = fst_prof_ns_diff(&_fst_t1, &_fst_t2);
+    uint64_t _ns_tail = fst_prof_ns_diff(&_fst_t2, &_fst_t3);
+    uint64_t _ns_total = fst_prof_ns_diff(&_fst_t0, &_fst_t3);
+    fst_flush_prof.count++;
+    fst_flush_prof.ns_vals += _ns_vals;
+    fst_flush_prof.ns_time += _ns_time;
+    fst_flush_prof.ns_tail += _ns_tail;
+    fst_flush_prof.ns_total += _ns_total;
+    fprintf(stderr, "[fst-prof] flush#%" PRIu64 " vals=%.3fms time=%.3fms tail=%.3fms total=%.3fms\n",
+            fst_flush_prof.count,
+            (double)_ns_vals / 1e6,
+            (double)_ns_time / 1e6,
+            (double)_ns_tail / 1e6,
+            (double)_ns_total / 1e6);
+}
+#endif
 }
 
 
@@ -7184,6 +7258,9 @@ if(xc && !xc->already_in_close && !xc->already_in_flush)
 		free(xc->outval_mem); xc->outval_mem = NULL;
 		xc->outval_alloc_siz = 0;
 		}
+#ifdef FST_PROFILE_FLUSH
+        fst_prof_dump();
+#endif
 
         /* write out geom section */
         fflush(xc->geom_handle);
