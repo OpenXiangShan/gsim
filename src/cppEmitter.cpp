@@ -607,19 +607,19 @@ int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
           emitBodyLock(indent, "if (dumpWaveformFlag && fstCtx) {\n");
           std::vector<int> dims = nodeArrayDims(inst.node);
           if (dims.empty()) {
-            emitBodyLock(indent + 1, "updateFstSignal(\"%s\", &%s, %d);\n", inst.node->name.c_str(), inst.node->name.c_str(), inst.node->width);
+            emitBodyLock(indent + 1, "updateFstSignal(fstHandle_%s, &%s, %d);\n", inst.node->name.c_str(), inst.node->name.c_str(), inst.node->width);
           } else {
             int curIndent = indent + 1;
             for (size_t i = 0; i < dims.size(); i ++) {
               emitBodyLock(curIndent ++, "for (int i%zu = 0; i%zu < %d; i%zu ++) {\n", i, i, dims[i], i);
             }
-            emitBodyLock(curIndent, "std::string node_name = \"%s\";\n", inst.node->name.c_str());
             std::string accessStr = inst.node->name;
+            emitBodyLock(curIndent, "size_t handle_idx = 0;\n");
             for (size_t i = 0; i < dims.size(); i ++) {
-              emitBodyLock(curIndent, "node_name += \"[\" + std::to_string(i%zu) + \"]\";\n", i);
               accessStr += format("[i%zu]", i);
+              emitBodyLock(curIndent, "handle_idx = handle_idx * %d + i%zu;\n", dims[i], i);
             }
-            emitBodyLock(curIndent, "updateFstSignal(node_name, &%s, %d);\n", accessStr.c_str(), inst.node->width);
+            emitBodyLock(curIndent, "updateFstSignal(fstHandle_%s[handle_idx], &%s, %d);\n", inst.node->name.c_str(), accessStr.c_str(), inst.node->width);
             for (size_t i = 0; i < dims.size(); i ++) {
               emitBodyLock(-- curIndent, "}\n");
             }
@@ -791,9 +791,10 @@ void graph::genStep(int subStepIdxMax) {
   std::vector<std::string> fstScopeStack;
   fstScopeStack.push_back("gsim");
   fstScopeStack.push_back("gsim_top");
-  emitBodyLock(2, "fstHandleMap.clear();\n");
+  emitBodyLock(2, "resetFstHandles();\n");
   emitBodyLock(2, "if (fstCtx) { fstWriterClose(fstCtx); fstCtx = nullptr; }\n");
   emitBodyLock(2, "fstCtx = fstWriterCreate(fstPath.c_str(), 1);\n");
+  emitBodyLock(2, "fstWriterSetPackType(fstCtx, FST_WR_PT_LZ4);\n");  // favor faster compression for value blocks
   emitBodyLock(2, "fstWriterSetTimescaleFromString(fstCtx, \"1ns\");\n");
   emitBodyLock(2, "fstWriterSetVersion(fstCtx, \"gsim\");\n");
   emitBodyLock(2, "fstWriterSetFileType(fstCtx, FST_FT_VERILOG);\n");
@@ -837,21 +838,23 @@ void graph::genStep(int subStepIdxMax) {
 
     std::vector<int> dims = nodeArrayDims(node);
     if (dims.empty()) {
-      emitBodyLock(2, "fstHandleMap[\"%s\"] = fstWriterCreateVar(fstCtx, %s, FST_VD_IMPLICIT, %d, \"%s\", 0u);\n",
+      emitBodyLock(2, "fstHandle_%s = fstWriterCreateVar(fstCtx, %s, FST_VD_IMPLICIT, %d, \"%s\", 0u);\n",
                    node->name.c_str(), typestr.c_str(), node->width, fstName.c_str());
     } else {
       int current_indent = 2;
+      int total_elems = 1;
+      for (int d : dims) total_elems *= d;
+      emitBodyLock(current_indent, "fstHandle_%s.resize(%d);\n", node->name.c_str(), total_elems);
+      emitBodyLock(current_indent, "size_t fstHandleIdx_%s = 0;\n", node->name.c_str());
       for (size_t i = 0; i < dims.size(); i ++) {
         emitBodyLock(current_indent ++, "for (int i%zu = 0; i%zu < %d; i%zu ++) {\n", i, i, dims[i], i);
       }
       emitBodyLock(current_indent, "std::string fst_name = \"%s\";\n", fstName.c_str());
-      emitBodyLock(current_indent, "std::string map_key = \"%s\";\n", node->name.c_str());
       for (size_t i = 0; i < dims.size(); i ++) {
         emitBodyLock(current_indent, "fst_name += \"[\" + std::to_string(i%zu) + \"]\";\n", i);
-        emitBodyLock(current_indent, "map_key += \"[\" + std::to_string(i%zu) + \"]\";\n", i);
       }
-      emitBodyLock(current_indent, "fstHandle handle = fstWriterCreateVar(fstCtx, %s, FST_VD_IMPLICIT, %d, fst_name.c_str(), 0u);\n", typestr.c_str(), node->width);
-      emitBodyLock(current_indent, "fstHandleMap[map_key] = handle;\n");
+      emitBodyLock(current_indent, "fstHandle_%s[fstHandleIdx_%s ++] = fstWriterCreateVar(fstCtx, %s, FST_VD_IMPLICIT, %d, fst_name.c_str(), 0u);\n",
+                   node->name.c_str(), node->name.c_str(), typestr.c_str(), node->width);
       for (size_t i = 0; i < dims.size(); i ++) {
         emitBodyLock(-- current_indent, "}\n");
       }
@@ -862,7 +865,7 @@ void graph::genStep(int subStepIdxMax) {
   }
   emitBodyLock(2, "fstWriterSetScope(fstCtx, FST_ST_VCD_MODULE, \"gsim\", nullptr);\n");
   emitBodyLock(2, "fstWriterSetScope(fstCtx, FST_ST_VCD_MODULE, \"gsim_meta\", nullptr);\n");
-  emitBodyLock(2, "fstHandleMap[\"gsim.gsim_meta.gsim_cycle\"] = fstWriterCreateVar(fstCtx, FST_VT_VCD_WIRE, FST_VD_IMPLICIT, 64, \"gsim_cycle\", 0u);\n");
+  emitBodyLock(2, "fstHandle_gsim_cycle = fstWriterCreateVar(fstCtx, FST_VT_VCD_WIRE, FST_VD_IMPLICIT, 64, \"gsim_cycle\", 0u);\n");
   emitBodyLock(2, "fstWriterSetUpscope(fstCtx);\n");
   emitBodyLock(2, "fstWriterSetUpscope(fstCtx);\n");
   emitBodyLock(2, "uint64_t fst_rel_cycle = cycles - fstCycleBase;\n");
@@ -885,7 +888,7 @@ void graph::genStep(int subStepIdxMax) {
   emitBodyLock(1, "cycles ++;\n");
   emitBodyLock(1, "if (dumpWaveformFlag && fstCtx) {\n");
   emitBodyLock(2, "uint64_t fst_rel_cycle = cycles - fstCycleBase;\n");
-  emitBodyLock(2, "updateFstSignal(\"gsim.gsim_meta.gsim_cycle\", &fst_rel_cycle, 64);\n");
+  emitBodyLock(2, "updateFstSignal(fstHandle_gsim_cycle, &fst_rel_cycle, 64);\n");
   emitBodyLock(2, "fstWriterEmitTimeChange(fstCtx, fst_rel_cycle);\n");
   emitBodyLock(1, "}\n");
   emitBodyLock(0, "}\n");
@@ -1043,7 +1046,14 @@ void graph::cppEmitter() {
   fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
   fprintf(header, "bool waveformEnabled;\n");
   fprintf(header, "void *fstCtx;\n");
-  fprintf(header, "std::map<std::string, fstHandle> fstHandleMap;\n");
+  fprintf(header, "fstHandle fstHandle_gsim_cycle;\n");
+  for (Node* node : fstWaveNodes) {
+    if (nodeArrayDims(node).empty()) {
+      fprintf(header, "fstHandle fstHandle_%s;\n", node->name.c_str());
+    } else {
+      fprintf(header, "std::vector<fstHandle> fstHandle_%s;\n", node->name.c_str());
+    }
+  }
   fprintf(header, "std::string fstPath;\n");
   fprintf(header, "bool dumpWaveformFlag;\n");
   fprintf(header, "bool fstDumpInitialized;\n");
@@ -1064,10 +1074,11 @@ void graph::cppEmitter() {
                "  fstCycleBase = 0;\n"
                "  waveformEnabled = false;\n"
                "  fstCtx = nullptr;\n"
-               "  fstHandleMap.clear();\n"
+               "  fstHandle_gsim_cycle = 0;\n"
                "  fstPath = \"%s.fst\";\n"
                "  dumpWaveformFlag = false;\n"
                "  fstDumpInitialized = false;\n"
+               "  resetFstHandles();\n"
                "  init();\n"
                "}\n", name.c_str(), name.c_str(), name.c_str());
 
@@ -1076,6 +1087,17 @@ void graph::cppEmitter() {
   emitBodyLock(2, "fstWriterFlushContext(this->fstCtx);\n");
   emitBodyLock(2, "fstWriterClose(this->fstCtx);\n");
   emitBodyLock(1, "}\n");
+  emitBodyLock(0, "}\n");
+
+  emitFuncDecl(0, "void S%s::resetFstHandles() {\n", name.c_str());
+  emitBodyLock(1, "fstHandle_gsim_cycle = 0;\n");
+  for (Node* node : fstWaveNodes) {
+    if (nodeArrayDims(node).empty()) {
+      emitBodyLock(1, "fstHandle_%s = 0;\n", node->name.c_str());
+    } else {
+      emitBodyLock(1, "fstHandle_%s.clear();\n", node->name.c_str());
+    }
+  }
   emitBodyLock(0, "}\n");
 
   /* initialization */
@@ -1130,7 +1152,7 @@ void graph::cppEmitter() {
   emitBodyLock(1, "fstDumpInitialized = false;\n");
   emitBodyLock(1, "dumpWaveformFlag = false;\n");
   emitBodyLock(1, "fstCycleBase = 0;\n");
-  emitBodyLock(1, "fstHandleMap.clear();\n");
+  emitBodyLock(1, "resetFstHandles();\n");
   emitBodyLock(1, "if (fstCtx) { fstWriterClose(fstCtx); fstCtx = nullptr; }\n");
 
   fprintf(header, "S%s();\n", name.c_str());
@@ -1141,6 +1163,7 @@ void graph::cppEmitter() {
   fprintf(header, "void enableWaveform();\n");
   fprintf(header, "void disableWaveform();\n");
   fprintf(header, "void flushWaveform();\n");
+  fprintf(header, "void resetFstHandles();\n");
 
   emitBodyLock(0, "}\n");
 
@@ -1154,7 +1177,7 @@ void graph::cppEmitter() {
   emitBodyLock(1, "fstPath = path;\n");
   emitBodyLock(1, "dumpWaveformFlag = false;\n");
   emitBodyLock(1, "fstDumpInitialized = false;\n");
-  emitBodyLock(1, "fstHandleMap.clear();\n");
+  emitBodyLock(1, "resetFstHandles();\n");
   emitBodyLock(1, "if (fstCtx) { fstWriterClose(fstCtx); fstCtx = nullptr; }\n");
   emitBodyLock(0, "}\n");
 
@@ -1173,10 +1196,8 @@ void graph::cppEmitter() {
   emitBodyLock(0, "}\n");
 
   fprintf(header, "template<typename T>\n");
-  fprintf(header, "inline void updateFstSignal(const std::string& signal_name, T* value_ptr, uint32_t width) {\n"
-                  "  if (!dumpWaveformFlag || !fstCtx) return;\n"
-                  "  auto it = this->fstHandleMap.find(signal_name);\n"
-                  "  if (it == this->fstHandleMap.end()) return;\n"
+  fprintf(header, "inline void updateFstSignal(fstHandle handle, T* value_ptr, uint32_t width) {\n"
+                  "  if (!dumpWaveformFlag || !fstCtx || handle == 0) return;\n"
                   "  if (width <= 32) {\n"
                   "    uint32_t val = 0;\n"
                   "    std::memcpy(&val, value_ptr, sizeof(T) < sizeof(val) ? sizeof(T) : sizeof(val));\n"
@@ -1184,7 +1205,7 @@ void graph::cppEmitter() {
                   "      if (width == 0) val = 0;\n"
                   "      else val &= ((uint32_t(1) << width) - 1);\n"
                   "    }\n"
-                  "    fstWriterEmitValueChange32(this->fstCtx, it->second, width, val);\n"
+                  "    fstWriterEmitValueChange32(this->fstCtx, handle, width, val);\n"
                   "  } else if (width <= 64) {\n"
                   "    uint64_t val = 0;\n"
                   "    std::memcpy(&val, value_ptr, sizeof(T) < sizeof(val) ? sizeof(T) : sizeof(val));\n"
@@ -1192,32 +1213,32 @@ void graph::cppEmitter() {
                   "      if (width == 0) val = 0;\n"
                   "      else val &= ((uint64_t(1) << width) - 1);\n"
                   "    }\n"
-                  "    fstWriterEmitValueChange64(this->fstCtx, it->second, width, val);\n"
+                  "    fstWriterEmitValueChange64(this->fstCtx, handle, width, val);\n"
                   "  } else {\n"
-                  "    fstWriterEmitValueChangeVec64(this->fstCtx, it->second, width, (const uint64_t*)value_ptr);\n"
+                  "    fstWriterEmitValueChangeVec64(this->fstCtx, handle, width, (const uint64_t*)value_ptr);\n"
                   "  }\n"
                   "}\n");
 
   emitFuncDecl(0, "void S%s::emitAllSignalValues() {\n", name.c_str());
   emitBodyLock(1, "if (!dumpWaveformFlag || !fstCtx) return;\n");
   emitBodyLock(1, "uint64_t fst_rel_cycle = cycles - fstCycleBase;\n");
-  emitBodyLock(1, "updateFstSignal(\"gsim.gsim_top.gsim_meta.gsim_cycle\", &fst_rel_cycle, 64);\n");
+  emitBodyLock(1, "updateFstSignal(fstHandle_gsim_cycle, &fst_rel_cycle, 64);\n");
   for (Node* node : fstWaveNodes) {
     std::vector<int> dims = nodeArrayDims(node);
     if (dims.empty()) {
-      emitBodyLock(2, "updateFstSignal(\"%s\", &%s, %d);\n", node->name.c_str(), node->name.c_str(), node->width);
+      emitBodyLock(2, "updateFstSignal(fstHandle_%s, &%s, %d);\n", node->name.c_str(), node->name.c_str(), node->width);
     } else {
       int indent = 2;
       for (size_t i = 0; i < dims.size(); i ++) {
         emitBodyLock(indent ++, "for (int i%zu = 0; i%zu < %d; i%zu ++) {\n", i, i, dims[i], i);
       }
-      emitBodyLock(indent, "std::string node_name = \"%s\";\n", node->name.c_str());
       std::string accessStr = node->name;
+      emitBodyLock(indent, "size_t handle_idx = 0;\n");
       for (size_t i = 0; i < dims.size(); i ++) {
-        emitBodyLock(indent, "node_name += \"[\" + std::to_string(i%zu) + \"]\";\n", i);
         accessStr += format("[i%zu]", i);
+        emitBodyLock(indent, "handle_idx = handle_idx * %d + i%zu;\n", dims[i], i);
       }
-      emitBodyLock(indent, "updateFstSignal(node_name, &%s, %d);\n", accessStr.c_str(), node->width);
+      emitBodyLock(indent, "updateFstSignal(fstHandle_%s[handle_idx], &%s, %d);\n", node->name.c_str(), accessStr.c_str(), node->width);
       for (size_t i = 0; i < dims.size(); i ++) {
         emitBodyLock(-- indent, "}\n");
       }
