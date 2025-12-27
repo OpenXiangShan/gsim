@@ -8,6 +8,8 @@
 #include <fstream>
 #include <csignal>
 #include <chrono>
+#include <cstdlib>
+#include <string>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -97,6 +99,8 @@ extern "C" void sd_read(int* data){
 #if defined(GSIM)
 #include DUT_HEADER
 static DUT_NAME* dut;
+static bool waveform_enabled = false;
+static std::string waveform_path;
 
 void dut_init(DUT_NAME *dut) {
 #if defined(__DUT_NutShell__)
@@ -126,6 +130,24 @@ void dut_hook(DUT_NAME *dut) {
   }
 #endif
 }
+
+static void maybe_enable_waveform(DUT_NAME *dut) {
+  const char* env_enable = std::getenv("GSIM_ENABLE_WAVEFORM");
+  if (env_enable == nullptr || env_enable[0] == '0') return;
+  const char* env_path = std::getenv("GSIM_WAVEFORM_PATH");
+  waveform_path = env_path ? std::string(env_path) : std::string("waveform.fst");
+  dut->setWaveformPath(waveform_path);
+  dut->enableWaveform();
+  waveform_enabled = true;
+}
+
+static void flush_waveform_if_needed() {
+  if (waveform_enabled && dut) {
+    dut->flushWaveform();
+  }
+}
+#else
+static inline void flush_waveform_if_needed() {}
 #endif
 
 #if defined(VERILATOR)
@@ -253,6 +275,7 @@ int main(int argc, char** argv) {
   dut = new DUT_NAME();
   memcpy(&dut->DUT_MEMORY, program, program_sz);
   dut_init(dut);
+  maybe_enable_waveform(dut);
   dut_reset();
 #endif
 #ifdef VERILATOR
@@ -298,6 +321,7 @@ int main(int argc, char** argv) {
       printf("ALL diffs: dut -- ref\n");
       printf("Failed after %ld cycles\n", cycles);
       checkSignals(false);
+      flush_waveform_if_needed();
       return -1;
     }
 #endif
@@ -335,9 +359,17 @@ int main(int argc, char** argv) {
       }
 #endif
 #if defined(PERF) || defined(PERF_CYCLE)
-      if (cycles >= CYCLE_MAX_PERF) return 0;
+      if (cycles >= CYCLE_MAX_PERF) {
+        flush_waveform_if_needed();
+        return 0;
+      }
 #endif
-      if (cycles == CYCLE_MAX_SIM) return 0;
+      if (cycles == CYCLE_MAX_SIM) {
+        flush_waveform_if_needed();
+        return 0;
+      }
     }
   }
+  flush_waveform_if_needed();
+  return 0;
 }
