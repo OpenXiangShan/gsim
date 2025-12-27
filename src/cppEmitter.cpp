@@ -16,6 +16,9 @@
 
 #define ENABLE_ACTIVATOR false
 
+// Avoid emitting waveform handles for giant arrays (e.g., full RAM contents);
+// limit is controlled by globalConfig.FstMaxArrayElems (0 = unlimited).
+
 #ifdef DIFFTEST_PER_SIG
 FILE* sigFile = nullptr;
 #endif
@@ -971,8 +974,31 @@ void graph::cppEmitter() {
 
   fstWaveNodes.clear();
   fstWaveNodeSet.clear();
+  const size_t fstWaveLimit = globalConfig.FstMaxArrayElems;
   auto collectWaveNode = [&](Node* n) {
-    if (isTopField(n)) fstWaveNodeSet.insert(n);
+    if (!isTopField(n)) return;
+    if (globalConfig.TraceFstNoNext) {
+      const std::string& nm = n->name;
+      if (nm.size() >= 5 && nm.rfind("$NEXT") == nm.size() - 5) return;
+    }
+    auto dims = nodeArrayDims(n);
+    if (!dims.empty() && fstWaveLimit != 0) {
+      size_t total = 1;
+      for (int dim : dims) {
+        if (dim <= 0) continue;
+        if (total > fstWaveLimit / static_cast<size_t>(dim)) {
+          total = fstWaveLimit + 1;
+          break;
+        }
+        total *= static_cast<size_t>(dim);
+      }
+      if (total > fstWaveLimit) {
+        fprintf(stderr, "[gsim] skip waveform for %s: %zu elements exceed limit %zu\n",
+                n->name.c_str(), total, fstWaveLimit);
+        return;
+      }
+    }
+    fstWaveNodeSet.insert(n);
   };
   for (SuperNode* super : sortedSuper) {
     if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {

@@ -383,11 +383,11 @@ diff-internal:
 	$(MAKE) MODE=2 compile
 	$(MAKE) MODE=2 difftest
 
-run:
+run: clean
 	mkdir -p $(dir $(LOG_FILE))
-	set -o pipefail && $(TIME) $(MAKE) run-internal 2>&1 | tee $(LOG_FILE)
+	set -o pipefail && stdbuf -oL -eL $(TIME) $(MAKE) run-internal 2>&1 | tee $(LOG_FILE)
 
-run-waveform:
+run-waveform: clean
 	$(MAKE) run WAVEFORM=1 LOG_FILE=$(WAVE_LOG_FILE) WAVE_LOG_FILE=$(WAVE_LOG_FILE) WAVEFORM_PATH=$(WAVEFORM_PATH)
 
 diff:
