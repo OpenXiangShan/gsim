@@ -600,12 +600,13 @@ int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
           if (inst.node->isArray() || inst.node->type == NODE_WRITER) activateUncondNext(inst.node, inst.node->nextActiveId, false, flagName, indent);
           else activateNext(inst.node, inst.node->nextActiveId, oldName(inst.node), false, flagName, indent);
         }
-        if (fstWaveNodeSet.count(inst.node)) {
+        if (globalConfig.TraceFst && fstWaveNodeSet.count(inst.node)) {
+          emitBodyLock(indent, "if (dumpWaveformFlag && fstCtx) {\n");
           std::vector<int> dims = nodeArrayDims(inst.node);
           if (dims.empty()) {
-            emitBodyLock(indent, "updateFstSignal(\"%s\", &%s, %d);\n", inst.node->name.c_str(), inst.node->name.c_str(), inst.node->width);
+            emitBodyLock(indent + 1, "updateFstSignal(\"%s\", &%s, %d);\n", inst.node->name.c_str(), inst.node->name.c_str(), inst.node->width);
           } else {
-            int curIndent = indent;
+            int curIndent = indent + 1;
             for (size_t i = 0; i < dims.size(); i ++) {
               emitBodyLock(curIndent ++, "for (int i%zu = 0; i%zu < %d; i%zu ++) {\n", i, i, dims[i], i);
             }
@@ -620,6 +621,7 @@ int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
               emitBodyLock(-- curIndent, "}\n");
             }
           }
+          emitBodyLock(indent, "}\n");
         }
         if (skipActivate) break;
       }

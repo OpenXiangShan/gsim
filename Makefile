@@ -8,6 +8,9 @@ mainargs ?= ready-to-run/bin/linux.bin
 # uncomment this line to let this file be part of dependency of each .o file
 THIS_MAKEFILE = Makefile
 
+WAVEFORM ?= 0
+WAVEFORM_PATH ?= $(WORK_DIR)/waveform.fst
+
 ifeq ($(dutName),ysyx3)
 	NAME ?= newtop
 	TEST_FILE = $(NAME)-ysyx3
@@ -59,6 +62,12 @@ include mk/toolchain.mk
 SHELL := /bin/bash
 TIME = /usr/bin/time
 LOG_FILE = $(WORK_DIR)/$(dutName).log
+WAVE_LOG_FILE = $(WORK_DIR)/$(dutName)-wave.log
+EMU_RUN_ENV :=
+ifeq ($(WAVEFORM),1)
+GSIM_FLAGS_EXTRA += --trace-fst
+EMU_RUN_ENV += GSIM_ENABLE_WAVEFORM=1 GSIM_WAVEFORM_PATH=$(WAVEFORM_PATH)
+endif
 
 CFLAGS_DUT = -DDUT_NAME=S$(NAME) -DDUT_HEADER=\"$(NAME).h\" -D__DUT_$(shell echo $(dutName) | tr - _)__
 
@@ -214,11 +223,13 @@ else
 EMU_MAIN_SRCS = emu/emu.cpp
 endif
 EMU_GEN_SRCS = $(shell find $(GEN_CPP_DIR) -name "*.cpp" 2> /dev/null)
+EMU_SRCS += emu/gsim_fst_impl.cpp
 EMU_SRCS += $(EMU_MAIN_SRCS) $(EMU_GEN_SRCS)
 
-EMU_CFLAGS := -O1 -MMD $(addprefix -I, $(abspath $(GEN_CPP_DIR))) $(EMU_CFLAGS) # allow to overwrite optimization level
-EMU_CFLAGS += $(MODE_FLAGS) $(CFLAGS_DUT) -Wno-parentheses-equality
+EMU_CFLAGS := -O1 -MMD $(addprefix -I, $(abspath $(GEN_CPP_DIR))) -I$(abspath include) $(EMU_CFLAGS) # allow to overwrite optimization level
+EMU_CFLAGS += $(MODE_FLAGS) $(CFLAGS_DUT) -Wno-parentheses-equality -pthread
 EMU_CFLAGS += -fbracket-depth=2048
+EMU_LDFLAGS += -lz
 #EMU_CFLAGS += -fsanitize=address -fsanitize-address-use-after-scope
 #EMU_CFLAGS += -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract
 #EMU_CFLAGS += -pg -ggdb
@@ -237,7 +248,7 @@ run-emu-simpoint: $(EMU_BIN)
 	@echo 'Please run "$^ <gcpt> <checkpoint>" manually'
 
 run-emu: $(EMU_BIN)
-	$(TIME) taskset 0x1 $^ $(mainargs)
+	env $(EMU_RUN_ENV) $(TIME) taskset 0x1 $^ $(mainargs)
 
 clean-emu:
 	-rm -rf $(EMU_BUILD_DIR) $(EMU_BIN)
@@ -375,6 +386,9 @@ diff-internal:
 run:
 	mkdir -p $(dir $(LOG_FILE))
 	set -o pipefail && $(TIME) $(MAKE) run-internal 2>&1 | tee $(LOG_FILE)
+
+run-waveform:
+	$(MAKE) run WAVEFORM=1 LOG_FILE=$(WAVE_LOG_FILE) WAVE_LOG_FILE=$(WAVE_LOG_FILE) WAVEFORM_PATH=$(WAVEFORM_PATH)
 
 diff:
 	mkdir -p $(dir $(LOG_FILE))
