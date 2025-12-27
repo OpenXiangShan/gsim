@@ -1,6 +1,7 @@
 #include <iostream>
 #include <time.h>
 #include <cstring>
+#include <cstdio>
 #include <cassert>
 #include <vector>
 #include <numeric>
@@ -270,6 +271,11 @@ bool checkSignals(bool display) {
 #endif
 
 int main(int argc, char** argv) {
+  // Force immediate flushing even when stdout/stderr are piped (e.g. via tee).
+  std::cout.setf(std::ios::unitbuf);
+  std::cerr.setf(std::ios::unitbuf);
+  setvbuf(stdout, nullptr, _IOLBF, 0);
+  setvbuf(stderr, nullptr, _IOLBF, 0);
   load_program(argv[1]);
 #ifdef GSIM
   dut = new DUT_NAME();

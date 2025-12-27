@@ -12,6 +12,7 @@
 #include <thread>
 #include <getopt.h>
 #include <sched.h>
+#include <cstdlib>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -62,6 +63,8 @@ Config::Config() {
   DumpAssignTree = false;
   DumpConstStatus = false;
   TraceFst = false;
+  FstMaxArrayElems = 1 << 20; // 1M elements cap for waveform handle emission
+  TraceFstNoNext = true;      // drop xxx$NEXT signals by default
   OutputDir = ".";
   SuperNodeMaxSize = 35;
   cppMaxSizeKB = -1;
@@ -143,6 +146,8 @@ static void printUsage(const char* ProgName) {
             << "      --dump-assign-tree           Include assignTree structure in JSON dump (can be large).\n"
             << "      --dump-const-status          Dump per-node constant-analysis status before removing constants.\n"
             << "      --trace-fst                  Enable FST waveform support in generated C++ (defines FST_WAVE).\n"
+            << "      --trace-fst-max-elems=[num]  Max array elements to emit FST handles (0 for unlimited, default: 1048576).\n"
+            << "      --trace-fst-no-next=[0|1]    Filter next-state signals (xxx$NEXT); default 1 = filter out.\n"
             ;
 }
 
@@ -173,6 +178,8 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_DUMP_ASSIGN_TREE,
     OPT_DUMP_CONST_STATUS,
     OPT_TRACE_FST,
+    OPT_TRACE_FST_MAX_ELEMS,
+    OPT_TRACE_FST_NO_NEXT,
   };
 
   const struct option Table[] = {
@@ -194,6 +201,8 @@ static char* parseCommandLine(int argc, char** argv) {
       {"dump-assign-tree", no_argument, nullptr, 0},
       {"dump-const-status", no_argument, nullptr, 0},
       {"trace-fst", no_argument, nullptr, 0},
+      {"trace-fst-max-elems", required_argument, nullptr, 0},
+      {"trace-fst-no-next", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -274,6 +283,16 @@ static char* parseCommandLine(int argc, char** argv) {
                 case OPT_TRACE_FST:
                   globalConfig.TraceFst = true;
                   break;
+                case OPT_TRACE_FST_MAX_ELEMS: {
+                  unsigned long long val = strtoull(optarg, nullptr, 0);
+                  globalConfig.FstMaxArrayElems = static_cast<size_t>(val);
+                  break;
+                }
+                case OPT_TRACE_FST_NO_NEXT: {
+                  int v = atoi(optarg);
+                  globalConfig.TraceFstNoNext = (v != 0);
+                  break;
+                }
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }
               break;
