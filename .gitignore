@@ -17,3 +17,6 @@ doc/html
 *.txt
 emu/obj*
 playground/
+
+# nix build .
+result
