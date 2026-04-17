@@ -10,7 +10,7 @@ body:
         You could use English or Chinese to open an issue.
         您可以使用中文或英文提问，我们推荐使用英文。
 
-        This template is only used for reporting a bug (incorrect behaviors) of GSIM. If this doesn't look right, please back and choose another template.
+        This template is only used for reporting a bug (incorrect behaviors) of GSIM. If this doesn't look right, please go back and choose another template.
         这个 issue 模板仅用于提报 GSIM 不正确的行为。如果您遇到的不是此类问题，请回退并选择其他模板。
 
         Please make sure that the incorrect behaviors can still be reproduced on the latest commit of the corresponding branch.
