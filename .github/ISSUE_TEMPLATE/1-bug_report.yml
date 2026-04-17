@@ -127,8 +127,8 @@ body:
         For example, your guess about the cause of the bug, or the modules that may be related.
         例如，您对 bug 可能原因的猜测，或者可能与 bug 相关的模块。
 
-        If possible, you can also try to solve the problem by yourself using vibe coding or other means, and submit a PR to fix it.
-        如果可能，您也可以尝试使用 vibe coding 等手段自行解决该问题，并提交 PR 来修复它。
+        If possible, you can also try to solve the problem yourself using AI-assisted coding or other approaches, and submit a PR to fix it.
+        如果可能，您也可以尝试通过 AI 辅助编码或其他方式自行解决该问题，并提交 PR 来修复它。
       placeholder:
     validations:
       required: false
