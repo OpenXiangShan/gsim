@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <fstream>
 #include <map>
 #include <string>
 #include <utility>
@@ -40,6 +41,54 @@ static std::map<Node*, std::pair<int, int>> super2ResetId;  // uint & async rese
 extern int maxConcatNum;
 bool nameExist(std::string str);
 static int resetFuncNum = 0;
+
+static size_t evaluatedMemberCount(const SuperNode* super) {
+  if (super->superType == SUPER_EXTMOD) {
+    return super->member.size() > 0 ? super->member.size() - 1 : 0;
+  }
+  return super->member.size();
+}
+
+static void emitInstrumentationSummary(const graph* g, const std::string& outputDir, int emittedSuperNum) {
+  size_t totalAdjacentEdges = 0;
+  size_t totalDepEdges = 0;
+  size_t emittedAdjacentEdges = 0;
+  size_t emittedDepEdges = 0;
+  size_t totalMembers = 0;
+  size_t emittedMembers = 0;
+
+  for (const SuperNode* super : g->sortedSuper) {
+    totalAdjacentEdges += super->next.size();
+    totalDepEdges += super->depNext.size();
+    totalMembers += evaluatedMemberCount(super);
+    if (super->cppId >= 0) {
+      emittedMembers += evaluatedMemberCount(super);
+      for (SuperNode* next : super->next) {
+        if (next->cppId >= 0) emittedAdjacentEdges ++;
+      }
+      for (SuperNode* next : super->depNext) {
+        if (next->cppId >= 0) emittedDepEdges ++;
+      }
+    }
+  }
+
+  const std::string reportPath = outputDir + "/gsim_instrumentation_summary.txt";
+  std::ofstream report(reportPath);
+  report << "sorted_supernodes=" << g->sortedSuper.size() << "\n";
+  report << "emitted_supernodes=" << emittedSuperNum << "\n";
+  report << "sorted_supernode_adjacent_edges=" << totalAdjacentEdges << "\n";
+  report << "sorted_supernode_dependency_edges=" << totalDepEdges << "\n";
+  report << "emitted_supernode_adjacent_edges=" << emittedAdjacentEdges << "\n";
+  report << "emitted_supernode_dependency_edges=" << emittedDepEdges << "\n";
+  report << "sorted_evaluated_members=" << totalMembers << "\n";
+  report << "emitted_evaluated_members=" << emittedMembers << "\n";
+  report.close();
+
+  printf("[instrument] sortedSuper=%ld emittedSuper=%d sortedAdjEdges=%ld emittedAdjEdges=%ld sortedDepEdges=%ld emittedDepEdges=%ld sortedMembers=%ld emittedMembers=%ld\n",
+         g->sortedSuper.size(), emittedSuperNum, totalAdjacentEdges, emittedAdjacentEdges,
+         totalDepEdges, emittedDepEdges, totalMembers, emittedMembers);
+  printf("[instrument] summary file: %s\n", reportPath.c_str());
+}
 
 static bool isAlwaysActive(int cppId) {
   return alwaysActive.find(cppId) != alwaysActive.end();
@@ -442,6 +491,8 @@ int graph::genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string
   if (!isAlwaysActive(node->cppId)) {
     emitBodyLock(indent ++, "if(unlikely(%s & 0x%lx)) { // id=%d\n", flagName.c_str(), mask, idx);
   }
+  emitBodyLock(indent, "currentStepActiveSupernodes ++;\n");
+  emitBodyLock(indent, "currentStepActiveMembers += superMemberNum[%d];\n", node->cppId);
   int id;
   uint64_t newMask;
   std::tie(id, newMask) = clearIdxMask(node->cppId);
@@ -692,6 +743,8 @@ void graph::genResetAll() {
 
 void graph::genStep(int subStepIdxMax) {
   emitFuncDecl(0, "void S%s::step() {\n", name.c_str());
+  emitBodyLock(1, "currentStepActiveSupernodes = 0;\n");
+  emitBodyLock(1, "currentStepActiveMembers = 0;\n");
   emitBodyLock(1, "resetAll();\n");
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
@@ -703,6 +756,8 @@ void graph::genStep(int subStepIdxMax) {
   for (int i = 0; i <= subStepIdxMax; i ++) {
     emitBodyLock(1, "subStep%d();\n", i);
   }
+  emitBodyLock(1, "stepActiveSupernodes.push_back(currentStepActiveSupernodes);\n");
+  emitBodyLock(1, "stepActiveMembers.push_back(currentStepActiveMembers);\n");
 
   emitBodyLock(1, "cycles ++;\n");
   emitBodyLock(0, "}\n");
@@ -799,6 +854,7 @@ void graph::cppEmitter() {
       }
     }
   }
+  emitInstrumentationSummary(this, globalConfig.OutputDir, superId);
 
   srcFp = NULL;
   srcFileIdx = 0;
@@ -813,6 +869,11 @@ void graph::cppEmitter() {
   fprintf(header, "uint64_t cycles;\n");
   fprintf(header, "uint64_t LOG_START, LOG_END;\n");
   fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
+  fprintf(header, "uint32_t currentStepActiveSupernodes;\n");
+  fprintf(header, "uint32_t currentStepActiveMembers;\n");
+  fprintf(header, "size_t superMemberNum[%d];\n", superId);
+  fprintf(header, "std::vector<uint32_t> stepActiveSupernodes;\n");
+  fprintf(header, "std::vector<uint32_t> stepActiveMembers;\n");
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
 #if ENABLE_ACTIVATOR
@@ -833,20 +894,29 @@ void graph::cppEmitter() {
   /* initialization */
   emitFuncDecl(0, "void S%s::init() {\n", name.c_str());
   emitBodyLock(1, "activateAll();\n");
+  emitBodyLock(1, "currentStepActiveSupernodes = 0;\n");
+  emitBodyLock(1, "currentStepActiveMembers = 0;\n");
+  emitBodyLock(1, "stepActiveSupernodes.clear();\n");
+  emitBodyLock(1, "stepActiveMembers.clear();\n");
 #ifdef PERF
   emitBodyLock(1, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
   #if ENABLE_ACTIVATOR
   emitBodyLock(1, "for (int i = 0; i < %d; i ++) activator[i] = std::map<int, int>();\n", superId);
   #endif
+#endif
   for (SuperNode* super : sortedSuper) {
     if (super->cppId >= 0) {
+      emitBodyLock(1, "superMemberNum[%d] = %ld;\n", super->cppId, evaluatedMemberCount(super));
+#ifdef PERF
       size_t num = 0;
       for (Node* member : super->member) {
         if (member->anyNextActive()) num ++;
       }
       emitBodyLock(1, "nodeNum[%d] = %ld; // memberNum=%ld\n", super->cppId, num, super->member.size());
+#endif
     }
   }
+#ifdef PERF
   emitBodyLock(1, "for (int i = 0; i < %d; i ++) validActive[i] = 0;\n", superId);
 #endif
   emitBodyLock(0, "#ifdef RANDOMIZE_INIT\n"

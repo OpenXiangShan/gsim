@@ -98,6 +98,51 @@ extern "C" void sd_read(int* data){
 #include DUT_HEADER
 static DUT_NAME* dut;
 
+static void clear_step_activation_stats(DUT_NAME* dut) {
+  dut->currentStepActiveSupernodes = 0;
+  dut->currentStepActiveMembers = 0;
+  dut->stepActiveSupernodes.clear();
+  dut->stepActiveMembers.clear();
+}
+
+static uint32_t percentile_u32(const std::vector<uint32_t>& samples, double percentile) {
+  assert(!samples.empty());
+  std::vector<uint32_t> sorted(samples.begin(), samples.end());
+  std::sort(sorted.begin(), sorted.end());
+  size_t idx = static_cast<size_t>(percentile * (sorted.size() - 1));
+  return sorted[idx];
+}
+
+static void report_step_activation_stats(DUT_NAME* dut) {
+  const auto& superSamples = dut->stepActiveSupernodes;
+  const auto& memberSamples = dut->stepActiveMembers;
+  if (superSamples.empty() || memberSamples.empty()) {
+    printf("[instrument] no post-reset step activation samples\n");
+    return;
+  }
+
+  uint64_t totalActiveSuper = std::accumulate(superSamples.begin(), superSamples.end(), uint64_t{0});
+  uint64_t totalActiveMembers = std::accumulate(memberSamples.begin(), memberSamples.end(), uint64_t{0});
+  auto minmaxSuper = std::minmax_element(superSamples.begin(), superSamples.end());
+  auto minmaxMember = std::minmax_element(memberSamples.begin(), memberSamples.end());
+
+  printf("[instrument] step_samples=%ld\n", superSamples.size());
+  printf("[instrument] active_supernodes_per_step avg=%.2f min=%u p50=%u p90=%u p99=%u max=%u\n",
+         static_cast<double>(totalActiveSuper) / superSamples.size(),
+         *minmaxSuper.first,
+         percentile_u32(superSamples, 0.50),
+         percentile_u32(superSamples, 0.90),
+         percentile_u32(superSamples, 0.99),
+         *minmaxSuper.second);
+  printf("[instrument] active_members_per_step avg=%.2f min=%u p50=%u p90=%u p99=%u max=%u\n",
+         static_cast<double>(totalActiveMembers) / memberSamples.size(),
+         *minmaxMember.first,
+         percentile_u32(memberSamples, 0.50),
+         percentile_u32(memberSamples, 0.90),
+         percentile_u32(memberSamples, 0.99),
+         *minmaxMember.second);
+}
+
 void dut_init(DUT_NAME *dut) {
 #if defined(__DUT_NutShell__)
   dut->set_difftest$$logCtrl$$begin(0);
@@ -254,6 +299,7 @@ int main(int argc, char** argv) {
   memcpy(&dut->DUT_MEMORY, program, program_sz);
   dut_init(dut);
   dut_reset();
+  clear_step_activation_stats(dut);
 #endif
 #ifdef VERILATOR
   ref = new REF_NAME();
@@ -277,6 +323,15 @@ int main(int argc, char** argv) {
   FILE* activeFp = fopen(ACTIVE_FILE, "w");
 #endif
   auto start = std::chrono::system_clock::now();
+  auto exit_main = [&](int code) -> int {
+#ifdef PERF
+    if (activeFp) fclose(activeFp);
+#endif
+#ifdef GSIM
+    report_step_activation_stats(dut);
+#endif
+    return code;
+  };
   while (!dut_end) {
 #if defined(GSIM)
     dut_cycle(1);
@@ -298,7 +353,7 @@ int main(int argc, char** argv) {
       printf("ALL diffs: dut -- ref\n");
       printf("Failed after %ld cycles\n", cycles);
       checkSignals(false);
-      return -1;
+      return exit_main(-1);
     }
 #endif
     if (cycles % (CYCLE_MAX_SIM / (CYCLE_STEP_PERCENT * 100)) == 0 && cycles <= CYCLE_MAX_SIM) {
@@ -335,9 +390,10 @@ int main(int argc, char** argv) {
       }
 #endif
 #if defined(PERF) || defined(PERF_CYCLE)
-      if (cycles >= CYCLE_MAX_PERF) return 0;
+      if (cycles >= CYCLE_MAX_PERF) return exit_main(0);
 #endif
-      if (cycles == CYCLE_MAX_SIM) return 0;
+      if (cycles == CYCLE_MAX_SIM) return exit_main(0);
     }
   }
+  return exit_main(0);
 }
