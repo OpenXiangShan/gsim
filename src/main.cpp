@@ -15,6 +15,18 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#ifndef GSIM_VERSION
+#define GSIM_VERSION "UNKNOWN"
+#endif
+
+#ifndef GSIM_BUILD_DATE
+#define GSIM_BUILD_DATE "UNKNOWN"
+#endif
+
+#ifndef GSIM_CXX_VERSION
+#define GSIM_CXX_VERSION "UNKNOWN"
+#endif
+
 PNode* parseFIR(char *strbuf);
 void preorder_traversal(PNode* root);
 graph* AST2Graph(PNode* root);
@@ -73,10 +85,22 @@ static inline bool shouldDumpStage(const std::string& name) {
 #define FUNC_TIMER(func)         FUNC_WRAPPER_INTERNAL(func, "", false)
 #define FUNC_WRAPPER(func, name) FUNC_WRAPPER_INTERNAL(func, name, true)
 
+static void printVersionBrief() {
+  std::cout << "GSIM " << GSIM_VERSION << "\n";
+}
+
+static void printVersionDetail() {
+  std::cout << "GSIM " << GSIM_VERSION << "\n"
+            << "Build Date: " << GSIM_BUILD_DATE << "\n"
+            << "Build CXX: " << GSIM_CXX_VERSION << "\n";
+}
+
 static void printUsage(const char* ProgName) {
+  printVersionBrief();
   std::cout << "Usage: " << ProgName << " [options] <input file>\n"
             << "Options:\n"
             << "  -h, --help                       Display this help message and exit.\n"
+            << "  -v, --version                    Display version/build information and exit.\n"
             << "      --dump                       Enable dumping of the graph.\n"
             << "      --dir=[dir]                  Specify the output directory.\n"
             << "      --supernode-max-size=[num]   Specify the maximum size of a superNode.\n"
@@ -104,6 +128,7 @@ static char* parseCommandLine(int argc, char** argv) {
 
   enum LongOptionIndex {
     OPT_HELP = 0,
+    OPT_VERSION,
     OPT_DUMP,
     OPT_DIR,
     OPT_SUPER_MAX,
@@ -122,6 +147,7 @@ static char* parseCommandLine(int argc, char** argv) {
 
   const struct option Table[] = {
       {"help", no_argument, nullptr, 'h'},
+      {"version", no_argument, nullptr, 'v'},
       {"dump", no_argument, nullptr, 'd'},
       {"dir", required_argument, nullptr, 0},
       {"supernode-max-size", required_argument, nullptr, 0},
@@ -143,7 +169,7 @@ static char* parseCommandLine(int argc, char** argv) {
   bool explicitDot = false;
   int Option{0};
   int option_index;
-  while ((Option = getopt_long(argc, argv, "-h", Table, &option_index)) != -1) {
+  while ((Option = getopt_long(argc, argv, "-hv", Table, &option_index)) != -1) {
     switch (Option) {
       case 0: switch (option_index) {
                 case OPT_DUMP:
@@ -196,7 +222,6 @@ static char* parseCommandLine(int argc, char** argv) {
                 case OPT_DUMP_CONST_STATUS:
                   globalConfig.DumpConstStatus = true;
                   break;
-                case OPT_HELP:
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }
               break;
@@ -206,6 +231,12 @@ static char* parseCommandLine(int argc, char** argv) {
         globalConfig.DumpGraphDot = true;
         globalConfig.DumpGraphJson = true;
         break;
+      case 'v':
+        printVersionDetail();
+        std::cout.flush();
+        fflush(nullptr);
+        _exit(EXIT_SUCCESS);
+      case 'h':
       default: {
         printUsage(argv[0]);
         std::cout.flush();

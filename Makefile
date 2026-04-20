@@ -145,6 +145,11 @@ GSIM_INC_DIR = include $(PARSER_DIR)/include $(PARSER_BUILD_DIR)
 #    You can force DWARF v4 by building with: make DWARF4=1 ... (see conditional below).
 CXXFLAGS += -ggdb -O3 -MMD $(addprefix -I,$(GSIM_INC_DIR)) -Wall -Werror --std=c++17 -pthread
 
+GSIM_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo UNKNOWN)
+GSIM_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo UNKNOWN)
+GSIM_CXX_VERSION ?= $(shell $(CXX) --version 2>/dev/null | head -n 1 || echo UNKNOWN)
+CXXFLAGS += '-DGSIM_VERSION="$(GSIM_VERSION)"' '-DGSIM_BUILD_DATE="$(GSIM_BUILD_DATE)"' '-DGSIM_CXX_VERSION="$(GSIM_CXX_VERSION)"'
+
 ifeq ($(DWARF4),1)
 	CXXFLAGS += -gdwarf-4
 endif
