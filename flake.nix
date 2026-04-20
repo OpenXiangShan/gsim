@@ -8,13 +8,14 @@
   outputs = { self, nixpkgs, ... }:
     let
       systems = nixpkgs.lib.systems.flakeExposed;
+      version = self.rev or self.dirtyRev or "UNKNOWN";
       perSystem = nixpkgs.lib.genAttrs systems (system:
         let
           pkgs = import nixpkgs { inherit system; };
           llvm = pkgs.llvmPackages_19;
           gsim = llvm.stdenv.mkDerivation {
             pname = "gsim";
-            version = "1.0.0-dev"; # FIXME?
+            version = version;
             src = self;
 
             strictDeps = true;
@@ -33,6 +34,8 @@
             makeFlags = [
               # gsim defaults to /bin/bash, which is not guaranteed in NixOS
               "SHELL=${llvm.stdenv.shell}"
+              # nix builder does not have access to .git, so 'git describe' will fail, we need pass this explicitly
+              "GSIM_VERSION=${version}"
               # override default build target to avoid running tests
               "build-gsim"
             ];
