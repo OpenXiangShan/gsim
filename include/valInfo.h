@@ -85,6 +85,7 @@ public:
     ret->consLength = consLength;
     mpz_set(ret->assignmentCons, assignmentCons);
     ret->sameConstant = sameConstant;
+    ret->directUpdate = directUpdate;
 
     for (int i = beg; i <= end; i ++) {
       if (getMemberInfo(i)) ret->memberInfo.push_back(getMemberInfo(i)->dup());

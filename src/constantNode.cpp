@@ -984,13 +984,18 @@ valInfo* Node::computeRegConstant() {
     if (resetInfo && resetInfo->status == VAL_EMPTY) {
       consMap[this] = new valInfo(width, sign);
     }
-    if ((updateInfo->status == VAL_CONSTANT || updateInfo->sameConstant) && cons_resetConsEq(updateInfo, resetInfo)) {
+    if ((updateInfo->status == VAL_CONSTANT || (updateInfo->sameConstant && updateInfo->directUpdate)) && cons_resetConsEq(updateInfo, resetInfo)) {
       status = CONSTANT_NODE;
-      if (updateInfo->status != VAL_CONSTANT) { // sameConstant
-        updateInfo->status = VAL_CONSTANT;
-        mpz_set(updateInfo->consVal, updateInfo->assignmentCons);
+      valInfo* regConst = new valInfo(width, sign);
+      if (updateInfo->status == VAL_CONSTANT) {
+        mpz_set(regConst->consVal, updateInfo->consVal);
+      } else {
+        mpz_set(regConst->consVal, updateInfo->assignmentCons);
       }
-      consMap[this] = updateInfo;
+      regConst->updateConsVal();
+      consMap[this] = regConst;
+      getDst()->status = CONSTANT_NODE;
+      consMap[getDst()] = regConst;
     } else if (updateInfo->status == VAL_CONSTANT) { // dst is constant but not equals to reset val
       Assert(resetTree->getRoot()->opType == OP_RESET, "invalid tree");
       if (reset == ASYRESET) {
@@ -1090,6 +1095,10 @@ valInfo* Node::computeConstant() {
               name.c_str(), ret->status, __LINE__);
     }
     ret->setConstantByStr("0");
+  }
+  if (assignTree.size() > 1 && ret->directUpdate) {
+    ret = ret->dup();
+    ret->directUpdate = false;
   }
   if (ret->status == VAL_CONSTANT) {
     status = CONSTANT_NODE;

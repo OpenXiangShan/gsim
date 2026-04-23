@@ -1,6 +1,29 @@
 name: ci
 on: [push, pull_request]
 jobs:
+  fir-regression:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make g++ flex bison libfl-dev libgmp-dev
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+            version: "20.1.4"
+      - name: Build gsim
+        run: |
+          make -j "$(nproc)" build-gsim
+      - name: Run FIR regression tests
+        run: |
+          # Auto-discover and run all minimized FIR regression inputs in test/*.fir.
+          # This currently includes the reproducer from issue #106.
+          make FIR_TEST_TIMEOUT=2m fir-tests
+
   difftest:
     runs-on: ubuntu-24.04
     strategy:
