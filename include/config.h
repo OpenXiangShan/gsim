@@ -5,9 +5,11 @@ struct Config {
   bool EnableDumpGraph;
   bool DumpGraphDot;
   bool DumpGraphJson;
+  bool DumpGraphStats;
   bool DumpAssignTree;
   bool DumpConstStatus;
   std::string OutputDir;
+  std::string StopAfterStage;
   int SuperNodeMaxSize;
   uint32_t cppMaxSizeKB;
   std::string sep_module;

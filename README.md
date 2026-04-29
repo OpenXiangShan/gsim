@@ -28,9 +28,10 @@ GSIM accepts chirrtl, and compiles it to C++
 ## Debug logs & dumps
 
 + By default `gsim` runs quietly (`LogLevel=0`, dump disabled). Enable lightweight stage logs with `--log-level=1` (prints pass begin/end). Use `--log-level=2` for verbose constant-analysis traces; expect a lot more stderr.
-+ Graph dumps: `--dump` turns on both DOT and JSON dumps for every stage; `--dump-json` / `--dump-dot` turn on a single format. Combine with `--dump-stages=a,b,c` to limit which stages emit (e.g., `AfterSplitNodes,ConstantAnalysis`). Set `--dir=tmp-out/gsim-dumps` to choose the output directory.
++ Graph dumps: `--dump` turns on both DOT and JSON dumps for every stage; `--dump-json` / `--dump-dot` turn on a single format. `--dump-stats-json` writes a compact per-stage summary with node / edge / expNode counts and histograms. Combine with `--dump-stages=a,b,c` to limit which stages emit (e.g., `Init,AfterSplitNodes`). Set `--dir=tmp-out/gsim-dumps` to choose the output directory.
++ `--stop-after-stage=<name>` stops the pipeline at a stage boundary, which is useful when you only want IR stats without paying for later passes or C++ emission.
 + Extra debugging artifacts: `--dump-assign-tree` includes assignTree structure in JSON dumps; `--dump-const-status` writes `<name>_<stage>_ConstStatus.json` with per-node constant-analysis status.
-+ Example: `build/gsim/gsim --dir tmp-out/gsim-dumps --dump --dump-stages=AfterSplitNodes,ConstantAnalysis --dump-assign-tree --log-level=1 ready-to-run/TestHarness-rocket.fir`
++ Example: `build/gsim/gsim --dir tmp-out/gsim-dumps --dump-stats-json --dump-stages=Init --stop-after-stage=Init --log-level=1 ready-to-run/TestHarness-rocket.fir`
 
 
 ## Papers and Presentations

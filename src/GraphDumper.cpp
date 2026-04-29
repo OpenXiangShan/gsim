@@ -1,8 +1,32 @@
 #include "common.h"
 #include <set>
 #include <map>
+#include <stack>
+#include <unordered_set>
 #include <vector>
 #include <unordered_map>
+
+static std::vector<const Node*> collectGraphNodes(const graph* g) {
+  std::vector<const Node*> nodes;
+  if (!g->sortedSuper.empty()) {
+    for (const SuperNode* super : g->sortedSuper) {
+      for (const Node* node : super->member) nodes.push_back(node);
+    }
+    return nodes;
+  }
+  if (!g->allNodes.empty()) {
+    nodes.reserve(g->allNodes.size());
+    for (const Node* node : g->allNodes) nodes.push_back(node);
+    return nodes;
+  }
+  std::unordered_set<const Node*> visited;
+  for (const SuperNode* super : g->supersrc) {
+    for (const Node* node : super->member) {
+      if (visited.insert(node).second) nodes.push_back(node);
+    }
+  }
+  return nodes;
+}
 
 class GraphDumper {
  public:
@@ -170,28 +194,38 @@ static const char* opTypeToStr(OPType t) {
   }
 }
 
+static std::string nodeStatusToStr(NodeStatus status) {
+  switch (status) {
+    case VALID_NODE: return "VALID_NODE";
+    case DEAD_NODE: return "DEAD_NODE";
+    case CONSTANT_NODE: return "CONSTANT_NODE";
+    case REPLICATION_NODE: return "REPLICATION_NODE";
+    case SPLITTED_NODE: return "SPLITTED_NODE";
+    case EMPTY_REG: return "EMPTY_REG";
+    default: return "NODE_STATUS_UNKNOWN";
+  }
+}
+
 class GraphJsonDumper {
  public:
   GraphJsonDumper(std::ostream& os) : os(os) {}
   void dump(const graph* g) {
-    const auto& supers = g->sortedSuper.empty() ? g->supersrc : g->sortedSuper;
+    const std::vector<const Node*> nodes = collectGraphNodes(g);
     std::set<std::pair<std::string, std::string>> edges;
     os << "{\n  \"nodes\": [\n";
     bool firstNode = true;
-    for (const SuperNode* super : supers) {
-      for (const Node* node : super->member) {
-        if (!firstNode) os << ",\n";
-        firstNode = false;
-        os << "    {\"name\": \"" << jsonEscape(node->name) << "\", "
-           << "\"type\": \"" << nodeTypeToStr(node->type) << "\", "
-           << "\"super\": " << super->id;
-        if (globalConfig.DumpAssignTree) {
-          os << ", \"assignTrees\": ";
-          dumpAssignTrees(node);
-        }
-        os << "}";
-        for (const Node* next : node->next) edges.insert({node->name, next->name});
+    for (const Node* node : nodes) {
+      if (!firstNode) os << ",\n";
+      firstNode = false;
+      os << "    {\"name\": \"" << jsonEscape(node->name) << "\", "
+         << "\"type\": \"" << nodeTypeToStr(node->type) << "\", "
+         << "\"super\": " << (node->super ? node->super->id : -1);
+      if (globalConfig.DumpAssignTree) {
+        os << ", \"assignTrees\": ";
+        dumpAssignTrees(node);
       }
+      os << "}";
+      for (const Node* next : node->next) edges.insert({node->name, next->name});
     }
     os << "\n  ],\n  \"edges\": [\n";
     bool firstEdge = true;
@@ -287,6 +321,124 @@ class GraphJsonDumper {
   std::ostream& os;
 };
 
+class GraphStatsJsonDumper {
+ public:
+  GraphStatsJsonDumper(std::ostream& os) : os(os) {}
+
+  void dump(const graph* g) {
+    const std::vector<const Node*> nodes = collectGraphNodes(g);
+    std::map<std::string, size_t> nodeTypes;
+    std::map<std::string, size_t> nodeStatuses;
+    std::map<std::string, size_t> treeSlots;
+    std::map<std::string, size_t> enodeOps;
+    std::map<std::string, size_t> nodeRefTargetTypes;
+    std::unordered_set<const ENode*> visited;
+    std::unordered_set<const SuperNode*> uniqueSupers;
+    size_t nodeCount = 0;
+    size_t edgeCount = 0;
+    size_t depEdgeCount = 0;
+    size_t treeCount = 0;
+    size_t treeRootCount = 0;
+    size_t treeLvalueCount = 0;
+    size_t enodeEdgeCount = 0;
+    size_t nodeRefCount = 0;
+    size_t intConstCount = 0;
+    size_t maxChildren = 0;
+
+    auto collectENode = [&](const ENode* root) {
+      if (!root) return;
+      std::stack<const ENode*> stack;
+      stack.push(root);
+      while (!stack.empty()) {
+        const ENode* cur = stack.top();
+        stack.pop();
+        if (!cur) continue;
+        if (!visited.insert(cur).second) continue;
+        maxChildren = std::max(maxChildren, cur->child.size());
+        enodeEdgeCount += cur->child.size();
+        if (cur->nodePtr) {
+          nodeRefCount ++;
+          nodeRefTargetTypes[nodeTypeToStr(cur->nodePtr->type)] ++;
+        } else {
+          enodeOps[opTypeToStr(cur->opType)] ++;
+          if (cur->opType == OP_INT) intConstCount ++;
+        }
+        for (const ENode* child : cur->child) stack.push(child);
+      }
+    };
+
+    auto collectTree = [&](const ExpTree* tree, const char* slot) {
+      if (!tree) return;
+      treeSlots[slot] ++;
+      treeCount ++;
+      if (tree->getRoot()) {
+        treeRootCount ++;
+        collectENode(tree->getRoot());
+      }
+      if (tree->getlval()) {
+        treeLvalueCount ++;
+        collectENode(tree->getlval());
+      }
+    };
+
+    for (const Node* node : nodes) {
+      nodeCount ++;
+      if (node->super) uniqueSupers.insert(node->super);
+      nodeTypes[nodeTypeToStr(node->type)] ++;
+      nodeStatuses[nodeStatusToStr(node->status)] ++;
+      edgeCount += node->next.size();
+      depEdgeCount += node->depNext.size();
+      for (const ExpTree* tree : node->assignTree) collectTree(tree, "assignTree");
+      collectTree(node->valTree, "valTree");
+      collectTree(node->resetTree, "resetTree");
+      collectTree(node->resetCond, "resetCond");
+      collectTree(node->resetVal, "resetVal");
+      collectTree(node->memTree, "memTree");
+    }
+
+    os << "{\n"
+       << "  \"graph\": \"" << jsonEscape(g->name) << "\",\n"
+       << "  \"supernode_count\": " << uniqueSupers.size() << ",\n"
+       << "  \"node_count\": " << nodeCount << ",\n"
+       << "  \"edge_count\": " << edgeCount << ",\n"
+       << "  \"dep_edge_count\": " << depEdgeCount << ",\n"
+       << "  \"node_types\": ";
+    dumpMap(nodeTypes);
+    os << ",\n  \"node_status\": ";
+    dumpMap(nodeStatuses);
+    os << ",\n  \"tree_slots\": ";
+    dumpMap(treeSlots);
+    os << ",\n  \"expnodes\": {\n"
+       << "    \"tree_count\": " << treeCount << ",\n"
+       << "    \"tree_root_count\": " << treeRootCount << ",\n"
+       << "    \"tree_lvalue_count\": " << treeLvalueCount << ",\n"
+       << "    \"unique_count\": " << visited.size() << ",\n"
+       << "    \"edge_count\": " << enodeEdgeCount << ",\n"
+       << "    \"max_children\": " << maxChildren << ",\n"
+       << "    \"node_ref_count\": " << nodeRefCount << ",\n"
+       << "    \"int_const_count\": " << intConstCount << ",\n"
+       << "    \"op_types\": ";
+    dumpMap(enodeOps);
+    os << ",\n    \"node_ref_target_types\": ";
+    dumpMap(nodeRefTargetTypes);
+    os << "\n  }\n}\n";
+  }
+
+ private:
+  void dumpMap(const std::map<std::string, size_t>& values) {
+    os << "{";
+    bool first = true;
+    for (const auto& it : values) {
+      if (!first) os << ", ";
+      first = false;
+      os << "\"" << jsonEscape(it.first) << "\": " << it.second;
+    }
+    os << "}";
+  }
+
+  std::ostream& os;
+};
+
 void graph::dump(std::string FileName) {
   std::string prefix = globalConfig.OutputDir + "/" + this->name + "_" + FileName;
   if (globalConfig.DumpGraphDot) {
@@ -296,5 +448,9 @@ void graph::dump(std::string FileName) {
   if (globalConfig.DumpGraphJson) {
     std::ofstream ofs(prefix + ".json");
     GraphJsonDumper(ofs).dump(this);
+  }
+  if (globalConfig.DumpGraphStats) {
+    std::ofstream ofs(prefix + "_Stats.json");
+    GraphStatsJsonDumper(ofs).dump(this);
   }
 }

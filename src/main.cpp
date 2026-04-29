@@ -36,9 +36,11 @@ Config::Config() {
   EnableDumpGraph = false;
   DumpGraphDot = false;
   DumpGraphJson = false;
+  DumpGraphStats = false;
   DumpAssignTree = false;
   DumpConstStatus = false;
   OutputDir = ".";
+  StopAfterStage.clear();
   SuperNodeMaxSize = 35;
   cppMaxSizeKB = -1;
   sep_module = "$";
@@ -63,6 +65,15 @@ static inline bool shouldDumpStage(const std::string& name) {
   return globalConfig.DumpStages.empty() || globalConfig.DumpStages.count(name);
 }
 
+static inline bool shouldStopAfterStage(const std::string& name) {
+  return !globalConfig.StopAfterStage.empty() && globalConfig.StopAfterStage == name;
+}
+
+static inline bool handleStageBoundary(graph* g, const std::string& name, int& dumpIdx) {
+  if (globalConfig.EnableDumpGraph && shouldDumpStage(name)) g->dump(std::to_string(dumpIdx ++) + name);
+  return shouldStopAfterStage(name);
+}
+
 
 #define FUNC_WRAPPER_INTERNAL(func, name, dumpCond) \
   do { \
@@ -79,7 +90,7 @@ static inline bool shouldDumpStage(const std::string& name) {
       fprintf(stderr, "[GSIM] %s done\n", name); \
       fflush(stderr); \
     } \
-    if (dumpCond && globalConfig.EnableDumpGraph && shouldDumpStage(name)) g->dump(std::to_string(dumpIdx ++) + name); \
+    if (dumpCond && handleStageBoundary(g, name, dumpIdx)) return 0; \
   } while(0)
 
 #define FUNC_TIMER(func)         FUNC_WRAPPER_INTERNAL(func, "", false)
@@ -112,7 +123,9 @@ static void printUsage(const char* ProgName) {
             << "      --log-level=[0|1|2]          Verbosity for additional logs.\n"
             << "      --dump-json                  Dump graphs in JSON (disable dot unless --dump-dot is also set).\n"
             << "      --dump-dot                   Dump graphs in DOT (disable json unless --dump-json is also set).\n"
+            << "      --dump-stats-json            Dump compact graph/node/expnode statistics in JSON.\n"
             << "      --dump-stages=a,b,c          Dump only the listed stages (e.g., Init,TopoSort,AliasAnalysis).\n"
+            << "      --stop-after-stage=[name]    Stop after the named stage boundary.\n"
             << "      --dump-assign-tree           Include assignTree structure in JSON dump (can be large).\n"
             << "      --dump-const-status          Dump per-node constant-analysis status before removing constants.\n"
             ;
@@ -140,7 +153,9 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_LOG_LEVEL,
     OPT_DUMP_JSON,
     OPT_DUMP_DOT,
+    OPT_DUMP_STATS_JSON,
     OPT_DUMP_STAGES,
+    OPT_STOP_AFTER_STAGE,
     OPT_DUMP_ASSIGN_TREE,
     OPT_DUMP_CONST_STATUS,
   };
@@ -159,7 +174,9 @@ static char* parseCommandLine(int argc, char** argv) {
       {"log-level", required_argument, nullptr, 0},
       {"dump-json", no_argument, nullptr, 0},
       {"dump-dot", no_argument, nullptr, 0},
+      {"dump-stats-json", no_argument, nullptr, 0},
       {"dump-stages", required_argument, nullptr, 0},
+      {"stop-after-stage", required_argument, nullptr, 0},
       {"dump-assign-tree", no_argument, nullptr, 0},
       {"dump-const-status", no_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
@@ -215,6 +232,13 @@ static char* parseCommandLine(int argc, char** argv) {
                 case OPT_DUMP_STAGES:
                   globalConfig.EnableDumpGraph = true;
                   globalConfig.DumpStages = parseStageList(optarg);
+                  break;
+                case OPT_DUMP_STATS_JSON:
+                  globalConfig.EnableDumpGraph = true;
+                  globalConfig.DumpGraphStats = true;
+                  break;
+                case OPT_STOP_AFTER_STAGE:
+                  globalConfig.StopAfterStage = optarg;
                   break;
                 case OPT_DUMP_ASSIGN_TREE:
                   globalConfig.DumpAssignTree = true;
@@ -287,22 +311,27 @@ int main(int argc, char** argv) {
   FUNC_WRAPPER(g = AST2Graph(globalRoot), "Init");
 
   FUNC_TIMER(g->splitArray());
+  if (handleStageBoundary(g, "SplitArray", dumpIdx)) return 0;
 
   FUNC_TIMER(g->detectLoop());
+  if (handleStageBoundary(g, "DetectLoop", dumpIdx)) return 0;
 
   FUNC_WRAPPER(g->topoSort(), "TopoSort");
 
   FUNC_TIMER(g->inferAllWidth());
+  if (handleStageBoundary(g, "InferAllWidth", dumpIdx)) return 0;
 
   FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
 
   FUNC_WRAPPER(g->exprOpt(), "ExprOpt");
 
   FUNC_TIMER(g->usedBits());
+  if (handleStageBoundary(g, "UsedBits", dumpIdx)) return 0;
 
   FUNC_TIMER(g->splitNodes());
+  if (handleStageBoundary(g, "SplitNodes", dumpIdx)) return 0;
 
-  if (globalConfig.EnableDumpGraph && shouldDumpStage("AfterSplitNodes")) g->dump(std::to_string(dumpIdx ++) + "AfterSplitNodes");
+  if (handleStageBoundary(g, "AfterSplitNodes", dumpIdx)) return 0;
 
   FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes1");
 
@@ -326,8 +355,10 @@ int main(int argc, char** argv) {
 
   // FUNC_WRAPPER(g->constructRegs(), "ConstructRegs");
   FUNC_TIMER(g->generateStmtTree());
+  if (handleStageBoundary(g, "GenerateStmtTree", dumpIdx)) return 0;
 
   FUNC_TIMER(g->instsGenerator());
+  if (handleStageBoundary(g, "InstsGenerator", dumpIdx)) return 0;
 
   FUNC_WRAPPER(g->cppEmitter(), "Final");
 

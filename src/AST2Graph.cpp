@@ -6,6 +6,7 @@
 #include "common.h"
 #include <stack>
 #include <map>
+#include <algorithm>
 #include <utility>
 
 /* check the node type and children num */
@@ -1682,6 +1683,13 @@ graph* AST2Graph(PNode* root) {
 #ifdef ORDERED_TOPO_SORT
   std::sort(g->supersrc.begin(), g->supersrc.end(), [](SuperNode* a, SuperNode* b) {return a->id < b->id;});
 #endif
+  g->allNodes.reserve(allSignals.size());
+  for (const auto& entry : allSignals) {
+    g->allNodes.push_back(entry.second);
+  }
+  std::sort(g->allNodes.begin(), g->allNodes.end(), [](const Node* a, const Node* b) {
+    return a->id < b->id;
+  });
   return g;
 }
 
