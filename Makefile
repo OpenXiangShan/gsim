@@ -158,6 +158,7 @@ GSIM_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo
 GSIM_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo UNKNOWN)
 GSIM_CXX_VERSION ?= $(shell $(CXX) --version 2>/dev/null | head -n 1 || echo UNKNOWN)
 CXXFLAGS += '-DGSIM_VERSION="$(GSIM_VERSION)"' '-DGSIM_BUILD_DATE="$(GSIM_BUILD_DATE)"' '-DGSIM_CXX_VERSION="$(GSIM_CXX_VERSION)"'
+CXXFLAGS += '-DGSIM_INCLUDE_DIR="$(abspath include)"'
 
 ifeq ($(DWARF4),1)
 	CXXFLAGS += -gdwarf-4
@@ -253,8 +254,15 @@ EMU_MAIN_SRCS = emu/emu-checkpoint.cpp emu/support/compress.cpp
 else
 EMU_MAIN_SRCS = emu/emu.cpp
 endif
-EMU_GEN_SRCS = $(shell find $(GEN_CPP_DIR) -name "*.cpp" 2> /dev/null)
-EMU_SRCS += emu/gsim_fst_impl.cpp
+EMU_GEN_SRCS := $(shell find $(GEN_CPP_DIR) -name "*.cpp" 2> /dev/null)
+EMU_GEN_FST_IMPL_SRC := $(firstword $(filter %/gsim_fst_impl.cpp,$(EMU_GEN_SRCS)))
+ifeq ($(EMU_GEN_FST_IMPL_SRC),)
+EMU_FST_IMPL_SRC = emu/gsim_fst_impl.cpp
+else
+EMU_FST_IMPL_SRC = $(EMU_GEN_FST_IMPL_SRC)
+endif
+EMU_GEN_SRCS := $(filter-out %/gsim_fst_impl.cpp,$(EMU_GEN_SRCS))
+EMU_SRCS += $(EMU_FST_IMPL_SRC)
 EMU_SRCS += $(EMU_MAIN_SRCS) $(EMU_GEN_SRCS)
 
 EMU_CFLAGS := -O1 -MMD $(addprefix -I, $(abspath $(GEN_CPP_DIR))) -I$(abspath include) $(EMU_CFLAGS) # allow to overwrite optimization level
@@ -270,6 +278,9 @@ endif
 
 $(foreach x, $(EMU_SRCS), $(eval \
 	$(call CXX_TEMPLATE, $(EMU_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(EMU_CFLAGS), EMU_OBJS,)))
+
+$(GEN_CPP_DIR)/gsim_fst_impl.cpp: $(GEN_CPP_DIR)/$(NAME)0.cpp
+	@:
 
 $(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS) $(EMU_LDFLAGS)))
 

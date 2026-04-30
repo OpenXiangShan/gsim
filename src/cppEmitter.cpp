@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <fstream>
 #include <map>
 #include <string>
 #include <utility>
@@ -42,9 +43,35 @@ static std::map<Node*, std::pair<int, int>> super2ResetId;  // uint & async rese
 static std::vector<Node*> fstWaveNodes;
 static std::set<Node*> fstWaveNodeSet;
 
+#ifndef GSIM_INCLUDE_DIR
+#define GSIM_INCLUDE_DIR "."
+#endif
+
 extern int maxConcatNum;
 bool nameExist(std::string str);
 static int resetFuncNum = 0;
+
+static void copySupportFile(const std::string& src, const std::string& dst) {
+  std::ifstream in(src, std::ios::binary);
+  assert(in.is_open());
+  std::ofstream out(dst, std::ios::binary);
+  assert(out.is_open());
+  out << in.rdbuf();
+  out.flush();
+  assert(out.good());
+}
+
+static void emitWaveformSupportFiles() {
+  const std::string supportDir = globalConfig.OutputDir;
+  copySupportFile(std::string(GSIM_INCLUDE_DIR) + "/gsimFst.h", supportDir + "/gsimFst.h");
+
+  std::ofstream impl(supportDir + "/gsim_fst_impl.cpp", std::ios::binary);
+  assert(impl.is_open());
+  impl << "#define GSIM_FST_IMPL 1\n"
+       << "#include \"gsimFst.h\"\n";
+  impl.flush();
+  assert(impl.good());
+}
 
 static bool isAlwaysActive(int cppId) {
   return alwaysActive.find(cppId) != alwaysActive.end();
@@ -1033,6 +1060,7 @@ void graph::cppEmitter() {
   srcFp = NULL;
   srcFileIdx = 0;
 
+  emitWaveformSupportFiles();
   FILE* header = genHeaderStart();
 #ifdef DIFFTEST_PER_SIG
   sigFile = fopen((globalConfig.OutputDir + "/" + name + "_sigs.txt").c_str(), "w");
@@ -1040,6 +1068,7 @@ void graph::cppEmitter() {
 
   /* class start*/
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
+  fprintf(header, "static constexpr bool kTraceFstCompiled = %s;\n", globalConfig.TraceFst ? "true" : "false");
   fprintf(header, "uint64_t cycles;\n");
   fprintf(header, "uint64_t LOG_START, LOG_END;\n");
   fprintf(header, "uint64_t fstCycleBase;\n");
