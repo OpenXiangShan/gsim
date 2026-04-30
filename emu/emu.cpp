@@ -162,6 +162,10 @@ void dut_hook(DUT_NAME *dut) {
 static void maybe_enable_waveform(DUT_NAME *dut) {
   const char* env_enable = std::getenv("GSIM_ENABLE_WAVEFORM");
   if (env_enable == nullptr || env_enable[0] == '0') return;
+  if (!DUT_NAME::kTraceFstCompiled) {
+    fprintf(stderr, "[gsim] warning: waveform requested, but the model was generated without --trace-fst; ignore request\n");
+    return;
+  }
   const char* env_path = std::getenv("GSIM_WAVEFORM_PATH");
   waveform_path = env_path ? std::string(env_path) : std::string("waveform.fst");
   dut->setWaveformPath(waveform_path);
