@@ -10,7 +10,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make g++ flex bison libfl-dev libgmp-dev
+          sudo apt-get install -y make g++ flex bison libfl-dev libgmp-dev zlib1g-dev
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
@@ -39,7 +39,7 @@ jobs:
           python-version: 3.x
       - name: Install dependencies
         run: |
-          sudo apt install -y flex bison libfl-dev
+          sudo apt install -y flex bison libfl-dev zlib1g-dev
       # Since ubuntu 2404 doesn't comes with llvm >= 19
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
@@ -82,7 +82,7 @@ jobs:
           python-version: 3.x
       - name: Install dependencies
         run: |
-          sudo apt install -y flex bison libfl-dev
+          sudo apt install -y flex bison libfl-dev zlib1g-dev
       # Since ubuntu 2404 doesn't comes with llvm >= 19
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2

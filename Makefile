@@ -315,10 +315,10 @@ VERI_BIN = $(WORK_DIR)/V$(NAME)
 VERI_GEN_MK = $(VERI_BUILD_DIR)/V$(NAME).mk
 
 VERI_CFLAGS = $(call escape_quote,$(EMU_CFLAGS) $(CFLAGS_REF))
-VERI_LDFLAGS = -O1
+VERI_LDFLAGS = -O1 -lz
 VERI_VFLAGS = --top $(NAME) -Wno-lint -j 8 --cc --exe +define+RANDOMIZE_GARBAGE_ASSIGN --max-num-width 1048576 --compiler clang
 ifeq ($(SIMPOINT),1)
-VERI_LDFLAGS += -lz -lzstd
+VERI_LDFLAGS += -lzstd
 endif
 VERI_VFLAGS += -Mdir $(VERI_BUILD_DIR) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)"
 VERI_VFLAGS += $(VERI_THREADS)
