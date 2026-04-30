@@ -325,14 +325,14 @@ VERI_VFLAGS += $(VERI_THREADS)
 #VERI_VFLAGS += --trace-fst
 
 VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
-VERI_CSRCS-2 = $(EMU_GEN_SRCS)
+VERI_CSRCS-2 = $(EMU_FST_IMPL_SRC) $(EMU_GEN_SRCS)
 
 $(VERI_GEN_MK): $(VERI_VSRCS) $(VERI_CSRCS-$(MODE)) | $(EMU_MAIN_SRCS)
 	@mkdir -p $(@D)
 	verilator $(VERI_VFLAGS) $(abspath $^ $|)
 
 $(VERI_BIN): | $(VERI_GEN_MK)
-	$(TIME) $(MAKE) OPT_FAST="-O1" CXX=clang++ -s -C $(VERI_BUILD_DIR) -f $(abspath $|)
+	$(TIME) $(MAKE) OPT_FAST="-O1" CXX=$(CXX) -s -C $(VERI_BUILD_DIR) -f $(abspath $|)
 	ln -sf $(abspath $(VERI_BUILD_DIR)/V$(NAME)) $@
 
 compile-veri: $(VERI_GEN_MK)
