@@ -1,6 +1,7 @@
 #include <iostream>
 #include <time.h>
 #include <cstring>
+#include <cstdio>
 #include <cassert>
 #include <vector>
 #include <numeric>
@@ -8,44 +9,73 @@
 #include <fstream>
 #include <csignal>
 #include <chrono>
+#include <cstdlib>
+#include <string>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifdef GSIM
+#include "gsimFst.h"
+#endif
 
 #define CYCLE_STEP_PERCENT 1
 
 #if defined(__DUT_ysyx3__)
 #define DUT_MEMORY mem$ram
 #define REF_MEMORY newtop__DOT__mem__DOT__ram_ext__DOT__Memory
+#ifndef CYCLE_MAX_PERF
 #define CYCLE_MAX_PERF 5000000
+#endif
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  11000000
+#endif
 #elif defined(__DUT_NutShell__)
 #define DUT_MEMORY mem$rdata_mem$mem
 #define REF_MEMORY SimTop__DOT__mem__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
+#ifndef CYCLE_MAX_PERF
 #define CYCLE_MAX_PERF 50000000
+#endif
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  250000000
+#endif
 #elif defined(__DUT_rocket__)
 #define DUT_MEMORY mem$srams$mem
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
+#ifndef CYCLE_MAX_PERF
 #define CYCLE_MAX_PERF 2000000
+#endif
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  4200000
+#endif
 #elif defined(__DUT_large_boom__) || defined(__DUT_small_boom__)
 #define DUT_MEMORY mem$srams$mem
 #define REF_MEMORY TestHarness__DOT__mem__DOT__srams__DOT__mem_ext__DOT__Memory
+#ifndef CYCLE_MAX_PERF
 #define CYCLE_MAX_PERF 1000000
+#endif
 #ifdef __DUT_large_boom__
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  3900000
+#endif
 #else
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  5400000
+#endif
 #endif
 #elif defined(__DUT_minimal_xiangshan__) || defined(__DUT_default_xiangshan__)
 #define DUT_MEMORY memory$ram$rdata_mem$mem
 #define REF_MEMORY SimTop__DOT__memory__DOT__ram__DOT__rdata_mem__DOT__mem_ext__DOT__Memory
+#ifndef CYCLE_MAX_PERF
 #define CYCLE_MAX_PERF 500000
+#endif
 #ifdef __DUT_default_xiangshan__
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  1900000
+#endif
 #else
+#ifndef CYCLE_MAX_SIM
 #define CYCLE_MAX_SIM  3400000
+#endif
 #endif
 
 // unused blackbox
@@ -97,6 +127,8 @@ extern "C" void sd_read(int* data){
 #if defined(GSIM)
 #include DUT_HEADER
 static DUT_NAME* dut;
+static bool waveform_enabled = false;
+static std::string waveform_path;
 
 void dut_init(DUT_NAME *dut) {
 #if defined(__DUT_NutShell__)
@@ -126,6 +158,28 @@ void dut_hook(DUT_NAME *dut) {
   }
 #endif
 }
+
+static void maybe_enable_waveform(DUT_NAME *dut) {
+  const char* env_enable = std::getenv("GSIM_ENABLE_WAVEFORM");
+  if (env_enable == nullptr || env_enable[0] == '0') return;
+  if (!DUT_NAME::kTraceFstCompiled) {
+    fprintf(stderr, "[gsim] warning: waveform requested, but the model was generated without --trace-fst; ignore request\n");
+    return;
+  }
+  const char* env_path = std::getenv("GSIM_WAVEFORM_PATH");
+  waveform_path = env_path ? std::string(env_path) : std::string("waveform.fst");
+  dut->setWaveformPath(waveform_path);
+  dut->enableWaveform();
+  waveform_enabled = true;
+}
+
+static void flush_waveform_if_needed() {
+  if (waveform_enabled && dut) {
+    dut->flushWaveform();
+  }
+}
+#else
+static inline void flush_waveform_if_needed() {}
 #endif
 
 #if defined(VERILATOR)
@@ -248,11 +302,17 @@ bool checkSignals(bool display) {
 #endif
 
 int main(int argc, char** argv) {
+  // Force immediate flushing even when stdout/stderr are piped (e.g. via tee).
+  std::cout.setf(std::ios::unitbuf);
+  std::cerr.setf(std::ios::unitbuf);
+  setvbuf(stdout, nullptr, _IOLBF, 0);
+  setvbuf(stderr, nullptr, _IOLBF, 0);
   load_program(argv[1]);
 #ifdef GSIM
   dut = new DUT_NAME();
   memcpy(&dut->DUT_MEMORY, program, program_sz);
   dut_init(dut);
+  maybe_enable_waveform(dut);
   dut_reset();
 #endif
 #ifdef VERILATOR
@@ -298,6 +358,7 @@ int main(int argc, char** argv) {
       printf("ALL diffs: dut -- ref\n");
       printf("Failed after %ld cycles\n", cycles);
       checkSignals(false);
+      flush_waveform_if_needed();
       return -1;
     }
 #endif
@@ -335,9 +396,29 @@ int main(int argc, char** argv) {
       }
 #endif
 #if defined(PERF) || defined(PERF_CYCLE)
-      if (cycles >= CYCLE_MAX_PERF) return 0;
+      if (cycles >= CYCLE_MAX_PERF) {
+        flush_waveform_if_needed();
+        return 0;
+      }
 #endif
-      if (cycles == CYCLE_MAX_SIM) return 0;
+      if (cycles == CYCLE_MAX_SIM) {
+        flush_waveform_if_needed();
+        return 0;
+      }
     }
   }
+  flush_waveform_if_needed();
+#if defined(GSIM)
+  if (dut) {
+    /* Explicitly close FST to ensure profiling dump is printed */
+    if (dut->fstCtx) {
+      fstWriterFlushContext(dut->fstCtx);
+      fstWriterClose(dut->fstCtx);
+      dut->fstCtx = nullptr;
+    }
+    delete dut;
+    dut = nullptr;
+  }
+#endif
+  return 0;
 }

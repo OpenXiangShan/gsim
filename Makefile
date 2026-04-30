@@ -8,6 +8,9 @@ mainargs ?= ready-to-run/bin/linux.bin
 # uncomment this line to let this file be part of dependency of each .o file
 THIS_MAKEFILE = Makefile
 
+WAVEFORM ?= 0
+WAVEFORM_PATH ?= $(WORK_DIR)/waveform.fst
+
 ifeq ($(dutName),ysyx3)
 	NAME ?= newtop
 	TEST_FILE = $(NAME)-ysyx3
@@ -59,6 +62,12 @@ include mk/toolchain.mk
 SHELL := /bin/bash
 TIME = /usr/bin/time
 LOG_FILE = $(WORK_DIR)/$(dutName).log
+WAVE_LOG_FILE = $(WORK_DIR)/$(dutName)-wave.log
+EMU_RUN_ENV :=
+ifeq ($(WAVEFORM),1)
+GSIM_FLAGS_EXTRA += --trace-fst
+EMU_RUN_ENV += GSIM_ENABLE_WAVEFORM=1 GSIM_WAVEFORM_PATH=$(WAVEFORM_PATH)
+endif
 
 CFLAGS_DUT = -DDUT_NAME=S$(NAME) -DDUT_HEADER=\"$(NAME).h\" -D__DUT_$(shell echo $(dutName) | tr - _)__
 
@@ -149,6 +158,7 @@ GSIM_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo
 GSIM_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo UNKNOWN)
 GSIM_CXX_VERSION ?= $(shell $(CXX) --version 2>/dev/null | head -n 1 || echo UNKNOWN)
 CXXFLAGS += '-DGSIM_VERSION="$(GSIM_VERSION)"' '-DGSIM_BUILD_DATE="$(GSIM_BUILD_DATE)"' '-DGSIM_CXX_VERSION="$(GSIM_CXX_VERSION)"'
+CXXFLAGS += '-DGSIM_INCLUDE_DIR="$(abspath include)"'
 
 ifeq ($(DWARF4),1)
 	CXXFLAGS += -gdwarf-4
@@ -244,12 +254,21 @@ EMU_MAIN_SRCS = emu/emu-checkpoint.cpp emu/support/compress.cpp
 else
 EMU_MAIN_SRCS = emu/emu.cpp
 endif
-EMU_GEN_SRCS = $(shell find $(GEN_CPP_DIR) -name "*.cpp" 2> /dev/null)
+EMU_GEN_SRCS := $(shell find $(GEN_CPP_DIR) -name "*.cpp" 2> /dev/null)
+EMU_GEN_FST_IMPL_SRC := $(firstword $(filter %/gsim_fst_impl.cpp,$(EMU_GEN_SRCS)))
+ifeq ($(EMU_GEN_FST_IMPL_SRC),)
+EMU_FST_IMPL_SRC = emu/gsim_fst_impl.cpp
+else
+EMU_FST_IMPL_SRC = $(EMU_GEN_FST_IMPL_SRC)
+endif
+EMU_GEN_SRCS := $(filter-out %/gsim_fst_impl.cpp,$(EMU_GEN_SRCS))
+EMU_SRCS += $(EMU_FST_IMPL_SRC)
 EMU_SRCS += $(EMU_MAIN_SRCS) $(EMU_GEN_SRCS)
 
-EMU_CFLAGS := -O1 -MMD $(addprefix -I, $(abspath $(GEN_CPP_DIR))) $(EMU_CFLAGS) # allow to overwrite optimization level
-EMU_CFLAGS += $(MODE_FLAGS) $(CFLAGS_DUT) -Wno-parentheses-equality
+EMU_CFLAGS := -O1 -MMD $(addprefix -I, $(abspath $(GEN_CPP_DIR))) -I$(abspath include) $(EMU_CFLAGS) # allow to overwrite optimization level
+EMU_CFLAGS += $(MODE_FLAGS) $(CFLAGS_DUT) -Wno-parentheses-equality -pthread
 EMU_CFLAGS += -fbracket-depth=2048
+EMU_LDFLAGS += -lz
 #EMU_CFLAGS += -fsanitize=address -fsanitize-address-use-after-scope
 #EMU_CFLAGS += -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract
 #EMU_CFLAGS += -pg -ggdb
@@ -260,6 +279,9 @@ endif
 $(foreach x, $(EMU_SRCS), $(eval \
 	$(call CXX_TEMPLATE, $(EMU_BUILD_DIR)/$(basename $(notdir $(x))).o, $(x), $(EMU_CFLAGS), EMU_OBJS,)))
 
+$(GEN_CPP_DIR)/gsim_fst_impl.cpp: $(GEN_CPP_DIR)/$(NAME)0.cpp
+	@:
+
 $(eval $(call LD_TEMPLATE, $(EMU_BIN), $(EMU_OBJS), $(EMU_CFLAGS) $(EMU_LDFLAGS)))
 
 build-emu: $(EMU_BIN)
@@ -268,7 +290,7 @@ run-emu-simpoint: $(EMU_BIN)
 	@echo 'Please run "$^ <gcpt> <checkpoint>" manually'
 
 run-emu: $(EMU_BIN)
-	$(TIME) taskset 0x1 $^ $(mainargs)
+	env $(EMU_RUN_ENV) $(TIME) taskset 0x1 $^ $(mainargs)
 
 clean-emu:
 	-rm -rf $(EMU_BUILD_DIR) $(EMU_BIN)
@@ -293,24 +315,24 @@ VERI_BIN = $(WORK_DIR)/V$(NAME)
 VERI_GEN_MK = $(VERI_BUILD_DIR)/V$(NAME).mk
 
 VERI_CFLAGS = $(call escape_quote,$(EMU_CFLAGS) $(CFLAGS_REF))
-VERI_LDFLAGS = -O1
+VERI_LDFLAGS = -O1 -lz
 VERI_VFLAGS = --top $(NAME) -Wno-lint -j 8 --cc --exe +define+RANDOMIZE_GARBAGE_ASSIGN --max-num-width 1048576 --compiler clang
 ifeq ($(SIMPOINT),1)
-VERI_LDFLAGS += -lz -lzstd
+VERI_LDFLAGS += -lzstd
 endif
 VERI_VFLAGS += -Mdir $(VERI_BUILD_DIR) -CFLAGS "$(VERI_CFLAGS)" -LDFLAGS "$(VERI_LDFLAGS)"
 VERI_VFLAGS += $(VERI_THREADS)
 #VERI_VFLAGS += --trace-fst
 
 VERI_VSRCS = ready-to-run/difftest/$(TEST_FILE).sv
-VERI_CSRCS-2 = $(EMU_GEN_SRCS)
+VERI_CSRCS-2 = $(EMU_FST_IMPL_SRC) $(EMU_GEN_SRCS)
 
 $(VERI_GEN_MK): $(VERI_VSRCS) $(VERI_CSRCS-$(MODE)) | $(EMU_MAIN_SRCS)
 	@mkdir -p $(@D)
 	verilator $(VERI_VFLAGS) $(abspath $^ $|)
 
 $(VERI_BIN): | $(VERI_GEN_MK)
-	$(TIME) $(MAKE) OPT_FAST="-O1" CXX=clang++ -s -C $(VERI_BUILD_DIR) -f $(abspath $|)
+	$(TIME) $(MAKE) OPT_FAST="-O1" CXX=$(CXX) -s -C $(VERI_BUILD_DIR) -f $(abspath $|)
 	ln -sf $(abspath $(VERI_BUILD_DIR)/V$(NAME)) $@
 
 compile-veri: $(VERI_GEN_MK)
@@ -403,9 +425,12 @@ diff-internal:
 	$(MAKE) MODE=2 compile
 	$(MAKE) MODE=2 difftest
 
-run:
+run: clean
 	mkdir -p $(dir $(LOG_FILE))
-	set -o pipefail && $(TIME) $(MAKE) run-internal 2>&1 | tee $(LOG_FILE)
+	set -o pipefail && stdbuf -oL -eL $(TIME) $(MAKE) run-internal 2>&1 | tee $(LOG_FILE)
+
+run-waveform: clean
+	$(MAKE) run WAVEFORM=1 LOG_FILE=$(WAVE_LOG_FILE) WAVE_LOG_FILE=$(WAVE_LOG_FILE) WAVEFORM_PATH=$(WAVEFORM_PATH)
 
 diff:
 	mkdir -p $(dir $(LOG_FILE))
