@@ -2,6 +2,8 @@
 #include <set>
 #include <map>
 #include <stack>
+#include <algorithm>
+#include <numeric>
 #include <unordered_set>
 #include <vector>
 #include <unordered_map>
@@ -334,6 +336,9 @@ class GraphStatsJsonDumper {
     std::map<std::string, size_t> nodeRefTargetTypes;
     std::unordered_set<const ENode*> visited;
     std::unordered_set<const SuperNode*> uniqueSupers;
+    std::set<std::pair<const SuperNode*, const SuperNode*>> supernodeEdges;
+    std::unordered_set<const SuperNode*> emittedSupers;
+    std::set<std::pair<const SuperNode*, const SuperNode*>> emittedSupernodeEdges;
     size_t nodeCount = 0;
     size_t edgeCount = 0;
     size_t depEdgeCount = 0;
@@ -344,6 +349,11 @@ class GraphStatsJsonDumper {
     size_t nodeRefCount = 0;
     size_t intConstCount = 0;
     size_t maxChildren = 0;
+    std::vector<size_t> enodesPerNode;
+    std::vector<size_t> treeSlotsPerNode;
+    std::vector<size_t> supernodeMemberSizes;
+    std::vector<size_t> enodesPerSupernode;
+    std::map<std::string, size_t> enodeDominantSlots;
 
     auto collectENode = [&](const ENode* root) {
       if (!root) return;
@@ -381,6 +391,55 @@ class GraphStatsJsonDumper {
       }
     };
 
+    auto collectNodeTree = [&](const ExpTree* tree,
+                               std::unordered_set<const ENode*>& nodeVisited) {
+      if (!tree) return;
+      std::stack<const ENode*> stack;
+      if (tree->getRoot()) stack.push(tree->getRoot());
+      if (tree->getlval()) stack.push(tree->getlval());
+      while (!stack.empty()) {
+        const ENode* cur = stack.top();
+        stack.pop();
+        if (!cur) continue;
+        if (!nodeVisited.insert(cur).second) continue;
+        for (const ENode* child : cur->child) stack.push(child);
+      }
+    };
+
+    auto collectNodeTreeSlot = [&](const ExpTree* tree,
+                                   const char* slot,
+                                   std::unordered_set<const ENode*>& nodeVisited) {
+      if (!tree) return static_cast<size_t>(0);
+      const size_t before = nodeVisited.size();
+      collectNodeTree(tree, nodeVisited);
+      return nodeVisited.size() - before;
+    };
+
+    auto collectNodeAllTrees = [&](const Node* node,
+                                   std::unordered_set<const ENode*>& nodeVisited) {
+      if (!node) return;
+      for (const ExpTree* tree : node->assignTree) collectNodeTree(tree, nodeVisited);
+      collectNodeTree(node->valTree, nodeVisited);
+      collectNodeTree(node->resetTree, nodeVisited);
+      collectNodeTree(node->resetCond, nodeVisited);
+      collectNodeTree(node->resetVal, nodeVisited);
+      collectNodeTree(node->memTree, nodeVisited);
+    };
+
+    for (const SuperNode* super : g->sortedSuper) {
+      if (!super) continue;
+      supernodeMemberSizes.push_back(super->member.size());
+      if (!super->insts.empty() || super->superType == SUPER_EXTMOD || super->superType == SUPER_ASYNC_RESET) {
+        emittedSupers.insert(super);
+      }
+      for (const SuperNode* next : super->next) {
+        if (next && next != super) supernodeEdges.insert({super, next});
+      }
+      std::unordered_set<const ENode*> superVisited;
+      for (const Node* member : super->member) collectNodeAllTrees(member, superVisited);
+      enodesPerSupernode.push_back(superVisited.size());
+    }
+
     for (const Node* node : nodes) {
       nodeCount ++;
       if (node->super) uniqueSupers.insert(node->super);
@@ -394,11 +453,46 @@ class GraphStatsJsonDumper {
       collectTree(node->resetCond, "resetCond");
       collectTree(node->resetVal, "resetVal");
       collectTree(node->memTree, "memTree");
+
+      std::unordered_set<const ENode*> nodeVisited;
+      std::map<std::string, size_t> slotCounts;
+      size_t nodeTreeSlots = 0;
+      auto accountSlot = [&](const ExpTree* tree, const char* slot) {
+        if (!tree) return;
+        nodeTreeSlots ++;
+        slotCounts[slot] += collectNodeTreeSlot(tree, slot, nodeVisited);
+      };
+      for (const ExpTree* tree : node->assignTree) accountSlot(tree, "assignTree");
+      accountSlot(node->valTree, "valTree");
+      accountSlot(node->resetTree, "resetTree");
+      accountSlot(node->resetCond, "resetCond");
+      accountSlot(node->resetVal, "resetVal");
+      accountSlot(node->memTree, "memTree");
+      enodesPerNode.push_back(nodeVisited.size());
+      treeSlotsPerNode.push_back(nodeTreeSlots);
+      std::string dominantSlot = "none";
+      size_t dominantCount = 0;
+      for (const auto& [slot, count] : slotCounts) {
+        if (count > dominantCount) {
+          dominantSlot = slot;
+          dominantCount = count;
+        }
+      }
+      enodeDominantSlots[dominantSlot] ++;
+    }
+    for (const auto& edge : supernodeEdges) {
+      if (emittedSupers.find(edge.first) != emittedSupers.end() &&
+          emittedSupers.find(edge.second) != emittedSupers.end()) {
+        emittedSupernodeEdges.insert(edge);
+      }
     }
 
     os << "{\n"
        << "  \"graph\": \"" << jsonEscape(g->name) << "\",\n"
        << "  \"supernode_count\": " << uniqueSupers.size() << ",\n"
+       << "  \"supernode_edge_count\": " << supernodeEdges.size() << ",\n"
+       << "  \"emitted_supernode_count\": " << emittedSupers.size() << ",\n"
+       << "  \"emitted_supernode_edge_count\": " << emittedSupernodeEdges.size() << ",\n"
        << "  \"node_count\": " << nodeCount << ",\n"
        << "  \"edge_count\": " << edgeCount << ",\n"
        << "  \"dep_edge_count\": " << depEdgeCount << ",\n"
@@ -421,10 +515,46 @@ class GraphStatsJsonDumper {
     dumpMap(enodeOps);
     os << ",\n    \"node_ref_target_types\": ";
     dumpMap(nodeRefTargetTypes);
-    os << "\n  }\n}\n";
+    os << "\n  },\n  \"nodes_enodes\": ";
+    dumpVectorStats(enodesPerNode);
+    os << ",\n  \"nodes_tree_slots\": ";
+    dumpVectorStats(treeSlotsPerNode);
+    os << ",\n  \"supernodes_members\": ";
+    dumpVectorStats(supernodeMemberSizes);
+    os << ",\n  \"supernodes_enodes\": ";
+    dumpVectorStats(enodesPerSupernode);
+    os << ",\n  \"node_enode_dominant_slots\": ";
+    dumpMap(enodeDominantSlots);
+    os << "\n}\n";
   }
 
  private:
+  void dumpVectorStats(std::vector<size_t> values) {
+    std::sort(values.begin(), values.end());
+    const size_t count = values.size();
+    const size_t sum = std::accumulate(values.begin(), values.end(), static_cast<size_t>(0));
+    auto percentile = [&](size_t num, size_t den) -> size_t {
+      if (values.empty()) return 0;
+      const size_t idx = (values.size() - 1) * num / den;
+      return values[idx];
+    };
+    size_t zero = 0;
+    for (size_t value : values) {
+      if (value == 0) zero ++;
+    }
+    os << "{"
+       << "\"count\": " << count
+       << ", \"sum\": " << sum
+       << ", \"zero\": " << zero
+       << ", \"min\": " << (values.empty() ? 0 : values.front())
+       << ", \"mean\": " << (count == 0 ? 0.0 : static_cast<double>(sum) / static_cast<double>(count))
+       << ", \"median\": " << percentile(50, 100)
+       << ", \"p90\": " << percentile(90, 100)
+       << ", \"p99\": " << percentile(99, 100)
+       << ", \"max\": " << (values.empty() ? 0 : values.back())
+       << "}";
+  }
+
   void dumpMap(const std::map<std::string, size_t>& values) {
     os << "{";
     bool first = true;
