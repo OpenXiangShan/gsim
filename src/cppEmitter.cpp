@@ -7,8 +7,13 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <fstream>
+#include <stack>
 #include <map>
+#include <set>
 #include <string>
+#include <tuple>
+#include <unordered_set>
 #include <utility>
 
 #define ACTIVE_WIDTH 8
@@ -40,6 +45,206 @@ static std::map<Node*, std::pair<int, int>> super2ResetId;  // uint & async rese
 extern int maxConcatNum;
 bool nameExist(std::string str);
 static int resetFuncNum = 0;
+
+static const char* opTypeToStr(OPType t) {
+  switch (t) {
+    case OP_EMPTY: return "OP_EMPTY";
+    case OP_MUX: return "OP_MUX";
+    case OP_ADD: return "OP_ADD";
+    case OP_SUB: return "OP_SUB";
+    case OP_MUL: return "OP_MUL";
+    case OP_DIV: return "OP_DIV";
+    case OP_REM: return "OP_REM";
+    case OP_LT: return "OP_LT";
+    case OP_LEQ: return "OP_LEQ";
+    case OP_GT: return "OP_GT";
+    case OP_GEQ: return "OP_GEQ";
+    case OP_EQ: return "OP_EQ";
+    case OP_NEQ: return "OP_NEQ";
+    case OP_DSHL: return "OP_DSHL";
+    case OP_DSHR: return "OP_DSHR";
+    case OP_AND: return "OP_AND";
+    case OP_OR: return "OP_OR";
+    case OP_XOR: return "OP_XOR";
+    case OP_CAT: return "OP_CAT";
+    case OP_ASUINT: return "OP_ASUINT";
+    case OP_ASSINT: return "OP_ASSINT";
+    case OP_ASCLOCK: return "OP_ASCLOCK";
+    case OP_ASASYNCRESET: return "OP_ASASYNCRESET";
+    case OP_CVT: return "OP_CVT";
+    case OP_NEG: return "OP_NEG";
+    case OP_NOT: return "OP_NOT";
+    case OP_ANDR: return "OP_ANDR";
+    case OP_ORR: return "OP_ORR";
+    case OP_XORR: return "OP_XORR";
+    case OP_PAD: return "OP_PAD";
+    case OP_SHL: return "OP_SHL";
+    case OP_SHR: return "OP_SHR";
+    case OP_HEAD: return "OP_HEAD";
+    case OP_TAIL: return "OP_TAIL";
+    case OP_BITS: return "OP_BITS";
+    case OP_BITS_NOSHIFT: return "OP_BITS_NOSHIFT";
+    case OP_INDEX_INT: return "OP_INDEX_INT";
+    case OP_INDEX: return "OP_INDEX";
+    case OP_WHEN: return "OP_WHEN";
+    case OP_PRINTF: return "OP_PRINTF";
+    case OP_ASSERT: return "OP_ASSERT";
+    case OP_EXIT: return "OP_EXIT";
+    case OP_INT: return "OP_INT";
+    case OP_GROUP: return "OP_GROUP";
+    case OP_READ_MEM: return "OP_READ_MEM";
+    case OP_WRITE_MEM: return "OP_WRITE_MEM";
+    case OP_INFER_MEM: return "OP_INFER_MEM";
+    case OP_INVALID: return "OP_INVALID";
+    case OP_RESET: return "OP_RESET";
+    case OP_SEXT: return "OP_SEXT";
+    case OP_EXT_FUNC: return "OP_EXT_FUNC";
+    case OP_STMT_SEQ: return "OP_STMT_SEQ";
+    case OP_STMT_WHEN: return "OP_STMT_WHEN";
+    case OP_STMT_NODE: return "OP_STMT_NODE";
+    default: return "OP_UNKNOWN";
+  }
+}
+
+static void writeSupernodeStatsJson(const std::string& path,
+                                    const std::string& graphName,
+                                    const std::vector<SuperNode*>& sortedSuper) {
+  auto jsonEscape = [](const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s) {
+      if (c == '\\' || c == '"') out.push_back('\\');
+      out.push_back(c);
+    }
+    return out;
+  };
+  size_t emittedSupernodes = 0;
+  size_t activationEdges = 0;
+  size_t activeSourceNodes = 0;
+  size_t alwaysActiveSupernodes = alwaysActive.size();
+  std::set<std::pair<int, int>> uniqueActivationPairs;
+  std::set<std::pair<int, int>> uniqueTopoEdges;
+  std::map<std::string, size_t> activationEdgesByNodeType;
+  std::map<std::string, size_t> activationSourceNodesByNodeType;
+  std::unordered_set<const ENode*> uniqueENodes;
+  size_t enodeEdgeCount = 0;
+  size_t enodeNodeRefCount = 0;
+  size_t enodeIntConstCount = 0;
+  std::map<std::string, size_t> enodeOps;
+
+  auto nodeTypeToString = [](NodeType type) -> const char* {
+    switch (type) {
+      case NODE_INVALID: return "NODE_INVALID";
+      case NODE_REG_SRC: return "NODE_REG_SRC";
+      case NODE_REG_DST: return "NODE_REG_DST";
+      case NODE_SPECIAL: return "NODE_SPECIAL";
+      case NODE_INP: return "NODE_INP";
+      case NODE_OUT: return "NODE_OUT";
+      case NODE_MEMORY: return "NODE_MEMORY";
+      case NODE_READER: return "NODE_READER";
+      case NODE_WRITER: return "NODE_WRITER";
+      case NODE_READWRITER: return "NODE_READWRITER";
+      case NODE_INFER: return "NODE_INFER";
+      case NODE_OTHERS: return "NODE_OTHERS";
+      case NODE_REG_RESET: return "NODE_REG_RESET";
+      case NODE_EXT_IN: return "NODE_EXT_IN";
+      case NODE_EXT_OUT: return "NODE_EXT_OUT";
+      case NODE_EXT: return "NODE_EXT";
+      default: return "NODE_UNKNOWN";
+    }
+  };
+
+  auto collectTreeENodes = [&](const ExpTree* tree) {
+    std::stack<const ENode*> stack;
+    if (tree && tree->getRoot()) stack.push(tree->getRoot());
+    if (tree && tree->getlval()) stack.push(tree->getlval());
+    while (!stack.empty()) {
+      const ENode* cur = stack.top();
+      stack.pop();
+      if (!cur) continue;
+      if (!uniqueENodes.insert(cur).second) continue;
+      enodeEdgeCount += cur->child.size();
+      if (cur->nodePtr) {
+        enodeNodeRefCount ++;
+      } else {
+        enodeOps[opTypeToStr(cur->opType)] ++;
+        if (cur->opType == OP_INT) enodeIntConstCount ++;
+      }
+      for (const ENode* child : cur->child) {
+        if (child) stack.push(child);
+      }
+    }
+  };
+
+  for (SuperNode* super : sortedSuper) {
+    if (super->cppId < 0) continue;
+    emittedSupernodes ++;
+
+    for (SuperNode* next : super->next) {
+      if (next->cppId < 0) continue;
+      uniqueTopoEdges.insert(std::make_pair(super->cppId, next->cppId));
+    }
+
+    for (Node* member : super->member) {
+      if (member->status != VALID_NODE) continue;
+      for (const ExpTree* tree : member->assignTree) collectTreeENodes(tree);
+      collectTreeENodes(member->valTree);
+      collectTreeENodes(member->resetTree);
+      collectTreeENodes(member->resetCond);
+      collectTreeENodes(member->resetVal);
+      collectTreeENodes(member->memTree);
+      if (member->nextNeedActivate.empty()) continue;
+      activeSourceNodes ++;
+      activationEdges += member->nextNeedActivate.size();
+      const std::string sourceNodeTypeName(nodeTypeToString(member->type));
+      activationSourceNodesByNodeType[sourceNodeTypeName] ++;
+      activationEdgesByNodeType[sourceNodeTypeName] += member->nextNeedActivate.size();
+      for (int targetId : member->nextNeedActivate) {
+        uniqueActivationPairs.insert(std::make_pair(super->cppId, targetId));
+      }
+    }
+  }
+
+  std::ofstream os(path);
+  Assert(os.good(), "failed to open gsim stats json: %s", path.c_str());
+  os << "{\n"
+     << "  \"graph\": \"" << jsonEscape(graphName) << "\",\n"
+     << "  \"supernodes\": " << emittedSupernodes << ",\n"
+     << "  \"dag_edges\": " << uniqueTopoEdges.size() << ",\n"
+     << "  \"boundary_activation_edges\": " << activationEdges << ",\n"
+     << "  \"unique_activation_edges\": " << uniqueActivationPairs.size() << ",\n"
+     << "  \"active_source_nodes\": " << activeSourceNodes << ",\n"
+     << "  \"always_active_supernodes\": " << alwaysActiveSupernodes << ",\n"
+     << "  \"enode_unique_count\": " << uniqueENodes.size() << ",\n"
+     << "  \"enode_edge_count\": " << enodeEdgeCount << ",\n"
+     << "  \"enode_node_ref_count\": " << enodeNodeRefCount << ",\n"
+     << "  \"enode_int_const_count\": " << enodeIntConstCount << ",\n"
+     << "  \"activation_edges_by_node_type\": {\n";
+  bool first = true;
+  for (const auto& it : activationEdgesByNodeType) {
+    if (!first) os << ",\n";
+    first = false;
+    os << "    \"" << jsonEscape(it.first) << "\": " << it.second;
+  }
+  os << "\n  },\n";
+  os << "  \"enode_op_types\": {\n";
+  first = true;
+  for (const auto& it : enodeOps) {
+    if (!first) os << ",\n";
+    first = false;
+    os << "    \"" << jsonEscape(it.first) << "\": " << it.second;
+  }
+  os << "\n  },\n";
+  os << "  \"activation_source_nodes_by_node_type\": {\n";
+  first = true;
+  for (const auto& it : activationSourceNodesByNodeType) {
+    if (!first) os << ",\n";
+    first = false;
+    os << "    \"" << jsonEscape(it.first) << "\": " << it.second;
+  }
+  os << "\n  }\n";
+  os << "}\n";
+}
 
 static bool isAlwaysActive(int cppId) {
   return alwaysActive.find(cppId) != alwaysActive.end();
@@ -925,6 +1130,12 @@ void graph::cppEmitter() {
   fclose(sigFile);
 #endif
 
+  writeSupernodeStatsJson(globalConfig.OutputDir + "/" + name + "_supernode_stats.json",
+                          name,
+                          sortedSuper);
   printf("[cppEmitter] define %ld nodes %d superNodes\n", definedNode.size(), superId);
+  std::cout << "[cppEmitter] wrote supernode stats to "
+            << globalConfig.OutputDir + "/" + name + "_supernode_stats.json"
+            << std::endl;
   std::cout << "[cppEmitter] finish writing " << srcFileIdx << " cpp files to " + globalConfig.OutputDir + "/" << std::endl;
 }
