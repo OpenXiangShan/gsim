@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <stack>
 #include <map>
@@ -45,6 +46,83 @@ static std::map<Node*, std::pair<int, int>> super2ResetId;  // uint & async rese
 extern int maxConcatNum;
 bool nameExist(std::string str);
 static int resetFuncNum = 0;
+
+static bool emitRuntimeProfile() {
+  static bool initialized = false;
+  static bool enabled = false;
+  if (!initialized) {
+    if (const char* env = std::getenv("GSIM_EMIT_RUNTIME_PROFILE")) {
+      enabled = env[0] != '\0' && env[0] != '0';
+    }
+    initialized = true;
+  }
+  return enabled;
+}
+
+struct RuntimeProfileWeights {
+  size_t nodes = 0;
+  size_t refENodes = 0;
+  size_t nonRefENodes = 0;
+};
+
+static RuntimeProfileWeights countRuntimeProfileTree(const ExpTree* tree) {
+  RuntimeProfileWeights weights;
+  std::unordered_set<const ENode*> visited;
+  std::stack<const ENode*> stack;
+  if (tree && tree->getRoot()) stack.push(tree->getRoot());
+  if (tree && tree->getlval()) stack.push(tree->getlval());
+  while (!stack.empty()) {
+    const ENode* cur = stack.top();
+    stack.pop();
+    if (!cur) continue;
+    if (!visited.insert(cur).second) continue;
+    if (cur->nodePtr) weights.refENodes ++;
+    else weights.nonRefENodes ++;
+    for (const ENode* child : cur->child) {
+      if (child) stack.push(child);
+    }
+  }
+  return weights;
+}
+
+static RuntimeProfileWeights countRuntimeProfileNode(Node* node) {
+  RuntimeProfileWeights weights;
+  if (node == nullptr || node->status != VALID_NODE) return weights;
+  weights.nodes = 1;
+  for (const ExpTree* tree : node->assignTree) {
+    RuntimeProfileWeights treeWeights = countRuntimeProfileTree(tree);
+    weights.refENodes += treeWeights.refENodes;
+    weights.nonRefENodes += treeWeights.nonRefENodes;
+  }
+  RuntimeProfileWeights treeWeights = countRuntimeProfileTree(node->valTree);
+  weights.refENodes += treeWeights.refENodes;
+  weights.nonRefENodes += treeWeights.nonRefENodes;
+  treeWeights = countRuntimeProfileTree(node->resetTree);
+  weights.refENodes += treeWeights.refENodes;
+  weights.nonRefENodes += treeWeights.nonRefENodes;
+  treeWeights = countRuntimeProfileTree(node->resetCond);
+  weights.refENodes += treeWeights.refENodes;
+  weights.nonRefENodes += treeWeights.nonRefENodes;
+  treeWeights = countRuntimeProfileTree(node->resetVal);
+  weights.refENodes += treeWeights.refENodes;
+  weights.nonRefENodes += treeWeights.nonRefENodes;
+  treeWeights = countRuntimeProfileTree(node->memTree);
+  weights.refENodes += treeWeights.refENodes;
+  weights.nonRefENodes += treeWeights.nonRefENodes;
+  return weights;
+}
+
+static RuntimeProfileWeights countRuntimeProfileSupernode(SuperNode* super) {
+  RuntimeProfileWeights weights;
+  if (super == nullptr) return weights;
+  for (Node* member : super->member) {
+    RuntimeProfileWeights nodeWeights = countRuntimeProfileNode(member);
+    weights.nodes += nodeWeights.nodes;
+    weights.refENodes += nodeWeights.refENodes;
+    weights.nonRefENodes += nodeWeights.nonRefENodes;
+  }
+  return weights;
+}
 
 static const char* opTypeToStr(OPType t) {
   switch (t) {
@@ -650,6 +728,14 @@ int graph::genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string
   int id;
   uint64_t newMask;
   std::tie(id, newMask) = clearIdxMask(node->cppId);
+  if (emitRuntimeProfile()) {
+    emitBodyLock(indent, "if (runtimeProfileEnabled) {\n");
+    emitBodyLock(indent + 1, "runtimeProfileActiveSupernodes ++;\n");
+    emitBodyLock(indent + 1, "runtimeProfileNodes += runtimeProfileNodeWeight[%d];\n", node->cppId);
+    emitBodyLock(indent + 1, "runtimeProfileRefENodes += runtimeProfileRefENodeWeight[%d];\n", node->cppId);
+    emitBodyLock(indent + 1, "runtimeProfileNonRefENodes += runtimeProfileNonRefENodeWeight[%d];\n", node->cppId);
+    emitBodyLock(indent, "}\n");
+  }
 #ifdef PERF
   emitBodyLock(indent, "activeTimes[%d] ++;\n", node->cppId);
   if (node->superType != SUPER_EXTMOD) {
@@ -1018,6 +1104,16 @@ void graph::cppEmitter() {
   fprintf(header, "uint64_t cycles;\n");
   fprintf(header, "uint64_t LOG_START, LOG_END;\n");
   fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
+  if (emitRuntimeProfile()) {
+    fprintf(header, "bool runtimeProfileEnabled;\n");
+    fprintf(header, "uint64_t runtimeProfileActiveSupernodes;\n");
+    fprintf(header, "uint64_t runtimeProfileNodes;\n");
+    fprintf(header, "uint64_t runtimeProfileRefENodes;\n");
+    fprintf(header, "uint64_t runtimeProfileNonRefENodes;\n");
+    fprintf(header, "uint64_t runtimeProfileNodeWeight[%d];\n", superId);
+    fprintf(header, "uint64_t runtimeProfileRefENodeWeight[%d];\n", superId);
+    fprintf(header, "uint64_t runtimeProfileNonRefENodeWeight[%d];\n", superId);
+  }
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
 #if ENABLE_ACTIVATOR
@@ -1038,6 +1134,24 @@ void graph::cppEmitter() {
   /* initialization */
   emitFuncDecl(0, "void S%s::init() {\n", name.c_str());
   emitBodyLock(1, "activateAll();\n");
+  if (emitRuntimeProfile()) {
+    emitBodyLock(1, "runtimeProfileEnabled = false;\n");
+    emitBodyLock(1, "runtimeProfileActiveSupernodes = 0;\n");
+    emitBodyLock(1, "runtimeProfileNodes = 0;\n");
+    emitBodyLock(1, "runtimeProfileRefENodes = 0;\n");
+    emitBodyLock(1, "runtimeProfileNonRefENodes = 0;\n");
+    emitBodyLock(1, "if (const char *env = std::getenv(\"EMU_RUNTIME_PROFILE\")) runtimeProfileEnabled = env[0] != '\\0' && env[0] != '0';\n");
+    emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileNodeWeight[i] = 0;\n", superId);
+    emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileRefENodeWeight[i] = 0;\n", superId);
+    emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileNonRefENodeWeight[i] = 0;\n", superId);
+    for (SuperNode* super : sortedSuper) {
+      if (super->cppId < 0) continue;
+      RuntimeProfileWeights weights = countRuntimeProfileSupernode(super);
+      emitBodyLock(1, "runtimeProfileNodeWeight[%d] = %zu;\n", super->cppId, weights.nodes);
+      emitBodyLock(1, "runtimeProfileRefENodeWeight[%d] = %zu;\n", super->cppId, weights.refENodes);
+      emitBodyLock(1, "runtimeProfileNonRefENodeWeight[%d] = %zu;\n", super->cppId, weights.nonRefENodes);
+    }
+  }
 #ifdef PERF
   emitBodyLock(1, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
   #if ENABLE_ACTIVATOR
@@ -1085,8 +1199,28 @@ void graph::cppEmitter() {
 
   fprintf(header, "S%s();\n", name.c_str());
   fprintf(header, "void init();\n");
+  if (emitRuntimeProfile()) {
+    fprintf(header, "void set_runtime_profile_enabled(bool enabled);\n");
+    fprintf(header, "bool runtime_profile_enabled() const;\n");
+    fprintf(header, "void dump_runtime_profile() const;\n");
+  }
 
   emitBodyLock(0, "}\n");
+
+  if (emitRuntimeProfile()) {
+    emitFuncDecl(0, "void S%s::set_runtime_profile_enabled(bool enabled) {\n", name.c_str());
+    emitBodyLock(1, "runtimeProfileEnabled = enabled;\n");
+    emitBodyLock(0, "}\n");
+
+    emitFuncDecl(0, "bool S%s::runtime_profile_enabled() const {\n", name.c_str());
+    emitBodyLock(1, "return runtimeProfileEnabled;\n");
+    emitBodyLock(0, "}\n");
+
+    emitFuncDecl(0, "void S%s::dump_runtime_profile() const {\n", name.c_str());
+    emitBodyLock(1, "if (!runtimeProfileEnabled) return;\n");
+    emitBodyLock(1, "printf(\"[GSIM_RUNTIME_PROFILE] active_supernodes=%%llu nodes=%%llu ref_enodes=%%llu non_ref_enodes=%%llu total_enodes=%%llu\\n\", static_cast<unsigned long long>(runtimeProfileActiveSupernodes), static_cast<unsigned long long>(runtimeProfileNodes), static_cast<unsigned long long>(runtimeProfileRefENodes), static_cast<unsigned long long>(runtimeProfileNonRefENodes), static_cast<unsigned long long>(runtimeProfileRefENodes + runtimeProfileNonRefENodes));\n");
+    emitBodyLock(0, "}\n");
+  }
 
   /* activation all nodes for reset */
   fprintf(header, "void activateAll();\n");
