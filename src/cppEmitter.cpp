@@ -209,6 +209,9 @@ static void writeSupernodeStatsJson(const std::string& path,
   size_t enodeNodeRefCount = 0;
   size_t enodeIntConstCount = 0;
   std::map<std::string, size_t> enodeOps;
+  std::vector<size_t> enodeOutDegrees;
+  std::vector<size_t> refEnodeOutDegrees;
+  std::vector<size_t> nonRefEnodeOutDegrees;
 
   auto nodeTypeToString = [](NodeType type) -> const char* {
     switch (type) {
@@ -242,9 +245,12 @@ static void writeSupernodeStatsJson(const std::string& path,
       if (!cur) continue;
       if (!uniqueENodes.insert(cur).second) continue;
       enodeEdgeCount += cur->child.size();
+      enodeOutDegrees.push_back(cur->child.size());
       if (cur->nodePtr) {
         enodeNodeRefCount ++;
+        refEnodeOutDegrees.push_back(cur->child.size());
       } else {
+        nonRefEnodeOutDegrees.push_back(cur->child.size());
         enodeOps[opTypeToStr(cur->opType)] ++;
         if (cur->opType == OP_INT) enodeIntConstCount ++;
       }
@@ -313,6 +319,35 @@ static void writeSupernodeStatsJson(const std::string& path,
     os << "    \"" << jsonEscape(it.first) << "\": " << it.second;
   }
   os << "\n  },\n";
+  auto emitSizeStats = [&](const std::string& name, std::vector<size_t> values) {
+    std::sort(values.begin(), values.end());
+    const size_t count = values.size();
+    size_t sum = 0;
+    size_t zero = 0;
+    for (size_t value : values) {
+      sum += value;
+      if (value == 0) zero ++;
+    }
+    auto percentile = [&](double pct) -> size_t {
+      if (values.empty()) return 0;
+      const double raw = pct * static_cast<double>(values.size() - 1);
+      return values[static_cast<size_t>(raw + 0.5)];
+    };
+    os << "  \"" << jsonEscape(name) << "\": {\n"
+       << "    \"count\": " << count << ",\n"
+       << "    \"sum\": " << sum << ",\n"
+       << "    \"zero\": " << zero << ",\n"
+       << "    \"min\": " << (values.empty() ? 0 : values.front()) << ",\n"
+       << "    \"mean\": " << (count == 0 ? 0.0 : static_cast<double>(sum) / static_cast<double>(count)) << ",\n"
+       << "    \"median\": " << percentile(0.50) << ",\n"
+       << "    \"p90\": " << percentile(0.90) << ",\n"
+       << "    \"p99\": " << percentile(0.99) << ",\n"
+       << "    \"max\": " << (values.empty() ? 0 : values.back()) << "\n"
+       << "  },\n";
+  };
+  emitSizeStats("enode_out_degree", enodeOutDegrees);
+  emitSizeStats("ref_enode_out_degree", refEnodeOutDegrees);
+  emitSizeStats("non_ref_enode_out_degree", nonRefEnodeOutDegrees);
   os << "  \"activation_source_nodes_by_node_type\": {\n";
   first = true;
   for (const auto& it : activationSourceNodesByNodeType) {
