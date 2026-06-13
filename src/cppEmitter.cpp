@@ -63,6 +63,12 @@ struct RuntimeProfileWeights {
   size_t nodes = 0;
   size_t refENodes = 0;
   size_t nonRefENodes = 0;
+  // NO0190 unified cost model (per real execution; see pdocs/grhsim_opt/NO0190):
+  size_t comp = 0;     // n_comp: real CPU compute ops (arith/logic/...; excludes OP_READ_MEM)
+  size_t src = 0;      // n_src : state reads, per-occurrence (NODE_REG_SRC leaf + OP_READ_MEM)
+  size_t sink = 0;     // n_sink: state writes (NODE_REG_DST / NODE_WRITER / NODE_READWRITER)
+  size_t constv = 0;   // n_const: constant materialization (OP_INT), per-occurrence
+  size_t aSucc = 0;    // a_succ: successor-activation change-detection points
 };
 
 static RuntimeProfileWeights countRuntimeProfileTree(const ExpTree* tree) {
@@ -76,8 +82,22 @@ static RuntimeProfileWeights countRuntimeProfileTree(const ExpTree* tree) {
     stack.pop();
     if (!cur) continue;
     if (!visited.insert(cur).second) continue;
-    if (cur->nodePtr) weights.refENodes ++;
-    else weights.nonRefENodes ++;
+    if (cur->nodePtr) {
+      weights.refENodes ++;
+      // n_src: register read leaf (per-occurrence, no dedup; gsim has no hoist, NO0190 §7.1)
+      if (cur->nodePtr->type == NODE_REG_SRC) weights.src ++;
+    } else {
+      weights.nonRefENodes ++;
+      switch (cur->opType) {
+        case OP_INT:        weights.constv ++; break;  // n_const
+        case OP_READ_MEM:   weights.src ++;    break;  // n_src: memory read (NO0190 §7.2)
+        case OP_INVALID:
+        case OP_EMPTY:
+        case OP_INDEX_INT:
+        case OP_INDEX:                          break;  // not a real op
+        default:            weights.comp ++;   break;  // n_comp: real compute op
+      }
+    }
     for (const ENode* child : cur->child) {
       if (child) stack.push(child);
     }
@@ -89,26 +109,28 @@ static RuntimeProfileWeights countRuntimeProfileNode(Node* node) {
   RuntimeProfileWeights weights;
   if (node == nullptr || node->status != VALID_NODE) return weights;
   weights.nodes = 1;
-  for (const ExpTree* tree : node->assignTree) {
-    RuntimeProfileWeights treeWeights = countRuntimeProfileTree(tree);
-    weights.refENodes += treeWeights.refENodes;
-    weights.nonRefENodes += treeWeights.nonRefENodes;
+  auto addTree = [&](const ExpTree* tree) {
+    RuntimeProfileWeights t = countRuntimeProfileTree(tree);
+    weights.refENodes += t.refENodes;
+    weights.nonRefENodes += t.nonRefENodes;
+    weights.comp += t.comp;
+    weights.src += t.src;
+    weights.constv += t.constv;
+  };
+  for (const ExpTree* tree : node->assignTree) addTree(tree);
+  addTree(node->valTree);
+  addTree(node->resetTree);
+  addTree(node->resetCond);
+  addTree(node->resetVal);
+  addTree(node->memTree);
+  // n_sink: state-write member nodes (register / memory write ports)
+  if (node->type == NODE_REG_DST || node->type == NODE_WRITER || node->type == NODE_READWRITER) {
+    weights.sink ++;
   }
-  RuntimeProfileWeights treeWeights = countRuntimeProfileTree(node->valTree);
-  weights.refENodes += treeWeights.refENodes;
-  weights.nonRefENodes += treeWeights.nonRefENodes;
-  treeWeights = countRuntimeProfileTree(node->resetTree);
-  weights.refENodes += treeWeights.refENodes;
-  weights.nonRefENodes += treeWeights.nonRefENodes;
-  treeWeights = countRuntimeProfileTree(node->resetCond);
-  weights.refENodes += treeWeights.refENodes;
-  weights.nonRefENodes += treeWeights.nonRefENodes;
-  treeWeights = countRuntimeProfileTree(node->resetVal);
-  weights.refENodes += treeWeights.refENodes;
-  weights.nonRefENodes += treeWeights.nonRefENodes;
-  treeWeights = countRuntimeProfileTree(node->memTree);
-  weights.refENodes += treeWeights.refENodes;
-  weights.nonRefENodes += treeWeights.nonRefENodes;
+  // a_succ: members that emit a change-detection compare to activate successors
+  if (node->needActivate() && !node->isArray() && node->type != NODE_WRITER) {
+    weights.aSucc ++;
+  }
   return weights;
 }
 
@@ -120,9 +142,35 @@ static RuntimeProfileWeights countRuntimeProfileSupernode(SuperNode* super) {
     weights.nodes += nodeWeights.nodes;
     weights.refENodes += nodeWeights.refENodes;
     weights.nonRefENodes += nodeWeights.nonRefENodes;
+    weights.comp += nodeWeights.comp;
+    weights.src += nodeWeights.src;
+    weights.sink += nodeWeights.sink;
+    weights.constv += nodeWeights.constv;
+    weights.aSucc += nodeWeights.aSucc;
   }
   return weights;
 }
+
+/* NO0190 §10.2: EMIT-time output — the STATIC per-supernode cost columns. Kept separate from
+ * the runtime fire-count output (emit-time structural data vs runtime dynamic data). Plain host
+ * file write; never baked into the generated cpp as N assignment statements (compile bomb, §10.3). */
+static void writeSupernodeCostStaticTsv(const std::string& path,
+                                        const std::vector<SuperNode*>& sortedSuper) {
+  FILE* fp = std::fopen(path.c_str(), "w");
+  if (fp == nullptr) {
+    std::cout << "[cppEmitter] WARN: cannot open supernode static cost tsv: " << path << std::endl;
+    return;
+  }
+  std::fprintf(fp, "supernode_id\tphase\tn_comp\tn_src\tn_sink\tn_const\ta_succ\n");
+  for (SuperNode* super : sortedSuper) {
+    if (super == nullptr || super->cppId < 0) continue;
+    RuntimeProfileWeights w = countRuntimeProfileSupernode(super);
+    std::fprintf(fp, "%d\t-\t%zu\t%zu\t%zu\t%zu\t%zu\n",
+                 super->cppId, w.comp, w.src, w.sink, w.constv, w.aSucc);
+  }
+  std::fclose(fp);
+}
+
 
 static const char* opTypeToStr(OPType t) {
   switch (t) {
@@ -769,6 +817,7 @@ int graph::genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string
     emitBodyLock(indent + 1, "runtimeProfileNodes += runtimeProfileNodeWeight[%d];\n", node->cppId);
     emitBodyLock(indent + 1, "runtimeProfileRefENodes += runtimeProfileRefENodeWeight[%d];\n", node->cppId);
     emitBodyLock(indent + 1, "runtimeProfileNonRefENodes += runtimeProfileNonRefENodeWeight[%d];\n", node->cppId);
+    emitBodyLock(indent + 1, "runtimeProfileFireCount[%d] ++;\n", node->cppId);
     emitBodyLock(indent, "}\n");
   }
 #ifdef PERF
@@ -1148,6 +1197,8 @@ void graph::cppEmitter() {
     fprintf(header, "uint64_t runtimeProfileNodeWeight[%d];\n", superId);
     fprintf(header, "uint64_t runtimeProfileRefENodeWeight[%d];\n", superId);
     fprintf(header, "uint64_t runtimeProfileNonRefENodeWeight[%d];\n", superId);
+    // NO0190: only runtime counter baked into generated code; static columns go to a file.
+    fprintf(header, "uint64_t runtimeProfileFireCount[%d];\n", superId);
   }
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
@@ -1179,6 +1230,7 @@ void graph::cppEmitter() {
     emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileNodeWeight[i] = 0;\n", superId);
     emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileRefENodeWeight[i] = 0;\n", superId);
     emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileNonRefENodeWeight[i] = 0;\n", superId);
+    emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileFireCount[i] = 0;\n", superId);
     for (SuperNode* super : sortedSuper) {
       if (super->cppId < 0) continue;
       RuntimeProfileWeights weights = countRuntimeProfileSupernode(super);
@@ -1254,6 +1306,18 @@ void graph::cppEmitter() {
     emitFuncDecl(0, "void S%s::dump_runtime_profile() const {\n", name.c_str());
     emitBodyLock(1, "if (!runtimeProfileEnabled) return;\n");
     emitBodyLock(1, "printf(\"[GSIM_RUNTIME_PROFILE] active_supernodes=%%llu nodes=%%llu ref_enodes=%%llu non_ref_enodes=%%llu total_enodes=%%llu\\n\", static_cast<unsigned long long>(runtimeProfileActiveSupernodes), static_cast<unsigned long long>(runtimeProfileNodes), static_cast<unsigned long long>(runtimeProfileRefENodes), static_cast<unsigned long long>(runtimeProfileNonRefENodes), static_cast<unsigned long long>(runtimeProfileRefENodes + runtimeProfileNonRefENodes));\n");
+    // NO0190: runtime output = per-supernode fire counts only (supernode_id, f). The STATIC
+    // columns (n_comp/n_src/n_sink/n_const/a_succ) are an EMIT-time artifact written separately
+    // by writeSupernodeCostStaticTsv; the two are joined on supernode_id for analysis. This keeps
+    // emit-time (structural) and runtime (dynamic) outputs cleanly separated.
+    emitBodyLock(1, "const char* fireTsvPath = std::getenv(\"GSIM_SUPERNODE_TSV\");\n");
+    emitBodyLock(1, "FILE* fireFp = std::fopen(fireTsvPath ? fireTsvPath : \"%s\", \"w\");\n",
+                 (globalConfig.OutputDir + "/" + name + "_supernode_fire.tsv").c_str());
+    emitBodyLock(1, "if (fireFp) {\n");
+    emitBodyLock(2, "std::fprintf(fireFp, \"supernode_id\\tf\\n\");\n");
+    emitBodyLock(2, "for (int i = 0; i < %d; i ++) std::fprintf(fireFp, \"%%d\\t%%llu\\n\", i, static_cast<unsigned long long>(runtimeProfileFireCount[i]));\n", superId);
+    emitBodyLock(2, "std::fclose(fireFp);\n");
+    emitBodyLock(1, "}\n");
     emitBodyLock(0, "}\n");
   }
 
@@ -1302,6 +1366,11 @@ void graph::cppEmitter() {
   writeSupernodeStatsJson(globalConfig.OutputDir + "/" + name + "_supernode_stats.json",
                           name,
                           sortedSuper);
+  if (emitRuntimeProfile()) {
+    std::string staticTsvPath = globalConfig.OutputDir + "/" + name + "_supernode_static.tsv";
+    writeSupernodeCostStaticTsv(staticTsvPath, sortedSuper);
+    std::cout << "[cppEmitter] wrote supernode static cost tsv to " << staticTsvPath << std::endl;
+  }
   printf("[cppEmitter] define %ld nodes %d superNodes\n", definedNode.size(), superId);
   std::cout << "[cppEmitter] wrote supernode stats to "
             << globalConfig.OutputDir + "/" + name + "_supernode_stats.json"
