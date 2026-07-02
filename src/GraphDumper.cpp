@@ -208,6 +208,107 @@ static std::string nodeStatusToStr(NodeStatus status) {
   }
 }
 
+struct StructuralActivationStats {
+  size_t activationEdges = 0;
+  size_t boundaryActivationEdges = 0;
+  size_t selfActivationEdges = 0;
+  size_t activeSourceNodes = 0;
+  size_t boundaryActiveSourceNodes = 0;
+  size_t alwaysActiveSupernodes = 0;
+  std::set<std::pair<const SuperNode*, const SuperNode*>> uniqueActivationPairs;
+  std::set<std::pair<const SuperNode*, const SuperNode*>> uniqueBoundaryActivationPairs;
+  std::map<std::string, size_t> activationEdgesByNodeType;
+  std::map<std::string, size_t> boundaryActivationEdgesByNodeType;
+  std::map<std::string, size_t> activationSourceNodesByNodeType;
+  std::map<std::string, size_t> boundaryActivationSourceNodesByNodeType;
+  std::vector<size_t> activationTargetsPerSourceNode;
+  std::vector<size_t> boundaryActivationTargetsPerSourceNode;
+};
+
+static bool isStructuralAlwaysActiveSupernode(const SuperNode* super) {
+  return super && super->superType == SUPER_EXTMOD;
+}
+
+static StructuralActivationStats collectStructuralActivationStats(const graph* g) {
+  StructuralActivationStats stats;
+  std::unordered_set<const SuperNode*> validSupers;
+  for (const SuperNode* super : g->sortedSuper) {
+    if (!super) continue;
+    validSupers.insert(super);
+    if (isStructuralAlwaysActiveSupernode(super)) stats.alwaysActiveSupernodes ++;
+  }
+
+  auto addTarget = [&](const SuperNode* target, std::set<const SuperNode*>& targets) {
+    if (!target) return;
+    if (validSupers.find(target) == validSupers.end()) return;
+    if (isStructuralAlwaysActiveSupernode(target)) return;
+    targets.insert(target);
+  };
+
+  for (const SuperNode* super : g->sortedSuper) {
+    if (!super) continue;
+    for (const Node* node : super->member) {
+      if (!node || node->status != VALID_NODE) continue;
+      std::set<const SuperNode*> targets;
+      for (const Node* nextNode : node->next) {
+        if (!nextNode || !nextNode->super) continue;
+        if (nextNode->super != super) {
+          addTarget(nextNode->super, targets);
+        } else if (node->orderInSuper >= nextNode->orderInSuper) {
+          addTarget(super, targets);
+        }
+      }
+      if (node->type == NODE_REG_DST && node->regNext) {
+        addTarget(node->regNext->super, targets);
+      }
+      if (node->type == NODE_WRITER && node->parent) {
+        for (const Node* port : node->parent->member) {
+          if (port && port->type == NODE_READER && port->status == VALID_NODE) {
+            addTarget(port->super, targets);
+          }
+        }
+      }
+      if (node->type == NODE_READWRITER && node->parent) {
+        for (const Node* port : node->parent->member) {
+          if (!port) continue;
+          if (port == node) {
+            if (port->parent && port->parent->extraInfo != "new") addTarget(super, targets);
+          } else if ((port->type == NODE_READER || port->type == NODE_READWRITER) &&
+                     port->status == VALID_NODE) {
+            addTarget(port->super, targets);
+          }
+        }
+      }
+
+      if (targets.empty()) continue;
+      const std::string nodeTypeName = nodeTypeToStr(node->type);
+      size_t boundaryTargets = 0;
+      stats.activeSourceNodes ++;
+      stats.activationEdges += targets.size();
+      stats.activationTargetsPerSourceNode.push_back(targets.size());
+      stats.activationEdgesByNodeType[nodeTypeName] += targets.size();
+      stats.activationSourceNodesByNodeType[nodeTypeName] ++;
+      for (const SuperNode* target : targets) {
+        stats.uniqueActivationPairs.insert({super, target});
+        if (target == super) {
+          stats.selfActivationEdges ++;
+          continue;
+        }
+        boundaryTargets ++;
+        stats.boundaryActivationEdges ++;
+        stats.uniqueBoundaryActivationPairs.insert({super, target});
+        stats.boundaryActivationEdgesByNodeType[nodeTypeName] ++;
+      }
+      if (boundaryTargets != 0) {
+        stats.boundaryActiveSourceNodes ++;
+        stats.boundaryActivationTargetsPerSourceNode.push_back(boundaryTargets);
+        stats.boundaryActivationSourceNodesByNodeType[nodeTypeName] ++;
+      }
+    }
+  }
+  return stats;
+}
+
 class GraphJsonDumper {
  public:
   GraphJsonDumper(std::ostream& os) : os(os) {}
@@ -329,6 +430,7 @@ class GraphStatsJsonDumper {
 
   void dump(const graph* g) {
     const std::vector<const Node*> nodes = collectGraphNodes(g);
+    const StructuralActivationStats activationStats = collectStructuralActivationStats(g);
     std::map<std::string, size_t> nodeTypes;
     std::map<std::string, size_t> nodeStatuses;
     std::map<std::string, size_t> treeSlots;
@@ -491,6 +593,15 @@ class GraphStatsJsonDumper {
        << "  \"graph\": \"" << jsonEscape(g->name) << "\",\n"
        << "  \"supernode_count\": " << uniqueSupers.size() << ",\n"
        << "  \"supernode_edge_count\": " << supernodeEdges.size() << ",\n"
+       << "  \"activation_edges\": " << activationStats.activationEdges << ",\n"
+       << "  \"boundary_activation_edges\": " << activationStats.boundaryActivationEdges << ",\n"
+       << "  \"self_activation_edges\": " << activationStats.selfActivationEdges << ",\n"
+       << "  \"unique_activation_edges\": " << activationStats.uniqueActivationPairs.size() << ",\n"
+       << "  \"unique_boundary_activation_edges\": "
+       << activationStats.uniqueBoundaryActivationPairs.size() << ",\n"
+       << "  \"active_source_nodes\": " << activationStats.activeSourceNodes << ",\n"
+       << "  \"boundary_active_source_nodes\": " << activationStats.boundaryActiveSourceNodes << ",\n"
+       << "  \"always_active_supernodes\": " << activationStats.alwaysActiveSupernodes << ",\n"
        << "  \"emitted_supernode_count\": " << emittedSupers.size() << ",\n"
        << "  \"emitted_supernode_edge_count\": " << emittedSupernodeEdges.size() << ",\n"
        << "  \"node_count\": " << nodeCount << ",\n"
@@ -500,6 +611,14 @@ class GraphStatsJsonDumper {
     dumpMap(nodeTypes);
     os << ",\n  \"node_status\": ";
     dumpMap(nodeStatuses);
+    os << ",\n  \"activation_edges_by_node_type\": ";
+    dumpMap(activationStats.activationEdgesByNodeType);
+    os << ",\n  \"boundary_activation_edges_by_node_type\": ";
+    dumpMap(activationStats.boundaryActivationEdgesByNodeType);
+    os << ",\n  \"activation_source_nodes_by_node_type\": ";
+    dumpMap(activationStats.activationSourceNodesByNodeType);
+    os << ",\n  \"boundary_activation_source_nodes_by_node_type\": ";
+    dumpMap(activationStats.boundaryActivationSourceNodesByNodeType);
     os << ",\n  \"tree_slots\": ";
     dumpMap(treeSlots);
     os << ",\n  \"expnodes\": {\n"
@@ -525,6 +644,10 @@ class GraphStatsJsonDumper {
     dumpVectorStats(enodesPerSupernode);
     os << ",\n  \"node_enode_dominant_slots\": ";
     dumpMap(enodeDominantSlots);
+    os << ",\n  \"activation_targets_per_source_node\": ";
+    dumpVectorStats(activationStats.activationTargetsPerSourceNode);
+    os << ",\n  \"boundary_activation_targets_per_source_node\": ";
+    dumpVectorStats(activationStats.boundaryActivationTargetsPerSourceNode);
     os << "\n}\n";
   }
 
@@ -583,4 +706,12 @@ void graph::dump(std::string FileName) {
     std::ofstream ofs(prefix + "_Stats.json");
     GraphStatsJsonDumper(ofs).dump(this);
   }
+}
+
+bool graph::dumpStage(std::string stageName) {
+  if (globalConfig.EnableDumpGraph &&
+      (globalConfig.DumpStages.empty() || globalConfig.DumpStages.count(stageName))) {
+    dump(stageName);
+  }
+  return !globalConfig.StopAfterStage.empty() && globalConfig.StopAfterStage == stageName;
 }

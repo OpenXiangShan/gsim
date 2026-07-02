@@ -246,12 +246,18 @@ static void writeSupernodeStatsJson(const std::string& path,
   };
   size_t emittedSupernodes = 0;
   size_t activationEdges = 0;
+  size_t boundaryActivationEdges = 0;
+  size_t selfActivationEdges = 0;
   size_t activeSourceNodes = 0;
+  size_t boundaryActiveSourceNodes = 0;
   size_t alwaysActiveSupernodes = alwaysActive.size();
   std::set<std::pair<int, int>> uniqueActivationPairs;
+  std::set<std::pair<int, int>> uniqueBoundaryActivationPairs;
   std::set<std::pair<int, int>> uniqueTopoEdges;
   std::map<std::string, size_t> activationEdgesByNodeType;
+  std::map<std::string, size_t> boundaryActivationEdgesByNodeType;
   std::map<std::string, size_t> activationSourceNodesByNodeType;
+  std::map<std::string, size_t> boundaryActivationSourceNodesByNodeType;
   std::unordered_set<const ENode*> uniqueENodes;
   size_t enodeEdgeCount = 0;
   size_t enodeNodeRefCount = 0;
@@ -329,10 +335,23 @@ static void writeSupernodeStatsJson(const std::string& path,
       activeSourceNodes ++;
       activationEdges += member->nextNeedActivate.size();
       const std::string sourceNodeTypeName(nodeTypeToString(member->type));
+      size_t boundaryTargets = 0;
       activationSourceNodesByNodeType[sourceNodeTypeName] ++;
       activationEdgesByNodeType[sourceNodeTypeName] += member->nextNeedActivate.size();
       for (int targetId : member->nextNeedActivate) {
         uniqueActivationPairs.insert(std::make_pair(super->cppId, targetId));
+        if (targetId == super->cppId) {
+          selfActivationEdges ++;
+          continue;
+        }
+        boundaryTargets ++;
+        boundaryActivationEdges ++;
+        uniqueBoundaryActivationPairs.insert(std::make_pair(super->cppId, targetId));
+        boundaryActivationEdgesByNodeType[sourceNodeTypeName] ++;
+      }
+      if (boundaryTargets != 0) {
+        boundaryActiveSourceNodes ++;
+        boundaryActivationSourceNodesByNodeType[sourceNodeTypeName] ++;
       }
     }
   }
@@ -343,9 +362,13 @@ static void writeSupernodeStatsJson(const std::string& path,
      << "  \"graph\": \"" << jsonEscape(graphName) << "\",\n"
      << "  \"supernodes\": " << emittedSupernodes << ",\n"
      << "  \"dag_edges\": " << uniqueTopoEdges.size() << ",\n"
-     << "  \"boundary_activation_edges\": " << activationEdges << ",\n"
+     << "  \"activation_edges\": " << activationEdges << ",\n"
+     << "  \"boundary_activation_edges\": " << boundaryActivationEdges << ",\n"
+     << "  \"self_activation_edges\": " << selfActivationEdges << ",\n"
      << "  \"unique_activation_edges\": " << uniqueActivationPairs.size() << ",\n"
+     << "  \"unique_boundary_activation_edges\": " << uniqueBoundaryActivationPairs.size() << ",\n"
      << "  \"active_source_nodes\": " << activeSourceNodes << ",\n"
+     << "  \"boundary_active_source_nodes\": " << boundaryActiveSourceNodes << ",\n"
      << "  \"always_active_supernodes\": " << alwaysActiveSupernodes << ",\n"
      << "  \"enode_unique_count\": " << uniqueENodes.size() << ",\n"
      << "  \"enode_edge_count\": " << enodeEdgeCount << ",\n"
@@ -354,6 +377,14 @@ static void writeSupernodeStatsJson(const std::string& path,
      << "  \"activation_edges_by_node_type\": {\n";
   bool first = true;
   for (const auto& it : activationEdgesByNodeType) {
+    if (!first) os << ",\n";
+    first = false;
+    os << "    \"" << jsonEscape(it.first) << "\": " << it.second;
+  }
+  os << "\n  },\n";
+  os << "  \"boundary_activation_edges_by_node_type\": {\n";
+  first = true;
+  for (const auto& it : boundaryActivationEdgesByNodeType) {
     if (!first) os << ",\n";
     first = false;
     os << "    \"" << jsonEscape(it.first) << "\": " << it.second;
@@ -399,6 +430,14 @@ static void writeSupernodeStatsJson(const std::string& path,
   os << "  \"activation_source_nodes_by_node_type\": {\n";
   first = true;
   for (const auto& it : activationSourceNodesByNodeType) {
+    if (!first) os << ",\n";
+    first = false;
+    os << "    \"" << jsonEscape(it.first) << "\": " << it.second;
+  }
+  os << "\n  },\n";
+  os << "  \"boundary_activation_source_nodes_by_node_type\": {\n";
+  first = true;
+  for (const auto& it : boundaryActivationSourceNodesByNodeType) {
     if (!first) os << ",\n";
     first = false;
     os << "    \"" << jsonEscape(it.first) << "\": " << it.second;

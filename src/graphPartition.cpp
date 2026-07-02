@@ -373,12 +373,14 @@ void graph::graphPartition() {
   graphCoarsen();
   resort();
   printf("[graphCoarsen] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
+  if (dumpStage("DpProfileAfterCoarsen")) exit(EXIT_SUCCESS);
 
 /* initial partition */
   phaseSuper = sortedSuper.size();
   graphInitPartition();
   orderAllNodes();
   printf("[InitPartition] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
+  if (dumpStage("DpProfileAfterInitPartition")) exit(EXIT_SUCCESS);
 /* refine & uncoarsen phase */
   // graphRefine();
   phaseSuper = sortedSuper.size();
