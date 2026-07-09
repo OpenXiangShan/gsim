@@ -5,7 +5,6 @@ struct Config {
   bool EnableDumpGraph;
   bool DumpGraphDot;
   bool DumpGraphJson;
-  bool DumpGraphStats;
   bool DumpAssignTree;
   bool DumpConstStatus;
   std::string OutputDir;

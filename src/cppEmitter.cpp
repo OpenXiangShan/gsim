@@ -9,12 +9,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
-#include <stack>
 #include <map>
 #include <set>
 #include <string>
 #include <tuple>
-#include <unordered_set>
 #include <utility>
 
 #define ACTIVE_WIDTH 8
@@ -47,11 +45,11 @@ extern int maxConcatNum;
 bool nameExist(std::string str);
 static int resetFuncNum = 0;
 
-static bool emitRuntimeProfile() {
+static bool emitRuntimeStats() {
   static bool initialized = false;
   static bool enabled = false;
   if (!initialized) {
-    if (const char* env = std::getenv("GSIM_EMIT_RUNTIME_PROFILE")) {
+    if (const char* env = std::getenv("GSIM_EMIT_RUNTIME_STATS")) {
       enabled = env[0] != '\0' && env[0] != '0';
     }
     initialized = true;
@@ -59,391 +57,85 @@ static bool emitRuntimeProfile() {
   return enabled;
 }
 
-struct RuntimeProfileWeights {
-  size_t nodes = 0;
-  size_t refENodes = 0;
-  size_t nonRefENodes = 0;
-  // NO0190 unified cost model (per real execution; see pdocs/grhsim_opt/NO0190):
-  size_t comp = 0;     // n_comp: real CPU compute ops (arith/logic/...; excludes OP_READ_MEM)
-  size_t src = 0;      // n_src : state reads, per-occurrence (NODE_REG_SRC leaf + OP_READ_MEM)
-  size_t sink = 0;     // n_sink: state writes (NODE_REG_DST / NODE_WRITER / NODE_READWRITER)
-  size_t constv = 0;   // n_const: constant materialization (OP_INT), per-occurrence
-  size_t aSucc = 0;    // a_succ: successor-activation change-detection points
+static std::string jsonEscape(const std::string& text) {
+  std::string out;
+  out.reserve(text.size() + 8);
+  for (char ch : text) {
+    switch (ch) {
+      case '\\': out += "\\\\"; break;
+      case '"': out += "\\\""; break;
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
+      default: out.push_back(ch); break;
+    }
+  }
+  return out;
+}
+
+struct GSimStaticStatsRow {
+  size_t activationEdges = 0;
+  size_t selfActivationEdges = 0;
+  size_t activationChecks = 0;
 };
 
-static RuntimeProfileWeights countRuntimeProfileTree(const ExpTree* tree) {
-  RuntimeProfileWeights weights;
-  std::unordered_set<const ENode*> visited;
-  std::stack<const ENode*> stack;
-  if (tree && tree->getRoot()) stack.push(tree->getRoot());
-  if (tree && tree->getlval()) stack.push(tree->getlval());
-  while (!stack.empty()) {
-    const ENode* cur = stack.top();
-    stack.pop();
-    if (!cur) continue;
-    if (!visited.insert(cur).second) continue;
-    if (cur->nodePtr) {
-      weights.refENodes ++;
-      // n_src: register read leaf (per-occurrence, no dedup; gsim has no hoist, NO0190 §7.1)
-      if (cur->nodePtr->type == NODE_REG_SRC) weights.src ++;
-    } else {
-      weights.nonRefENodes ++;
-      switch (cur->opType) {
-        case OP_INT:        weights.constv ++; break;  // n_const
-        case OP_READ_MEM:   weights.src ++;    break;  // n_src: memory read (NO0190 §7.2)
-        case OP_INVALID:
-        case OP_EMPTY:
-        case OP_INDEX_INT:
-        case OP_INDEX:                          break;  // not a real op
-        default:            weights.comp ++;   break;  // n_comp: real compute op
-      }
-    }
-    for (const ENode* child : cur->child) {
-      if (child) stack.push(child);
-    }
-  }
-  return weights;
-}
+static void writeGSimStaticStatsJson(const std::string& path,
+                                     const std::string& graphName,
+                                     const std::vector<SuperNode*>& sortedSuper) {
+  std::vector<GSimStaticStatsRow> rows(static_cast<size_t>(superId));
+  size_t emittedSupernodes = 0;
+  GSimStaticStatsRow summary;
 
-static RuntimeProfileWeights countRuntimeProfileNode(Node* node) {
-  RuntimeProfileWeights weights;
-  if (node == nullptr || node->status != VALID_NODE) return weights;
-  weights.nodes = 1;
-  auto addTree = [&](const ExpTree* tree) {
-    RuntimeProfileWeights t = countRuntimeProfileTree(tree);
-    weights.refENodes += t.refENodes;
-    weights.nonRefENodes += t.nonRefENodes;
-    weights.comp += t.comp;
-    weights.src += t.src;
-    weights.constv += t.constv;
-  };
-  for (const ExpTree* tree : node->assignTree) addTree(tree);
-  addTree(node->valTree);
-  addTree(node->resetTree);
-  addTree(node->resetCond);
-  addTree(node->resetVal);
-  addTree(node->memTree);
-  // n_sink: state-write member nodes (register / memory write ports)
-  if (node->type == NODE_REG_DST || node->type == NODE_WRITER || node->type == NODE_READWRITER) {
-    weights.sink ++;
-  }
-  // a_succ: members that emit a change-detection compare to activate successors
-  if (node->needActivate() && !node->isArray() && node->type != NODE_WRITER) {
-    weights.aSucc ++;
-  }
-  return weights;
-}
-
-static RuntimeProfileWeights countRuntimeProfileSupernode(SuperNode* super) {
-  RuntimeProfileWeights weights;
-  if (super == nullptr) return weights;
-  for (Node* member : super->member) {
-    RuntimeProfileWeights nodeWeights = countRuntimeProfileNode(member);
-    weights.nodes += nodeWeights.nodes;
-    weights.refENodes += nodeWeights.refENodes;
-    weights.nonRefENodes += nodeWeights.nonRefENodes;
-    weights.comp += nodeWeights.comp;
-    weights.src += nodeWeights.src;
-    weights.sink += nodeWeights.sink;
-    weights.constv += nodeWeights.constv;
-    weights.aSucc += nodeWeights.aSucc;
-  }
-  return weights;
-}
-
-/* NO0190 §10.2: EMIT-time output — the STATIC per-supernode cost columns. Kept separate from
- * the runtime fire-count output (emit-time structural data vs runtime dynamic data). Plain host
- * file write; never baked into the generated cpp as N assignment statements (compile bomb, §10.3). */
-static void writeSupernodeCostStaticTsv(const std::string& path,
-                                        const std::vector<SuperNode*>& sortedSuper) {
-  FILE* fp = std::fopen(path.c_str(), "w");
-  if (fp == nullptr) {
-    std::cout << "[cppEmitter] WARN: cannot open supernode static cost tsv: " << path << std::endl;
-    return;
-  }
-  std::fprintf(fp, "supernode_id\tphase\tn_comp\tn_src\tn_sink\tn_const\ta_succ\n");
   for (SuperNode* super : sortedSuper) {
     if (super == nullptr || super->cppId < 0) continue;
-    RuntimeProfileWeights w = countRuntimeProfileSupernode(super);
-    std::fprintf(fp, "%d\t-\t%zu\t%zu\t%zu\t%zu\t%zu\n",
-                 super->cppId, w.comp, w.src, w.sink, w.constv, w.aSucc);
-  }
-  std::fclose(fp);
-}
-
-
-static const char* opTypeToStr(OPType t) {
-  switch (t) {
-    case OP_EMPTY: return "OP_EMPTY";
-    case OP_MUX: return "OP_MUX";
-    case OP_ADD: return "OP_ADD";
-    case OP_SUB: return "OP_SUB";
-    case OP_MUL: return "OP_MUL";
-    case OP_DIV: return "OP_DIV";
-    case OP_REM: return "OP_REM";
-    case OP_LT: return "OP_LT";
-    case OP_LEQ: return "OP_LEQ";
-    case OP_GT: return "OP_GT";
-    case OP_GEQ: return "OP_GEQ";
-    case OP_EQ: return "OP_EQ";
-    case OP_NEQ: return "OP_NEQ";
-    case OP_DSHL: return "OP_DSHL";
-    case OP_DSHR: return "OP_DSHR";
-    case OP_AND: return "OP_AND";
-    case OP_OR: return "OP_OR";
-    case OP_XOR: return "OP_XOR";
-    case OP_CAT: return "OP_CAT";
-    case OP_ASUINT: return "OP_ASUINT";
-    case OP_ASSINT: return "OP_ASSINT";
-    case OP_ASCLOCK: return "OP_ASCLOCK";
-    case OP_ASASYNCRESET: return "OP_ASASYNCRESET";
-    case OP_CVT: return "OP_CVT";
-    case OP_NEG: return "OP_NEG";
-    case OP_NOT: return "OP_NOT";
-    case OP_ANDR: return "OP_ANDR";
-    case OP_ORR: return "OP_ORR";
-    case OP_XORR: return "OP_XORR";
-    case OP_PAD: return "OP_PAD";
-    case OP_SHL: return "OP_SHL";
-    case OP_SHR: return "OP_SHR";
-    case OP_HEAD: return "OP_HEAD";
-    case OP_TAIL: return "OP_TAIL";
-    case OP_BITS: return "OP_BITS";
-    case OP_BITS_NOSHIFT: return "OP_BITS_NOSHIFT";
-    case OP_INDEX_INT: return "OP_INDEX_INT";
-    case OP_INDEX: return "OP_INDEX";
-    case OP_WHEN: return "OP_WHEN";
-    case OP_PRINTF: return "OP_PRINTF";
-    case OP_ASSERT: return "OP_ASSERT";
-    case OP_EXIT: return "OP_EXIT";
-    case OP_INT: return "OP_INT";
-    case OP_GROUP: return "OP_GROUP";
-    case OP_READ_MEM: return "OP_READ_MEM";
-    case OP_WRITE_MEM: return "OP_WRITE_MEM";
-    case OP_INFER_MEM: return "OP_INFER_MEM";
-    case OP_INVALID: return "OP_INVALID";
-    case OP_RESET: return "OP_RESET";
-    case OP_SEXT: return "OP_SEXT";
-    case OP_EXT_FUNC: return "OP_EXT_FUNC";
-    case OP_STMT_SEQ: return "OP_STMT_SEQ";
-    case OP_STMT_WHEN: return "OP_STMT_WHEN";
-    case OP_STMT_NODE: return "OP_STMT_NODE";
-    default: return "OP_UNKNOWN";
-  }
-}
-
-static void writeSupernodeStatsJson(const std::string& path,
-                                    const std::string& graphName,
-                                    const std::vector<SuperNode*>& sortedSuper) {
-  auto jsonEscape = [](const std::string& s) {
-    std::string out;
-    out.reserve(s.size());
-    for (char c : s) {
-      if (c == '\\' || c == '"') out.push_back('\\');
-      out.push_back(c);
-    }
-    return out;
-  };
-  size_t emittedSupernodes = 0;
-  size_t activationEdges = 0;
-  size_t boundaryActivationEdges = 0;
-  size_t selfActivationEdges = 0;
-  size_t activeSourceNodes = 0;
-  size_t boundaryActiveSourceNodes = 0;
-  size_t alwaysActiveSupernodes = alwaysActive.size();
-  std::set<std::pair<int, int>> uniqueActivationPairs;
-  std::set<std::pair<int, int>> uniqueBoundaryActivationPairs;
-  std::set<std::pair<int, int>> uniqueTopoEdges;
-  std::map<std::string, size_t> activationEdgesByNodeType;
-  std::map<std::string, size_t> boundaryActivationEdgesByNodeType;
-  std::map<std::string, size_t> activationSourceNodesByNodeType;
-  std::map<std::string, size_t> boundaryActivationSourceNodesByNodeType;
-  std::unordered_set<const ENode*> uniqueENodes;
-  size_t enodeEdgeCount = 0;
-  size_t enodeNodeRefCount = 0;
-  size_t enodeIntConstCount = 0;
-  std::map<std::string, size_t> enodeOps;
-  std::vector<size_t> enodeOutDegrees;
-  std::vector<size_t> refEnodeOutDegrees;
-  std::vector<size_t> nonRefEnodeOutDegrees;
-
-  auto nodeTypeToString = [](NodeType type) -> const char* {
-    switch (type) {
-      case NODE_INVALID: return "NODE_INVALID";
-      case NODE_REG_SRC: return "NODE_REG_SRC";
-      case NODE_REG_DST: return "NODE_REG_DST";
-      case NODE_SPECIAL: return "NODE_SPECIAL";
-      case NODE_INP: return "NODE_INP";
-      case NODE_OUT: return "NODE_OUT";
-      case NODE_MEMORY: return "NODE_MEMORY";
-      case NODE_READER: return "NODE_READER";
-      case NODE_WRITER: return "NODE_WRITER";
-      case NODE_READWRITER: return "NODE_READWRITER";
-      case NODE_INFER: return "NODE_INFER";
-      case NODE_OTHERS: return "NODE_OTHERS";
-      case NODE_REG_RESET: return "NODE_REG_RESET";
-      case NODE_EXT_IN: return "NODE_EXT_IN";
-      case NODE_EXT_OUT: return "NODE_EXT_OUT";
-      case NODE_EXT: return "NODE_EXT";
-      default: return "NODE_UNKNOWN";
-    }
-  };
-
-  auto collectTreeENodes = [&](const ExpTree* tree) {
-    std::stack<const ENode*> stack;
-    if (tree && tree->getRoot()) stack.push(tree->getRoot());
-    if (tree && tree->getlval()) stack.push(tree->getlval());
-    while (!stack.empty()) {
-      const ENode* cur = stack.top();
-      stack.pop();
-      if (!cur) continue;
-      if (!uniqueENodes.insert(cur).second) continue;
-      enodeEdgeCount += cur->child.size();
-      enodeOutDegrees.push_back(cur->child.size());
-      if (cur->nodePtr) {
-        enodeNodeRefCount ++;
-        refEnodeOutDegrees.push_back(cur->child.size());
-      } else {
-        nonRefEnodeOutDegrees.push_back(cur->child.size());
-        enodeOps[opTypeToStr(cur->opType)] ++;
-        if (cur->opType == OP_INT) enodeIntConstCount ++;
-      }
-      for (const ENode* child : cur->child) {
-        if (child) stack.push(child);
-      }
-    }
-  };
-
-  for (SuperNode* super : sortedSuper) {
-    if (super->cppId < 0) continue;
     emittedSupernodes ++;
-
-    for (SuperNode* next : super->next) {
-      if (next->cppId < 0) continue;
-      uniqueTopoEdges.insert(std::make_pair(super->cppId, next->cppId));
-    }
-
+    std::set<int> uniqueTargets;
+    GSimStaticStatsRow& row = rows[static_cast<size_t>(super->cppId)];
     for (Node* member : super->member) {
-      if (member->status != VALID_NODE) continue;
-      for (const ExpTree* tree : member->assignTree) collectTreeENodes(tree);
-      collectTreeENodes(member->valTree);
-      collectTreeENodes(member->resetTree);
-      collectTreeENodes(member->resetCond);
-      collectTreeENodes(member->resetVal);
-      collectTreeENodes(member->memTree);
-      if (member->nextNeedActivate.empty()) continue;
-      activeSourceNodes ++;
-      activationEdges += member->nextNeedActivate.size();
-      const std::string sourceNodeTypeName(nodeTypeToString(member->type));
-      size_t boundaryTargets = 0;
-      activationSourceNodesByNodeType[sourceNodeTypeName] ++;
-      activationEdgesByNodeType[sourceNodeTypeName] += member->nextNeedActivate.size();
-      for (int targetId : member->nextNeedActivate) {
-        uniqueActivationPairs.insert(std::make_pair(super->cppId, targetId));
-        if (targetId == super->cppId) {
-          selfActivationEdges ++;
-          continue;
-        }
-        boundaryTargets ++;
-        boundaryActivationEdges ++;
-        uniqueBoundaryActivationPairs.insert(std::make_pair(super->cppId, targetId));
-        boundaryActivationEdgesByNodeType[sourceNodeTypeName] ++;
-      }
-      if (boundaryTargets != 0) {
-        boundaryActiveSourceNodes ++;
-        boundaryActivationSourceNodesByNodeType[sourceNodeTypeName] ++;
+      if (member == nullptr || member->status != VALID_NODE || member->nextNeedActivate.empty()) continue;
+      row.activationChecks ++;
+      for (int target : member->nextNeedActivate) {
+        if (target < 0 || target >= superId) continue;
+        uniqueTargets.insert(target);
       }
     }
+    row.activationEdges = uniqueTargets.size();
+    for (int target : uniqueTargets) {
+      if (target == super->cppId) row.selfActivationEdges ++;
+    }
+    summary.activationEdges += row.activationEdges;
+    summary.selfActivationEdges += row.selfActivationEdges;
+    summary.activationChecks += row.activationChecks;
   }
 
-  std::ofstream os(path);
-  Assert(os.good(), "failed to open gsim stats json: %s", path.c_str());
-  os << "{\n"
-     << "  \"graph\": \"" << jsonEscape(graphName) << "\",\n"
-     << "  \"supernodes\": " << emittedSupernodes << ",\n"
-     << "  \"dag_edges\": " << uniqueTopoEdges.size() << ",\n"
-     << "  \"activation_edges\": " << activationEdges << ",\n"
-     << "  \"boundary_activation_edges\": " << boundaryActivationEdges << ",\n"
-     << "  \"self_activation_edges\": " << selfActivationEdges << ",\n"
-     << "  \"unique_activation_edges\": " << uniqueActivationPairs.size() << ",\n"
-     << "  \"unique_boundary_activation_edges\": " << uniqueBoundaryActivationPairs.size() << ",\n"
-     << "  \"active_source_nodes\": " << activeSourceNodes << ",\n"
-     << "  \"boundary_active_source_nodes\": " << boundaryActiveSourceNodes << ",\n"
-     << "  \"always_active_supernodes\": " << alwaysActiveSupernodes << ",\n"
-     << "  \"enode_unique_count\": " << uniqueENodes.size() << ",\n"
-     << "  \"enode_edge_count\": " << enodeEdgeCount << ",\n"
-     << "  \"enode_node_ref_count\": " << enodeNodeRefCount << ",\n"
-     << "  \"enode_int_const_count\": " << enodeIntConstCount << ",\n"
-     << "  \"activation_edges_by_node_type\": {\n";
+  std::ofstream out(path);
+  Assert(out.good(), "failed to open gsim_static_stats.json: %s", path.c_str());
+  out << "{\n";
+  out << "  \"format\": \"wolvrix.sim-supernode-static-stats.v1\",\n";
+  out << "  \"sim\": \"gsim\",\n";
+  out << "  \"top\": \"" << jsonEscape(graphName) << "\",\n";
+  out << "  \"summary\": {\n";
+  out << "    \"supernodes\": {\"total\": " << emittedSupernodes << "},\n";
+  out << "    \"activation_edges\": {\"total\": " << summary.activationEdges
+      << ", \"self\": " << summary.selfActivationEdges << "},\n";
+  out << "    \"activation_checks\": {\"total\": " << summary.activationChecks << "}\n";
+  out << "  },\n";
+  out << "  \"supernodes\": [\n";
   bool first = true;
-  for (const auto& it : activationEdgesByNodeType) {
-    if (!first) os << ",\n";
+  for (SuperNode* super : sortedSuper) {
+    if (super == nullptr || super->cppId < 0) continue;
+    const GSimStaticStatsRow& row = rows[static_cast<size_t>(super->cppId)];
+    if (!first) out << ",\n";
     first = false;
-    os << "    \"" << jsonEscape(it.first) << "\": " << it.second;
+    out << "    {\"sim\": \"gsim\", \"top\": \"" << jsonEscape(graphName)
+        << "\", \"supernode_id\": " << super->cppId
+        << ", \"kind\": \"supernode\""
+        << ", \"activation_edges\": {\"total\": " << row.activationEdges
+        << ", \"self\": " << row.selfActivationEdges << "}"
+        << ", \"activation_checks\": " << row.activationChecks << "}";
   }
-  os << "\n  },\n";
-  os << "  \"boundary_activation_edges_by_node_type\": {\n";
-  first = true;
-  for (const auto& it : boundaryActivationEdgesByNodeType) {
-    if (!first) os << ",\n";
-    first = false;
-    os << "    \"" << jsonEscape(it.first) << "\": " << it.second;
-  }
-  os << "\n  },\n";
-  os << "  \"enode_op_types\": {\n";
-  first = true;
-  for (const auto& it : enodeOps) {
-    if (!first) os << ",\n";
-    first = false;
-    os << "    \"" << jsonEscape(it.first) << "\": " << it.second;
-  }
-  os << "\n  },\n";
-  auto emitSizeStats = [&](const std::string& name, std::vector<size_t> values) {
-    std::sort(values.begin(), values.end());
-    const size_t count = values.size();
-    size_t sum = 0;
-    size_t zero = 0;
-    for (size_t value : values) {
-      sum += value;
-      if (value == 0) zero ++;
-    }
-    auto percentile = [&](double pct) -> size_t {
-      if (values.empty()) return 0;
-      const double raw = pct * static_cast<double>(values.size() - 1);
-      return values[static_cast<size_t>(raw + 0.5)];
-    };
-    os << "  \"" << jsonEscape(name) << "\": {\n"
-       << "    \"count\": " << count << ",\n"
-       << "    \"sum\": " << sum << ",\n"
-       << "    \"zero\": " << zero << ",\n"
-       << "    \"min\": " << (values.empty() ? 0 : values.front()) << ",\n"
-       << "    \"mean\": " << (count == 0 ? 0.0 : static_cast<double>(sum) / static_cast<double>(count)) << ",\n"
-       << "    \"median\": " << percentile(0.50) << ",\n"
-       << "    \"p90\": " << percentile(0.90) << ",\n"
-       << "    \"p99\": " << percentile(0.99) << ",\n"
-       << "    \"max\": " << (values.empty() ? 0 : values.back()) << "\n"
-       << "  },\n";
-  };
-  emitSizeStats("enode_out_degree", enodeOutDegrees);
-  emitSizeStats("ref_enode_out_degree", refEnodeOutDegrees);
-  emitSizeStats("non_ref_enode_out_degree", nonRefEnodeOutDegrees);
-  os << "  \"activation_source_nodes_by_node_type\": {\n";
-  first = true;
-  for (const auto& it : activationSourceNodesByNodeType) {
-    if (!first) os << ",\n";
-    first = false;
-    os << "    \"" << jsonEscape(it.first) << "\": " << it.second;
-  }
-  os << "\n  },\n";
-  os << "  \"boundary_activation_source_nodes_by_node_type\": {\n";
-  first = true;
-  for (const auto& it : boundaryActivationSourceNodesByNodeType) {
-    if (!first) os << ",\n";
-    first = false;
-    os << "    \"" << jsonEscape(it.first) << "\": " << it.second;
-  }
-  os << "\n  }\n";
-  os << "}\n";
+  out << "\n  ]\n";
+  out << "}\n";
 }
 
 static bool isAlwaysActive(int cppId) {
@@ -568,6 +260,7 @@ FILE* graph::genHeaderStart() {
   includeLib(header, "cstring", true);
   includeLib(header, "map", true);
   includeLib(header, "cstdarg", true);
+  includeLib(header, "fstream", true);
   newLine(header);
 
   fprintf(header, "\n// User configuration\n");
@@ -850,14 +543,8 @@ int graph::genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string
   int id;
   uint64_t newMask;
   std::tie(id, newMask) = clearIdxMask(node->cppId);
-  if (emitRuntimeProfile()) {
-    emitBodyLock(indent, "if (runtimeProfileEnabled) {\n");
-    emitBodyLock(indent + 1, "runtimeProfileActiveSupernodes ++;\n");
-    emitBodyLock(indent + 1, "runtimeProfileNodes += runtimeProfileNodeWeight[%d];\n", node->cppId);
-    emitBodyLock(indent + 1, "runtimeProfileRefENodes += runtimeProfileRefENodeWeight[%d];\n", node->cppId);
-    emitBodyLock(indent + 1, "runtimeProfileNonRefENodes += runtimeProfileNonRefENodeWeight[%d];\n", node->cppId);
-    emitBodyLock(indent + 1, "runtimeProfileFireCount[%d] ++;\n", node->cppId);
-    emitBodyLock(indent, "}\n");
+  if (emitRuntimeStats()) {
+    emitBodyLock(indent, "runtimeStatsActivationCount[%d] ++;\n", node->cppId);
   }
 #ifdef PERF
   emitBodyLock(indent, "activeTimes[%d] ++;\n", node->cppId);
@@ -1214,6 +901,8 @@ void graph::cppEmitter() {
     }
   }
 
+  writeGSimStaticStatsJson(globalConfig.OutputDir + "/gsim_static_stats.json", name, sortedSuper);
+
   srcFp = NULL;
   srcFileIdx = 0;
 
@@ -1227,17 +916,10 @@ void graph::cppEmitter() {
   fprintf(header, "uint64_t cycles;\n");
   fprintf(header, "uint64_t LOG_START, LOG_END;\n");
   fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
-  if (emitRuntimeProfile()) {
-    fprintf(header, "bool runtimeProfileEnabled;\n");
-    fprintf(header, "uint64_t runtimeProfileActiveSupernodes;\n");
-    fprintf(header, "uint64_t runtimeProfileNodes;\n");
-    fprintf(header, "uint64_t runtimeProfileRefENodes;\n");
-    fprintf(header, "uint64_t runtimeProfileNonRefENodes;\n");
-    fprintf(header, "uint64_t runtimeProfileNodeWeight[%d];\n", superId);
-    fprintf(header, "uint64_t runtimeProfileRefENodeWeight[%d];\n", superId);
-    fprintf(header, "uint64_t runtimeProfileNonRefENodeWeight[%d];\n", superId);
-    // NO0190: only runtime counter baked into generated code; static columns go to a file.
-    fprintf(header, "uint64_t runtimeProfileFireCount[%d];\n", superId);
+  fprintf(header, "static constexpr bool kRuntimeStatsCompiled = %s;\n", emitRuntimeStats() ? "true" : "false");
+  if (emitRuntimeStats()) {
+    fprintf(header, "uint64_t runtimeStatsActivationCount[%d];\n", superId == 0 ? 1 : superId);
+    fprintf(header, "mutable bool runtimeStatsDefaultDumped;\n");
   }
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
@@ -1253,30 +935,21 @@ void graph::cppEmitter() {
                "  cycles = 0;\n"
                "  LOG_START = 1;\n"
                "  LOG_END = 0;\n"
-               "  init();\n"
-               "}\n", name.c_str(), name.c_str());
+	               "  init();\n"
+	               "}\n", name.c_str(), name.c_str());
+  fprintf(header, "~S%s();\n", name.c_str());
+  emitFuncDecl(0, "S%s::~S%s() {\n", name.c_str(), name.c_str());
+  if (emitRuntimeStats()) {
+    emitBodyLock(1, "dump_runtime_stats();\n");
+  }
+  emitBodyLock(0, "}\n");
 
   /* initialization */
   emitFuncDecl(0, "void S%s::init() {\n", name.c_str());
   emitBodyLock(1, "activateAll();\n");
-  if (emitRuntimeProfile()) {
-    emitBodyLock(1, "runtimeProfileEnabled = false;\n");
-    emitBodyLock(1, "runtimeProfileActiveSupernodes = 0;\n");
-    emitBodyLock(1, "runtimeProfileNodes = 0;\n");
-    emitBodyLock(1, "runtimeProfileRefENodes = 0;\n");
-    emitBodyLock(1, "runtimeProfileNonRefENodes = 0;\n");
-    emitBodyLock(1, "if (const char *env = std::getenv(\"EMU_RUNTIME_PROFILE\")) runtimeProfileEnabled = env[0] != '\\0' && env[0] != '0';\n");
-    emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileNodeWeight[i] = 0;\n", superId);
-    emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileRefENodeWeight[i] = 0;\n", superId);
-    emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileNonRefENodeWeight[i] = 0;\n", superId);
-    emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileFireCount[i] = 0;\n", superId);
-    for (SuperNode* super : sortedSuper) {
-      if (super->cppId < 0) continue;
-      RuntimeProfileWeights weights = countRuntimeProfileSupernode(super);
-      emitBodyLock(1, "runtimeProfileNodeWeight[%d] = %zu;\n", super->cppId, weights.nodes);
-      emitBodyLock(1, "runtimeProfileRefENodeWeight[%d] = %zu;\n", super->cppId, weights.refENodes);
-      emitBodyLock(1, "runtimeProfileNonRefENodeWeight[%d] = %zu;\n", super->cppId, weights.nonRefENodes);
-    }
+  if (emitRuntimeStats()) {
+    emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeStatsActivationCount[i] = 0;\n", superId);
+    emitBodyLock(1, "runtimeStatsDefaultDumped = false;\n");
   }
 #ifdef PERF
   emitBodyLock(1, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
@@ -1325,40 +998,40 @@ void graph::cppEmitter() {
 
   fprintf(header, "S%s();\n", name.c_str());
   fprintf(header, "void init();\n");
-  if (emitRuntimeProfile()) {
-    fprintf(header, "void set_runtime_profile_enabled(bool enabled);\n");
-    fprintf(header, "bool runtime_profile_enabled() const;\n");
-    fprintf(header, "void dump_runtime_profile() const;\n");
-  }
+  fprintf(header, "void dump_runtime_stats(const char *path = nullptr) const;\n");
 
   emitBodyLock(0, "}\n");
 
-  if (emitRuntimeProfile()) {
-    emitFuncDecl(0, "void S%s::set_runtime_profile_enabled(bool enabled) {\n", name.c_str());
-    emitBodyLock(1, "runtimeProfileEnabled = enabled;\n");
-    emitBodyLock(0, "}\n");
-
-    emitFuncDecl(0, "bool S%s::runtime_profile_enabled() const {\n", name.c_str());
-    emitBodyLock(1, "return runtimeProfileEnabled;\n");
-    emitBodyLock(0, "}\n");
-
-    emitFuncDecl(0, "void S%s::dump_runtime_profile() const {\n", name.c_str());
-    emitBodyLock(1, "if (!runtimeProfileEnabled) return;\n");
-    emitBodyLock(1, "printf(\"[GSIM_RUNTIME_PROFILE] active_supernodes=%%llu nodes=%%llu ref_enodes=%%llu non_ref_enodes=%%llu total_enodes=%%llu\\n\", static_cast<unsigned long long>(runtimeProfileActiveSupernodes), static_cast<unsigned long long>(runtimeProfileNodes), static_cast<unsigned long long>(runtimeProfileRefENodes), static_cast<unsigned long long>(runtimeProfileNonRefENodes), static_cast<unsigned long long>(runtimeProfileRefENodes + runtimeProfileNonRefENodes));\n");
-    // NO0190: runtime output = per-supernode fire counts only (supernode_id, f). The STATIC
-    // columns (n_comp/n_src/n_sink/n_const/a_succ) are an EMIT-time artifact written separately
-    // by writeSupernodeCostStaticTsv; the two are joined on supernode_id for analysis. This keeps
-    // emit-time (structural) and runtime (dynamic) outputs cleanly separated.
-    emitBodyLock(1, "const char* fireTsvPath = std::getenv(\"GSIM_SUPERNODE_TSV\");\n");
-    emitBodyLock(1, "FILE* fireFp = std::fopen(fireTsvPath ? fireTsvPath : \"%s\", \"w\");\n",
-                 (globalConfig.OutputDir + "/" + name + "_supernode_fire.tsv").c_str());
-    emitBodyLock(1, "if (fireFp) {\n");
-    emitBodyLock(2, "std::fprintf(fireFp, \"supernode_id\\tf\\n\");\n");
-    emitBodyLock(2, "for (int i = 0; i < %d; i ++) std::fprintf(fireFp, \"%%d\\t%%llu\\n\", i, static_cast<unsigned long long>(runtimeProfileFireCount[i]));\n", superId);
-    emitBodyLock(2, "std::fclose(fireFp);\n");
+  emitFuncDecl(0, "void S%s::dump_runtime_stats(const char *path) const {\n", name.c_str());
+  if (emitRuntimeStats()) {
+    emitBodyLock(1, "const bool useDefaultPath = path == nullptr || path[0] == '\\0';\n");
+    emitBodyLock(1, "if (useDefaultPath && runtimeStatsDefaultDumped) return;\n");
+    emitBodyLock(1, "const char *outPath = useDefaultPath ? \"%s\" : path;\n",
+                 (globalConfig.OutputDir + "/gsim_runtime_stats.json").c_str());
+    emitBodyLock(1, "std::ofstream out(outPath);\n");
+    emitBodyLock(1, "if (!out.is_open()) return;\n");
+    emitBodyLock(1, "uint64_t totalActivationCount = 0;\n");
+    emitBodyLock(1, "for (int i = 0; i < %d; i ++) totalActivationCount += runtimeStatsActivationCount[i];\n", superId);
+    emitBodyLock(1, "out << \"{\\n\";\n");
+    emitBodyLock(1, "out << \"  \\\"format\\\": \\\"wolvrix.sim-supernode-runtime-stats.v1\\\",\\n\";\n");
+    emitBodyLock(1, "out << \"  \\\"sim\\\": \\\"gsim\\\",\\n\";\n");
+    emitBodyLock(1, "out << \"  \\\"top\\\": \\\"%s\\\",\\n\";\n", jsonEscape(name).c_str());
+    emitBodyLock(1, "out << \"  \\\"summary\\\": {\\\"activation_count\\\": \" << totalActivationCount << \"},\\n\";\n");
+    emitBodyLock(1, "out << \"  \\\"supernodes\\\": [\\n\";\n");
+    emitBodyLock(1, "for (int i = 0; i < %d; i ++) {\n", superId);
+    emitBodyLock(2, "out << \"    {\\\"sim\\\": \\\"gsim\\\", \\\"top\\\": \\\"%s\\\", \\\"supernode_id\\\": \" << i\n",
+                 jsonEscape(name).c_str());
+    emitBodyLock(2, "    << \", \\\"kind\\\": \\\"supernode\\\", \\\"activation_count\\\": \" << runtimeStatsActivationCount[i] << \"}\";\n");
+    emitBodyLock(2, "if (i + 1 != %d) out << \",\";\n", superId);
+    emitBodyLock(2, "out << \"\\n\";\n");
     emitBodyLock(1, "}\n");
-    emitBodyLock(0, "}\n");
+    emitBodyLock(1, "out << \"  ]\\n\";\n");
+    emitBodyLock(1, "out << \"}\\n\";\n");
+    emitBodyLock(1, "if (useDefaultPath) runtimeStatsDefaultDumped = true;\n");
+  } else {
+    emitBodyLock(1, "(void)path;\n");
   }
+  emitBodyLock(0, "}\n");
 
   /* activation all nodes for reset */
   fprintf(header, "void activateAll();\n");
@@ -1402,17 +1075,6 @@ void graph::cppEmitter() {
   fclose(sigFile);
 #endif
 
-  writeSupernodeStatsJson(globalConfig.OutputDir + "/" + name + "_supernode_stats.json",
-                          name,
-                          sortedSuper);
-  if (emitRuntimeProfile()) {
-    std::string staticTsvPath = globalConfig.OutputDir + "/" + name + "_supernode_static.tsv";
-    writeSupernodeCostStaticTsv(staticTsvPath, sortedSuper);
-    std::cout << "[cppEmitter] wrote supernode static cost tsv to " << staticTsvPath << std::endl;
-  }
   printf("[cppEmitter] define %ld nodes %d superNodes\n", definedNode.size(), superId);
-  std::cout << "[cppEmitter] wrote supernode stats to "
-            << globalConfig.OutputDir + "/" + name + "_supernode_stats.json"
-            << std::endl;
   std::cout << "[cppEmitter] finish writing " << srcFileIdx << " cpp files to " + globalConfig.OutputDir + "/" << std::endl;
 }
