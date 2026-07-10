@@ -45,6 +45,18 @@ static std::set<Node*> stmtsNodes;
 
 static std::map<std::string, std::pair<std::vector<Node*>, std::vector<AggrParentNode*>>> memoryMap;
 
+static bool isResetGenInnerName(const std::string& name) {
+  const std::string prefix = "ResetGenInnerS";
+  size_t pos = name.find(prefix);
+  if (pos == std::string::npos) return false;
+  pos += prefix.size();
+  if (pos == name.size()) return false;
+  for (; pos < name.size(); pos ++) {
+    if (name[pos] < '0' || name[pos] > '9') return false;
+  }
+  return true;
+}
+
 static inline void typeCheck(PNode* node, const int expect[], int size, int minChildNum, int maxChildNum) {
   const int* expectEnd = expect + size;
   Assert((size == 0) || (std::find(expect, expectEnd, node->type) != expectEnd),
@@ -547,16 +559,23 @@ void visitExtModule(graph* g, PNode* module) {
     gateAnd->addChild(gateOr);
     Q->valTree = new ExpTree(gateAnd, Q);
   } else {
-    Node* extNode = allocNode(NODE_EXT, module->name, module->lineno);
+    // Extmodule definitions can have many instances; keep NODE_EXT scoped
+    // to the current instance while extraInfo preserves the external defname.
+    Node* extNode = allocNode(NODE_EXT, prefixName(SEP_MODULE, module->name), module->lineno);
     extNode->extraInfo = module->getExtra(0);
+    bool needsClockInput = isResetGenInnerName(extNode->extraInfo);
     addSignal(extNode->name, extNode);
     PNode* ports = module->getChild(0);
     for (int i = 0; i < ports->getChildNum(); i ++) {
       TypeInfo* portInfo = visitPort(g, ports->getChild(i), P_EXTMOD);
       for (auto entry : portInfo->aggrMember) {
         if (entry.first->isClock) {
-          if (!extNode->clock) extNode->clock = entry.first;
-          else entry.first->type = NODE_OTHERS;
+          if (!extNode->clock) {
+            extNode->clock = entry.first;
+            if (needsClockInput) extNode->add_member(entry.first);
+          } else {
+            entry.first->type = NODE_OTHERS;
+          }
         } else extNode->add_member(entry.first);
         addSignal(entry.first->name, entry.first);
       }

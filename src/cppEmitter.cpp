@@ -41,6 +41,97 @@ extern int maxConcatNum;
 bool nameExist(std::string str);
 static int resetFuncNum = 0;
 
+struct GenericRamInfo {
+  bool singlePort = false;
+  int depth = 0;
+  int dataWidth = 0;
+  int maskBits = 0;
+  bool delay = false;
+};
+
+static std::string extFuncName(Node* ext) {
+  return ext->extraInfo.length() ? ext->extraInfo : ext->name;
+}
+
+static int storageWidth(int width) {
+  if (width <= 8) return 8;
+  if (width <= 16) return 16;
+  if (width <= 32) return 32;
+  if (width <= 64) return 64;
+  return ROUNDUP(width, 64);
+}
+
+static std::string dataMaskExpr(const std::string& type, int width) {
+  if (width >= storageWidth(width)) return format("~(%s)0", type.c_str());
+  return format("(((%s)1 << %d) - (%s)1)", type.c_str(), width, type.c_str());
+}
+
+static bool parseGenericRamName(const std::string& funcName, GenericRamInfo& info) {
+  size_t pos = funcName.find("GENERIC_RAM_");
+  if (pos == std::string::npos) return false;
+
+  int ports = 0;
+  int used = 0;
+  const char* name = funcName.c_str() + pos;
+  if (std::sscanf(name, "GENERIC_RAM_%dP%dD%dW%dM%n",
+                  &ports, &info.depth, &info.dataWidth, &info.maskBits, &used) != 4) {
+    return false;
+  }
+  if (ports != 1 && ports != 2) return false;
+  const char* suffix = name + used;
+  if (*suffix == 'D') {
+    info.delay = true;
+    suffix ++;
+  }
+  if (*suffix != '\0') return false;
+  info.singlePort = ports == 1;
+  return info.depth > 0 && info.dataWidth > 0 && info.maskBits > 0;
+}
+
+static bool parseResetGenName(const std::string& funcName, int& stages) {
+  size_t pos = funcName.find("ResetGenInnerS");
+  if (pos == std::string::npos) return false;
+  int used = 0;
+  if (std::sscanf(funcName.c_str() + pos, "ResetGenInnerS%d%n", &stages, &used) != 1) return false;
+  return stages > 1 && *(funcName.c_str() + pos + used) == '\0';
+}
+
+static std::string extFuncSignature(Node* ext, const std::string& funcName, bool weak) {
+  std::string funcDecl = std::string(weak ? "__attribute__((weak)) " : "") + "void " + funcName + "(";
+  int argIdx = 0;
+  bool first = true;
+  auto appendComma = [&]() {
+    if (first) first = false;
+    else funcDecl += ", ";
+  };
+
+  for (auto param : ext->params) {
+    appendComma();
+    funcDecl += (param.first ? "int _" : "const char* _") + std::to_string(argIdx ++);
+  }
+
+  for (size_t i = 0; i < ext->member.size(); i ++) {
+    Node* arg = ext->member[i];
+    if (arg->type == NODE_EXT_IN) {
+      if (arg->isArray()) {
+        for (size_t j = 0; j < arg->arrayEntryNum(); j ++) {
+          appendComma();
+          funcDecl += widthUType(arg->width) + " _" + std::to_string(argIdx ++);
+        }
+      } else {
+        appendComma();
+        funcDecl += widthUType(arg->width) + " _" + std::to_string(argIdx ++);
+      }
+    } else {
+      Assert(!arg->isArray(), "array extmodule outputs are not supported by builtin models");
+      appendComma();
+      funcDecl += widthUType(arg->width) + "& _" + std::to_string(argIdx ++);
+    }
+  }
+  funcDecl += ")";
+  return funcDecl;
+}
+
 static bool isAlwaysActive(int cppId) {
   return alwaysActive.find(cppId) != alwaysActive.end();
 }
@@ -543,6 +634,15 @@ int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
 
 void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { // current indent = 2
   if (super->superType == SUPER_EXTMOD) { // TODO: normalize
+    auto emitExtAsyncReset = [&](Node* extOut) {
+      if (!extOut->isAsyncReset()) return;
+      auto resetId = super2ResetId.find(extOut);
+      Assert(resetId != super2ResetId.end() && resetId->second.second >= 0, "missing async reset id for %s", extOut->name.c_str());
+      emitBodyLock(indent, "subReset%d();\n", resetId->second.second);
+    };
+    for (size_t i = 1; i < super->member.size(); i ++) {
+      emitExtAsyncReset(super->member[i]);
+    }
     /* save old EXT_OUT*/
     for (size_t i = 1; i < super->member.size(); i ++) {
       if (!super->member[i]->needActivate()) continue;
@@ -551,6 +651,9 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
     }
     for (InstInfo inst : super->insts) {
       indent = translateInst(inst, indent, flagName);
+    }
+    for (size_t i = 1; i < super->member.size(); i ++) {
+      emitExtAsyncReset(super->member[i]);
     }
     for (size_t i = 1; i < super->member.size(); i ++) {
       if (!super->member[i]->needActivate()) continue;
@@ -771,6 +874,120 @@ void graph::emitPrintf() {
   );
 }
 
+void graph::genBuiltinExtModels() {
+  std::set<std::string> emitted;
+  for (SuperNode* super : sortedSuper) {
+    if (super->superType != SUPER_EXTMOD) continue;
+    Node* ext = super->member[0];
+    std::string funcName = extFuncName(ext);
+    if (emitted.find(funcName) != emitted.end()) continue;
+
+    GenericRamInfo ramInfo;
+    int resetStages = 0;
+    if (parseGenericRamName(funcName, ramInfo)) {
+      int expectedArgs = ramInfo.singlePort ? (ramInfo.maskBits > 1 ? 6 : 5) : (ramInfo.maskBits > 1 ? 7 : 6);
+      Assert((int)ext->member.size() == expectedArgs, "unsupported generic ram signature for %s", funcName.c_str());
+      std::string dataType = widthUType(ramInfo.dataWidth);
+      std::string dataMask = dataMaskExpr(dataType, ramInfo.dataWidth);
+      int segWidth = ramInfo.dataWidth / ramInfo.maskBits;
+
+      emitFuncDecl(0, "%s {\n", extFuncSignature(ext, funcName, true).c_str());
+      emitBodyLock(1, "struct GSimRamState {\n");
+      emitBodyLock(2, "std::vector<%s> mem;\n", dataType.c_str());
+      emitBodyLock(2, "%s rdata;\n", dataType.c_str());
+      emitBodyLock(2, "GSimRamState() : mem(%d), rdata(0) {}\n", ramInfo.depth);
+      emitBodyLock(1, "};\n");
+      emitBodyLock(1, "static std::map<const void*, GSimRamState> states;\n");
+      emitBodyLock(1, "GSimRamState& ram = states[__builtin_return_address(0)];\n");
+      emitBodyLock(1, "const %s dataMask = %s;\n", dataType.c_str(), dataMask.c_str());
+      if (ramInfo.singlePort) {
+        int addrArg = 0;
+        int enArg = 1;
+        int wmodeArg = 2;
+        int maskArg = ramInfo.maskBits > 1 ? 3 : -1;
+        int wdataArg = ramInfo.maskBits > 1 ? 4 : 3;
+        int rdataArg = ramInfo.maskBits > 1 ? 5 : 4;
+        emitBodyLock(1, "if (_%d) {\n", enArg);
+        emitBodyLock(2, "size_t idx = (size_t)_%d %% %d;\n", addrArg, ramInfo.depth);
+        emitBodyLock(2, "if (_%d) {\n", wmodeArg);
+        if (ramInfo.maskBits <= 1) {
+          emitBodyLock(3, "ram.mem[idx] = _%d & dataMask;\n", wdataArg);
+        } else {
+          emitBodyLock(3, "%s merged = ram.mem[idx] & dataMask;\n", dataType.c_str());
+          emitBodyLock(3, "%s cleanData = _%d & dataMask;\n", dataType.c_str(), wdataArg);
+          emitBodyLock(3, "for (int i = 0; i < %d; i ++) {\n", ramInfo.maskBits);
+          emitBodyLock(4, "if ((_%d >> i) & 1) {\n", maskArg);
+          emitBodyLock(5, "%s segMask = (((%s)1 << %d) - (%s)1) << (i * %d);\n",
+                       dataType.c_str(), dataType.c_str(), segWidth, dataType.c_str(), segWidth);
+          emitBodyLock(5, "merged = (merged & ~segMask) | (cleanData & segMask);\n");
+          emitBodyLock(4, "}\n");
+          emitBodyLock(3, "}\n");
+          emitBodyLock(3, "ram.mem[idx] = merged & dataMask;\n");
+        }
+        emitBodyLock(2, "} else {\n");
+        emitBodyLock(3, "ram.rdata = ram.mem[idx] & dataMask;\n");
+        emitBodyLock(2, "}\n");
+        emitBodyLock(1, "}\n");
+        emitBodyLock(1, "_%d = ram.rdata & dataMask;\n", rdataArg);
+      } else {
+        int raddrArg = 0;
+        int renArg = 1;
+        int rdataArg = 2;
+        int waddrArg = 3;
+        int wenArg = 4;
+        int wdataArg = 5;
+        int maskArg = ramInfo.maskBits > 1 ? 6 : -1;
+        emitBodyLock(1, "if (_%d) {\n", renArg);
+        emitBodyLock(2, "size_t idx = (size_t)_%d %% %d;\n", raddrArg, ramInfo.depth);
+        emitBodyLock(2, "ram.rdata = ram.mem[idx] & dataMask;\n");
+        emitBodyLock(1, "}\n");
+        emitBodyLock(1, "if (_%d) {\n", wenArg);
+        emitBodyLock(2, "size_t idx = (size_t)_%d %% %d;\n", waddrArg, ramInfo.depth);
+        if (ramInfo.maskBits <= 1) {
+          emitBodyLock(2, "ram.mem[idx] = _%d & dataMask;\n", wdataArg);
+        } else {
+          emitBodyLock(2, "%s merged = ram.mem[idx] & dataMask;\n", dataType.c_str());
+          emitBodyLock(2, "%s cleanData = _%d & dataMask;\n", dataType.c_str(), wdataArg);
+          emitBodyLock(2, "for (int i = 0; i < %d; i ++) {\n", ramInfo.maskBits);
+          emitBodyLock(3, "if ((_%d >> i) & 1) {\n", maskArg);
+          emitBodyLock(4, "%s segMask = (((%s)1 << %d) - (%s)1) << (i * %d);\n",
+                       dataType.c_str(), dataType.c_str(), segWidth, dataType.c_str(), segWidth);
+          emitBodyLock(4, "merged = (merged & ~segMask) | (cleanData & segMask);\n");
+          emitBodyLock(3, "}\n");
+          emitBodyLock(2, "}\n");
+          emitBodyLock(2, "ram.mem[idx] = merged & dataMask;\n");
+        }
+        emitBodyLock(1, "}\n");
+        emitBodyLock(1, "_%d = ram.rdata & dataMask;\n", rdataArg);
+      }
+      emitBodyLock(0, "}\n");
+      emitted.insert(funcName);
+    } else if (parseResetGenName(funcName, resetStages)) {
+      Assert(ext->member.size() == 7, "unsupported reset gen signature for %s", funcName.c_str());
+      std::string resetMask = resetStages >= 64 ? "~0ull" : format("((1ull << %d) - 1ull)", resetStages);
+      emitFuncDecl(0, "%s {\n", extFuncSignature(ext, funcName, true).c_str());
+      emitBodyLock(1, "struct GSimResetState { uint8_t lastClock; uint64_t shifter; GSimResetState() : lastClock(0), shifter(%s) {} };\n", resetMask.c_str());
+      emitBodyLock(1, "static std::map<const void*, GSimResetState> states;\n");
+      emitBodyLock(1, "GSimResetState& state = states[__builtin_return_address(0)];\n");
+      emitBodyLock(1, "uint8_t reset = _3 ? !_2 : _1;\n");
+      emitBodyLock(1, "if (reset) state.shifter = %s;\n", resetMask.c_str());
+      emitBodyLock(1, "else if (_0 && !state.lastClock) state.shifter = (state.shifter >> 1) & %s;\n", resetMask.c_str());
+      emitBodyLock(1, "state.lastClock = _0;\n");
+      emitBodyLock(1, "_6 = state.shifter & 1;\n");
+      emitBodyLock(1, "_5 = _4 ? !_2 : _6;\n");
+      emitBodyLock(0, "}\n");
+      emitted.insert(funcName);
+    } else if (funcName == "LogPerfHelper") {
+      emitFuncDecl(0, "%s {\n", extFuncSignature(ext, funcName, true).c_str());
+      for (size_t i = 0; i < ext->member.size(); i ++) {
+        if (ext->member[i]->type != NODE_EXT_IN) emitBodyLock(1, "_%ld = 0;\n", i);
+      }
+      emitBodyLock(0, "}\n");
+      emitted.insert(funcName);
+    }
+  }
+}
+
 void graph::cppEmitter() {
   for (SuperNode* super : sortedSuper) {
     if (!super->instsEmpty() || super->superType == SUPER_EXTMOD || super->superType == SUPER_ASYNC_RESET) {
@@ -822,6 +1039,7 @@ void graph::cppEmitter() {
   fprintf(header, "size_t nodeNum[%d];\n", superId);
 #endif
   emitPrintf();
+  genBuiltinExtModels();
   /* constrcutor */
   emitFuncDecl(0, "S%s::S%s() {\n"
                "  cycles = 0;\n"

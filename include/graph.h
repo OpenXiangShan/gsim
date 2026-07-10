@@ -34,6 +34,7 @@ class graph {
   void genResetDef(SuperNode* super, bool isUIntReset, int indent);
   void genResetActivation(SuperNode* super, bool isUIntReset, int indent, int resetId);
   void genResetDecl(FILE* fp);
+  void genBuiltinExtModels();
   int translateInst(InstInfo inst, int indent, std::string flagName);
   void genSuperEval(SuperNode* super, std::string flagName, int indent);
   void removeNodesNoConnect(NodeStatus status);

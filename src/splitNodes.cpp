@@ -592,8 +592,16 @@ ExpTree* dupTreeWithBits(ExpTree* tree, int _hi, int _lo) {
           bits->addChild(top);
           if (parent) parent->child[idx] = bits;
           else rvalue = bits;
-          s.push(std::make_tuple(top->getChild(0), top, 0, hi, 0));
-          s.push(std::make_tuple(top->getChild(1), top, 1, hi, 0));
+          for (int childIdx = 0; childIdx < 2; childIdx ++) {
+            ENode* child = top->getChild(childIdx);
+            int childHi = MIN(hi, child->width - 1);
+            if (childHi >= 0) {
+              // Addition may produce one more result bit than either operand.
+              // Keep all operand bits up to the requested result bit so carries
+              // are preserved, but never request bits above the operand width.
+              s.push(std::make_tuple(child, top, childIdx, childHi, 0));
+            }
+          }
           break;
         }
         case OP_DSHR: case OP_DSHL: case OP_SUB: {
