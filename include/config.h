@@ -10,6 +10,11 @@ struct Config {
   bool DumpConstStatus;
   std::string OutputDir;
   std::string StopAfterStage;
+  std::string ExportPreCoarsenGrh;
+  std::string ExportExecutableGrh;
+  std::string ExecutableGrhProfile;
+  std::string InputFile;
+  uint64_t InputFileBytes;
   int SuperNodeMaxSize;
   uint32_t cppMaxSizeKB;
   std::string sep_module;

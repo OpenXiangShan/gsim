@@ -204,6 +204,32 @@ FIR_TEST ?=
 FIR_TEST_TIMEOUT_PREFIX = $(if $(strip $(FIR_TEST_TIMEOUT)),timeout $(FIR_TEST_TIMEOUT),)
 FIR_TEST_TARGETS = $(addprefix $(FIR_TEST_OUTPUT_DIR)/,$(addsuffix /.done,$(FIR_TEST_CASES)))
 
+EXECUTABLE_GRH_SPLIT_REG_TEST = executable-grh-split-register-clock
+EXECUTABLE_GRH_SPLIT_REG_CHECK = $(FIR_TEST_INPUT_DIR)/check-$(EXECUTABLE_GRH_SPLIT_REG_TEST).py
+EXECUTABLE_GRH_SPLIT_REG_TARGET = $(FIR_TEST_OUTPUT_DIR)/$(EXECUTABLE_GRH_SPLIT_REG_TEST)/.done
+EXECUTABLE_GRH_REGISTER_CLOCK_TEST = executable-grh-register-clock-liveness
+EXECUTABLE_GRH_REGISTER_CLOCK_CHECK = $(FIR_TEST_INPUT_DIR)/check-$(EXECUTABLE_GRH_REGISTER_CLOCK_TEST).py
+EXECUTABLE_GRH_REGISTER_CLOCK_TARGET = $(FIR_TEST_OUTPUT_DIR)/$(EXECUTABLE_GRH_REGISTER_CLOCK_TEST)/.done
+EXECUTABLE_GRH_ASYNC_CONSTANT_TEST = executable-grh-async-reset-constant-next
+EXECUTABLE_GRH_ASYNC_CONSTANT_CHECK = $(FIR_TEST_INPUT_DIR)/check-$(EXECUTABLE_GRH_ASYNC_CONSTANT_TEST).py
+EXECUTABLE_GRH_ASYNC_CONSTANT_TARGET = $(FIR_TEST_OUTPUT_DIR)/$(EXECUTABLE_GRH_ASYNC_CONSTANT_TEST)/.done
+EXECUTABLE_GRH_EFFECTS_TEST = executable-grh-effects
+EXECUTABLE_GRH_EFFECTS_CHECK = $(FIR_TEST_INPUT_DIR)/check-$(EXECUTABLE_GRH_EFFECTS_TEST).py
+EXECUTABLE_GRH_EFFECTS_TARGET = $(FIR_TEST_OUTPUT_DIR)/$(EXECUTABLE_GRH_EFFECTS_TEST)/.done
+EXECUTABLE_GRH_EFFECTS_UNIT_BIN = $(FIR_TEST_OUTPUT_DIR)/$(EXECUTABLE_GRH_EFFECTS_TEST)/effects-unit
+EXECUTABLE_GRH_EMPTY_MEMORY_WRITER_TEST = executable-grh-empty-memory-writer
+EXECUTABLE_GRH_EMPTY_MEMORY_WRITER_CHECK = $(FIR_TEST_INPUT_DIR)/check-$(EXECUTABLE_GRH_EMPTY_MEMORY_WRITER_TEST).py
+EXECUTABLE_GRH_EMPTY_MEMORY_WRITER_TARGET = $(FIR_TEST_OUTPUT_DIR)/$(EXECUTABLE_GRH_EMPTY_MEMORY_WRITER_TEST)/.done
+EXECUTABLE_GRH_SYNC_MEMORY_ADDRESS_TEST = executable-grh-synchronous-memory-address
+EXECUTABLE_GRH_SYNC_MEMORY_ADDRESS_CHECK = $(FIR_TEST_INPUT_DIR)/check-$(EXECUTABLE_GRH_SYNC_MEMORY_ADDRESS_TEST).py
+EXECUTABLE_GRH_SYNC_MEMORY_ADDRESS_TARGET = $(FIR_TEST_OUTPUT_DIR)/$(EXECUTABLE_GRH_SYNC_MEMORY_ADDRESS_TEST)/.done
+EXECUTABLE_GRH_ASSIGN_ELISION_TEST = executable-grh-node-final-assign-elision
+EXECUTABLE_GRH_ASSIGN_ELISION_CHECK = $(FIR_TEST_INPUT_DIR)/check-$(EXECUTABLE_GRH_ASSIGN_ELISION_TEST).py
+EXECUTABLE_GRH_ASSIGN_ELISION_TARGET = $(FIR_TEST_OUTPUT_DIR)/$(EXECUTABLE_GRH_ASSIGN_ELISION_TEST)/.done
+EXECUTABLE_GRH_EFFECTS_UNIT_SRCS = \
+	$(FIR_TEST_INPUT_DIR)/$(EXECUTABLE_GRH_EFFECTS_TEST).cpp \
+	src/ExecutableGrhEffects.cpp src/Node.cpp src/ENode.cpp src/ExpTree.cpp
+
 $(GEN_CPP_DIR)/$(NAME)0.cpp: $(GSIM_BIN) $(FIRRTL_FILE)
 	@mkdir -p $(@D)
 	set -o pipefail && $(TIME) $(GSIM_BIN) $(GSIM_FLAGS) --dir $(@D) \
@@ -213,6 +239,77 @@ $(GEN_CPP_DIR)/$(NAME)0.cpp: $(GSIM_BIN) $(FIRRTL_FILE)
 compile: $(GEN_CPP_DIR)/$(NAME)0.cpp
 
 .PHONY: compile
+
+$(EXECUTABLE_GRH_SPLIT_REG_TARGET): $(FIR_TEST_INPUT_DIR)/$(EXECUTABLE_GRH_SPLIT_REG_TEST).fir \
+		$(EXECUTABLE_GRH_SPLIT_REG_CHECK) $(GSIM_BIN)
+	@mkdir -p $(@D)
+	set -o pipefail && $(TIME) $(FIR_TEST_TIMEOUT_PREFIX) $(GSIM_BIN) $(GSIM_FLAGS_EXTRA) \
+		--export-executable-grh=$(@D)/model.json --stop-after-stage=PreCoarsen \
+		--dir=$(@D) $< 2>&1 | tee $(@D)/gsim.log
+	python3 $(EXECUTABLE_GRH_SPLIT_REG_CHECK) $(@D)/model.json
+	@touch $@
+
+$(EXECUTABLE_GRH_REGISTER_CLOCK_TARGET): $(FIR_TEST_INPUT_DIR)/$(EXECUTABLE_GRH_REGISTER_CLOCK_TEST).fir \
+		$(EXECUTABLE_GRH_REGISTER_CLOCK_CHECK) $(GSIM_BIN)
+	@mkdir -p $(@D)
+	set -o pipefail && $(TIME) $(FIR_TEST_TIMEOUT_PREFIX) $(GSIM_BIN) $(GSIM_FLAGS_EXTRA) \
+		--export-executable-grh=$(@D)/model.json --stop-after-stage=PreCoarsen \
+		--dir=$(@D) $< 2>&1 | tee $(@D)/gsim.log
+	python3 $(EXECUTABLE_GRH_REGISTER_CLOCK_CHECK) $(@D)/model.json
+	@touch $@
+
+$(EXECUTABLE_GRH_ASYNC_CONSTANT_TARGET): $(FIR_TEST_INPUT_DIR)/$(EXECUTABLE_GRH_ASYNC_CONSTANT_TEST).fir \
+		$(EXECUTABLE_GRH_ASYNC_CONSTANT_CHECK) $(GSIM_BIN)
+	@mkdir -p $(@D)
+	set -o pipefail && $(TIME) $(FIR_TEST_TIMEOUT_PREFIX) $(GSIM_BIN) $(GSIM_FLAGS_EXTRA) \
+		--export-executable-grh=$(@D)/model.json --stop-after-stage=PreCoarsen \
+		--dir=$(@D) $< 2>&1 | tee $(@D)/gsim.log
+	python3 $(EXECUTABLE_GRH_ASYNC_CONSTANT_CHECK) $(@D)/model.json
+	@touch $@
+
+$(EXECUTABLE_GRH_EFFECTS_UNIT_BIN): $(EXECUTABLE_GRH_EFFECTS_UNIT_SRCS) \
+		include/ExecutableGrhEffects.h include/ExpTree.h include/Node.h $(THIS_MAKEFILE)
+	@mkdir -p $(@D) && echo + CXX $@
+	$(CXX) --std=c++17 -O2 -Wall -Wextra -Werror \
+		-ffunction-sections -fdata-sections -Iinclude -Iparser/include \
+		$(EXECUTABLE_GRH_EFFECTS_UNIT_SRCS) -Wl,--gc-sections -lgmp -o $@
+
+$(EXECUTABLE_GRH_EFFECTS_TARGET): $(FIR_TEST_INPUT_DIR)/$(EXECUTABLE_GRH_EFFECTS_TEST).fir \
+		$(EXECUTABLE_GRH_EFFECTS_CHECK) $(EXECUTABLE_GRH_EFFECTS_UNIT_BIN) $(GSIM_BIN)
+	@mkdir -p $(@D)
+	$(EXECUTABLE_GRH_EFFECTS_UNIT_BIN)
+	set -o pipefail && $(TIME) $(FIR_TEST_TIMEOUT_PREFIX) $(GSIM_BIN) $(GSIM_FLAGS_EXTRA) \
+		--export-executable-grh=$(@D)/model.json --stop-after-stage=PreCoarsen \
+		--dir=$(@D) $< 2>&1 | tee $(@D)/gsim.log
+	python3 $(EXECUTABLE_GRH_EFFECTS_CHECK) $(@D)/model.json
+	@touch $@
+
+$(EXECUTABLE_GRH_EMPTY_MEMORY_WRITER_TARGET): $(FIR_TEST_INPUT_DIR)/$(EXECUTABLE_GRH_EMPTY_MEMORY_WRITER_TEST).fir \
+		$(EXECUTABLE_GRH_EMPTY_MEMORY_WRITER_CHECK) $(GSIM_BIN)
+	@mkdir -p $(@D)
+	set -o pipefail && $(TIME) $(FIR_TEST_TIMEOUT_PREFIX) $(GSIM_BIN) $(GSIM_FLAGS_EXTRA) \
+		--export-executable-grh=$(@D)/model.json --stop-after-stage=PreCoarsen \
+		--dir=$(@D) $< 2>&1 | tee $(@D)/gsim.log
+	python3 $(EXECUTABLE_GRH_EMPTY_MEMORY_WRITER_CHECK) $(@D)/model.json
+	@touch $@
+
+$(EXECUTABLE_GRH_SYNC_MEMORY_ADDRESS_TARGET): $(FIR_TEST_INPUT_DIR)/$(EXECUTABLE_GRH_SYNC_MEMORY_ADDRESS_TEST).fir \
+		$(EXECUTABLE_GRH_SYNC_MEMORY_ADDRESS_CHECK) $(GSIM_BIN)
+	@mkdir -p $(@D)
+	set -o pipefail && $(TIME) $(FIR_TEST_TIMEOUT_PREFIX) $(GSIM_BIN) $(GSIM_FLAGS_EXTRA) \
+		--export-executable-grh=$(@D)/model.json --stop-after-stage=PreCoarsen \
+		--dir=$(@D) $< 2>&1 | tee $(@D)/gsim.log
+	python3 $(EXECUTABLE_GRH_SYNC_MEMORY_ADDRESS_CHECK) $(@D)/model.json
+	@touch $@
+
+$(EXECUTABLE_GRH_ASSIGN_ELISION_TARGET): $(FIR_TEST_INPUT_DIR)/$(EXECUTABLE_GRH_ASSIGN_ELISION_TEST).fir \
+		$(EXECUTABLE_GRH_ASSIGN_ELISION_CHECK) $(GSIM_BIN)
+	@mkdir -p $(@D)
+	set -o pipefail && $(TIME) $(FIR_TEST_TIMEOUT_PREFIX) $(GSIM_BIN) $(GSIM_FLAGS_EXTRA) \
+		--export-executable-grh=$(@D)/model.json --stop-after-stage=PreCoarsen \
+		--dir=$(@D) $< 2>&1 | tee $(@D)/gsim.log
+	python3 $(EXECUTABLE_GRH_ASSIGN_ELISION_CHECK) $(@D)/model.json
+	@touch $@
 
 $(FIR_TEST_OUTPUT_DIR)/%/.done: $(FIR_TEST_INPUT_DIR)/%.fir $(GSIM_BIN)
 	@mkdir -p $(@D)
@@ -230,7 +327,20 @@ fir-tests: $(GSIM_BIN)
 	@test -n "$(strip $(FIR_TEST_CASES))" || (echo "No FIR tests found under $(FIR_TEST_INPUT_DIR)" >&2; exit 1)
 	@$(MAKE) $(FIR_TEST_TARGETS) FIR_TEST_TIMEOUT="$(FIR_TEST_TIMEOUT)"
 
-.PHONY: run-fir-test fir-tests
+test-executable-grh-split-register-clock: $(EXECUTABLE_GRH_SPLIT_REG_TARGET)
+test-executable-grh-register-clock-liveness: $(EXECUTABLE_GRH_REGISTER_CLOCK_TARGET)
+test-executable-grh-async-reset-constant-next: $(EXECUTABLE_GRH_ASYNC_CONSTANT_TARGET)
+test-executable-grh-effects: $(EXECUTABLE_GRH_EFFECTS_TARGET)
+test-executable-grh-empty-memory-writer: $(EXECUTABLE_GRH_EMPTY_MEMORY_WRITER_TARGET)
+test-executable-grh-synchronous-memory-address: $(EXECUTABLE_GRH_SYNC_MEMORY_ADDRESS_TARGET)
+test-executable-grh-node-final-assign-elision: $(EXECUTABLE_GRH_ASSIGN_ELISION_TARGET)
+
+.PHONY: run-fir-test fir-tests test-executable-grh-split-register-clock \
+	test-executable-grh-register-clock-liveness \
+	test-executable-grh-async-reset-constant-next test-executable-grh-effects \
+	test-executable-grh-empty-memory-writer \
+	test-executable-grh-synchronous-memory-address \
+	test-executable-grh-node-final-assign-elision
 
 ##############################################
 ### Building EMU from cpp model generated by GSIM

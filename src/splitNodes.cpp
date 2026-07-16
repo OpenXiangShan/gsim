@@ -57,6 +57,10 @@ void createSplittedNode(Node* node, std::set<int>& cuts) {
       Node* newDstNode = node->dup(node->getDst()->type, node->getDst()->name + format("$%d_%d", hi, lo));
       newDstNode->width = hi - lo + 1;
       newDstNode->super = new SuperNode(newDstNode);
+      // Node::dup intentionally copies only the value shape.  A split register
+      // is still clocked by the same event as the original register pair.
+      newSrcNode->clock = node->clock;
+      newDstNode->clock = node->getDst()->clock;
       newSrcNode->bindReg(newDstNode);
       componentMap[newDstNode] = new NodeComponent();
       componentMap[newDstNode]->addElementAll(new NodeElement(ELE_SPACE));

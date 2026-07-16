@@ -1181,6 +1181,10 @@ void visitWhenConnect(graph* g, PNode* connect) {
 void visitWhenPrintf(graph* g, PNode* print) {
   TYPE_CHECK(print, 3, 3, P_PRINTF);
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, "PRINTF_" + std::to_string(print->lineno)), print->lineno);
+  ASTExpTree* clock = visitExpr(g, print->getChild(0));
+  Assert(clock && !clock->isAggr() && clock->getExpRoot(),
+         "printf clock must be a scalar expression in lineno %d", print->lineno);
+  n->effectClock = clock->getExpRoot();
   ASTExpTree* exp = visitExpr(g, print->getChild(1)); // cond
 
   ENode* expRoot = exp->getExpRoot();
@@ -1214,6 +1218,10 @@ void visitWhenAssert(graph* g, PNode* ass) {
   TYPE_CHECK(ass, 3, 3, P_ASSERT);
   std::string assertName = ass->name.empty() ? format("ASSERT_%d", ass->lineno) : ass->name;
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, assertName), ass->lineno);
+  ASTExpTree* clock = visitExpr(g, ass->getChild(0));
+  Assert(clock && !clock->isAggr() && clock->getExpRoot(),
+         "assert clock must be a scalar expression in lineno %d", ass->lineno);
+  n->effectClock = clock->getExpRoot();
 
   ASTExpTree* pred = visitExpr(g, ass->getChild(1));
   ASTExpTree* en = visitExpr(g, ass->getChild(2));
@@ -1248,6 +1256,10 @@ void visitWhenStop(graph* g, PNode* stop) {
   TYPE_CHECK(stop, 2, 2, P_STOP);
   std::string stopName = stop->name.empty() ? format("STOP_%d", stop->lineno) : stop->name;
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stopName), stop->lineno);
+  ASTExpTree* clock = visitExpr(g, stop->getChild(0));
+  Assert(clock && !clock->isAggr() && clock->getExpRoot(),
+         "stop clock must be a scalar expression in lineno %d", stop->lineno);
+  n->effectClock = clock->getExpRoot();
 
   ASTExpTree* exp = visitExpr(g, stop->getChild(1));
 
@@ -1335,6 +1347,10 @@ void visitWhen(graph* g, PNode* when) {
 void visitPrintf(graph* g, PNode* print) {
   TYPE_CHECK(print, 3, 3, P_PRINTF);
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, print->name), print->lineno);
+  ASTExpTree* clock = visitExpr(g, print->getChild(0));
+  Assert(clock && !clock->isAggr() && clock->getExpRoot(),
+         "printf clock must be a scalar expression in lineno %d", print->lineno);
+  n->effectClock = clock->getExpRoot();
   ASTExpTree* exp = visitExpr(g, print->getChild(1));
 
   ENode* enode = new ENode(OP_PRINTF);
@@ -1362,6 +1378,7 @@ void visitPrintf(graph* g, PNode* print) {
 void visitStop(graph* g, PNode* stop) {
   TYPE_CHECK(stop, 2, 2, P_STOP);
 
+  ASTExpTree* clock = visitExpr(g, stop->getChild(0));
   ASTExpTree* exp = visitExpr(g, stop->getChild(1));
   ENode* enode = new ENode(OP_EXIT);
   enode->addChild(exp->getExpRoot());
@@ -1369,6 +1386,9 @@ void visitStop(graph* g, PNode* stop) {
 
   std::string stopName = stop->name.empty() ? format("STOP_%d", stop->lineno) : stop->name;
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stopName), stop->lineno);
+  Assert(clock && !clock->isAggr() && clock->getExpRoot(),
+         "stop clock must be a scalar expression in lineno %d", stop->lineno);
+  n->effectClock = clock->getExpRoot();
   n->valTree = new ExpTree(enode, new ENode(n));
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
@@ -1382,6 +1402,10 @@ void visitAssert(graph* g, PNode* ass) {
   TYPE_CHECK(ass, 3, 3, P_ASSERT);
   std::string assertName = ass->name.empty() ? format("ASSERT_%d", ass->lineno) : ass->name;
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, assertName), ass->lineno);
+  ASTExpTree* clock = visitExpr(g, ass->getChild(0));
+  Assert(clock && !clock->isAggr() && clock->getExpRoot(),
+         "assert clock must be a scalar expression in lineno %d", ass->lineno);
+  n->effectClock = clock->getExpRoot();
 
   ASTExpTree* pred = visitExpr(g, ass->getChild(1));
   ASTExpTree* en = visitExpr(g, ass->getChild(2));

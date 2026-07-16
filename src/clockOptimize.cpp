@@ -196,17 +196,47 @@ void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
           gateDup->setChild(1, tree->getRoot());
           tree->setRoot(gateDup);
         }
+        node->clock = val->node;
+        node->regNext->clock = val->node;
       } else if (val->node) {
         if (node->clock->type != NODE_INP) {
           ENode* clockENode = new ENode(val->node);
           clockENode->width = val->node->width;
           node->clock->assignTree[0]->setRoot(clockENode);
         }
+        // The clock wire can subsequently be removed as an ordinary alias.
+        // Preserve the event dependency explicitly on both halves of the
+        // register before splitNodes copies it to register fragments.
+        node->clock = val->node;
+        node->regNext->clock = val->node;
       } else {
         node->setConstantZero(0);
         node->regNext->setConstantZero(0);
         node->getSrc()->resetTree = nullptr;
         node->getSrc()->reset = ZERO_RESET;
+      }
+    } else if (node->type == NODE_SPECIAL && node->effectClock) {
+      clockVal* val = node->effectClock->clockCompute();
+      if (val->node) {
+        ENode* clockENode = new ENode(val->node);
+        clockENode->width = val->node->width;
+        clockENode->sign = val->node->sign;
+        clockENode->isClock = true;
+        node->effectClock = clockENode;
+        if (val->gateENode) {
+          for (ExpTree* tree : node->assignTree) {
+            ENode* gatedEffect = new ENode(OP_WHEN);
+            gatedEffect->width = tree->getRoot()->width;
+            gatedEffect->sign = tree->getRoot()->sign;
+            gatedEffect->addChild(val->gateENode->dup());
+            gatedEffect->addChild(tree->getRoot());
+            gatedEffect->addChild(nullptr);
+            tree->setRoot(gatedEffect);
+          }
+        }
+      } else {
+        // A constant or invalid event clock has no executable edge.
+        node->effectClock = nullptr;
       }
     } else if (node->type == NODE_EXT && node->clock) {
       clockVal* val = clockMap[node->clock];
@@ -244,12 +274,14 @@ void graph::clockOptimize(std::map<std::string, Node*>& allSignals) {
               tree->setRoot(gateDup);
             }
           }
+          node->clock = val->node;
         } else if (val->node) {
           if (!clockMember->assignTree.empty()) {
             ENode* clockENode = new ENode(val->node);
             clockENode->width = val->node->width;
             clockMember->assignTree[0]->setRoot(clockENode);
           }
+          node->clock = val->node;
         } else {
           for (Node* member : node->member)
             member->setConstantZero(0);

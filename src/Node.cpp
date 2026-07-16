@@ -7,6 +7,7 @@ int Node::counter = 1;
 void Node::updateConnect() {
   if (type == NODE_REG_SRC) return;
   std::queue<ENode*> q;
+  if (type == NODE_SPECIAL && effectClock) q.push(effectClock);
   for (ExpTree* tree : assignTree) {
     q.push(tree->getRoot());
     for (size_t i = 0; i < tree->getlval()->getChildNum(); i ++) q.push(tree->getlval()->getChild(i));

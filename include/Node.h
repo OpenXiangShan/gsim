@@ -147,6 +147,8 @@ class Node {
   valInfo* computeInfo = nullptr;
 /* used for reg & memory */
   Node* clock = nullptr;
+/* original FIRRTL event clock for printf/assert/stop */
+  ENode* effectClock = nullptr;
   bool isClock = false;
   ResetType reset = UNCERTAIN;
   AsReset asReset = EMPTY;

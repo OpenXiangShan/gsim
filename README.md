@@ -24,6 +24,7 @@ GSIM accepts chirrtl, and compiles it to C++
 + Run `build/gsim/gsim $(chirrtl-file)` to compile chirrtl to C++
 + Refer to `build/gsim/gsim --help` for more information
 + See [C++ harness example](https://github.com/jaypiper/simulator/blob/master/emu/emu.cpp) to know how it interacts with the emitted C++ code.
++ Run `make test-executable-grh-effects` for the lightweight executable-GRH effect-plan and export regression.
 
 ## Debug logs & dumps
 

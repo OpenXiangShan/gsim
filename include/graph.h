@@ -109,6 +109,8 @@ class graph {
   void inferAllWidth();
   void dump(std::string FileName);
   bool dumpStage(std::string stageName);
+  void exportPreCoarsenGrh(const std::string& path);
+  bool exportExecutableGrh(const std::string& path, std::string& error);
   void depthPerf();
   void generateStmtTree();
   void connectDep();

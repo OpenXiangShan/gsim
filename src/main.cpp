@@ -41,6 +41,11 @@ Config::Config() {
   DumpConstStatus = false;
   OutputDir = ".";
   StopAfterStage.clear();
+  ExportPreCoarsenGrh.clear();
+  ExportExecutableGrh.clear();
+  ExecutableGrhProfile = "full-fidelity";
+  InputFile.clear();
+  InputFileBytes = 0;
   SuperNodeMaxSize = 35;
   cppMaxSizeKB = -1;
   sep_module = "$";
@@ -128,6 +133,9 @@ static void printUsage(const char* ProgName) {
             << "      --stop-after-stage=[name]    Stop after the named stage boundary.\n"
             << "      --dump-assign-tree           Include assignTree structure in JSON dump (can be large).\n"
             << "      --dump-const-status          Dump per-node constant-analysis status before removing constants.\n"
+            << "      --export-precoarsen-grh=[p]  Export the PreCoarsen schedule-only GRH projection.\n"
+            << "      --export-executable-grh=[p]  Export strict executable GRH at PreCoarsen.\n"
+            << "      --executable-grh-profile=[p] Select full-fidelity (default) or xiangshan-gsim-coremark-stub.\n"
             ;
 }
 
@@ -158,6 +166,9 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_STOP_AFTER_STAGE,
     OPT_DUMP_ASSIGN_TREE,
     OPT_DUMP_CONST_STATUS,
+    OPT_EXPORT_PRECOARSEN_GRH,
+    OPT_EXPORT_EXECUTABLE_GRH,
+    OPT_EXECUTABLE_GRH_PROFILE,
   };
 
   const struct option Table[] = {
@@ -179,6 +190,9 @@ static char* parseCommandLine(int argc, char** argv) {
       {"stop-after-stage", required_argument, nullptr, 0},
       {"dump-assign-tree", no_argument, nullptr, 0},
       {"dump-const-status", no_argument, nullptr, 0},
+      {"export-precoarsen-grh", required_argument, nullptr, 0},
+      {"export-executable-grh", required_argument, nullptr, 0},
+      {"executable-grh-profile", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -246,6 +260,22 @@ static char* parseCommandLine(int argc, char** argv) {
                 case OPT_DUMP_CONST_STATUS:
                   globalConfig.DumpConstStatus = true;
                   break;
+                case OPT_EXPORT_PRECOARSEN_GRH:
+                  globalConfig.ExportPreCoarsenGrh = optarg;
+                  break;
+                case OPT_EXPORT_EXECUTABLE_GRH:
+                  globalConfig.ExportExecutableGrh = optarg;
+                  break;
+                case OPT_EXECUTABLE_GRH_PROFILE:
+                  globalConfig.ExecutableGrhProfile = optarg;
+                  if (globalConfig.ExecutableGrhProfile != "full-fidelity" &&
+                      globalConfig.ExecutableGrhProfile != "xiangshan-gsim-coremark-stub") {
+                    fprintf(stderr,
+                            "Error: unsupported executable GRH profile '%s'.\n",
+                            globalConfig.ExecutableGrhProfile.c_str());
+                    _exit(EXIT_FAILURE);
+                  }
+                  break;
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }
               break;
@@ -299,10 +329,12 @@ int main(int argc, char** argv) {
   graph* g = NULL;
   static int dumpIdx = 0;
   const char *InputFileName = parseCommandLine(argc, argv);
+  globalConfig.InputFile = InputFileName;
 
   size_t size = 0, mapSize = 0;
   char *strbuf;
   FUNC_TIMER(strbuf = readFile(InputFileName, size, mapSize));
+  globalConfig.InputFileBytes = size == 0 ? 0 : size - 1;
 
   PNode* globalRoot;
   FUNC_TIMER(globalRoot= parseFIR(strbuf));

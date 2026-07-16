@@ -368,6 +368,21 @@ void graph::graphPartition() {
   size_t totalSuper = sortedSuper.size();
   size_t phaseSuper = sortedSuper.size();
   orderAllNodes();
+  if (!globalConfig.ExportPreCoarsenGrh.empty()) {
+    exportPreCoarsenGrh(globalConfig.ExportPreCoarsenGrh);
+  }
+  if (!globalConfig.ExportExecutableGrh.empty()) {
+    fprintf(stderr,
+            "[ExecutableGrhExport] profile=%s boundary=PreCoarsen output=%s\n",
+            globalConfig.ExecutableGrhProfile.c_str(),
+            globalConfig.ExportExecutableGrh.c_str());
+    std::string error;
+    if (!exportExecutableGrh(globalConfig.ExportExecutableGrh, error)) {
+      fprintf(stderr, "[ExecutableGrhExport] ERROR: %s\n", error.c_str());
+      exit(EXIT_FAILURE);
+    }
+  }
+  if (dumpStage("PreCoarsen")) exit(EXIT_SUCCESS);
 
 /* coarsen phase */
   graphCoarsen();

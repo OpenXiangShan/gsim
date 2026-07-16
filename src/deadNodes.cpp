@@ -67,15 +67,25 @@ void graph::removeDeadNodes() {
     }
     if (top->type == NODE_REG_SRC) {
       add(top->getDst());
+      if (top->clock) add(top->clock);
       std::set<Node*> resetNodes;
       if (top->resetTree) top->resetTree->getRelyNodes(resetNodes);
       for (Node* node : resetNodes) add(node);
     } else if (top->type == NODE_READER) {
+      if (top->clock) add(top->clock);
       Node* memory = top->parent;
       for (Node* port : memory->member) {
         if (port->type == NODE_WRITER) add(port);
         if (port->type == NODE_READWRITER) add(port);
       }
+    } else if (top->type == NODE_WRITER || top->type == NODE_READWRITER) {
+      if (top->clock) add(top->clock);
+    } else if (top->type == NODE_SPECIAL && top->effectClock) {
+      std::set<Node*> clockNodes;
+      getENodeRelyNodes(top->effectClock, clockNodes);
+      for (Node* node : clockNodes) add(node);
+    } else if (top->type == NODE_EXT && top->clock) {
+      add(top->clock);
     } else if (top->type == NODE_EXT_OUT) {
       Node* ext = top->parent;
       for (Node* member : ext->member) add(member);
