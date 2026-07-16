@@ -261,8 +261,11 @@ void graph::mergeResetAll() {
     if (asyncSuper->member.size() != 0) {
       allReset.push_back(asyncSuper);
       iter.first->setAsyncReset();
-      iter.first->super->superType = SUPER_ASYNC_RESET;
-      iter.first->super->resetNode = asyncSuper->resetNode;
+      /* Keep special super types such as extmodules on their own emit path. */
+      if (iter.first->super->superType == SUPER_VALID) {
+        iter.first->super->superType = SUPER_ASYNC_RESET;
+        iter.first->super->resetNode = asyncSuper->resetNode;
+      }
     }
   }
 }
