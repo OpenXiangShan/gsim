@@ -547,7 +547,9 @@ void visitExtModule(graph* g, PNode* module) {
     gateAnd->addChild(gateOr);
     Q->valTree = new ExpTree(gateAnd, Q);
   } else {
-    Node* extNode = allocNode(NODE_EXT, module->name, module->lineno);
+    // Extmodule definitions can be instantiated multiple times; keep the
+    // graph node name scoped to this instance and preserve the defname below.
+    Node* extNode = allocNode(NODE_EXT, prefixName(SEP_MODULE, module->name), module->lineno);
     extNode->extraInfo = module->getExtra(0);
     addSignal(extNode->name, extNode);
     PNode* ports = module->getChild(0);
