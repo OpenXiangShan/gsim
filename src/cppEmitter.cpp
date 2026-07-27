@@ -543,6 +543,15 @@ int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
 
 void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { // current indent = 2
   if (super->superType == SUPER_EXTMOD) { // TODO: normalize
+    auto emitExtAsyncReset = [&](Node* extOut) {
+      if (!extOut->isAsyncReset()) return;
+      auto resetId = super2ResetId.find(extOut);
+      Assert(resetId != super2ResetId.end() && resetId->second.second >= 0, "missing async reset id for %s", extOut->name.c_str());
+      emitBodyLock(indent, "subReset%d();\n", resetId->second.second);
+    };
+    for (size_t i = 1; i < super->member.size(); i ++) {
+      emitExtAsyncReset(super->member[i]);
+    }
     /* save old EXT_OUT*/
     for (size_t i = 1; i < super->member.size(); i ++) {
       if (!super->member[i]->needActivate()) continue;
@@ -551,6 +560,9 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
     }
     for (InstInfo inst : super->insts) {
       indent = translateInst(inst, indent, flagName);
+    }
+    for (size_t i = 1; i < super->member.size(); i ++) {
+      emitExtAsyncReset(super->member[i]);
     }
     for (size_t i = 1; i < super->member.size(); i ++) {
       if (!super->member[i]->needActivate()) continue;
