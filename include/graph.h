@@ -103,6 +103,7 @@ class graph {
   void exprOpt();
   void patternDetect();
   void graphPartition();
+  void flattenNodes();
   void MFFCPartition();
   void mergeEssentSmallSubling(size_t maxSize, double sim);
   void essentPartition();
@@ -114,6 +115,12 @@ class graph {
   void depthPerf();
   void generateStmtTree();
   void connectDep();
+  void exportTopoProjGraph(const std::string& path);
+  void exportTopoProjAssignment(const std::string& path, const char* stage);
+  std::map<Node*, int> topoProjNodeId;
+  std::map<Node*, int> topoProjMemVar;
+  std::vector<Node*> topoProjNodes;
+  std::vector<Node*> topoProjMems;
 };
 
 #endif

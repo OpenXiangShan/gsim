@@ -41,6 +41,9 @@ Config::Config() {
   DumpConstStatus = false;
   OutputDir = ".";
   StopAfterStage.clear();
+  FlattenNodes = false;
+  NoCoarsen = false;
+  ExportTopoProj.clear();
   ExportPreCoarsenGrh.clear();
   ExportExecutableGrh.clear();
   ExecutableGrhProfile = "full-fidelity";
@@ -136,6 +139,12 @@ static void printUsage(const char* ProgName) {
             << "      --export-precoarsen-grh=[p]  Export the PreCoarsen schedule-only GRH projection.\n"
             << "      --export-executable-grh=[p]  Export strict executable GRH at PreCoarsen.\n"
             << "      --executable-grh-profile=[p] Select full-fidelity (default) or xiangshan-gsim-coremark-stub.\n"
+            << "      --flatten-nodes              Flatten expression trees before graphPartition so each node\n"
+            << "                                 holds at most one compute enode (refs express connectivity).\n"
+            << "      --no-coarsen               Skip the graphCoarsen merge passes (mergeWhenNodes/mergeOut1/\n"
+            << "                                 mergeIn1/mergeSublings); mergeResetAll is kept for reset codegen.\n"
+            << "      --export-topo-proj=[dir]     Export node graph + coarsen/DP block assignments in\n"
+            << "                                 topo-partition-proj JSONL formats into dir.\n"
             ;
 }
 
@@ -169,6 +178,9 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_EXPORT_PRECOARSEN_GRH,
     OPT_EXPORT_EXECUTABLE_GRH,
     OPT_EXECUTABLE_GRH_PROFILE,
+    OPT_FLATTEN_NODES,
+    OPT_NO_COARSEN,
+    OPT_EXPORT_TOPO_PROJ,
   };
 
   const struct option Table[] = {
@@ -193,6 +205,9 @@ static char* parseCommandLine(int argc, char** argv) {
       {"export-precoarsen-grh", required_argument, nullptr, 0},
       {"export-executable-grh", required_argument, nullptr, 0},
       {"executable-grh-profile", required_argument, nullptr, 0},
+      {"flatten-nodes", no_argument, nullptr, 0},
+      {"no-coarsen", no_argument, nullptr, 0},
+      {"export-topo-proj", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -276,6 +291,13 @@ static char* parseCommandLine(int argc, char** argv) {
                     _exit(EXIT_FAILURE);
                   }
                   break;
+                case OPT_FLATTEN_NODES:
+                  globalConfig.FlattenNodes = true;
+                  break;
+                case OPT_NO_COARSEN:
+                  globalConfig.NoCoarsen = true;
+                  break;
+                case OPT_EXPORT_TOPO_PROJ: globalConfig.ExportTopoProj = optarg; break;
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }
               break;
@@ -378,6 +400,10 @@ int main(int argc, char** argv) {
   FUNC_WRAPPER(g->commonExpr(), "CommonExpr");
 
   FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
+
+  if (globalConfig.FlattenNodes) {
+    FUNC_WRAPPER(g->flattenNodes(), "FlattenNodes");
+  }
 
   FUNC_WRAPPER(g->graphPartition(), "graphPartition");
 

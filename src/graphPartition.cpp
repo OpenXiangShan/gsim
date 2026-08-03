@@ -368,6 +368,9 @@ void graph::graphPartition() {
   size_t totalSuper = sortedSuper.size();
   size_t phaseSuper = sortedSuper.size();
   orderAllNodes();
+  if (!globalConfig.ExportTopoProj.empty()) {
+    exportTopoProjGraph(globalConfig.ExportTopoProj + "/instruction_graph.jsonl");
+  }
   if (!globalConfig.ExportPreCoarsenGrh.empty()) {
     exportPreCoarsenGrh(globalConfig.ExportPreCoarsenGrh);
   }
@@ -385,9 +388,21 @@ void graph::graphPartition() {
   if (dumpStage("PreCoarsen")) exit(EXIT_SUCCESS);
 
 /* coarsen phase */
-  graphCoarsen();
-  resort();
-  printf("[graphCoarsen] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
+  if (globalConfig.NoCoarsen) {
+    /* keep only mergeResetAll (reset supernodes are required by codegen);
+       skip mergeWhenNodes / mergeOut1 / mergeIn1 / mergeSublings so the DP
+       partition sees the un-coarsened graph */
+    mergeResetAll();
+    resort();
+    printf("[graphCoarsen] disabled by --no-coarsen (kept mergeResetAll only, %ld superNodes)\n", sortedSuper.size());
+  } else {
+    graphCoarsen();
+    resort();
+    printf("[graphCoarsen] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
+  }
+  if (!globalConfig.ExportTopoProj.empty()) {
+    exportTopoProjAssignment(globalConfig.ExportTopoProj + "/block_assignment_coarsen.jsonl", "coarsen");
+  }
   if (dumpStage("DpProfileAfterCoarsen")) exit(EXIT_SUCCESS);
 
 /* initial partition */
@@ -395,6 +410,9 @@ void graph::graphPartition() {
   graphInitPartition();
   orderAllNodes();
   printf("[InitPartition] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
+  if (!globalConfig.ExportTopoProj.empty()) {
+    exportTopoProjAssignment(globalConfig.ExportTopoProj + "/block_assignment_dp.jsonl", "dp");
+  }
   if (dumpStage("DpProfileAfterInitPartition")) exit(EXIT_SUCCESS);
 /* refine & uncoarsen phase */
   // graphRefine();
