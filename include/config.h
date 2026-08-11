@@ -10,6 +10,7 @@ struct Config {
   bool DumpConstStatus;
   bool FlattenNodes;
   bool NoCoarsen;
+  bool NoReplication;
   std::string OutputDir;
   std::string StopAfterStage;
   std::string ExportPreCoarsenGrh;

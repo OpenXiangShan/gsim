@@ -162,9 +162,9 @@ void graph::exportTopoProjGraph(const std::string& path) {
   for (Node* node : topoProjNodes) {
     int id = topoProjNodeId[node];
     int op = topoProjNodeOp(node);
-    fprintf(fp, "{\"record\":\"node\",\"id\":%d,\"op\":%d,\"opcode\":\"%s\",\"width\":%d,"
+    fprintf(fp, "{\"record\":\"node\",\"id\":%d,\"gsim_id\":%d,\"op\":%d,\"opcode\":\"%s\",\"width\":%d,"
                 "\"state_write\":%s,\"atom\":%d,\"comb_loop_atom\":false,\"gsim_type\":%d,\"name\":\"%s\"}\n",
-            id, op, topoProjOpName(op), MAX(node->width, 0),
+            id, node->id, op, topoProjOpName(op), MAX(node->width, 0),
             topoProjStateWrite(node) ? "true" : "false", id, (int)node->type, node->name.c_str());
   }
 

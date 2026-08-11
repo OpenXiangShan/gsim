@@ -275,6 +275,7 @@ class ExecutableGrhExporter {
       error = error_;
       return false;
     }
+    dumpEnodeAttribution();
     error.clear();
     return true;
   }
@@ -285,6 +286,57 @@ class ExecutableGrhExporter {
     const ENode* node;
     ~ActiveExpressionGuard() { active.erase(node); }
   };
+
+  // NO0005 instrumentation: attribute every emitted operation to the enode
+  // currently being lowered (innermost context wins), so the export can dump
+  // an exact gsim-enode-type x exec-GRH-op-kind count matrix.
+  struct EnodeContextGuard {
+    std::vector<std::string>& stack;
+    EnodeContextGuard(std::vector<std::string>& stack, std::string key)
+        : stack(stack) {
+      stack.push_back(std::move(key));
+    }
+    ~EnodeContextGuard() { stack.pop_back(); }
+  };
+
+  struct NodeContextGuard {
+    std::vector<const Node*>& stack;
+    NodeContextGuard(std::vector<const Node*>& stack, const Node* node)
+        : stack(stack) {
+      stack.push_back(node);
+    }
+    ~NodeContextGuard() { stack.pop_back(); }
+  };
+
+  static std::string effectContextKey(executable_grh::EffectKind kind) {
+    switch (kind) {
+      case executable_grh::EffectKind::Printf: return "OP_PRINTF";
+      case executable_grh::EffectKind::Assert: return "OP_ASSERT";
+      case executable_grh::EffectKind::Exit: return "OP_EXIT";
+    }
+    return "OP_EFFECT_UNKNOWN";
+  }
+
+  static std::string enodeContextKey(const ENode* enode) {
+    if (!enode) return "<non-enode>";
+    if (enode->opType == OP_EMPTY) return enode->nodePtr ? "REF" : "OP_EMPTY";
+    static const char* opNames[] = {
+        "OP_EMPTY", "OP_MUX", "OP_ADD", "OP_SUB", "OP_MUL", "OP_DIV", "OP_REM",
+        "OP_LT", "OP_LEQ", "OP_GT", "OP_GEQ", "OP_EQ", "OP_NEQ", "OP_DSHL",
+        "OP_DSHR", "OP_AND", "OP_OR", "OP_XOR", "OP_CAT", "OP_ASUINT",
+        "OP_ASSINT", "OP_ASCLOCK", "OP_ASASYNCRESET", "OP_CVT", "OP_NEG",
+        "OP_NOT", "OP_ANDR", "OP_ORR", "OP_XORR", "OP_PAD", "OP_SHL", "OP_SHR",
+        "OP_HEAD", "OP_TAIL", "OP_BITS", "OP_BITS_NOSHIFT", "OP_INDEX_INT",
+        "OP_INDEX", "OP_WHEN", "OP_PRINTF", "OP_ASSERT", "OP_EXIT", "OP_INT",
+        "OP_GROUP", "OP_READ_MEM", "OP_WRITE_MEM", "OP_INFER_MEM", "OP_INVALID",
+        "OP_RESET", "OP_SEXT", "OP_EXT_FUNC", "OP_STMT_SEQ", "OP_STMT_WHEN",
+        "OP_STMT_NODE"};
+    const int op = static_cast<int>(enode->opType);
+    if (op >= 0 && op < static_cast<int>(sizeof(opNames) / sizeof(opNames[0]))) {
+      return opNames[op];
+    }
+    return "OP_UNKNOWN";
+  }
 
   struct IndexPath {
     LoweredValue selectionShape;
@@ -1186,6 +1238,13 @@ class ExecutableGrhExporter {
     return static_cast<bool>(ops_);
   }
 
+  static bool hasAttrKey(const std::vector<JsonAttr>& attrs, const std::string& key) {
+    for (const JsonAttr& attr : attrs) {
+      if (attr.key == key) return true;
+    }
+    return false;
+  }
+
   bool emitOperation(const std::string& symbol, const std::string& kind,
                      const std::vector<std::string>& inputs,
                      const std::vector<std::string>& outputs,
@@ -1193,7 +1252,20 @@ class ExecutableGrhExporter {
     if (!emittedOperationSymbols_.insert(symbol).second) {
       return fail("duplicate executable GRH operation symbol '" + symbol + "'");
     }
+    enodeOpAttribution_[enodeContextStack_.empty() ? std::string("<non-enode>")
+                                                   : enodeContextStack_.back()][kind]++;
     EmittedOperationRecord record{symbol, kind, inputs, outputs, attrs};
+    // Stamp every node-owned operation with its owner node id so downstream
+    // consumers can rebuild gsim node groupings without heuristics.  Global
+    // constants stay unowned (shared across nodes by design); operations that
+    // already carry an explicit gsim.node_id keep it.
+    if (kind != "kConstant" && !hasAttrKey(record.attrs, "gsim.node_id")) {
+      if (!nodeContextStack_.empty()) {
+        record.attrs.push_back(intAttr("gsim.node_id", nodeContextStack_.back()->id));
+      } else {
+        unownedOpCounts_[kind]++;
+      }
+    }
     if (nodeEmissionCapture_) {
       nodeEmissionCapture_->operations.push_back(std::move(record));
       return true;
@@ -1256,6 +1328,15 @@ class ExecutableGrhExporter {
     if (canRetarget) {
       EmittedOperationRecord& producer = nodeEmissionCapture_->operations[producerIndex];
       producer.outputs[0] = target.symbol;
+      // The auto-stamped owner id duplicates the anchor attr; drop it so the
+      // merged attr list carries each key exactly once.
+      producer.attrs.erase(
+          std::remove_if(producer.attrs.begin(), producer.attrs.end(),
+                         [](const JsonAttr& attr) {
+                           return attr.key == "gsim.node_id" ||
+                                  attr.key == "gsim.node_name";
+                         }),
+          producer.attrs.end());
       producer.attrs.insert(producer.attrs.end(), nodeAttrs.begin(), nodeAttrs.end());
       nodeEmissionCapture_->values.erase(nodeEmissionCapture_->values.begin() + valueIndex);
       emittedValueSymbols_.erase(current.symbol);
@@ -2086,6 +2167,8 @@ class ExecutableGrhExporter {
       return std::nullopt;
     }
     ActiveExpressionGuard guard{activeExpressions_, enode};
+    EnodeContextGuard enodeGuard{enodeContextStack_, enodeContextKey(enode)};
+    enodeVisitCounts_[enodeContextStack_.back()]++;
 
     if (enode->width == 0 && enode->opType == OP_INT &&
         !enode->nodePtr && enode->child.empty()) {
@@ -2312,6 +2395,7 @@ class ExecutableGrhExporter {
     if (nodeEmissionCapture_) {
       return fail(nodeContext(node) + ": nested executable GRH node emission capture");
     }
+    NodeContextGuard nodeGuard{nodeContextStack_, node};
     nodeEmissionCapture_.emplace();
     const LoweredValue target = nodeValues_.at(node);
     std::optional<LoweredValue> current;
@@ -2336,6 +2420,8 @@ class ExecutableGrhExporter {
     }
     for (size_t i = 0; i < node->assignTree.size(); i++) {
       ExpTree* tree = node->assignTree[i];
+      EnodeContextGuard treeGuard{enodeContextStack_,
+                                  enodeContextKey(tree ? tree->getRoot() : nullptr)};
       if (!validateLvalue(node, tree, i)) return false;
       auto path = lowerIndexPath(node, node, tree->getlval(), target);
       if (!path) return false;
@@ -2355,6 +2441,8 @@ class ExecutableGrhExporter {
 
     const ENode* coercionContext = node->assignTree.empty()
         ? nullptr : node->assignTree.back()->getRoot();
+    EnodeContextGuard anchorGuard{enodeContextStack_,
+                                  enodeContextKey(coercionContext)};
     auto coerced = coerceToShape(node, coercionContext, *current, target);
     if (!coerced) return false;
     current = *coerced;
@@ -2422,6 +2510,8 @@ class ExecutableGrhExporter {
       return fail(nodeContext(node) + ": executable effect reached lowering without a plan");
     }
     const executable_grh::EffectPlan& plan = planIt->second;
+    NodeContextGuard nodeGuard{nodeContextStack_, node};
+    EnodeContextGuard effectGuard{enodeContextStack_, effectContextKey(plan.kind)};
     auto condition = lowerEffectCondition(node, plan);
     if (!condition) return false;
 
@@ -2639,6 +2729,7 @@ class ExecutableGrhExporter {
     if (member->type != NODE_EXT_OUT) {
       return fail(nodeContext(member) + ": external plan attempted to assign an input member");
     }
+    NodeContextGuard nodeGuard{nodeContextStack_, member};
     const LoweredValue& target = nodeValues_.at(member);
     auto coerced = coerceToShape(
         root, root->assignTree.front()->getRoot(), source, target);
@@ -2657,6 +2748,8 @@ class ExecutableGrhExporter {
 
   bool lowerAndEmitExternalInstance(ExternalInstance& instance) {
     Node* root = instance.root;
+    NodeContextGuard nodeGuard{nodeContextStack_, root};
+    EnodeContextGuard extGuard{enodeContextStack_, std::string("OP_EXT_FUNC")};
     for (size_t callIndex = 0; callIndex < instance.plan.calls.size(); ++callIndex) {
       const auto& call = instance.plan.calls[callIndex];
       if (!emitDpiImport(call)) return false;
@@ -2852,6 +2945,7 @@ class ExecutableGrhExporter {
 
   bool emitMemoryDeclarationsAndReads() {
     for (Node* memory : memories_) {
+      EnodeContextGuard memGuard{enodeContextStack_, std::string("OP_INFER_MEM")};
       const LoweredValue& row = nodeValues_.at(memory);
       if (!emitOperation(memorySymbol(memory), "kMemory", {}, {},
                          {intAttr("width", row.width),
@@ -2873,6 +2967,10 @@ class ExecutableGrhExporter {
 
     for (Node* port : memoryPorts_) {
       if (port->type == NODE_WRITER) continue;
+      NodeContextGuard nodeGuard{nodeContextStack_, port};
+      EnodeContextGuard readGuard{
+          enodeContextStack_,
+          enodeContextKey(port->memTree ? port->memTree->getRoot() : nullptr)};
       auto address = lowerMemoryReadAddress(port);
       if (!address) return false;
       Node* memory = port->parent;
@@ -3016,6 +3114,8 @@ class ExecutableGrhExporter {
     if (expression->opType == OP_INVALID || expression->opType == OP_READ_MEM) {
       return true;
     }
+    EnodeContextGuard writeGuard{enodeContextStack_, enodeContextKey(expression)};
+    enodeVisitCounts_[enodeContextStack_.back()]++;
     if (expression->opType != OP_WHEN) {
       return appendMemoryWrite(port, lvalue, expression, condition);
     }
@@ -3069,6 +3169,7 @@ class ExecutableGrhExporter {
     for (Node* memory : memories_) {
       for (Node* port : memory->member) {
         if (port->type == NODE_READER) continue;
+        NodeContextGuard nodeGuard{nodeContextStack_, port};
         const size_t firstWrite = memoryWrites_.size();
         bool hasWriteAction = false;
         for (size_t treeIndex = 0; treeIndex < port->assignTree.size(); treeIndex++) {
@@ -3095,6 +3196,9 @@ class ExecutableGrhExporter {
     }
     std::map<WriteGroupKey, size_t> groupOffsets;
     for (const LoweredMemoryWrite& write : memoryWrites_) {
+      NodeContextGuard nodeGuard{nodeContextStack_, write.port};
+      EnodeContextGuard writeEmitGuard{enodeContextStack_,
+                                       enodeContextKey(write.expression)};
       auto clock = nodeValues_.find(write.port->clock);
       if (clock == nodeValues_.end() || clock->second.width != 1 ||
           clock->second.isArray()) {
@@ -3127,6 +3231,7 @@ class ExecutableGrhExporter {
     LoweredValue active = emitConstant(1, false, "1'h1");
     if (active.symbol.empty()) return false;
     for (const SynchronousMemoryRead& read : synchronousMemoryReads_) {
+      NodeContextGuard nodeGuard{nodeContextStack_, read.port};
       LoweredValue data = read.oldData;
       const std::string ruw = read.memory->extraInfo.empty()
                                   ? "undefined" : read.memory->extraInfo;
@@ -3135,6 +3240,8 @@ class ExecutableGrhExporter {
           if (write.memory != read.memory || write.port->clock != read.port->clock) {
             continue;
           }
+          EnodeContextGuard ruwGuard{enodeContextStack_,
+                                     enodeContextKey(write.expression)};
           const int compareWidth = std::max(read.address.width, write.address.width);
           const LoweredValue compareShape = scalarValue({}, compareWidth, false);
           auto readAddress = coerceToShape(
@@ -3208,6 +3315,8 @@ class ExecutableGrhExporter {
       fail(nodeContext(src) + ": resetTree root must be OP_RESET(cond, value)");
       return std::nullopt;
     }
+    EnodeContextGuard resetGuard{enodeContextStack_, enodeContextKey(root)};
+    enodeVisitCounts_[enodeContextStack_.back()]++;
     auto cond = lowerExpression(src, root->child[0]);
     auto value = lowerExpression(src, root->child[1]);
     if (!cond || !value) return std::nullopt;
@@ -3247,6 +3356,7 @@ class ExecutableGrhExporter {
     LoweredValue updateCond = emitConstant(1, false, "1'h1");
     if (updateCond.symbol.empty()) return false;
     for (Node* src : registerSources_) {
+      NodeContextGuard nodeGuard{nodeContextStack_, src};
       Node* dst = src->regNext;
       if (!assignedNodes_.count(dst)) {
         return fail(nodeContext(dst) + ": register destination value was not lowered");
@@ -3452,6 +3562,45 @@ class ExecutableGrhExporter {
     return true;
   }
 
+  void dumpEnodeAttribution() const {
+    const std::string path = outputPath_ + ".enode_matrix.json";
+    std::ofstream out(path, std::ios::out | std::ios::trunc);
+    if (!out.is_open()) return;
+    out << "{\n  \"visits\": {";
+    bool first = true;
+    for (const auto& entry : enodeVisitCounts_) {
+      if (!first) out << ", ";
+      first = false;
+      writeJsonString(out, entry.first);
+      out << ": " << entry.second;
+    }
+    out << "},\n  \"ops\": {";
+    first = true;
+    for (const auto& entry : enodeOpAttribution_) {
+      if (!first) out << ", ";
+      first = false;
+      writeJsonString(out, entry.first);
+      out << ": {";
+      bool firstKind = true;
+      for (const auto& kindEntry : entry.second) {
+        if (!firstKind) out << ", ";
+        firstKind = false;
+        writeJsonString(out, kindEntry.first);
+        out << ": " << kindEntry.second;
+      }
+      out << "}";
+    }
+    out << "},\n  \"unownedOps\": {";
+    first = true;
+    for (const auto& entry : unownedOpCounts_) {
+      if (!first) out << ", ";
+      first = false;
+      writeJsonString(out, entry.first);
+      out << ": " << entry.second;
+    }
+    out << "}\n}\n";
+  }
+
   graph* source_ = nullptr;
   std::string outputPath_;
   std::string valuesPath_;
@@ -3494,6 +3643,11 @@ class ExecutableGrhExporter {
   bool externalProfileValid_ = true;
   std::unordered_map<std::string, std::string> emittedDpiImportSignatures_;
   std::unordered_set<const ENode*> activeExpressions_;
+  std::vector<std::string> enodeContextStack_;
+  std::vector<const Node*> nodeContextStack_;
+  std::map<std::string, uint64_t> unownedOpCounts_;
+  std::map<std::string, std::map<std::string, uint64_t>> enodeOpAttribution_;
+  std::map<std::string, uint64_t> enodeVisitCounts_;
   std::unordered_set<const Node*> assignedNodes_;
   std::unordered_set<std::string> emittedValueSymbols_;
   std::unordered_set<std::string> emittedOperationSymbols_;

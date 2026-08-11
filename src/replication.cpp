@@ -80,7 +80,10 @@ void graph::replicationOpt() {
     for (Node* member : super->member) {
       int op = member->repOpCount();
       int threadHold = super->member.size() == 1 ? 3 : 0;
-      if (mustNodes.find(member) != mustNodes.end() || op < 0 || op * (int)member->next.size() >= threadHold || !member->anyExtEdge()) {
+      /* never replicate reset-condition nodes: reset consumption is carried by
+         dep edges and genResetDef prints super->resetNode->name directly, so a
+         replicated/removed reset node would lose its declared storage */
+      if (mustNodes.find(member) != mustNodes.end() || member->isReset() || op < 0 || op * (int)member->next.size() >= threadHold || !member->anyExtEdge()) {
         opNum[member] = -1; // mark node is valid
       } else {
         opNum[member] = op; // mark node is replicated
