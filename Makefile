@@ -354,7 +354,7 @@ pgo-gsim:
 	$(GSIM_BIN) $(GSIM_FLAGS) --dir $(GEN_CPP_DIR) $(GSIM_FLAGS_EXTRA) $(FIRRTL_FILE)
 	$(LLVM_PROFDATA) merge -o $(GSIM_PGO_DIR)/gsim.profdata $(GSIM_PGO_DIR)/*.profraw
 	rm -rf $(GSIM_BUILD_DIR)
-	$(MAKE) build-gsim GSIM_PGO_CFLAGS="-fprofile-use=$(GSIM_PGO_DIR)/gsim.profdata -Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date"
+	$(MAKE) build-gsim GSIM_PGO_CFLAGS="-fprofile-use=$(GSIM_PGO_DIR)/gsim.profdata -Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date -Wno-backend-plugin"
 
 .PHONY: pgo-gsim
 
