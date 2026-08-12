@@ -143,7 +143,7 @@ GSIM_INC_DIR = include $(PARSER_DIR)/include $(PARSER_BUILD_DIR)
 # 2) If you still see "DWARF error: invalid or unhandled FORM value: 0x25" from ld
 #    your binutils (ld) may be older than the DWARF version emitted by clang-19.
 #    You can force DWARF v4 by building with: make DWARF4=1 ... (see conditional below).
-CXXFLAGS += -ggdb -O3 -MMD $(addprefix -I,$(GSIM_INC_DIR)) -Wall -Werror --std=c++17 -pthread
+CXXFLAGS += -ggdb -O3 -MMD $(addprefix -I,$(GSIM_INC_DIR)) -Wall -Werror --std=c++17 -pthread $(GSIM_PGO_CFLAGS)
 
 GSIM_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo UNKNOWN)
 GSIM_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo UNKNOWN)
@@ -341,6 +341,22 @@ run-veri: $(VERI_BIN)
 
 LLVM_PROFDATA = llvm-profdata
 PGO_BUILD_DIR = $(WORK_DIR)/pgo
+
+# The same treatment for gsim itself. It is branch heavy and chases pointers,
+# so knowing which way the branches actually go is worth more than any single
+# flag. Train on the design given in FIRRTL_FILE.
+GSIM_PGO_DIR = $(BUILD_DIR)/gsim-pgo
+
+pgo-gsim:
+	rm -rf $(GSIM_PGO_DIR) $(GSIM_BUILD_DIR)
+	mkdir -p $(GSIM_PGO_DIR)
+	$(MAKE) build-gsim GSIM_PGO_CFLAGS="-fprofile-generate=$(GSIM_PGO_DIR)"
+	$(GSIM_BIN) $(GSIM_FLAGS) --dir $(GEN_CPP_DIR) $(GSIM_FLAGS_EXTRA) $(FIRRTL_FILE)
+	$(LLVM_PROFDATA) merge -o $(GSIM_PGO_DIR)/gsim.profdata $(GSIM_PGO_DIR)/*.profraw
+	rm -rf $(GSIM_BUILD_DIR)
+	$(MAKE) build-gsim GSIM_PGO_CFLAGS="-fprofile-use=$(GSIM_PGO_DIR)/gsim.profdata -Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date"
+
+.PHONY: pgo-gsim
 
 pgo:
 	rm -rf $(PGO_BUILD_DIR)
