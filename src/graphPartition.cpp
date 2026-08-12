@@ -53,6 +53,27 @@ void graph::graphCoarsen() {
   mergeWhenNodes();
   resort();
 
+  { // NO0018 probe: value-graph degree histogram over SUPER_VALID supers
+    std::map<size_t, size_t> outHist, inHist;
+    auto bucket = [](size_t d) {
+      if (d == 0) return (size_t)0; if (d == 1) return (size_t)1;
+      if (d == 2) return (size_t)2; if (d == 3) return (size_t)3;
+      if (d <= 7) return (size_t)4; if (d <= 15) return (size_t)5;
+      if (d <= 63) return (size_t)6; return (size_t)7;
+    };
+    size_t outTot = 0, inTot = 0, cnt = 0;
+    for (SuperNode* s : sortedSuper) {
+      if (s->superType != SUPER_VALID) continue;
+      cnt++;
+      outHist[bucket(s->next.size())]++; outTot += s->next.size();
+      inHist[bucket(s->prev.size())]++; inTot += s->prev.size();
+    }
+    printf("[coarsen-probe] valid supers=%zu outdeg{0=%zu 1=%zu 2=%zu 3=%zu 4-7=%zu 8-15=%zu 16-63=%zu >=64=%zu total=%zu} "
+           "indeg{0=%zu 1=%zu 2=%zu 3=%zu 4-7=%zu 8-15=%zu 16-63=%zu >=64=%zu total=%zu}\n",
+           cnt, outHist[0], outHist[1], outHist[2], outHist[3], outHist[4], outHist[5], outHist[6], outHist[7], outTot,
+           inHist[0], inHist[1], inHist[2], inHist[3], inHist[4], inHist[5], inHist[6], inHist[7], inTot);
+  }
+
   mergeOut1();
   mergeIn1();
   mergeSublings();

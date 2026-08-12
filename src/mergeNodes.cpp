@@ -270,6 +270,7 @@ void graph::mergeResetAll() {
   merge nodes with out-degree=1 to their successors
 */
 void graph::mergeOut1() {
+  size_t mergeCount = 0, depBlocked = 0;
   for (int i = sortedSuper.size() - 1; i >= 0; i --) {
     SuperNode* super = sortedSuper[i];
     /* do not merge superNodes that contains reg src */
@@ -282,7 +283,8 @@ void graph::mergeOut1() {
       for (SuperNode* depNext : super->depNext) {
         if (depNext->order < nextSuper->order) canMerge = false;
       }
-      if (!canMerge) continue;
+      if (!canMerge) { depBlocked ++; continue; }
+      mergeCount ++;
       for (Node* member : super->member) member->super = nextSuper;
       /* move members in super to next super*/
       for (Node* member : super->member) {
@@ -316,12 +318,14 @@ void graph::mergeOut1() {
     }
   }
   removeEmptySuper();
+  printf("[mergeNodes-out1] merge %zu superNodes (depBlocked %zu)\n", mergeCount, depBlocked);
 }
 
 /*
   merge nodes with in-degree=1 to their preceding nodes
 */
 void graph::mergeIn1() {
+  size_t mergeCount = 0, depBlocked = 0;
   for (size_t i = 0; i < sortedSuper.size(); i ++) {
     SuperNode* super = sortedSuper[i];
     if (super->superType != SUPER_VALID) continue;
@@ -333,7 +337,8 @@ void graph::mergeIn1() {
       for (SuperNode* depPrev : super->depPrev) {
         if (depPrev->order > prevSuper->order) canMerge = false;
       }
-      if (!canMerge) continue;
+      if (!canMerge) { depBlocked ++; continue; }
+      mergeCount ++;
       /* move members in super to prev super */
       for (Node* member : super->member) member->super = prevSuper;
       Assert(prevSuper->member.size() != 0, "empty prevSuper %d", prevSuper->id);
@@ -365,6 +370,7 @@ void graph::mergeIn1() {
 
   removeEmptySuper();
   // reconnectSuper();
+  printf("[mergeNodes-in1] merge %zu superNodes (depBlocked %zu)\n", mergeCount, depBlocked);
 }
 
 uint64_t prevHash(SuperNode* super) {
@@ -380,6 +386,7 @@ bool prevEq(SuperNode* super1, SuperNode* super2) {
 }
 
 void graph::mergeSublings() {
+  size_t mergeCount = 0;
   std::map<uint64_t, std::vector<SuperNode*>> prevSuper;
   for (SuperNode* super : sortedSuper) {
     if (super->prev.size() == 0) continue;
@@ -397,6 +404,7 @@ void graph::mergeSublings() {
         if (prevEq(checkSuper, super)) { // merge or replace
           find = true;
           if (checkSuper->member.size() < MAX_SUBLINGS) {
+            mergeCount ++;
             for (Node* member : super->member) member->super = checkSuper;
             checkSuper->member.insert(checkSuper->member.end(), super->member.begin(), super->member.end());
             super->member.clear();
@@ -412,4 +420,5 @@ void graph::mergeSublings() {
   }
   removeEmptySuper();
   reconnectSuper();
+  printf("[mergeNodes-sibling] merge %zu superNodes\n", mergeCount);
 }
