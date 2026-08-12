@@ -899,12 +899,18 @@ int graph::genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string
   uint64_t newMask;
   std::tie(id, newMask) = clearIdxMask(node->cppId);
   if (emitRuntimeProfile()) {
+    // NO0010: per-supernode cycle accumulation. The t0 local is declared inside the
+    // activation branch (function scope for always-active supers; cppId suffix keeps
+    // the name unique there) and consumed in genNodeStepEnd, so the timed region is
+    // exactly the fired supernode body.
+    emitBodyLock(indent, "uint64_t runtimeProfileT0_%d = 0;\n", node->cppId);
     emitBodyLock(indent, "if (runtimeProfileEnabled) {\n");
     emitBodyLock(indent + 1, "runtimeProfileActiveSupernodes ++;\n");
     emitBodyLock(indent + 1, "runtimeProfileNodes += runtimeProfileNodeWeight[%d];\n", node->cppId);
     emitBodyLock(indent + 1, "runtimeProfileRefENodes += runtimeProfileRefENodeWeight[%d];\n", node->cppId);
     emitBodyLock(indent + 1, "runtimeProfileNonRefENodes += runtimeProfileNonRefENodeWeight[%d];\n", node->cppId);
     emitBodyLock(indent + 1, "runtimeProfileFireCount[%d] ++;\n", node->cppId);
+    emitBodyLock(indent + 1, "runtimeProfileT0_%d = gsimRdtsc();\n", node->cppId);
     emitBodyLock(indent, "}\n");
   }
 #ifdef PERF
@@ -964,6 +970,9 @@ int graph::genNodeStepEnd(SuperNode* node, int indent) {
   }
 #endif
 
+  if (emitRuntimeProfile()) {
+    emitBodyLock(indent, "if (runtimeProfileEnabled) { runtimeProfileCycles[%d] += gsimRdtsc() - runtimeProfileT0_%d; }\n", node->cppId, node->cppId);
+  }
   if(!isAlwaysActive(node->cppId)) {
     emitBodyLock(-- indent, "}\n");
   }
@@ -1164,6 +1173,11 @@ void graph::genResetAll() {
 
 void graph::genStep(int subStepIdxMax) {
   emitFuncDecl(0, "void S%s::step() {\n", name.c_str());
+  if (emitRuntimeProfile()) {
+    // NO0010: whole-step cycle total, the engine-side denominator of the closure check.
+    emitBodyLock(1, "uint64_t runtimeProfileStepT0 = 0;\n");
+    emitBodyLock(1, "if (runtimeProfileEnabled) runtimeProfileStepT0 = gsimRdtsc();\n");
+  }
   emitBodyLock(1, "resetAll();\n");
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
@@ -1176,6 +1190,9 @@ void graph::genStep(int subStepIdxMax) {
     emitBodyLock(1, "subStep%d();\n", i);
   }
 
+  if (emitRuntimeProfile()) {
+    emitBodyLock(1, "if (runtimeProfileEnabled) runtimeProfileStepCycles += gsimRdtsc() - runtimeProfileStepT0;\n");
+  }
   emitBodyLock(1, "cycles ++;\n");
   emitBodyLock(0, "}\n");
 }
@@ -1280,6 +1297,19 @@ void graph::cppEmitter() {
   sigFile = fopen((globalConfig.OutputDir + "/" + name + "_sigs.txt").c_str(), "w");
 #endif
 
+  if (emitRuntimeProfile()) {
+    // NO0010: rdtsc helper for per-supernode cycle accounting. Plain rdtsc with a
+    // compiler barrier (no lfence): cluster-level aggregation plus median-of-3 runs
+    // absorbs the reordering jitter, and the pair stays cheap on the hot path.
+    fprintf(header, "#include <chrono>\n");
+    fprintf(header,
+            "static inline uint64_t gsimRdtsc() {\n"
+            "  uint32_t lo, hi;\n"
+            "  __asm__ __volatile__(\"rdtsc\" : \"=a\"(lo), \"=d\"(hi) :: \"memory\");\n"
+            "  return ((uint64_t)hi << 32) | lo;\n"
+            "}\n");
+  }
+
   /* class start*/
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
   fprintf(header, "uint64_t cycles;\n");
@@ -1296,6 +1326,11 @@ void graph::cppEmitter() {
     fprintf(header, "uint64_t runtimeProfileNonRefENodeWeight[%d];\n", superId);
     // NO0190: only runtime counter baked into generated code; static columns go to a file.
     fprintf(header, "uint64_t runtimeProfileFireCount[%d];\n", superId);
+    // NO0010: per-supernode accumulated cycles + whole-step total + calibration.
+    fprintf(header, "uint64_t runtimeProfileCycles[%d];\n", superId);
+    fprintf(header, "uint64_t runtimeProfileStepCycles;\n");
+    fprintf(header, "uint64_t runtimeProfileRdtscOverhead;\n");
+    fprintf(header, "uint64_t runtimeProfileTscHz;\n");
   }
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
@@ -1328,6 +1363,10 @@ void graph::cppEmitter() {
     emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileRefENodeWeight[i] = 0;\n", superId);
     emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileNonRefENodeWeight[i] = 0;\n", superId);
     emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileFireCount[i] = 0;\n", superId);
+    emitBodyLock(1, "for (int i = 0; i < %d; i ++) runtimeProfileCycles[i] = 0;\n", superId);
+    emitBodyLock(1, "runtimeProfileStepCycles = 0;\n");
+    emitBodyLock(1, "runtimeProfileRdtscOverhead = 0;\n");
+    emitBodyLock(1, "runtimeProfileTscHz = 0;\n");
     for (SuperNode* super : sortedSuper) {
       if (super->cppId < 0) continue;
       RuntimeProfileWeights weights = countRuntimeProfileSupernode(super);
@@ -1335,6 +1374,17 @@ void graph::cppEmitter() {
       emitBodyLock(1, "runtimeProfileRefENodeWeight[%d] = %zu;\n", super->cppId, weights.refENodes);
       emitBodyLock(1, "runtimeProfileNonRefENodeWeight[%d] = %zu;\n", super->cppId, weights.nonRefENodes);
     }
+    // NO0010: one-time calibration at init — empty rdtsc pair cost (min over 100k
+    // samples) and TSC frequency (2ms busy wait against steady_clock).
+    emitBodyLock(1, "if (runtimeProfileEnabled) {\n");
+    emitBodyLock(2, "uint64_t rpCalBest = ~0ull;\n");
+    emitBodyLock(2, "for (int i = 0; i < 100000; i ++) { uint64_t rpCalA = gsimRdtsc(); uint64_t rpCalB = gsimRdtsc(); if (rpCalB - rpCalA < rpCalBest) rpCalBest = rpCalB - rpCalA; }\n");
+    emitBodyLock(2, "runtimeProfileRdtscOverhead = rpCalBest;\n");
+    emitBodyLock(2, "const std::chrono::steady_clock::time_point rpCalStart = std::chrono::steady_clock::now();\n");
+    emitBodyLock(2, "const uint64_t rpCalT0 = gsimRdtsc();\n");
+    emitBodyLock(2, "while (std::chrono::steady_clock::now() - rpCalStart < std::chrono::milliseconds(2)) {}\n");
+    emitBodyLock(2, "runtimeProfileTscHz = (gsimRdtsc() - rpCalT0) * 500;\n");
+    emitBodyLock(1, "}\n");
   }
 #ifdef PERF
   emitBodyLock(1, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
@@ -1414,6 +1464,17 @@ void graph::cppEmitter() {
     emitBodyLock(2, "std::fprintf(fireFp, \"supernode_id\\tf\\n\");\n");
     emitBodyLock(2, "for (int i = 0; i < %d; i ++) std::fprintf(fireFp, \"%%d\\t%%llu\\n\", i, static_cast<unsigned long long>(runtimeProfileFireCount[i]));\n", superId);
     emitBodyLock(2, "std::fclose(fireFp);\n");
+    emitBodyLock(1, "}\n");
+    // NO0010: calibration report + per-supernode (fires, cycles) time TSV. The fire
+    // TSV above stays byte-compatible with NO0019 tooling; the time file is separate.
+    emitBodyLock(1, "printf(\"[GSIM_RUNTIME_PROFILE_TSC] tsc_hz=%%llu rdtsc_overhead=%%llu step_cycles=%%llu\\n\", static_cast<unsigned long long>(runtimeProfileTscHz), static_cast<unsigned long long>(runtimeProfileRdtscOverhead), static_cast<unsigned long long>(runtimeProfileStepCycles));\n");
+    emitBodyLock(1, "const char* timeTsvPath = std::getenv(\"GSIM_SUPERNODE_TIME_TSV\");\n");
+    emitBodyLock(1, "FILE* timeFp = std::fopen(timeTsvPath ? timeTsvPath : \"%s\", \"w\");\n",
+                 (globalConfig.OutputDir + "/" + name + "_supernode_time.tsv").c_str());
+    emitBodyLock(1, "if (timeFp) {\n");
+    emitBodyLock(2, "std::fprintf(timeFp, \"supernode_id\\tf\\tcycles\\n\");\n");
+    emitBodyLock(2, "for (int i = 0; i < %d; i ++) std::fprintf(timeFp, \"%%d\\t%%llu\\t%%llu\\n\", i, static_cast<unsigned long long>(runtimeProfileFireCount[i]), static_cast<unsigned long long>(runtimeProfileCycles[i]));\n", superId);
+    emitBodyLock(2, "std::fclose(timeFp);\n");
     emitBodyLock(1, "}\n");
     emitBodyLock(0, "}\n");
   }
