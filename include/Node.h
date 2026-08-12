@@ -338,7 +338,7 @@ class InstInfo{
 public:
   SuperInfo infoType = SUPER_INFO_STR;
   std::string inst;
-  Node* node;
+  Node* node = nullptr; // back-pointer to the source node; null for string-only insts
   InstInfo(SuperInfo _type, Node* _node) {
     infoType = _type;
     node = _node;

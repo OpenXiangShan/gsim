@@ -232,6 +232,17 @@ static const char* opTypeToStr(OPType t) {
   }
 }
 
+static const char* superTypeName(SuperType t) {
+  switch (t) {
+    case SUPER_VALID: return "SUPER_VALID";
+    case SUPER_EXTMOD: return "SUPER_EXTMOD";
+    case SUPER_ASYNC_RESET: return "SUPER_ASYNC_RESET";
+    case SUPER_UINT_RESET: return "SUPER_UINT_RESET";
+    case SUPER_UPDATE_REG: return "SUPER_UPDATE_REG";
+    default: return "SUPER_UNKNOWN";
+  }
+}
+
 static void writeSupernodeStatsJson(const std::string& path,
                                     const std::string& graphName,
                                     const std::vector<SuperNode*>& sortedSuper) {
@@ -444,6 +455,43 @@ static void writeSupernodeStatsJson(const std::string& path,
   }
   os << "\n  }\n";
   os << "}\n";
+}
+
+/* Supernode <-> node membership side export: one JSONL record per supernode that got a cppId.
+ * Written next to the stats json so downstream tooling can join cpp trace comments / fire
+ * counts back to the (process-local) node ids of the same gsim run. */
+static void writeSupernodeMembersJsonl(const std::string& path,
+                                       const std::vector<SuperNode*>& sortedSuper) {
+  auto jsonEscape = [](const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s) {
+      if (c == '\\' || c == '"') out.push_back('\\');
+      out.push_back(c);
+    }
+    return out;
+  };
+  std::ofstream os(path);
+  Assert(os.good(), "failed to open supernode members jsonl: %s", path.c_str());
+  for (SuperNode* super : sortedSuper) {
+    if (super == nullptr || super->cppId < 0) continue;
+    std::vector<int> memberIds;
+    memberIds.reserve(super->member.size());
+    for (Node* member : super->member) {
+      if (member == nullptr) continue;
+      memberIds.push_back(member->id);
+    }
+    os << "{\"super\": " << super->id
+       << ", \"cpp_id\": " << super->cppId
+       << ", \"type\": \"" << jsonEscape(superTypeName(super->superType)) << "\""
+       << ", \"member_count\": " << memberIds.size()
+       << ", \"nodes\": [";
+    for (size_t i = 0; i < memberIds.size(); i ++) {
+      if (i != 0) os << ", ";
+      os << memberIds[i];
+    }
+    os << "]}\n";
+  }
 }
 
 static bool isAlwaysActive(int cppId) {
@@ -927,6 +975,7 @@ bool Node::isLocal() { // TODO: isArray is OK
 }
 
 int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
+  const bool traceNode = globalConfig.CppTraceComments && inst.node != nullptr;
   switch (inst.infoType) {
     case SUPER_INFO_IF:
       emitBodyLock(indent ++, "%s\n", inst.inst.c_str());
@@ -938,11 +987,16 @@ int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
       emitBodyLock(--indent, "%s\n", inst.inst.c_str());
       break;
     case SUPER_INFO_STR:
-      emitBodyLock(indent, "%s\n", inst.inst.c_str());
+      if (traceNode) emitBodyLock(indent, "%s // node=%d\n", inst.inst.c_str(), inst.node->id);
+      else emitBodyLock(indent, "%s\n", inst.inst.c_str());
       break;
     case SUPER_INFO_ASSIGN_BEG:
       if (inst.node->isLocal() || inst.node->isArray() || inst.node->type == NODE_WRITER) break;
-      emitBodyLock(indent, "%s %s = %s;\n", widthUType(inst.node->width).c_str(), oldName(inst.node).c_str(), inst.node->name.c_str());
+      if (globalConfig.CppTraceComments) {
+        emitBodyLock(indent, "%s %s = %s; // node=%d\n", widthUType(inst.node->width).c_str(), oldName(inst.node).c_str(), inst.node->name.c_str(), inst.node->id);
+      } else {
+        emitBodyLock(indent, "%s %s = %s;\n", widthUType(inst.node->width).c_str(), oldName(inst.node).c_str(), inst.node->name.c_str());
+      }
       break;
     case SUPER_INFO_ASSIGN_END:
       if (inst.node->isLocal() || !inst.node->needActivate()) break;
@@ -956,6 +1010,10 @@ int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
 }
 
 void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { // current indent = 2
+  if (globalConfig.CppTraceComments) {
+    emitBodyLock(indent, "// ===== super=%d cpp_id=%d type=%s members=%zu =====\n",
+                 super->id, super->cppId, superTypeName(super->superType), super->member.size());
+  }
   if (super->superType == SUPER_EXTMOD) { // TODO: normalize
     /* save old EXT_OUT*/
     for (size_t i = 1; i < super->member.size(); i ++) {
@@ -1405,6 +1463,8 @@ void graph::cppEmitter() {
   writeSupernodeStatsJson(globalConfig.OutputDir + "/" + name + "_supernode_stats.json",
                           name,
                           sortedSuper);
+  writeSupernodeMembersJsonl(globalConfig.OutputDir + "/" + name + "_supernode_members.jsonl",
+                             sortedSuper);
   if (emitRuntimeProfile()) {
     std::string staticTsvPath = globalConfig.OutputDir + "/" + name + "_supernode_static.tsv";
     writeSupernodeCostStaticTsv(staticTsvPath, sortedSuper);

@@ -44,6 +44,7 @@ Config::Config() {
   FlattenNodes = false;
   NoCoarsen = false;
   NoReplication = false;
+  CppTraceComments = true;
   ExportTopoProj.clear();
   ExportPreCoarsenGrh.clear();
   ExportExecutableGrh.clear();
@@ -148,6 +149,9 @@ static void printUsage(const char* ProgName) {
             << "                                 topo-partition-proj JSONL formats into dir.\n"
             << "      --no-replication           Skip the post-partition replication pass (replicationOpt);\n"
             << "                                 alignment comparisons use the unreplicated graph (NO0006).\n"
+            << "      --cpp-trace-comments       Annotate generated C++ with per-supernode banners and\n"
+            << "                                 per-statement node id comments (default: enabled).\n"
+            << "      --no-cpp-trace-comments    Disable trace comments in generated C++.\n"
             ;
 }
 
@@ -185,6 +189,8 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_NO_COARSEN,
     OPT_EXPORT_TOPO_PROJ,
     OPT_NO_REPLICATION,
+    OPT_CPP_TRACE_COMMENTS,
+    OPT_NO_CPP_TRACE_COMMENTS,
   };
 
   const struct option Table[] = {
@@ -213,6 +219,8 @@ static char* parseCommandLine(int argc, char** argv) {
       {"no-coarsen", no_argument, nullptr, 0},
       {"export-topo-proj", required_argument, nullptr, 0},
       {"no-replication", no_argument, nullptr, 0},
+      {"cpp-trace-comments", no_argument, nullptr, 0},
+      {"no-cpp-trace-comments", no_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -305,6 +313,12 @@ static char* parseCommandLine(int argc, char** argv) {
                 case OPT_EXPORT_TOPO_PROJ: globalConfig.ExportTopoProj = optarg; break;
                 case OPT_NO_REPLICATION:
                   globalConfig.NoReplication = true;
+                  break;
+                case OPT_CPP_TRACE_COMMENTS:
+                  globalConfig.CppTraceComments = true;
+                  break;
+                case OPT_NO_CPP_TRACE_COMMENTS:
+                  globalConfig.CppTraceComments = false;
                   break;
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }

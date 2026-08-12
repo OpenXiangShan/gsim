@@ -11,6 +11,7 @@ struct Config {
   bool FlattenNodes;
   bool NoCoarsen;
   bool NoReplication;
+  bool CppTraceComments;
   std::string OutputDir;
   std::string StopAfterStage;
   std::string ExportPreCoarsenGrh;

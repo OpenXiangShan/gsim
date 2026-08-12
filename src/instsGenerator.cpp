@@ -1700,7 +1700,7 @@ void StmtNode::compute(std::vector<InstInfo>& insts, std::set<InstInfo> assign_i
       valInfo* linfo = tree->getlval()->compute(node, INVALID_LVALUE, false);
       valInfo* rinfo = tree->getRoot()->compute(node, linfo->valStr, true);
       if (rinfo->status == VAL_FINISH || node->type == NODE_SPECIAL) { // printf / assert
-        insts.emplace_back(rinfo->valStr);
+        insts.emplace_back(SUPER_INFO_STR, node, rinfo->valStr);
       } else if (rinfo->status == VAL_INVALID) {
       } else if (rinfo->opNum >= 0) {
         if (rinfo->valStr != linfo->valStr) {
@@ -1709,9 +1709,9 @@ void StmtNode::compute(std::vector<InstInfo>& insts, std::set<InstInfo> assign_i
             else insts.emplace_back(SUPER_INFO_ASSIGN_BEG, belong);
           }
           if (isSubArray(linfo->valStr, node)) {
-            insts.emplace_back(arrayCopy(linfo->valStr, node, rinfo));
+            insts.emplace_back(SUPER_INFO_STR, node, arrayCopy(linfo->valStr, node, rinfo));
           } else {
-            insts.emplace_back(format("%s = %s;", linfo->valStr.c_str(), rinfo->valStr.c_str()));
+            insts.emplace_back(SUPER_INFO_STR, node, format("%s = %s;", linfo->valStr.c_str(), rinfo->valStr.c_str()));
           }
           if (belong) {
             if (assign_insts) assign_insts[1].emplace(SUPER_INFO_ASSIGN_END, belong);
@@ -1723,7 +1723,7 @@ void StmtNode::compute(std::vector<InstInfo>& insts, std::set<InstInfo> assign_i
           if (assign_insts) assign_insts[0].emplace(SUPER_INFO_ASSIGN_BEG, belong);
           else insts.emplace_back(SUPER_INFO_ASSIGN_BEG, belong);
         }
-        insts.emplace_back(rinfo->valStr);
+        insts.emplace_back(SUPER_INFO_STR, node, rinfo->valStr);
         if (belong) {
           if (assign_insts) assign_insts[1].emplace(SUPER_INFO_ASSIGN_END, belong);
           else insts.emplace_back(SUPER_INFO_ASSIGN_END, belong);
