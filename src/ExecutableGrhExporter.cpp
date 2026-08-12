@@ -374,6 +374,20 @@ class ExecutableGrhExporter {
     std::optional<LoweredValue> asyncResetCondition;
   };
 
+  /* one conditional (masked) partial write of a vector register update; the
+     per-register list is kept in gsim source order and emitted as consecutive
+     kRegisterWritePort ops so the consumer applies them with last-win order */
+  struct LoweredRegisterWrite {
+    Node* src = nullptr;
+    const ENode* expression = nullptr;
+    LoweredValue condition;
+    LoweredValue data;
+    LoweredValue mask;
+    bool isSyncReset = false;
+    /* async reset leaf only: extra posedge event riding the reset signal */
+    std::optional<LoweredValue> asyncEvent;
+  };
+
   struct ExternalInstance {
     Node* root = nullptr;
     executable_grh::ExternalModuleAbi abi;
@@ -2396,6 +2410,17 @@ class ExecutableGrhExporter {
       return fail(nodeContext(node) + ": nested executable GRH node emission capture");
     }
     NodeContextGuard nodeGuard{nodeContextStack_, node};
+    if (node->type == NODE_REG_DST) {
+      auto srcIt = registerDestinations_.find(node);
+      if (srcIt != registerDestinations_.end() &&
+          usePerLeafRegisterWrites(node)) {
+        /* vector register with when-skeleton updates: the functional merge
+           is replaced by per-leaf masked write ports in emitRegisterWrites,
+           so no merged nextValue is materialized here */
+        assignedNodes_.insert(node);
+        return true;
+      }
+    }
     nodeEmissionCapture_.emplace();
     const LoweredValue target = nodeValues_.at(node);
     std::optional<LoweredValue> current;
@@ -3016,6 +3041,11 @@ class ExecutableGrhExporter {
     return true;
   }
 
+  bool isConstOneBit(const LoweredValue& value) const {
+    auto it = constantValues_.find("1:u:1'h1");
+    return it != constantValues_.end() && it->second.symbol == value.symbol;
+  }
+
   std::optional<LoweredValue> lowerMemoryGuard(Node* port, const ENode* context,
                                                 const LoweredValue& lhs,
                                                 const LoweredValue& rhs) {
@@ -3023,6 +3053,8 @@ class ExecutableGrhExporter {
       fail(expressionContext(port, context) + ": memory write guard must be 1 bit");
       return std::nullopt;
     }
+    if (isConstOneBit(lhs)) return rhs;
+    if (isConstOneBit(rhs)) return lhs;
     LoweredValue guard = emitTypedOperation(
         "kAnd", {lhs, rhs}, scalarValue({}, 1, false));
     if (guard.symbol.empty()) return std::nullopt;
@@ -3104,6 +3136,161 @@ class ExecutableGrhExporter {
 
     memoryWrites_.push_back(LoweredMemoryWrite{
         memory, port, expression, condition, *address, *packedData, mask});
+    return true;
+  }
+
+  /* Vector registers (array-typed REG_DST) keep their OP_WHEN skeletons
+     (flattenNodes skips arrays), so their conditional partial updates can be
+     exported as one masked write port per when leaf — the same effect-style
+     form the memory write path already uses — instead of a functional
+     full-value merge mux chain feeding a single all-ones-mask write.
+     Leaves are collected in gsim source order (assignTree order, then-branch
+     before else-branch; the else guard carries the negated condition, so
+     same-tree leaves are mutually exclusive and cross-tree last-win is just
+     emission order). */
+
+  bool usePerLeafRegisterWrites(const Node* dst) const {
+    auto it = nodeValues_.find(dst);
+    return it != nodeValues_.end() && it->second.isArray();
+  }
+
+  bool appendRegisterWrite(Node* src, Node* dst, const ENode* lvalue,
+                           const ENode* expression, LoweredValue condition,
+                           std::vector<LoweredRegisterWrite>& writes) {
+    const LoweredValue& registerShape = nodeValues_.at(dst);
+    auto data = lowerExpression(dst, expression);
+    if (!data) return false;
+    auto path = lowerIndexPath(dst, dst, lvalue, registerShape);
+    if (!path) return false;
+    LoweredValue zero = emitConstant(
+        registerShape.width, false, std::to_string(registerShape.width) + "'h0");
+    if (zero.symbol.empty()) return false;
+    zero.elementWidth = registerShape.elementWidth;
+    zero.elementSign = registerShape.elementSign;
+    zero.dimensions = registerShape.dimensions;
+    auto packedData = insertIndexedValue(dst, lvalue, zero, *path, *data);
+    if (!packedData) return false;
+
+    LoweredValue mask;
+    if (path->staticBitOffset) {
+      const int64_t low = *path->staticBitOffset;
+      const int64_t high = low + path->selectionShape.width - 1;
+      if (high >= registerShape.width) {
+        return fail(expressionContext(dst, lvalue) +
+                    ": indexed register update exceeds packed register width");
+      }
+      mask = emitRangeOnesConstant(registerShape.width, static_cast<int>(low),
+                                   static_cast<int>(high));
+    } else {
+      LoweredValue baseMask = emitRangeOnesConstant(
+          registerShape.width, 0, path->selectionShape.width - 1);
+      if (baseMask.symbol.empty()) return false;
+      mask = emitTypedOperation("kShl", {baseMask, path->dynamicBitOffset},
+                                scalarValue({}, registerShape.width, false));
+      if (mask.symbol.empty()) return false;
+      if (!path->inRange.symbol.empty()) {
+        auto guarded = lowerMemoryGuard(dst, lvalue, condition, path->inRange);
+        if (!guarded) return false;
+        condition = *guarded;
+      }
+    }
+    if (mask.symbol.empty()) return false;
+    writes.push_back(
+        LoweredRegisterWrite{src, expression, condition, *packedData, mask, false});
+    return true;
+  }
+
+  bool lowerRegisterWriteLeaves(Node* src, Node* dst, const ENode* lvalue,
+                                const ENode* expression,
+                                const LoweredValue& condition,
+                                std::vector<LoweredRegisterWrite>& writes) {
+    if (!expression) return true;
+    if (!expression->nodePtr &&
+        (expression->opType == OP_INVALID || expression->opType == OP_EMPTY)) {
+      /* missing/invalid when branch: the register holds, i.e. no write */
+      return true;
+    }
+    EnodeContextGuard writeGuard{enodeContextStack_, enodeContextKey(expression)};
+    enodeVisitCounts_[enodeContextStack_.back()]++;
+    if (expression->opType != OP_WHEN) {
+      return appendRegisterWrite(src, dst, lvalue, expression, condition, writes);
+    }
+    if (expression->child.size() != 3 || !expression->child[0]) {
+      return fail(expressionContext(dst, expression) +
+                  ": malformed conditional register update");
+    }
+    auto branchCondition = lowerExpression(dst, expression->child[0]);
+    if (!branchCondition) return false;
+    if (branchCondition->isArray() || branchCondition->width != 1) {
+      return fail(expressionContext(dst, expression) +
+                  ": conditional register update guard must be 1 bit");
+    }
+    if (expression->child[1]) {
+      auto trueCondition = lowerMemoryGuard(
+          dst, expression, condition, *branchCondition);
+      if (!trueCondition ||
+          !lowerRegisterWriteLeaves(src, dst, lvalue, expression->child[1],
+                                    *trueCondition, writes)) {
+        return false;
+      }
+    }
+    if (expression->child[2]) {
+      LoweredValue inverse = emitTypedOperation(
+          "kNot", {*branchCondition}, scalarValue({}, 1, false));
+      if (inverse.symbol.empty()) return false;
+      auto falseCondition = lowerMemoryGuard(dst, expression, condition, inverse);
+      if (!falseCondition ||
+          !lowerRegisterWriteLeaves(src, dst, lvalue, expression->child[2],
+                                    *falseCondition, writes)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /* the reset write becomes the last write leaf (all-ones mask), so it wins
+     over every normal update of the same cycle by emission order; an async
+     reset additionally rides the reset-signal posedge as a second event */
+  bool appendRegisterSyncReset(Node* src, Node* dst,
+                               std::vector<LoweredRegisterWrite>& writes) {
+    if (src->reset == ZERO_RESET) return true;
+    if ((src->reset != UINTRESET && src->reset != ASYRESET) || !src->resetTree) {
+      return fail(nodeContext(src) + ": unsupported reset representation");
+    }
+    if (!validateLvalue(src, src->resetTree, 0)) return false;
+    if (!src->resetTree->getlval()->child.empty()) {
+      return fail(nodeContext(src) + ": indexed array reset lvalues are not supported");
+    }
+    const ENode* root = src->resetTree->getRoot();
+    if (!root || root->opType != OP_RESET || !expectChildren(src, root, 2, false)) {
+      return fail(nodeContext(src) + ": resetTree root must be OP_RESET(cond, value)");
+    }
+    EnodeContextGuard resetGuard{enodeContextStack_, enodeContextKey(root)};
+    enodeVisitCounts_[enodeContextStack_.back()]++;
+    auto cond = lowerExpression(src, root->child[0]);
+    auto value = lowerExpression(src, root->child[1]);
+    if (!cond || !value) return false;
+    if (cond->isArray() || cond->width != 1) {
+      return fail(nodeContext(src) + ": reset condition must be scalar one-bit logic");
+    }
+    const LoweredValue& registerShape = nodeValues_.at(dst);
+    if (value->isArray()) {
+      if (value->dimensions != registerShape.dimensions) {
+        return fail(nodeContext(src) +
+                    ": reset value packed-array dimensions do not exactly match the register");
+      }
+    } else if (root->child[1]->opType != OP_INT) {
+      return fail(nodeContext(src) +
+                  ": only GSim's scalar constant canonical form may broadcast to an array reset");
+    }
+    auto resetValue = coerceToShape(src, root->child[1], *value, registerShape);
+    if (!resetValue) return false;
+    LoweredValue mask = emitAllOnesConstant(registerShape.width);
+    if (mask.symbol.empty()) return false;
+    LoweredRegisterWrite write{src, root, *cond, *resetValue, mask,
+                               src->reset == UINTRESET};
+    if (src->reset == ASYRESET) write.asyncEvent = *cond;
+    writes.push_back(std::move(write));
     return true;
   }
 
@@ -3356,20 +3543,59 @@ class ExecutableGrhExporter {
     LoweredValue updateCond = emitConstant(1, false, "1'h1");
     if (updateCond.symbol.empty()) return false;
     for (Node* src : registerSources_) {
-      NodeContextGuard nodeGuard{nodeContextStack_, src};
       Node* dst = src->regNext;
       if (!assignedNodes_.count(dst)) {
         return fail(nodeContext(dst) + ": register destination value was not lowered");
       }
-      auto update = lowerRegisterReset(src, nodeValues_.at(dst));
-      if (!update) return false;
-      LoweredValue mask = emitAllOnesConstant(nodeValues_.at(src).width);
-      if (mask.symbol.empty()) return false;
       auto clockIt = nodeValues_.find(src->clock);
       if (clockIt == nodeValues_.end() || clockIt->second.isArray() ||
           clockIt->second.width != 1) {
         return fail(nodeContext(src) + ": clock is unavailable or not scalar 1 bit");
       }
+      if (usePerLeafRegisterWrites(dst)) {
+        std::vector<LoweredRegisterWrite> writes;
+        {
+          NodeContextGuard nodeGuard{nodeContextStack_, dst};
+          for (size_t i = 0; i < dst->assignTree.size(); i++) {
+            ExpTree* tree = dst->assignTree[i];
+            if (!validateLvalue(dst, tree, i)) return false;
+            if (!lowerRegisterWriteLeaves(src, dst, tree->getlval(),
+                                          tree->getRoot(), updateCond, writes)) {
+              return false;
+            }
+          }
+          if (!appendRegisterSyncReset(src, dst, writes)) return false;
+        }
+        NodeContextGuard nodeGuard{nodeContextStack_, src};
+        size_t leafIndex = 0;
+        for (const LoweredRegisterWrite& write : writes) {
+          std::vector<std::string> inputs = {write.condition.symbol, write.data.symbol,
+                                             write.mask.symbol, clockIt->second.symbol};
+          std::vector<std::string> eventEdges = {"posedge"};
+          if (write.asyncEvent) {
+            inputs.push_back(write.asyncEvent->symbol);
+            eventEdges.push_back("posedge");
+          }
+          if (!emitOperation(
+                  "gsim.reg_write." + std::to_string(src->id) + "." +
+                      std::to_string(leafIndex++),
+                  "kRegisterWritePort", inputs, {},
+                  {stringAttr("regSymbol", registerSymbol(src)),
+                   stringListAttr("eventEdge", std::move(eventEdges)),
+                   stringAttr("gsim.reset_kind",
+                              write.isSyncReset ? "sync"
+                                                : (write.asyncEvent ? "async" : "none")),
+                   intAttr("gsim.node_id", src->id)})) {
+            return false;
+          }
+        }
+        continue;
+      }
+      NodeContextGuard nodeGuard{nodeContextStack_, src};
+      auto update = lowerRegisterReset(src, nodeValues_.at(dst));
+      if (!update) return false;
+      LoweredValue mask = emitAllOnesConstant(nodeValues_.at(src).width);
+      if (mask.symbol.empty()) return false;
       std::vector<std::string> inputs = {
           updateCond.symbol, update->data.symbol, mask.symbol, clockIt->second.symbol};
       std::vector<std::string> eventEdges = {"posedge"};
