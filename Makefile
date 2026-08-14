@@ -348,9 +348,11 @@ PGO_BUILD_DIR = $(WORK_DIR)/pgo
 GSIM_PGO_DIR = $(BUILD_DIR)/gsim-pgo
 
 pgo-gsim:
+	@test -f $(FIRRTL_FILE) || { echo "error: $(FIRRTL_FILE) not found; run 'make init' to fetch the reference designs"; exit 1; }
 	rm -rf $(GSIM_PGO_DIR) $(GSIM_BUILD_DIR)
 	mkdir -p $(GSIM_PGO_DIR)
 	$(MAKE) build-gsim GSIM_PGO_CFLAGS="-fprofile-generate=$(GSIM_PGO_DIR)"
+	mkdir -p $(GEN_CPP_DIR)
 	$(GSIM_BIN) $(GSIM_FLAGS) --dir $(GEN_CPP_DIR) $(GSIM_FLAGS_EXTRA) $(FIRRTL_FILE)
 	$(LLVM_PROFDATA) merge -o $(GSIM_PGO_DIR)/gsim.profdata $(GSIM_PGO_DIR)/*.profraw
 	rm -rf $(GSIM_BUILD_DIR)
