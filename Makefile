@@ -339,22 +339,28 @@ run-veri: $(VERI_BIN)
 ### PGO
 ##############################################
 
-LLVM_PROFDATA = llvm-profdata
+# llvm-profdata must match the clang that CXX resolves to; -print-prog-name
+# returns the tool shipped with that compiler, and LLVM_PROFDATA stays
+# overridable on the command line.
+LLVM_PROFDATA ?= $(shell $(CXX) -print-prog-name=llvm-profdata 2>/dev/null || echo llvm-profdata)
 PGO_BUILD_DIR = $(WORK_DIR)/pgo
 
 # The same treatment for gsim itself. It is branch heavy and chases pointers,
 # so knowing which way the branches actually go is worth more than any single
-# flag. Train on the design given in FIRRTL_FILE.
+# flag. Train on the design given in FIRRTL_FILE. Do not run this target
+# concurrently with other goals that consume build/gsim: it removes and
+# rebuilds that directory.
 GSIM_PGO_DIR = $(BUILD_DIR)/gsim-pgo
 
 pgo-gsim:
-	@test -f $(FIRRTL_FILE) || { echo "error: $(FIRRTL_FILE) not found; run 'make init' to fetch the reference designs"; exit 1; }
+	@test -f "$(FIRRTL_FILE)" || { echo "Missing FIRRTL input: $(FIRRTL_FILE). Run 'make init' or pass FIRRTL_FILE=... / dutName=..." >&2; exit 2; }
 	rm -rf $(GSIM_PGO_DIR) $(GSIM_BUILD_DIR)
-	mkdir -p $(GSIM_PGO_DIR)
+	mkdir -p $(GSIM_PGO_DIR) $(GEN_CPP_DIR)
 	$(MAKE) build-gsim GSIM_PGO_CFLAGS="-fprofile-generate=$(GSIM_PGO_DIR)"
-	mkdir -p $(GEN_CPP_DIR)
-	$(GSIM_BIN) $(GSIM_FLAGS) --dir $(GEN_CPP_DIR) $(GSIM_FLAGS_EXTRA) $(FIRRTL_FILE)
-	$(LLVM_PROFDATA) merge -o $(GSIM_PGO_DIR)/gsim.profdata $(GSIM_PGO_DIR)/*.profraw
+	LLVM_PROFILE_FILE="$(GSIM_PGO_DIR)/gsim-%m.profraw" $(GSIM_BIN) $(GSIM_FLAGS) --dir $(GEN_CPP_DIR) $(GSIM_FLAGS_EXTRA) $(FIRRTL_FILE)
+	@shopt -s nullglob; profiles=("$(GSIM_PGO_DIR)"/*.profraw); \
+	(($${#profiles[@]})) || { echo "error: no PGO profiles produced by the training run" >&2; exit 1; }; \
+	"$(LLVM_PROFDATA)" merge -o "$(GSIM_PGO_DIR)/gsim.profdata" "$${profiles[@]}"
 	rm -rf $(GSIM_BUILD_DIR)
 	$(MAKE) build-gsim GSIM_PGO_CFLAGS="-fprofile-use=$(GSIM_PGO_DIR)/gsim.profdata -Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date -Wno-backend-plugin"
 
