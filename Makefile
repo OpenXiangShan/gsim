@@ -180,7 +180,26 @@ $(foreach x, $(PARSER_GEN_SRCS), $(eval \
 $(foreach x, $(GSIM_SRCS), $(eval \
 	$(call CXX_TEMPLATE, $(GSIM_BUILD_DIR)/$(basename $(x)).o, $(x), $(CXXFLAGS), GSIM_OBJS, $(PARSER_GEN_HEADER))))
 
-$(eval $(call LD_TEMPLATE, $(GSIM_BIN), $(GSIM_OBJS), $(CXXFLAGS) -lgmp))
+# gsim allocates very heavily and frees almost nothing, which is the case the
+# general purpose allocator handles worst. Linking a thread caching allocator
+# is the single largest speedup available and does not change the output.
+# Override with MALLOC=system to opt out, or MALLOC=<name> to force one.
+# The probe links the same way the real binary will, LDFLAGS included, so a
+# static build only picks an allocator that has a static archive.
+MALLOC ?= auto
+ifeq ($(MALLOC),auto)
+  GSIM_MALLOC := $(shell for l in jemalloc mimalloc tcmalloc_minimal; do \
+    if echo 'int main(){return 0;}' | $(CXX) $(LDFLAGS) -x c++ - -l$$l -o /dev/null 2>/dev/null; then echo -l$$l; break; fi; done)
+else ifneq ($(MALLOC),system)
+  GSIM_MALLOC := -l$(MALLOC)
+endif
+ifneq ($(GSIM_MALLOC),)
+  $(info [gsim] linking allocator: $(GSIM_MALLOC))
+else
+  $(info [gsim] no thread caching allocator found, using the system allocator)
+endif
+
+$(eval $(call LD_TEMPLATE, $(GSIM_BIN), $(GSIM_OBJS), $(CXXFLAGS) -lgmp $(GSIM_MALLOC)))
 
 build-gsim: $(GSIM_BIN)
 
