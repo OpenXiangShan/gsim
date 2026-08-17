@@ -21,7 +21,6 @@
 #include <gmp.h>
 #include <cstdarg>
 
-#define NR_THREAD 10
 #define ORDERED_TOPO_SORT
 // #define PERF
 
