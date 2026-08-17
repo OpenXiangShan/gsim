@@ -29,6 +29,7 @@
             buildInputs = [
               pkgs.flex
               pkgs.gmp
+              pkgs.jemalloc
             ];
 
             makeFlags = [
@@ -60,6 +61,7 @@
               pname = "${prev.pname}-static";
               buildInputs = prev.buildInputs ++ [
                 pkgs.pkgsStatic.gmp
+                pkgs.pkgsStatic.jemalloc
                 llvm.stdenv.cc.libc.static
               ];
               makeFlags = prev.makeFlags ++ [
