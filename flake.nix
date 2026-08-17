@@ -56,6 +56,16 @@
         {
           packages = {
             gsim = gsim;
+            gsim-static = (gsim.overrideAttrs (prev: {
+              pname = "${prev.pname}-static";
+              buildInputs = prev.buildInputs ++ [
+                pkgs.pkgsStatic.gmp
+                llvm.stdenv.cc.libc.static
+              ];
+              makeFlags = prev.makeFlags ++ [
+                "STATIC=1"
+              ];
+            }));
             default = gsim;
           };
         }
