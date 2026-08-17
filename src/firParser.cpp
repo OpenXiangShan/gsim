@@ -93,7 +93,8 @@ void parseFunc(char *strbuf, int tid) {
 
 PNode* parseFIR(char *strbuf) {
   taskQueue = new std::vector<TaskRecord>;
-  std::future<void> *threads = new std::future<void> [NR_THREAD];
+  const int nrThread = globalConfig.NumThreads;
+  std::future<void> *threads = new std::future<void> [nrThread];
 
   // create tasks
   char *prev = strbuf;
@@ -134,9 +135,9 @@ PNode* parseFIR(char *strbuf) {
     }
   }
   printf("[Parser] using %d threads to parse %d modules with %d tasks\n",
-      NR_THREAD, modules, id);
+      nrThread, modules, id);
   lists = new PList* [id];
-  for (int i = 0; i < NR_THREAD; i ++) {
+  for (int i = 0; i < nrThread; i ++) {
     taskQueue->push_back(TaskRecord{0, 0, -1, -1}); // exit flags
   }
 
@@ -145,12 +146,12 @@ PNode* parseFIR(char *strbuf) {
       [](TaskRecord &a, TaskRecord &b){ return a.len < b.len; });
 
   // create threads
-  for (int i = 0; i < NR_THREAD; i ++) {
+  for (int i = 0; i < nrThread; i ++) {
     threads[i] = async(std::launch::async, parseFunc, strbuf, i);
   }
 
-  for (int i = 0; i < NR_THREAD; i ++) {
-    printf("[Parser] waiting for thread %d/%d...\n", i, NR_THREAD - 1);
+  for (int i = 0; i < nrThread; i ++) {
+    printf("[Parser] waiting for thread %d/%d...\n", i, nrThread - 1);
     threads[i].get();
   }
   assert(taskQueue->empty());
