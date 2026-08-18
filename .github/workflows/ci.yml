@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["master"]
 
+env:
+  CLANG_VERSION: 21.1.8
+
 jobs:
   fir-regression:
     runs-on: ubuntu-24.04
@@ -16,10 +19,10 @@ jobs:
       - name: Install dependencies
         run: |
           sudo ./scripts/install-dependencies.sh
-      - name: Install LLVM and Clang
+      - name: Install LLVM toolchain
         uses: KyleMayes/install-llvm-action@v2
         with:
-            version: "20.1.4"
+          version: ${{ env.CLANG_VERSION }}
       - name: Build gsim
         run: |
           make -j "$(nproc)" build-gsim
@@ -45,16 +48,15 @@ jobs:
       - name: Install dependencies
         run: |
           sudo ./scripts/install-dependencies.sh
-      # Since ubuntu 2404 doesn't comes with llvm >= 19
-      - name: Install LLVM and Clang
+      - name: Install LLVM toolchain
         uses: KyleMayes/install-llvm-action@v2
         with:
-            version: "20.1.4"
+          version: ${{ env.CLANG_VERSION }}
       - name: Install verilator
         uses: YosysHQ/setup-oss-cad-suite@v3
         with:
-            version: "2025-04-24"
-            github-token: ${{ secrets.GITHUB_TOKEN }}
+          version: "2025-04-24"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Enlarge swap
         if: matrix.dutName == 'minimal-xiangshan'
         run: |
@@ -88,16 +90,15 @@ jobs:
       - name: Install dependencies
         run: |
           sudo ./scripts/install-dependencies.sh
-      # Since ubuntu 2404 doesn't comes with llvm >= 19
-      - name: Install LLVM and Clang
+      - name: Install LLVM toolchain
         uses: KyleMayes/install-llvm-action@v2
         with:
-            version: "20.1.4"
+          version: ${{ env.CLANG_VERSION }}
       - name: Install verilator
         uses: YosysHQ/setup-oss-cad-suite@v3
         with:
-            version: "2025-04-24"
-            github-token: ${{ secrets.GITHUB_TOKEN }}
+          version: "2025-04-24"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Check resources
         run: |
           echo "nproc = `nproc`"
