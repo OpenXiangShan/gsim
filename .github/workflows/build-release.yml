@@ -53,8 +53,11 @@ jobs:
   release:
     name: Release on master
     needs: build
-    if: github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -76,6 +79,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          target_commitish: ${{ github.sha }}
           tag_name: master-${{ github.sha }}
           name: gsim ${{ steps.release_info.outputs.date }} ${{ steps.release_info.outputs.sha }}
           body: ${{ github.event.head_commit.message }}
