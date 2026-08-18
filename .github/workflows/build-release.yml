@@ -12,13 +12,16 @@ permissions:
 jobs:
   build:
     name: Build gsim
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         llvm-version:
           - 21.1.8
           - 19.1.7
+        os:
+          - ubuntu-latest
+          - ubuntu-26.04-arm
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
