@@ -30,6 +30,9 @@ public:
   int end = -1;
   std::vector<valInfo*> memberInfo;
   bool sameConstant = false;
+  /* Length of the bare array reference valStr was built from, zero when valStr
+     is anything else. Placed here to fit existing padding. */
+  uint32_t arrayRefLen = 0;
   mpz_t assignmentCons;
   bool directUpdate = true;
 
@@ -104,6 +107,8 @@ public:
     if (idx >= memberInfo.size()) return nullptr;
     return memberInfo[idx];
   }
+  bool isArrayRef() { return arrayRefLen != 0; }
+  std::string arrayRef() { return valStr.substr(0, arrayRefLen); }
 };
 
 #endif
