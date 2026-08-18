@@ -132,6 +132,67 @@ static std::string constantAssign(std::string lvalue, int dimIdx, Node* node, va
   return ret;
 }
 
+/* Characters that may appear in a generated node name. */
+static bool isArrayNameChar(char c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+         (c >= '0' && c <= '9') || c == '_' || c == '$';
+}
+
+/* Whether an array expression is rooted at the given name. The leading
+   identifier of an expression names the model member it accesses, so two
+   expressions rooted at different names cannot overlap. */
+static bool hasArrayRoot(const std::string& expr, const std::string& name) {
+  if (expr.compare(0, name.length(), name) != 0) return false;
+  return expr.length() == name.length() || !isArrayNameChar(expr[name.length()]);
+}
+
+/* Strip the trailing loop-index suffix from an rvalue. Returns the base array
+   expression when the rvalue is a bare name optionally followed by constant
+   indices, and an empty string for anything else. */
+static std::string arraySrcBase(const std::string& rvalue, const std::string& idxStr) {
+  if (rvalue.length() <= idxStr.length()) return "";
+  if (rvalue.compare(rvalue.length() - idxStr.length(), idxStr.length(), idxStr) != 0) return "";
+  std::string base = rvalue.substr(0, rvalue.length() - idxStr.length());
+  size_t idx = 0;
+  while (idx < base.length() && isArrayNameChar(base[idx])) idx ++;
+  if (idx == 0) return "";
+  while (idx < base.length()) {
+    if (base[idx ++] != '[') return "";
+    size_t digits = 0;
+    while (idx < base.length() && base[idx] >= '0' && base[idx] <= '9') { idx ++; digits ++; }
+    if (digits == 0 || idx >= base.length() || base[idx ++] != ']') return "";
+  }
+  return base;
+}
+
+/* An element-wise copy loop per array assignment leaves the C++ compiler with a
+   basic block per assignment, and its value numbering scans those blocks
+   superlinearly. Return a single block copy when it is provably equivalent to
+   the loop it replaces, and an empty string otherwise. */
+static std::string arrayBlockCopy(const std::string& lvalue, Node* node, valInfo* rinfo,
+                                  int dimIdx, const std::string& idxStr, int num) {
+  /* Only the innermost dimension is guaranteed contiguous: every declared extent
+     is rounded up to a power of two when the node is defined, so the rows of an
+     outer dimension are not adjacent once that dimension is padded. The element
+     count is taken from the dimension rather than from sizeof of the whole
+     array, which keeps a prefix copy exact. */
+  if (node->dimension.size() - dimIdx != 1) return "";
+  /* The declared element type is described by node->width only when the lvalue
+     really denotes this node. A memory write reaches here with an lvalue rooted
+     at the memory array while node is the writer port. */
+  if (!hasArrayRoot(lvalue, node->name)) return "";
+  std::string src = arraySrcBase(rinfo->valStr, idxStr);
+  if (src.length() == 0) return "";
+  /* A block copy is undefined on overlapping regions. A source rooted at
+     another name is a separate member and cannot overlap the destination. */
+  if (hasArrayRoot(src, node->name)) return "";
+  /* An element assignment converts the source to the destination type, a block
+     copy does not, so both must be declared with the same type. */
+  if (widthBits(node->width) != widthBits(rinfo->width)) return "";
+  return format("memcpy(%s, %s, %d * sizeof(%s[0]));",
+                lvalue.c_str(), src.c_str(), num, lvalue.c_str());
+}
+
 static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int dimIdx = -1) {
   std::string ret;
   int num = 1;
@@ -153,12 +214,17 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int
   } else {
     std::string idxStr, bracket;
     for (size_t i = 0; i < node->dimension.size() - dimIdx; i ++) {
-      ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) { ", i, i, node->dimension[i + dimIdx], i);
       idxStr += "[i" + std::to_string(i) + "]";
-      bracket += "}";
     }
-    ret += format("%s%s = %s; ", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
-    ret += bracket;
+    ret = arrayBlockCopy(lvalue, node, rinfo, dimIdx, idxStr, num);
+    if (ret.length() == 0) {
+      for (size_t i = 0; i < node->dimension.size() - dimIdx; i ++) {
+        ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) { ", i, i, node->dimension[i + dimIdx], i);
+        bracket += "}";
+      }
+      ret += format("%s%s = %s; ", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
+      ret += bracket;
+    }
   }
   return ret;
 }
