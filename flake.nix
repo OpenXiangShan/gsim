@@ -29,6 +29,7 @@
             buildInputs = [
               pkgs.flex
               pkgs.gmp
+              pkgs.jemalloc
             ];
 
             makeFlags = [
@@ -56,6 +57,17 @@
         {
           packages = {
             gsim = gsim;
+            gsim-static = (gsim.overrideAttrs (prev: {
+              pname = "${prev.pname}-static";
+              buildInputs = prev.buildInputs ++ [
+                pkgs.pkgsStatic.gmp
+                pkgs.pkgsStatic.jemalloc
+                llvm.stdenv.cc.libc.static
+              ];
+              makeFlags = prev.makeFlags ++ [
+                "STATIC=1"
+              ];
+            }));
             default = gsim;
           };
         }
