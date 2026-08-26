@@ -13,7 +13,7 @@ jobs:
   fir-regression:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
       - name: Install dependencies
@@ -39,10 +39,10 @@ jobs:
       matrix:
         dutName: [ysyx3, rocket, small-boom, large-boom, minimal-xiangshan]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: 3.x
       - name: Install dependencies
@@ -53,7 +53,7 @@ jobs:
         with:
           version: ${{ env.CLANG_VERSION }}
       - name: Install verilator
-        uses: YosysHQ/setup-oss-cad-suite@v3
+        uses: YosysHQ/setup-oss-cad-suite@v4
         with:
           version: "2025-04-24"
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -81,10 +81,10 @@ jobs:
   bolt-ysyx3:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
             submodules: true
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: 3.x
       - name: Install dependencies
@@ -95,7 +95,7 @@ jobs:
         with:
           version: ${{ env.CLANG_VERSION }}
       - name: Install verilator
-        uses: YosysHQ/setup-oss-cad-suite@v3
+        uses: YosysHQ/setup-oss-cad-suite@v4
         with:
           version: "2025-04-24"
           github-token: ${{ secrets.GITHUB_TOKEN }}
