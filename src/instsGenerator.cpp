@@ -150,6 +150,16 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int
       ret = constantAssign(lvalue, dimIdx, node, rinfo->memberInfo[0]);
     } else Panic();
 
+  } else if (node->dimension.size() - dimIdx == 1 && rinfo->isArrayRef()) {
+    /* A loop per copy gives the C++ compiler a basic block per assignment, and
+       its value numbering scans those superlinearly. One block copy is
+       equivalent here: a bare reference over a single dimension is contiguous,
+       cannot overlap the destination since a register splits into current and
+       next state, and shares its type since a width change lowers to a mask or
+       a cast that stops it being bare. The count comes from the dimension
+       rather than sizeof, which keeps a prefix copy exact. */
+    ret = format("memcpy(%s, %s, %d * sizeof(%s[0]));",
+                 lvalue.c_str(), rinfo->arrayRef().c_str(), num, lvalue.c_str());
   } else {
     std::string idxStr, bracket;
     for (size_t i = 0; i < node->dimension.size() - dimIdx; i ++) {
@@ -1475,9 +1485,15 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       computeInfo->beg = beg;
       computeInfo->end = end;
       if (!IS_INVALID_LVALUE(lvalue) && computeInfo->status == VAL_VALID) {
-        for (size_t i = 0; i < nodePtr->dimension.size() - getChildNum(); i ++) {
+        size_t refLen = computeInfo->valStr.length();
+        size_t loopDim = nodePtr->dimension.size() - getChildNum();
+        for (size_t i = 0; i < loopDim; i ++) {
           computeInfo->valStr += "[i" + std::to_string(i) + "]";
         }
+        /* One loop dimension walks the innermost, contiguous elements. Every
+           operator builds a valInfo of its own, so only a bare reference is
+           ever recorded. */
+        if (loopDim == 1) computeInfo->arrayRefLen = refLen;
       }
     } else {
       computeInfo = allocNodeInfo(nodePtr);
