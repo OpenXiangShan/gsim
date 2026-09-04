@@ -86,7 +86,7 @@ bool checkPattern2(Node *node) {
         int lwidth = lsignal->width;
         int rwidth = rsignal->width;
         if(catNode->opType == OP_CAT) {
-            BITS_mpz(constant1, constant, lwidth + rwidth, rwidth + 1);
+            BITS_mpz(constant1, constant, lwidth + rwidth - 1, rwidth);
             BITS_mpz(constant2, constant, rwidth - 1, 0);
             ret = true;
         } else if(catNode->opType == OP_OR) {
