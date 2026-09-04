@@ -224,7 +224,7 @@ public:
   void inferWidth();
   void usedBitWithFixRoot(int width);
   void clearWidth();
-  valInfo* compute(Node* n, std::string lvalue, bool isRoot);
+  valInfo* compute(Node* n, std::string lvalue, bool isRoot, bool isLvalue = false);
   valInfo* computeConstant(Node* node, bool isLvalue);
   void passWidthToChild();
   void updateWidth();

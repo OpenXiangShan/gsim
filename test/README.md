@@ -5,6 +5,8 @@
   AddressSanitizer and UndefinedBehaviorSanitizer.
 - dshr-overshift.fir: Checks FIRRTL-defined dynamic right shifts at and beyond
   the operand width for both unsigned and signed values.
+- dynamic-vector-index.fir: Checks in-bounds reads plus deterministic,
+  memory-safe out-of-bounds reads and writes through dynamic vector indices.
 - repro-usefulreset.fir: Minimized FIR reproducer for GSIM issue #106, used to guard against ConstantAnalysis hangs and OOM regressions.
 - signed-node-shr.fir: Checks constant propagation of a signed right shift
   whose operand is a node reference.
