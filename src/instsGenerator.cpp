@@ -739,11 +739,25 @@ valInfo* ENode::instsDshr(Node* node, std::string lvalue, bool isRoot) {
       ret->opNum = ChildInfo(0, opNum) + 1;
     }
   } else {
-    ret->valStr = format("((%s%s %s) & %s)",
-                         Cast(ChildInfo(0, width), Child(0, sign)).c_str(),
-                         ChildInfo(0, valStr).c_str(),
-                         shiftBits(ChildInfo(1, valStr), ShiftDir::Right).c_str(),
-                         bitMask(width).c_str());
+    const std::string value = format("%s%s",
+                                     Cast(ChildInfo(0, width), Child(0, sign)).c_str(),
+                                     ChildInfo(0, valStr).c_str());
+    const std::string shifted = format("((%s %s) & %s)", value.c_str(),
+                                       shiftBits(ChildInfo(1, valStr), ShiftDir::Right).c_str(),
+                                       bitMask(width).c_str());
+    const int shiftWidth = ChildInfo(1, width);
+    const bool mayOvershift = shiftWidth >= 63 ||
+      (uint64_t{1} << shiftWidth) > static_cast<uint64_t>(ChildInfo(0, width));
+    if (mayOvershift) {
+      const std::string overshift = Child(0, sign)
+        ? format("((%s < 0) ? %s : 0)", value.c_str(), bitMask(width).c_str())
+        : "0";
+      ret->valStr = format("((%s >= %d) ? %s : %s)",
+                           ChildInfo(1, valStr).c_str(), ChildInfo(0, width),
+                           overshift.c_str(), shifted.c_str());
+    } else {
+      ret->valStr = shifted;
+    }
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
   }
   if (ChildInfo(0, typeWidth) > BASIC_WIDTH) {
