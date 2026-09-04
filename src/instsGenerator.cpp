@@ -1479,7 +1479,7 @@ valInfo* allocNodeInfo(Node* n) {
 }
 
 /* compute enode */
-valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
+valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot, bool isLvalue) {
   if (computeInfo) return computeInfo;
   if (width == 0 && !IS_INVALID_LVALUE(lvalue)) {
     computeInfo = new valInfo();
@@ -1492,8 +1492,34 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
   if (nodePtr) {
     if (nodePtr->isArray()) {
       computeInfo = allocNodeInfo(nodePtr);
-      for (ENode* childENode : child)
+      std::string boundsCheck;
+      const bool isPartialRef = getChildNum() < nodePtr->dimension.size();
+      for (size_t i = 0; i < child.size(); i++) {
+        ENode* childENode = child[i];
+        if (childENode->opType == OP_INDEX) {
+          const std::string& index = childENode->getChild(0)->computeInfo->valStr;
+          const int indexWidth = childENode->getChild(0)->computeInfo->width;
+          const bool mayBeOutOfBounds = indexWidth >= 63 ||
+            (uint64_t{1} << indexWidth) > static_cast<uint64_t>(nodePtr->dimension[i]);
+          if (mayBeOutOfBounds) {
+            if (!boundsCheck.empty()) boundsCheck += " && ";
+            boundsCheck += format("(%s < %d)", index.c_str(), nodePtr->dimension[i]);
+          }
+          if (mayBeOutOfBounds && !isLvalue && isPartialRef) {
+            computeInfo->valStr += format("[((%s < %d) ? %s : 0)]",
+                                          index.c_str(), nodePtr->dimension[i], index.c_str());
+            continue;
+          }
+        }
         computeInfo->valStr += childENode->computeInfo->valStr;
+      }
+      if (!boundsCheck.empty()) {
+        computeInfo->boundsCheck = boundsCheck;
+        if (!isLvalue && getChildNum() == nodePtr->dimension.size()) {
+          computeInfo->valStr = format("((%s) ? %s : 0)",
+                                       boundsCheck.c_str(), computeInfo->valStr.c_str());
+        }
+      }
       int beg, end;
       std::tie(beg, end) = getIdx(nodePtr);
       computeInfo->beg = beg;
@@ -1727,8 +1753,11 @@ void StmtNode::compute(std::vector<InstInfo>& insts, std::set<InstInfo> assign_i
     case OP_STMT_NODE: {
       Assert(!isENode, "invalid stmt node\n");
       Node* node = tree->getlval()->getNode();
-      valInfo* linfo = tree->getlval()->compute(node, INVALID_LVALUE, false);
+      valInfo* linfo = tree->getlval()->compute(node, INVALID_LVALUE, false, true);
       valInfo* rinfo = tree->getRoot()->compute(node, linfo->valStr, true);
+      if (!linfo->boundsCheck.empty()) {
+        insts.emplace_back(format("if (%s) {", linfo->boundsCheck.c_str()), SUPER_INFO_IF);
+      }
       if (rinfo->status == VAL_FINISH || node->type == NODE_SPECIAL) { // printf / assert
         insts.emplace_back(rinfo->valStr);
       } else if (rinfo->status == VAL_INVALID) {
@@ -1758,6 +1787,9 @@ void StmtNode::compute(std::vector<InstInfo>& insts, std::set<InstInfo> assign_i
           if (assign_insts) assign_insts[1].emplace(SUPER_INFO_ASSIGN_END, belong);
           else insts.emplace_back(SUPER_INFO_ASSIGN_END, belong);
         }
+      }
+      if (!linfo->boundsCheck.empty()) {
+        insts.emplace_back("}", SUPER_INFO_DEDENT);
       }
       break;
     }

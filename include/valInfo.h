@@ -30,6 +30,7 @@ public:
   int end = -1;
   std::vector<valInfo*> memberInfo;
   bool sameConstant = false;
+  std::string boundsCheck;
   /* Length of the bare array reference valStr was built from, zero when valStr
      is anything else. Placed here to fit existing padding. */
   uint32_t arrayRefLen = 0;
@@ -86,6 +87,7 @@ public:
     ret->typeWidth = typeWidth;
     ret->sign = sign;
     ret->consLength = consLength;
+    ret->boundsCheck = boundsCheck;
     mpz_set(ret->assignmentCons, assignmentCons);
     ret->sameConstant = sameConstant;
     ret->directUpdate = directUpdate;
