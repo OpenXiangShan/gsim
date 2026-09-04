@@ -33,7 +33,7 @@ void u_shl(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) { mpz_mu
 void u_shr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) { mpz_tdiv_q_2exp(dst, src, n); }
 void s_shr(mpz_t& dst, mpz_t& src, mp_bitcnt_t bitcnt, unsigned long n) {
   if (mpz_cmp_ui(src, 0) < 0) {
-    mpz_fdiv_q_2exp(dst, dst, n);
+    mpz_fdiv_q_2exp(dst, src, n);
   } else {
     mpz_tdiv_q_2exp(dst, src, n);
   }
