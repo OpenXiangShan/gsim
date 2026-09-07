@@ -41,7 +41,9 @@ public:
     updateWidth();
   }
   void updateWidth() {
-    if (lo != 0) mpz_tdiv_q_2exp(val, val, lo);
+    if (lo != 0) {
+      (sign ? mpz_fdiv_q_2exp : mpz_tdiv_q_2exp)(val, val, lo);
+    }
     mpz_t mask;
     mpz_init(mask);
     mpz_set_ui(mask, 1);
@@ -66,13 +68,17 @@ public:
     return ret;
   }
   /* select [_hi, lo] */
-  NodeElement* getBits(int _hi, int _lo) {
+  NodeElement* getBits(int _hi, int _lo, bool arithmeticShift = false) {
     Assert(_hi <= hi - lo + 1, "invalid range [%d, %d]", _hi, lo);
     NodeElement* ret = dup();
     if (eleType == ELE_NODE) {
       ret->hi = _hi + ret->lo;
       ret->lo = _lo + ret->lo;
     } else {
+      if (ret->eleType == ELE_INT && !arithmeticShift && ret->sign && mpz_sgn(ret->val) < 0) {
+        u_asUInt(ret->val, ret->val, ret->hi - ret->lo + 1);
+      }
+      ret->sign = arithmeticShift && ret->sign;
       ret->hi = _hi;
       ret->lo = _lo;
       if (eleType == ELE_INT) ret->updateWidth();
@@ -148,7 +154,7 @@ public:
     }
     return ret;
   }
-  void getElementBits(NodeComponent* src, int hi, int lo) {
+  void getElementBits(NodeComponent* src, int hi, int lo, bool arithmeticShift) {
     int w = src->width;
     bool start = false;
     if (hi >= src->width) {
@@ -164,14 +170,14 @@ public:
         if (start) {
           int selectHigh = MIN(hi, w-1) - (w - memberWidth);
           int selectLo = MAX(lo, w - memberWidth) - (w - memberWidth);
-          addElement(src->elements[i]->getBits(selectHigh, selectLo));
+          addElement(src->elements[i]->getBits(selectHigh, selectLo, arithmeticShift));
           if ((w - memberWidth) <= lo) break;
         }
         w = w - memberWidth;
       }
     }
   }
-  void getDirectBits(NodeComponent* src, int hi, int lo) {
+  void getDirectBits(NodeComponent* src, int hi, int lo, bool arithmeticShift) {
     int w = src->width;
     bool start = false;
     if (hi >= src->width) {
@@ -187,17 +193,17 @@ public:
         if (start) {
           int selectHigh = MIN(hi, w-1) - (w - memberWidth);
           int selectLo = MAX(lo, w - memberWidth) - (w - memberWidth);
-          addDirectElement(src->directElements[i]->getBits(selectHigh, selectLo));
+          addDirectElement(src->directElements[i]->getBits(selectHigh, selectLo, arithmeticShift));
           if ((w - memberWidth) <= lo) break;
         }
         w = w - memberWidth;
       }
     }
   }
-  NodeComponent* getbits(int hi, int lo) {
+  NodeComponent* getbits(int hi, int lo, bool arithmeticShift = false) {
     NodeComponent* comp = new NodeComponent();
-    comp->getElementBits(this, hi, lo);
-    comp->getDirectBits(this, hi, lo);
+    comp->getElementBits(this, hi, lo, arithmeticShift);
+    comp->getDirectBits(this, hi, lo, arithmeticShift);
     return comp;
   }
   int countWidth() {

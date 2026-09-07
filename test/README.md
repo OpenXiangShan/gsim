@@ -12,3 +12,5 @@
 - repro-usefulreset.fir: Minimized FIR reproducer for GSIM issue #106, used to guard against ConstantAnalysis hangs and OOM regressions.
 - signed-node-shr.fir: Checks constant propagation of a signed right shift
   whose operand is a node reference.
+- signed-constant-slice.fir: Checks node splitting of shifts, bit selections,
+  and padding applied to negative signed constants.

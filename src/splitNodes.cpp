@@ -126,6 +126,34 @@ void addDirectRef(NodeComponent* dst, NodeComponent* comp) {
     dst->directElements[0]->referNodes.insert(comp->directElements[i]->referNodes.begin(), comp->directElements[i]->referNodes.end());
 }
 
+static NodeElement* signExtendConstant(NodeElement* element, int width) {
+  NodeElement* ret = element->dup();
+  ret->hi = width - 1;
+  ret->lo = 0;
+  ret->sign = true;
+  ret->updateWidth();
+  return ret;
+}
+
+static NodeComponent* padComponent(NodeComponent* src, int width, bool sign) {
+  if (!sign) return src->getbits(width - 1, 0);
+
+  if (src->elements.size() == 1 &&
+      src->elements[0]->eleType == ELE_INT &&
+      src->directElements.size() == 1 &&
+      src->directElements[0]->eleType == ELE_INT) {
+    NodeComponent* ret = new NodeComponent();
+    ret->addElement(signExtendConstant(src->elements[0], width));
+    ret->addDirectElement(signExtendConstant(src->directElements[0], width));
+    return ret;
+  }
+
+  NodeComponent* ret = spaceComp(width);
+  addRefer(ret, src);
+  addDirectRef(ret, src);
+  return ret;
+}
+
 NodeComponent* mergeMux(NodeComponent* comp1, NodeComponent* comp2, int width) {
   NodeComponent* ret;
   if (comp1->elements.size() == 1 && comp1->elements[0]->eleType == ELE_INT) {
@@ -276,10 +304,10 @@ NodeComponent* ENode::inferComponent(Node* n) {
       ret->addElementAll(new NodeElement("0", 16, values[0] - 1, 0));
       break;
     case OP_SHR:
-      ret = childComp[0]->getbits(childComp[0]->width - 1, values[0]);
+      ret = childComp[0]->getbits(childComp[0]->width - 1, values[0], sign);
       break;
     case OP_PAD:
-      ret = childComp[0]->getbits(values[0]-1, 0);
+      ret = padComponent(childComp[0], width, sign);
       break;
     case OP_WHEN:
       if (!getChild(1) && !getChild(2)) break;
