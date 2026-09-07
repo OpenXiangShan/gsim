@@ -14,6 +14,7 @@ GSIM accepts chirrtl, and compiles it to C++
     ```
     $ make init
     $ make run dutName=core
+    $ make diff dutName=core # add V_WAVE=1 to generate waveform from verilated model
     ```
 + Set core to `ysyx3`, `rocket`, `small-boom`, `large-boom`, `minimal-xiangshan` or `default-xiangshan`
 
