@@ -141,6 +141,8 @@ static void printUsage(const char* ProgName) {
             << "      --dump-stages=a,b,c          Dump only the listed stages (e.g., Init,TopoSort,AliasAnalysis).\n"
             << "      --dump-assign-tree           Include assignTree structure in JSON dump (can be large).\n"
             << "      --dump-const-status          Dump per-node constant-analysis status before removing constants.\n"
+            << "      --mt-mode=off|on             Select the C++ emitter mode.\n"
+            << "                                   Emit the compact dense multithreaded executor.\n"
             ;
 }
 
@@ -170,6 +172,7 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_DUMP_STAGES,
     OPT_DUMP_ASSIGN_TREE,
     OPT_DUMP_CONST_STATUS,
+    OPT_MT_MODE,
   };
 
   const struct option Table[] = {
@@ -190,6 +193,7 @@ static char* parseCommandLine(int argc, char** argv) {
       {"dump-stages", required_argument, nullptr, 0},
       {"dump-assign-tree", no_argument, nullptr, 0},
       {"dump-const-status", no_argument, nullptr, 0},
+      {"mt-mode", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -266,6 +270,13 @@ static char* parseCommandLine(int argc, char** argv) {
                   break;
                 case OPT_DUMP_CONST_STATUS:
                   globalConfig.DumpConstStatus = true;
+                  break;
+                case OPT_MT_MODE:
+                  if (strcmp(optarg, "off") != 0 && strcmp(optarg, "on") != 0) {
+                    fprintf(stderr, "Error: --mt-mode expects off or on, got '%s'.\n", optarg);
+                    _exit(EXIT_FAILURE);
+                  }
+                  setenv("GSIM_MT_MODE", optarg, 1);
                   break;
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }

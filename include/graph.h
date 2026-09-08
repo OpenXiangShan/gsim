@@ -5,7 +5,10 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
+class CppEmitterMt;
+
 class graph {
+  friend class CppEmitterMt;
   FILE *srcFp;
   int srcFileIdx;
   int srcFileBytes;

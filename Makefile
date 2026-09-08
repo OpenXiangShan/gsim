@@ -134,7 +134,13 @@ SYNTAX_NAME = syntax
 PARSER_BUILD_DIR = $(GSIM_BUILD_DIR)/$(PARSER_DIR)
 PARSER_GEN_SRCS = $(foreach x, $(LEXICAL_NAME) $(SYNTAX_NAME), $(PARSER_BUILD_DIR)/$(x).cc)
 PARSER_GEN_HEADER = $(PARSER_BUILD_DIR)/$(SYNTAX_NAME).hh
+GSIM_EMITTER ?= single
 GSIM_SRCS = $(foreach x, src $(PARSER_DIR), $(wildcard $(x)/*.cpp))
+ifeq ($(GSIM_EMITTER),mt)
+GSIM_SRCS := $(filter-out src/cppEmitter.cpp,$(GSIM_SRCS))
+else
+GSIM_SRCS := $(filter-out src/cppEmitter-mt.cpp,$(GSIM_SRCS))
+endif
 
 GSIM_INC_DIR = include $(PARSER_DIR)/include $(PARSER_BUILD_DIR)
 # NOTE:
@@ -203,10 +209,13 @@ $(eval $(call LD_TEMPLATE, $(GSIM_BIN), $(GSIM_OBJS), $(CXXFLAGS) -lgmp $(GSIM_M
 
 build-gsim: $(GSIM_BIN)
 
+build-gsim-mt:
+	$(MAKE) BUILD_DIR=$(BUILD_DIR)-mt GSIM_EMITTER=mt build-gsim
+
 # Dependency
 -include $(GSIM_OBJS:.o=.d)
 
-.PHONY: build-gsim
+.PHONY: build-gsim build-gsim-mt
 
 ##############################################
 ### Running GSIM to generate cpp model
