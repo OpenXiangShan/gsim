@@ -450,8 +450,12 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
   fprintf(header, "void mtInit();\nvoid mtStart();\nvoid mtStopWorkers();\n");
   fprintf(header, "void mtWorkerLoop(int worker);\nvoid mtRunWorker(int worker, uint8_t parity);\n");
   fprintf(header, "void mtPinWorker(int worker);\nvoid resetAllMt();\nvoid stepMt();\n");
-  for (const Reset& reset : resets_) fprintf(header, "void subResetMt%d();\n", reset.id);
   for (const Reset& reset : resets_) {
+    if (reset.asynchronous) fprintf(header, "void subResetMt%d(bool resetValue);\n", reset.id);
+    else fprintf(header, "void subResetMt%d();\n", reset.id);
+  }
+  for (const Reset& reset : resets_) {
+    printf("reset.id %d, uint %d\n", reset.id, !reset.asynchronous);
     for (int chunk = 1; chunk <= reset.chunkCount; ++chunk) {
       fprintf(header, "void subResetMt%d_c%d();\n", reset.id, chunk);
     }
@@ -472,11 +476,13 @@ void CppEmitterMt::emitConstructorStart() {
 
 void CppEmitterMt::emitResetFunction(SuperNode* super, int resetId) {
   const std::string className = "S" + graph_.name;
-  emitText(0, true, "void " + className + "::subResetMt" + std::to_string(resetId) + "() {\n");
+  const bool asynchronous = super->superType == SUPER_ASYNC_RESET;
+  emitText(0, true, "void " + className + "::subResetMt" + std::to_string(resetId) +
+                        (asynchronous ? "(bool resetValue) {\n" : "() {\n"));
   Node* resetNode = super->resetNode;
   const std::string resetName = resetNode->type == NODE_REG_SRC ? resetNode->name + "$RESET" : resetNode->name;
   int indent = 1;
-  emitText(indent++, false, "if (unlikely(" + resetName + ")) {\n");
+  emitText(indent++, false, "if (unlikely(" + (asynchronous ? "resetValue" : resetName) + ")) {\n");
   int emitted = 0;
   int chunk = 0;
   int nesting = 0;
@@ -529,24 +535,39 @@ void CppEmitterMt::emitSuperNode(SuperNode* super, int indent) {
       }
     }
   };
+  auto resetValueName = [](Node* resetNode) {
+    return resetNode->type == NODE_REG_SRC ? resetNode->name + "$RESET" : resetNode->name;
+  };
+  std::map<Node*, std::string> savedAsyncResetValues;
+  auto saveAsyncResetValue = [&](Node* resetNode) {
+    auto reset = asyncResetIds_.find(resetNode);
+    Assert(reset != asyncResetIds_.end(), "missing MT async reset for %s", resetNode->name.c_str());
+    std::string oldName = "__gsim_async_reset_old_" + std::to_string(reset->second);
+    if (savedAsyncResetValues.emplace(resetNode, oldName).second) {
+      emitText(indent, false, "uint8_t " + oldName + " = " + resetValueName(resetNode) + ";\n");
+    }
+  };
   auto emitAsyncReset = [&](Node* resetNode) {
     auto reset = asyncResetIds_.find(resetNode);
     Assert(reset != asyncResetIds_.end(), "missing MT async reset for %s", resetNode->name.c_str());
-    emitText(indent, false, "subResetMt" + std::to_string(reset->second) + "();\n");
+    auto oldValue = savedAsyncResetValues.find(resetNode);
+    Assert(oldValue != savedAsyncResetValues.end(), "missing old value for MT async reset %s", resetNode->name.c_str());
+    emitText(indent, false, "subResetMt" + std::to_string(reset->second) + "(" + oldValue->second +
+                                " || " + resetValueName(resetNode) + ");\n");
   };
 
   if (super->superType == SUPER_EXTMOD) {
+    std::set<Node*> asyncResets;
     for (size_t i = 1; i < super->member.size(); ++i) {
-      if (super->member[i]->isAsyncReset()) emitAsyncReset(super->member[i]);
+      if (super->member[i]->isAsyncReset()) asyncResets.insert(super->member[i]);
     }
+    for (Node* resetNode : asyncResets) saveAsyncResetValue(resetNode);
     emitInstructions(super->insts);
-    for (size_t i = 1; i < super->member.size(); ++i) {
-      if (super->member[i]->isAsyncReset()) emitAsyncReset(super->member[i]);
-    }
+    for (Node* resetNode : asyncResets) emitAsyncReset(resetNode);
     return;
   }
 
-  if (super->superType == SUPER_ASYNC_RESET) emitAsyncReset(super->resetNode);
+  if (super->superType == SUPER_ASYNC_RESET) saveAsyncResetValue(super->resetNode);
   for (Node* node : super->member) {
     if (node->isLocal()) emitText(indent, false, widthUType(node->width) + " " + node->name + "{};\n");
   }
