@@ -2,6 +2,10 @@
 #include <queue>
 #include <map>
 
+bool Node::isLocal() { // TODO: isArray is OK
+  return status == VALID_NODE && type == NODE_OTHERS && !anyNextActive() && !isArray() && !isReset();
+}
+
 int Node::counter = 1;
 
 void Node::updateConnect() {

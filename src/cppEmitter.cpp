@@ -508,10 +508,6 @@ int graph::genNodeStepEnd(SuperNode* node, int indent) {
   return indent;
 }
 
-bool Node::isLocal() { // TODO: isArray is OK
-  return status == VALID_NODE && type == NODE_OTHERS && !anyNextActive() && !isArray() && !isReset();
-}
-
 int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
   switch (inst.infoType) {
     case SUPER_INFO_IF:
@@ -718,10 +714,6 @@ void graph::genStep(int subStepIdxMax) {
 
   emitBodyLock(1, "cycles ++;\n");
   emitBodyLock(0, "}\n");
-}
-
-bool SuperNode::instsEmpty() {
-  return insts.size() == 0;
 }
 
 bool graph::__emitSrc(int indent, bool canNewFile, bool alreadyEndFunc, const char *nextFuncDef, const char *fmt, ...) {

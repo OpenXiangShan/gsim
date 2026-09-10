@@ -14,14 +14,20 @@ class graph {
   int srcFileBytes;
 
   bool __emitSrc(int indent, bool canNewFile, bool alreadyEndFunc, const char *nextFuncDef, const char *fmt, ...);
+  bool __emitSrcMt(int indent, bool canNewFile, bool alreadyEndFunc, const char *nextFuncDef, const char *fmt, ...);
   void emitPrintf();
+  void emitPrintfMt();
   void activateNext(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName, int indent);
   void activateUncondNext(Node* node, std::set<int>& activateId, bool inStep, std::string flagName, int indent);
 
   FILE* genHeaderStart();
+  FILE* genHeaderStartMt();
   void genNodeDef(FILE* fp, Node* node);
+  void genNodeDefMt(FILE* fp, Node* node);
   void genInterfaceInput(Node* input);
+  void genInterfaceInputMt(Node* input);
   void genInterfaceOutput(Node* output);
+  void genInterfaceOutputMt(Node* output);
   void genStep(int subStepIdxMax);
   void genHeaderEnd(FILE* fp);
   int genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string flagName, int indent);
@@ -55,6 +61,7 @@ class graph {
   void constantMemory();
   void orderAllNodes();
   void genDiffSig(FILE* fp, Node* node);
+  void genDiffSigMt(FILE* fp, Node* node);
   void graphCoarsen();
   void graphInitPartition();
   void graphRefine();
@@ -86,6 +93,7 @@ class graph {
   void topoSort();
   void instsGenerator();
   void cppEmitter();
+  void cppEmitterMt();
   void usedBits();
   void traversal();
   void traversalNoTree();

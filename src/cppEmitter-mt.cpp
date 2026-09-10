@@ -25,11 +25,6 @@ int positiveEnv(const char* name, int fallback) {
              : fallback;
 }
 
-bool mtModeEnabled() {
-  const char* mode = std::getenv("GSIM_MT_MODE");
-  return mode != nullptr && std::string(mode) == "on";
-}
-
 int resetChunkSize() {
   const char* value = std::getenv("GSIM_EMIT_RESET_CHUNK");
   if (value == nullptr || value[0] == '\0') return 4096;
@@ -42,15 +37,15 @@ int taskCost(const SuperNode* super) {
   return std::max<int>(1, static_cast<int>(super->insts.size() + super->member.size()));
 }
 
-std::pair<size_t, size_t> resetBodyRange(const SuperNode* super) {
-  const std::vector<InstInfo>& instructions = super->insts;
+std::pair<size_t, size_t> resetBodyRange(const std::vector<InstInfo>& instructions,
+                                        const Node* resetNode) {
   if (instructions.size() < 2 || instructions.front().infoType != SUPER_INFO_IF ||
       instructions.back().infoType != SUPER_INFO_DEDENT) {
     return {0, instructions.size()};
   }
-  const std::string resetName = super->resetNode->type == NODE_REG_SRC
-                                    ? super->resetNode->name + "$RESET"
-                                    : super->resetNode->name;
+  const std::string resetName = resetNode->type == NODE_REG_SRC
+                                    ? resetNode->name + "$RESET"
+                                    : resetNode->name;
   if (instructions.front().inst.find(resetName) == std::string::npos) return {0, instructions.size()};
 
   int nesting = 0;
@@ -61,6 +56,46 @@ std::pair<size_t, size_t> resetBodyRange(const SuperNode* super) {
   }
   return nesting == 0 ? std::make_pair<size_t, size_t>(1, instructions.size() - 1)
                       : std::make_pair<size_t, size_t>(0, instructions.size());
+}
+
+std::pair<size_t, size_t> resetBodyRange(const SuperNode* super) {
+  return resetBodyRange(super->insts, super->resetNode);
+}
+
+std::vector<InstInfo> buildResetInstructions(const std::vector<Node*>& members) {
+  StmtTree tree;
+  tree.root = new StmtNode(OP_STMT_SEQ);
+  for (Node* member : members) {
+    for (ExpTree* assignment : member->assignTree) {
+      std::vector<int> emptyPath;
+      tree.mergeExpTree(assignment, emptyPath, emptyPath, member);
+    }
+  }
+  std::vector<InstInfo> instructions;
+  tree.compute(instructions);
+  return instructions;
+}
+
+template <typename Instruction>
+int countResetChunks(const std::vector<Instruction>& body, int chunkSize) {
+  if (chunkSize <= 0) return 0;
+  int chunks = 0;
+  int statements = 0;
+  int nesting = 0;
+  for (const auto& instruction : body) {
+    const SuperInfo type = static_cast<SuperInfo>(instruction.type);
+    const bool statement = type == SUPER_INFO_IF || type == SUPER_INFO_ELSE ||
+                           type == SUPER_INFO_STR;
+    if (statement && statements >= chunkSize && nesting == 0) {
+      ++chunks;
+      statements = 0;
+    }
+    if (type == SUPER_INFO_IF) ++nesting;
+    if (type == SUPER_INFO_DEDENT) --nesting;
+    statements += statement;
+  }
+  Assert(nesting == 0, "unbalanced reset instructions while planning worker reset");
+  return chunks;
 }
 
 void appendValues(std::string& text, const std::vector<int>& values) {
@@ -78,7 +113,7 @@ void appendValues(std::string& text, const std::vector<int>& values) {
 
 CppEmitterMt::CppEmitterMt(graph& graph)
     : graph_(graph),
-      enabled_(mtModeEnabled()),
+      enabled_(globalConfig.MtMode),
       workerCount_(positiveEnv("GSIM_THREADS", 1)),
       maxTasks_(positiveEnv("GSIM_MT_DENSE_VCONTRACT_MAXMT", 1600)),
       resetChunk_(resetChunkSize()) {}
@@ -323,10 +358,115 @@ void CppEmitterMt::prepare() {
 
   workerTasks_.assign(static_cast<size_t>(workerCount_), std::vector<int>());
   std::vector<int> workerPosition(tasks_.size(), -1);
+  std::vector<int> taskByFinalCppId(static_cast<size_t>(taskCount), -1);
   for (size_t taskId = 0; taskId < tasks_.size(); ++taskId) {
     int owner = tasks_[taskId].owner;
     workerPosition[taskId] = static_cast<int>(workerTasks_[static_cast<size_t>(owner)].size());
     workerTasks_[static_cast<size_t>(owner)].push_back(taskId);
+    for (int cppId : tasks_[taskId].cppIds) {
+      taskByFinalCppId[static_cast<size_t>(cppId)] = static_cast<int>(taskId);
+    }
+  }
+
+  // Reset each register on the worker that normally owns its update MTask.
+  // The trigger task is kept intact so oldReset || newReset is still computed once.
+  int resetId = 0;
+  for (SuperNode* super : graph_.allReset) {
+    if (super->resetNode->status == CONSTANT_NODE) continue;
+    Reset reset;
+    reset.super = super;
+    reset.id = resetId++;
+    reset.asynchronous = super->superType == SUPER_ASYNC_RESET;
+    if (!reset.asynchronous) {
+      const auto range = resetBodyRange(super);
+      for (size_t i = range.first; i < range.second; ++i) {
+        reset.body.push_back(
+            {static_cast<uint8_t>(super->insts[i].infoType), super->insts[i].inst});
+      }
+      reset.chunkCount = countResetChunks(reset.body, resetChunk_);
+      resets_.push_back(std::move(reset));
+      continue;
+    }
+
+    const int triggerCppId = super->resetNode->super->cppId;
+    Assert(triggerCppId >= 0 && triggerCppId < taskCount,
+           "missing trigger SuperNode for async reset %s", super->resetNode->name.c_str());
+    reset.triggerTask = taskByFinalCppId[static_cast<size_t>(triggerCppId)];
+    Assert(reset.triggerTask >= 0, "missing trigger MTask for async reset %s",
+           super->resetNode->name.c_str());
+    reset.triggerOwner = tasks_[static_cast<size_t>(reset.triggerTask)].owner;
+
+    std::map<int, std::vector<Node*>> membersByWorker;
+    for (Node* member : super->member) {
+      Assert(member->type == NODE_REG_RESET, "invalid async reset member %s",
+             member->name.c_str());
+      Node* reg = member->getResetSrc();
+      int owner = reset.triggerOwner;
+      auto findOwner = [&](Node* candidate) {
+        if (candidate == nullptr || candidate->super == nullptr) return -1;
+        const int cppId = candidate->super->cppId;
+        if (cppId < 0 || cppId >= taskCount) return -1;
+        const int taskId = taskByFinalCppId[static_cast<size_t>(cppId)];
+        return taskId >= 0 ? tasks_[static_cast<size_t>(taskId)].owner : -1;
+      };
+      int registerOwner = findOwner(reg);
+      if (registerOwner < 0 && reg->regSplit && reg->getDst()->status == VALID_NODE) {
+        registerOwner = findOwner(reg->getDst());
+      }
+      if (registerOwner >= 0) owner = registerOwner;
+      membersByWorker[owner].push_back(member);
+    }
+
+    for (const auto& entry : membersByWorker) {
+      std::vector<InstInfo> instructions = buildResetInstructions(entry.second);
+      const auto range = resetBodyRange(instructions, super->resetNode);
+      Assert(range.first == 1 && range.second + 1 == instructions.size(),
+             "async reset %s does not have a single outer reset condition",
+             super->resetNode->name.c_str());
+      Reset::Worker worker;
+      worker.id = entry.first;
+      for (size_t i = range.first; i < range.second; ++i) {
+        worker.body.push_back(
+            {static_cast<uint8_t>(instructions[i].infoType), instructions[i].inst});
+      }
+      worker.chunkCount = countResetChunks(worker.body, resetChunk_);
+      reset.workers.push_back(std::move(worker));
+    }
+
+    for (int worker = 0; worker < workerCount_; ++worker) {
+      if (worker == reset.triggerOwner) continue;
+      const std::vector<int>& chain = workerTasks_[static_cast<size_t>(worker)];
+      const bool ownsResetState = membersByWorker.find(worker) != membersByWorker.end();
+      auto position = std::upper_bound(chain.begin(), chain.end(), reset.triggerTask);
+      if (position == chain.end() && !ownsResetState) continue;
+      reset.participants.push_back(worker);
+    }
+
+    asyncResetIds_[super->resetNode] = reset.id;
+    resets_.push_back(std::move(reset));
+  }
+
+  // A remote worker rendezvous before its first post-trigger task. This keeps
+  // pre-trigger work ahead of reset and prevents post-trigger work from seeing
+  // partially reset state.
+  resetJoins_.assign(static_cast<size_t>(workerCount_), std::vector<ResetJoin>());
+  for (const Reset& reset : resets_) {
+    if (!reset.asynchronous) continue;
+    for (int worker : reset.participants) {
+      const std::vector<int>& chain = workerTasks_[static_cast<size_t>(worker)];
+      const auto position = std::upper_bound(chain.begin(), chain.end(), reset.triggerTask);
+      resetJoins_[static_cast<size_t>(worker)].push_back(
+          {reset.id, static_cast<size_t>(position - chain.begin())});
+    }
+  }
+  for (std::vector<ResetJoin>& joins : resetJoins_) {
+    std::sort(joins.begin(), joins.end(), [&](const ResetJoin& lhs, const ResetJoin& rhs) {
+      if (lhs.beforePosition != rhs.beforePosition) return lhs.beforePosition < rhs.beforePosition;
+      const int lhsTrigger = resets_[static_cast<size_t>(lhs.resetId)].triggerTask;
+      const int rhsTrigger = resets_[static_cast<size_t>(rhs.resetId)].triggerTask;
+      if (lhsTrigger != rhsTrigger) return lhsTrigger < rhsTrigger;
+      return lhs.resetId < rhs.resetId;
+    });
   }
 
   struct TokenGroup {
@@ -382,35 +522,6 @@ void CppEmitterMt::prepare() {
     task.storeEnd = storeSlots_.size();
   }
 
-  int resetId = 0;
-  for (SuperNode* super : graph_.allReset) {
-    if (super->resetNode->status == CONSTANT_NODE) continue;
-    Reset reset;
-    reset.super = super;
-    reset.id = resetId++;
-    reset.asynchronous = super->superType == SUPER_ASYNC_RESET;
-    if (resetChunk_ > 0) {
-      int statements = 0;
-      int nesting = 0;
-      std::pair<size_t, size_t> body = resetBodyRange(super);
-      for (size_t i = body.first; i < body.second; ++i) {
-        const InstInfo& inst = super->insts[i];
-        bool statement = inst.infoType == SUPER_INFO_IF || inst.infoType == SUPER_INFO_ELSE ||
-                         inst.infoType == SUPER_INFO_STR;
-        if (statement && statements >= resetChunk_ && nesting == 0) {
-          ++reset.chunkCount;
-          statements = 0;
-        }
-        if (inst.infoType == SUPER_INFO_IF) ++nesting;
-        if (inst.infoType == SUPER_INFO_DEDENT) --nesting;
-        statements += statement;
-      }
-      Assert(nesting == 0, "unbalanced reset instructions while planning MT reset %d", reset.id);
-    }
-    resets_.push_back(reset);
-    if (reset.asynchronous) asyncResetIds_[super->resetNode] = reset.id;
-  }
-
   size_t edgeCount = 0;
   for (const Task& task : tasks_) edgeCount += task.successors.size();
   fprintf(stderr,
@@ -419,7 +530,7 @@ void CppEmitterMt::prepare() {
 }
 
 void CppEmitterMt::emitText(int indent, bool canStartFile, const std::string& text) {
-  graph_.__emitSrc(indent, canStartFile, true, nullptr, "%s", text.c_str());
+  graph_.__emitSrcMt(indent, canStartFile, true, nullptr, "%s", text.c_str());
 }
 
 void CppEmitterMt::emitHeaderPreamble(FILE* header) const {
@@ -432,6 +543,7 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
   fprintf(header, "static constexpr int kMtWorkerCount = %d;\n", workerCount_);
   fprintf(header, "struct MtReadyToken { std::atomic<uint8_t> value{0}; };\n");
   fprintf(header, "struct alignas(64) MtDoneFlag { std::atomic<uint8_t> parity{0}; };\n");
+  fprintf(header, "struct alignas(64) MtResetFlag { std::atomic<uint64_t> generation{0}; };\n");
   fprintf(header, "struct MtDispatch { void (S%s::*fn)(); uint32_t waitBegin, waitEnd, storeBegin, storeEnd; };\n",
           graph_.name.c_str());
   fprintf(header, "alignas(64) MtReadyToken mtReadyTokens[%d];\n", readySlotCount_);
@@ -441,23 +553,40 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
   fprintf(header, "alignas(64) std::atomic<int> mtReadyWorkers{0};\n");
   fprintf(header, "alignas(64) std::atomic<bool> mtStop{false};\n");
   fprintf(header, "bool mtEnabled = false;\n");
+  const size_t resetCount = std::max<size_t>(1, resets_.size());
+  fprintf(header, "uint8_t mtAsyncResetValues[%zu]{};\n", resetCount);
+  fprintf(header, "MtResetFlag mtAsyncResetReady[%zu];\n", resetCount);
+  fprintf(header, "MtResetFlag mtAsyncResetRelease[%zu];\n", resetCount);
+  fprintf(header, "MtResetFlag mtAsyncResetDone[%zu];\n",
+          std::max<size_t>(1, resets_.size() * static_cast<size_t>(workerCount_)));
   fprintf(header, "static const uint32_t mtWaitSlots[%zu];\n", std::max<size_t>(1, waitSlots_.size()));
   fprintf(header, "static const uint32_t mtStoreSlots[%zu];\n", std::max<size_t>(1, storeSlots_.size()));
   for (int worker = 0; worker < workerCount_; ++worker) {
     fprintf(header, "static const MtDispatch mtDispatchW%d[%zu];\n", worker,
-            std::max<size_t>(1, workerTasks_[static_cast<size_t>(worker)].size()));
+            std::max<size_t>(1, workerTasks_[static_cast<size_t>(worker)].size() +
+                                   resetJoins_[static_cast<size_t>(worker)].size()));
   }
   fprintf(header, "void mtInit();\nvoid mtStart();\nvoid mtStopWorkers();\n");
   fprintf(header, "void mtWorkerLoop(int worker);\nvoid mtRunWorker(int worker, uint8_t parity);\n");
   fprintf(header, "void mtPinWorker(int worker);\nvoid resetAllMt();\nvoid stepMt();\n");
   for (const Reset& reset : resets_) {
-    if (reset.asynchronous) fprintf(header, "void subResetMt%d(bool resetValue);\n", reset.id);
-    else fprintf(header, "void subResetMt%d();\n", reset.id);
-  }
-  for (const Reset& reset : resets_) {
     printf("reset.id %d, uint %d\n", reset.id, !reset.asynchronous);
-    for (int chunk = 1; chunk <= reset.chunkCount; ++chunk) {
-      fprintf(header, "void subResetMt%d_c%d();\n", reset.id, chunk);
+    if (!reset.asynchronous) {
+      fprintf(header, "void subResetMt%d();\n", reset.id);
+      for (int chunk = 1; chunk <= reset.chunkCount; ++chunk) {
+        fprintf(header, "void subResetMt%d_c%d();\n", reset.id, chunk);
+      }
+      continue;
+    }
+    fprintf(header, "void mtTriggerAsyncReset%d(bool resetValue);\n", reset.id);
+    for (const Reset::Worker& worker : reset.workers) {
+      fprintf(header, "void subResetMt%dW%d();\n", reset.id, worker.id);
+      for (int chunk = 1; chunk <= worker.chunkCount; ++chunk) {
+        fprintf(header, "void subResetMt%dW%d_c%d();\n", reset.id, worker.id, chunk);
+      }
+    }
+    for (int worker : reset.participants) {
+      fprintf(header, "void mtJoinAsyncReset%dW%d();\n", reset.id, worker);
     }
   }
   for (size_t taskId = 0; taskId < tasks_.size(); ++taskId) fprintf(header, "void mtTask%zu();\n", taskId);
@@ -474,52 +603,68 @@ void CppEmitterMt::emitConstructorStart() {
   }
 }
 
-void CppEmitterMt::emitResetFunction(SuperNode* super, int resetId) {
+void CppEmitterMt::emitResetBodyFunction(const std::string& name, const std::string& condition,
+                                         const std::vector<Reset::Instruction>& body,
+                                         int chunkCount) {
   const std::string className = "S" + graph_.name;
-  const bool asynchronous = super->superType == SUPER_ASYNC_RESET;
-  emitText(0, true, "void " + className + "::subResetMt" + std::to_string(resetId) +
-                        (asynchronous ? "(bool resetValue) {\n" : "() {\n"));
-  Node* resetNode = super->resetNode;
-  const std::string resetName = resetNode->type == NODE_REG_SRC ? resetNode->name + "$RESET" : resetNode->name;
+  emitText(0, true, "void " + className + "::" + name + "() {\n");
   int indent = 1;
-  emitText(indent++, false, "if (unlikely(" + (asynchronous ? "resetValue" : resetName) + ")) {\n");
+  if (!condition.empty()) {
+    emitText(indent++, false, "if (unlikely(" + condition + ")) {\n");
+  }
   int emitted = 0;
   int chunk = 0;
   int nesting = 0;
-  std::pair<size_t, size_t> body = resetBodyRange(super);
-  for (size_t i = body.first; i < body.second; ++i) {
-    const InstInfo& inst = super->insts[i];
-    bool statement = inst.infoType == SUPER_INFO_IF || inst.infoType == SUPER_INFO_ELSE ||
-                     inst.infoType == SUPER_INFO_STR;
+  for (const Reset::Instruction& instruction : body) {
+    const SuperInfo type = static_cast<SuperInfo>(instruction.type);
+    const bool statement = type == SUPER_INFO_IF || type == SUPER_INFO_ELSE ||
+                           type == SUPER_INFO_STR;
     if (resetChunk_ > 0 && statement && emitted >= resetChunk_ && nesting == 0) {
-      emitText(indent, false,
-               "subResetMt" + std::to_string(resetId) + "_c" + std::to_string(chunk + 1) + "();\n");
-      if (chunk == 0) emitText(--indent, false, "}\n");
+      emitText(indent, false, name + "_c" + std::to_string(chunk + 1) + "();\n");
+      if (chunk == 0 && !condition.empty()) emitText(--indent, false, "}\n");
       emitText(--indent, false, "}\n");
-      emitText(0, true, "void " + className + "::subResetMt" + std::to_string(resetId) + "_c" +
+      emitText(0, true, "void " + className + "::" + name + "_c" +
                             std::to_string(++chunk) + "() {\n");
       indent = 1;
       emitted = 0;
     }
-    switch (inst.infoType) {
+    switch (type) {
       case SUPER_INFO_IF:
-        emitText(indent++, false, inst.inst + "\n");
+        emitText(indent++, false, instruction.text + "\n");
         ++nesting;
         break;
-      case SUPER_INFO_ELSE: emitText(indent - 1, false, inst.inst + "\n"); break;
+      case SUPER_INFO_ELSE: emitText(indent - 1, false, instruction.text + "\n"); break;
       case SUPER_INFO_DEDENT:
-        emitText(--indent, false, inst.inst + "\n");
+        emitText(--indent, false, instruction.text + "\n");
         --nesting;
         break;
-      case SUPER_INFO_STR: emitText(indent, false, inst.inst + "\n"); break;
+      case SUPER_INFO_STR: emitText(indent, false, instruction.text + "\n"); break;
       case SUPER_INFO_ASSIGN_BEG:
       case SUPER_INFO_ASSIGN_END: break;
     }
     emitted += statement;
   }
-  Assert(nesting == 0, "unbalanced reset instructions while emitting MT reset %d", resetId);
-  if (chunk == 0) emitText(--indent, false, "}\n");
+  Assert(nesting == 0, "unbalanced reset instructions while emitting %s", name.c_str());
+  Assert(chunk == chunkCount, "reset chunk mismatch for %s: planned %d emitted %d",
+         name.c_str(), chunkCount, chunk);
+  if (chunk == 0 && !condition.empty()) emitText(--indent, false, "}\n");
   emitText(--indent, false, "}\n");
+}
+
+void CppEmitterMt::emitResetFunction(const Reset& reset) {
+  Assert(!reset.asynchronous, "async reset %d requires worker functions", reset.id);
+  Node* resetNode = reset.super->resetNode;
+  const std::string condition =
+      resetNode->type == NODE_REG_SRC ? resetNode->name + "$RESET" : resetNode->name;
+  emitResetBodyFunction("subResetMt" + std::to_string(reset.id), condition,
+                        reset.body, reset.chunkCount);
+}
+
+void CppEmitterMt::emitAsyncResetWorkerFunction(const Reset& reset,
+                                                const Reset::Worker& worker) {
+  emitResetBodyFunction("subResetMt" + std::to_string(reset.id) + "W" +
+                            std::to_string(worker.id),
+                        "", worker.body, worker.chunkCount);
 }
 
 void CppEmitterMt::emitSuperNode(SuperNode* super, int indent) {
@@ -552,8 +697,8 @@ void CppEmitterMt::emitSuperNode(SuperNode* super, int indent) {
     Assert(reset != asyncResetIds_.end(), "missing MT async reset for %s", resetNode->name.c_str());
     auto oldValue = savedAsyncResetValues.find(resetNode);
     Assert(oldValue != savedAsyncResetValues.end(), "missing old value for MT async reset %s", resetNode->name.c_str());
-    emitText(indent, false, "subResetMt" + std::to_string(reset->second) + "(" + oldValue->second +
-                                " || " + resetValueName(resetNode) + ");\n");
+    emitText(indent, false, "mtTriggerAsyncReset" + std::to_string(reset->second) + "(" +
+                                oldValue->second + " || " + resetValueName(resetNode) + ");\n");
   };
 
   if (super->superType == SUPER_EXTMOD) {
@@ -579,7 +724,70 @@ void CppEmitterMt::emitDefinitions() {
   if (!enabled()) return;
   const std::string className = "S" + graph_.name;
 
-  for (const Reset& reset : resets_) emitResetFunction(reset.super, reset.id);
+  for (const Reset& reset : resets_) {
+    if (!reset.asynchronous) {
+      emitResetFunction(reset);
+      continue;
+    }
+    for (const Reset::Worker& worker : reset.workers) {
+      emitAsyncResetWorkerFunction(reset, worker);
+    }
+
+    const auto workerReset = [&](int worker) -> const Reset::Worker* {
+      for (const Reset::Worker& candidate : reset.workers) {
+        if (candidate.id == worker) return &candidate;
+      }
+      return nullptr;
+    };
+
+    // Ready is published every cycle. The more expensive done/release barrier
+    // is entered only while reset is asserted.
+    emitText(0, true, "void " + className + "::mtTriggerAsyncReset" +
+                          std::to_string(reset.id) + "(bool resetValue) {\n");
+    emitText(1, false,
+             "const uint64_t generation = mtGeneration.load(std::memory_order_relaxed);\n");
+    emitText(1, false, "mtAsyncResetValues[" + std::to_string(reset.id) + "] = resetValue;\n");
+    emitText(1, false, "mtAsyncResetReady[" + std::to_string(reset.id) +
+                           "].generation.store(generation, std::memory_order_release);\n");
+    emitText(1, false, "if (!resetValue) return;\n");
+    if (workerReset(reset.triggerOwner) != nullptr) {
+      emitText(1, false, "subResetMt" + std::to_string(reset.id) + "W" +
+                             std::to_string(reset.triggerOwner) + "();\n");
+    }
+    for (int worker : reset.participants) {
+      const size_t index = static_cast<size_t>(reset.id) * static_cast<size_t>(workerCount_) +
+                           static_cast<size_t>(worker);
+      emitText(1, false, "while (mtAsyncResetDone[" + std::to_string(index) +
+                             "].generation.load(std::memory_order_acquire) != generation)\n");
+      emitText(2, false, "__asm__ __volatile__(\"pause\" ::: \"memory\");\n");
+    }
+    emitText(1, false, "mtAsyncResetRelease[" + std::to_string(reset.id) +
+                           "].generation.store(generation, std::memory_order_release);\n");
+    emitText(0, false, "}\n");
+
+    for (int worker : reset.participants) {
+      const size_t index = static_cast<size_t>(reset.id) * static_cast<size_t>(workerCount_) +
+                           static_cast<size_t>(worker);
+      emitText(0, true, "void " + className + "::mtJoinAsyncReset" +
+                            std::to_string(reset.id) + "W" + std::to_string(worker) + "() {\n");
+      emitText(1, false,
+               "const uint64_t generation = mtGeneration.load(std::memory_order_relaxed);\n");
+      emitText(1, false, "while (mtAsyncResetReady[" + std::to_string(reset.id) +
+                             "].generation.load(std::memory_order_acquire) != generation)\n");
+      emitText(2, false, "__asm__ __volatile__(\"pause\" ::: \"memory\");\n");
+      emitText(1, false, "if (!mtAsyncResetValues[" + std::to_string(reset.id) + "]) return;\n");
+      if (workerReset(worker) != nullptr) {
+        emitText(1, false, "subResetMt" + std::to_string(reset.id) + "W" +
+                               std::to_string(worker) + "();\n");
+      }
+      emitText(1, false, "mtAsyncResetDone[" + std::to_string(index) +
+                             "].generation.store(generation, std::memory_order_release);\n");
+      emitText(1, false, "while (mtAsyncResetRelease[" + std::to_string(reset.id) +
+                             "].generation.load(std::memory_order_acquire) != generation)\n");
+      emitText(2, false, "__asm__ __volatile__(\"pause\" ::: \"memory\");\n");
+      emitText(0, false, "}\n");
+    }
+  }
 
   emitText(0, true, "void " + className + "::resetAllMt() {\n");
   for (const Reset& reset : resets_) {
@@ -605,17 +813,29 @@ void CppEmitterMt::emitDefinitions() {
 
   for (int worker = 0; worker < workerCount_; ++worker) {
     const std::vector<int>& chain = workerTasks_[static_cast<size_t>(worker)];
+    const std::vector<ResetJoin>& joins = resetJoins_[static_cast<size_t>(worker)];
+    const size_t dispatchCount = chain.size() + joins.size();
     std::string text = "const " + className + "::MtDispatch " + className + "::mtDispatchW" +
-                       std::to_string(worker) + "[" + std::to_string(std::max<size_t>(1, chain.size())) + "] = {\n";
-    if (chain.empty()) {
+                       std::to_string(worker) + "[" +
+                       std::to_string(std::max<size_t>(1, dispatchCount)) + "] = {\n";
+    if (dispatchCount == 0) {
       text += "  {nullptr, 0, 0, 0, 0}\n";
     } else {
-      for (int taskId : chain) {
+      size_t joinIndex = 0;
+      for (size_t position = 0; position <= chain.size(); ++position) {
+        while (joinIndex < joins.size() && joins[joinIndex].beforePosition == position) {
+          const ResetJoin& join = joins[joinIndex++];
+          text += "  {&" + className + "::mtJoinAsyncReset" + std::to_string(join.resetId) +
+                  "W" + std::to_string(worker) + ",0,0,0,0},\n";
+        }
+        if (position == chain.size()) break;
+        const int taskId = chain[position];
         const Task& task = tasks_[static_cast<size_t>(taskId)];
         text += "  {&" + className + "::mtTask" + std::to_string(taskId) + "," +
                 std::to_string(task.waitBegin) + "," + std::to_string(task.waitEnd) + "," +
                 std::to_string(task.storeBegin) + "," + std::to_string(task.storeEnd) + "},\n";
       }
+      Assert(joinIndex == joins.size(), "unemitted async reset joins for worker %d", worker);
     }
     text += "};\n";
     emitText(0, true, text);
@@ -695,7 +915,10 @@ void CppEmitterMt::emitDefinitions() {
   runtime += "  const MtDispatch* entries = nullptr; uint32_t count = 0;\n  switch (worker) {\n";
   for (int worker = 0; worker < workerCount_; ++worker) {
     runtime += "    case " + std::to_string(worker) + ": entries = mtDispatchW" + std::to_string(worker) +
-               "; count = " + std::to_string(workerTasks_[static_cast<size_t>(worker)].size()) + "; break;\n";
+               "; count = " +
+               std::to_string(workerTasks_[static_cast<size_t>(worker)].size() +
+                              resetJoins_[static_cast<size_t>(worker)].size()) +
+               "; break;\n";
   }
   runtime += "    default: abort();\n  }\n";
   // A worker's task order is part of correctness: sortedSuper contains ordering
@@ -751,12 +974,12 @@ void CppEmitterMt::emitStep() {
 // Dense-specific copy of the common C++ model lowering. It emits declarations,
 // initialization and interfaces; all evaluation is emitted by CppEmitterMt.
 #ifdef DIFFTEST_PER_SIG
-FILE* sigFile = nullptr;
+FILE* sigFileMt = nullptr;
 #endif
 
 #define RESET_NAME(node) (node->name + "$RESET")
-#define emitFuncDecl(indent, ...) __emitSrc(indent, true, true, NULL, __VA_ARGS__)
-#define emitBodyLock(indent, ...) __emitSrc(indent, false, false, NULL, __VA_ARGS__)
+#define emitFuncDecl(indent, ...) __emitSrcMt(indent, true, true, NULL, __VA_ARGS__)
+#define emitBodyLock(indent, ...) __emitSrcMt(indent, false, false, NULL, __VA_ARGS__)
 
 static int superId = 0;
 static std::set<Node*> definedNode;
@@ -773,15 +996,7 @@ static void inline newLine(FILE* fp) {
   fprintf(fp, "\n");
 }
 
-std::string strReplace(std::string s, std::string oldStr, std::string newStr) {
-  size_t pos;
-  while ((pos = s.find(oldStr)) != std::string::npos) {
-    s.replace(pos, oldStr.length(), newStr);
-  }
-  return s;
-}
-
-FILE* graph::genHeaderStart() {
+FILE* graph::genHeaderStartMt() {
   FILE* header = std::fopen((globalConfig.OutputDir + "/" + name + ".h").c_str(), "w");
 
   fprintf(header, "#ifndef %s_H\n#define %s_H\n", name.c_str(), name.c_str());
@@ -843,13 +1058,13 @@ FILE* graph::genHeaderStart() {
   return header;
 }
 
-void graph::genInterfaceInput(Node* input) {
+void graph::genInterfaceInputMt(Node* input) {
   emitFuncDecl(0, "void S%s::set_%s(%s val) {\n", name.c_str(), input->name.c_str(), widthUType(input->width).c_str());
   emitBodyLock(1, "%s = val;\n", input->name.c_str());
   emitBodyLock(0, "}\n");
 }
 
-void graph::genInterfaceOutput(Node* output) {
+void graph::genInterfaceOutputMt(Node* output) {
   emitFuncDecl(0, "%s S%s::get_%s() {\n"
                "  return %s;\n"
                "}\n",
@@ -857,13 +1072,8 @@ void graph::genInterfaceOutput(Node* output) {
                output->name.c_str(), output->status == CONSTANT_NODE ? output->computeInfo->valStr.c_str() : output->name.c_str());
 }
 
-void graph::genHeaderEnd(FILE* fp) {
-  fprintf(fp, "};\n");
-  fprintf(fp, "#endif\n");
-}
-
 #if defined(DIFFTEST_PER_SIG) && defined(GSIM_DIFF)
-void graph::genDiffSig(FILE* fp, Node* node) {
+void graph::genDiffSigMt(FILE* fp, Node* node) {
   std::set<std::string> allNames;
   std::string diffNodeName = node->name;
   std::string originName = node->name;
@@ -894,12 +1104,12 @@ void graph::genDiffSig(FILE* fp, Node* node) {
     allNames.insert(diffNodeName);
   }
   for (auto iter : allNames)
-    fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, iter.c_str(), iter.c_str());
+    fprintf(sigFileMt, "%d %d %s %s\n", node->sign, node->width, iter.c_str(), iter.c_str());
 }
 #endif
 
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-void graph::genDiffSig(FILE* fp, Node* node) {
+void graph::genDiffSigMt(FILE* fp, Node* node) {
   std::string verilatorName = name + "__DOT__" + node->name;
   size_t pos;
   while ((pos = verilatorName.find("$$")) != std::string::npos) {
@@ -942,17 +1152,17 @@ void graph::genDiffSig(FILE* fp, Node* node) {
     allNames[diffNodeName] = verilatorName;
   }
   for (auto iter : allNames)
-    fprintf(sigFile, "%d %d %s %s\n", node->sign, node->width, iter.first.c_str(), iter.second.c_str());
+    fprintf(sigFileMt, "%d %d %s %s\n", node->sign, node->width, iter.first.c_str(), iter.second.c_str());
 }
 #endif
 
-void graph::genNodeDef(FILE* fp, Node* node) {
+void graph::genNodeDefMt(FILE* fp, Node* node) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || (node->status != VALID_NODE)) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
   if (node->type == NODE_WRITER) return;
   if (node->isLocal()) return;
 #if defined(GSIM_DIFF) || defined(VERILATOR_DIFF)
-  genDiffSig(fp, node);
+  genDiffSigMt(fp, node);
 #endif
   if (definedNode.find(node) != definedNode.end()) return;
   definedNode.insert(node);
@@ -989,15 +1199,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   }
 }
 
-bool Node::isLocal() { // TODO: isArray is OK
-  return status == VALID_NODE && type == NODE_OTHERS && !anyNextActive() && !isArray() && !isReset();
-}
-
-bool SuperNode::instsEmpty() {
-  return insts.size() == 0;
-}
-
-bool graph::__emitSrc(int indent, bool canNewFile, bool alreadyEndFunc, const char *nextFuncDef, const char *fmt, ...) {
+bool graph::__emitSrcMt(int indent, bool canNewFile, bool alreadyEndFunc, const char *nextFuncDef, const char *fmt, ...) {
   bool newFile = false;
   if (srcFp == NULL || (srcFileBytes > (globalConfig.cppMaxSizeKB * 1024) && canNewFile)) {
     if (srcFp != NULL) {
@@ -1023,7 +1225,7 @@ bool graph::__emitSrc(int indent, bool canNewFile, bool alreadyEndFunc, const ch
   return newFile;
 }
 
-void graph::emitPrintf() {
+void graph::emitPrintfMt() {
   emitFuncDecl(0, "void gprintf(const char *fmt, ...) {\n");
   emitBodyLock(0,
   "  FILE *fp = stderr;\n"
@@ -1056,7 +1258,7 @@ void graph::emitPrintf() {
   );
 }
 
-void graph::cppEmitter() {
+void graph::cppEmitterMt() {
   CppEmitterMt mtEmitter(*this);
   if (!mtEmitter.enabled()) {
     fprintf(stderr, "[cppEmitter-mt] --mt-mode=on is required\n");
@@ -1082,11 +1284,11 @@ void graph::cppEmitter() {
   srcFp = NULL;
   srcFileIdx = 0;
 
-  FILE* header = genHeaderStart();
+  FILE* header = genHeaderStartMt();
   mtEmitter.emitHeaderPreamble(header);
 #ifdef DIFFTEST_PER_SIG
-  sigFile = fopen((globalConfig.OutputDir + "/" + name + "_sigs.txt").c_str(), "w");
-  Assert(sigFile != nullptr, "failed to open MT signal list in %s", globalConfig.OutputDir.c_str());
+  sigFileMt = fopen((globalConfig.OutputDir + "/" + name + "_sigs.txt").c_str(), "w");
+  Assert(sigFileMt != nullptr, "failed to open MT signal list in %s", globalConfig.OutputDir.c_str());
 #endif
 
   /* class start*/
@@ -1094,7 +1296,7 @@ void graph::cppEmitter() {
   fprintf(header, "uint64_t cycles;\n");
   fprintf(header, "uint64_t LOG_START, LOG_END;\n");
   mtEmitter.emitClassMembers(header);
-  emitPrintf();
+  emitPrintfMt();
   /* constrcutor */
   emitFuncDecl(0, "S%s::S%s() {\n", name.c_str(), name.c_str());
   emitBodyLock(1, "cycles = 0;\n");
@@ -1119,14 +1321,14 @@ void graph::cppEmitter() {
   for (SuperNode* super : sortedSuper) {
     // std::string insts;
     if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
-      for (Node* n : super->member) genNodeDef(header, n);
+      for (Node* n : super->member) genNodeDefMt(header, n);
     }
     if (super->superType == SUPER_EXTMOD) {
-      for (size_t i = 1; i < super->member.size(); i ++) genNodeDef(header, super->member[i]);
+      for (size_t i = 1; i < super->member.size(); i ++) genNodeDefMt(header, super->member[i]);
     }
   }
   /* memory definition */
-  for (Node* mem : memory) genNodeDef(header, mem);
+  for (Node* mem : memory) genNodeDefMt(header, mem);
   fprintf(header, "uint32_t _var_end;\n");
 
   emitBodyLock(0, "// initialize registers with reset value 0 to overwrite the rand() results\n" );
@@ -1144,11 +1346,11 @@ void graph::cppEmitter() {
    /* input/output interface */
   for (Node* node : input) {
     fprintf(header, "void set_%s(%s val);\n", node->name.c_str(), widthUType(node->width).c_str());
-    genInterfaceInput(node);
+    genInterfaceInputMt(node);
   }
   for (Node* node : output) {
     fprintf(header, "%s get_%s();\n", widthUType(node->width).c_str(), node->name.c_str());
-    genInterfaceOutput(node);
+    genInterfaceOutputMt(node);
   }
   /* reset functions */
   mtEmitter.emitDefinitions();
@@ -1163,7 +1365,7 @@ void graph::cppEmitter() {
   fclose(header);
   fclose(srcFp);
 #ifdef DIFFTEST_PER_SIG
-  fclose(sigFile);
+  fclose(sigFileMt);
 #endif
 
   printf("[cppEmitter] define %ld nodes %d superNodes\n", definedNode.size(), superId);

@@ -25,6 +25,26 @@ GSIM accepts chirrtl, and compiles it to C++
 + Refer to `build/gsim/gsim --help` for more information
 + See [C++ harness example](https://github.com/jaypiper/simulator/blob/master/emu/emu.cpp) to know how it interacts with the emitted C++ code.
 
+### Multithreaded emitter
+
+`make build-gsim` builds one compiler containing both emitters. The default and
+`--mt-mode=off` select the single-thread active emitter; `--mt-mode=on` selects
+the multithreaded dense emitter. Generate an MT model with a fixed worker count:
+
+```
+GSIM_THREADS=4 GSIM_MT_DENSE_VCONTRACT_MAXMT=256 \
+  build/gsim/gsim --mt-mode=on \
+  --dir out/model design.fir
+```
+
+Compile the emitted C++ with `-pthread`, then run it with
+`GSIM_THREADS=4 GSIM_MT_EXECUTOR=dense`. The runtime worker count must match generation.
+Multithreaded test sources are kept under `test/`; they are intentionally not exposed as dedicated
+Makefile targets. Per-signal comparison uses an independently generated single-thread active model.
+
+See [Multithreaded C++ Emitter Design and Usage](docs/multithreaded-emitter.md) for the scheduler,
+runtime synchronization protocol, XiangShan workflow, correctness tests, and tuning guidance.
+
 ## Debug logs & dumps
 
 + By default `gsim` runs quietly (`LogLevel=0`, dump disabled). Enable lightweight stage logs with `--log-level=1` (prints pass begin/end). Use `--log-level=2` for verbose constant-analysis traces; expect a lot more stderr.

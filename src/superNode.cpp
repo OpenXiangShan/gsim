@@ -1,5 +1,9 @@
 #include "common.h"
 
+bool SuperNode::instsEmpty() {
+  return insts.empty();
+}
+
 int SuperNode::counter = 1;
 
 void SuperNode::clear_relation() {

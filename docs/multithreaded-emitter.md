@@ -40,14 +40,17 @@
 | `include/Node.h` | `Node`、`SuperNode`、`InstInfo` |
 | `include/graph.h` | `sortedSuper`、`allReset` 和 emitter 所需私有输出接口 |
 | `src/main.cpp` | `--mt-mode` 命令行开关 |
-| `Makefile` | emitter 二选一构建、MT 单测和 difftest |
+| `Makefile` | 构建同时包含 single 和 MT emitter 的统一生成器 |
 
-`Makefile` 保证一个生成器只链接一个 emitter translation unit：
+`Makefile` 只生成一份编译器：
 
-- `make build-gsim` 生成 `build/gsim/gsim`，链接 `cppEmitter.cpp`；
-- `make build-gsim-mt` 生成 `build-mt/gsim/gsim`，链接 `cppEmitter-mt.cpp`。
+- `make build-gsim` 生成 `build/gsim/gsim`，同时链接 `cppEmitter.cpp` 和
+  `cppEmitter-mt.cpp`；
+- 默认或 `--mt-mode=off` 调用 `graph::cppEmitter()`；
+- `--mt-mode=on` 调用 `graph::cppEmitterMt()`。
 
-MT 文件保留了一份稳定 lowering 的独立副本，而不是调用单线程 emitter。两种 emitter 可以分别演进。两者共享的唯一额外接口是 `graph` 对 `CppEmitterMt` 的 friend 声明，用于复用已有文件切分和源码输出机制。
+MT 文件保留了一份稳定 lowering 的独立副本，而不是调用单线程 emitter。
+两种 emitter 可以分别演进；MT 使用带 `Mt` 后缀的 `graph` 输出接口，因此统一链接时不会与单线程实现产生重复符号。
 
 ## 3. 从电路图到 MTask
 
@@ -475,11 +478,11 @@ task 内局部中间量使用 `T value{};` 值初始化。部分 external/memory
 ### 10.1 通用模型
 
 ```bash
-make -j"$(nproc)" build-gsim-mt
+make -j"$(nproc)" build-gsim
 
 GSIM_THREADS=4 \
 GSIM_MT_DENSE_VCONTRACT_MAXMT=256 \
-  build-mt/gsim/gsim \
+  build/gsim/gsim \
   --mt-mode=on \
   --dir out/model \
   design.fir
@@ -508,12 +511,12 @@ GSIM_MT_CPU_AFFINITY=auto \
 从 GSIM 仓库运行：
 
 ```bash
-make -j"$(nproc)" build-gsim-mt
+make -j"$(nproc)" build-gsim
 mkdir -p build/xiangshan-perf/gsim-compile/model
 
 GSIM_THREADS=32 \
 GSIM_MT_DENSE_VCONTRACT_MAXMT=2400 \
-  build-mt/gsim/gsim \
+  build/gsim/gsim \
   --supernode-max-size=30 \
   --cpp-max-size-KB=8192 \
   --sep-mod=__DOT__ \

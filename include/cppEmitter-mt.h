@@ -1,6 +1,7 @@
 #ifndef CPP_EMITTER_MT_H
 #define CPP_EMITTER_MT_H
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <map>
@@ -45,14 +46,38 @@ class CppEmitterMt {
   };
 
   struct Reset {
+    struct Instruction {
+      uint8_t type = 0;
+      std::string text;
+    };
+
+    struct Worker {
+      int id = -1;
+      int chunkCount = 0;
+      std::vector<Instruction> body;
+    };
+
     SuperNode* super = nullptr;
     int id = -1;
     bool asynchronous = false;
     int chunkCount = 0;
+    int triggerTask = -1;
+    int triggerOwner = -1;
+    std::vector<Instruction> body;
+    std::vector<Worker> workers;
+    std::vector<int> participants;
+  };
+
+  struct ResetJoin {
+    int resetId = -1;
+    size_t beforePosition = 0;
   };
 
   void emitText(int indent, bool canStartFile, const std::string& text);
-  void emitResetFunction(SuperNode* super, int resetId);
+  void emitResetBodyFunction(const std::string& name, const std::string& condition,
+                             const std::vector<Reset::Instruction>& body, int chunkCount);
+  void emitResetFunction(const Reset& reset);
+  void emitAsyncResetWorkerFunction(const Reset& reset, const Reset::Worker& worker);
   void emitSuperNode(SuperNode* super, int indent);
 
   graph& graph_;
@@ -68,6 +93,7 @@ class CppEmitterMt {
   std::vector<int> waitSlots_;
   std::vector<int> storeSlots_;
   std::vector<Reset> resets_;
+  std::vector<std::vector<ResetJoin>> resetJoins_;
   std::map<Node*, int> asyncResetIds_;
 };
 

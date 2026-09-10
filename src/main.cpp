@@ -61,6 +61,7 @@ Config::Config() {
   DumpGraphJson = false;
   DumpAssignTree = false;
   DumpConstStatus = false;
+  MtMode = false;
   OutputDir = ".";
   SuperNodeMaxSize = 35;
   cppMaxSizeKB = -1;
@@ -142,7 +143,7 @@ static void printUsage(const char* ProgName) {
             << "      --dump-assign-tree           Include assignTree structure in JSON dump (can be large).\n"
             << "      --dump-const-status          Dump per-node constant-analysis status before removing constants.\n"
             << "      --mt-mode=off|on             Select the C++ emitter mode.\n"
-            << "                                   Emit the compact dense multithreaded executor.\n"
+            << "                                   off: single-thread active (default); on: multithread dense.\n"
             ;
 }
 
@@ -276,7 +277,7 @@ static char* parseCommandLine(int argc, char** argv) {
                     fprintf(stderr, "Error: --mt-mode expects off or on, got '%s'.\n", optarg);
                     _exit(EXIT_FAILURE);
                   }
-                  setenv("GSIM_MT_MODE", optarg, 1);
+                  globalConfig.MtMode = strcmp(optarg, "on") == 0;
                   break;
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }
@@ -385,7 +386,11 @@ int main(int argc, char** argv) {
 
   FUNC_TIMER(g->instsGenerator());
 
-  FUNC_WRAPPER(g->cppEmitter(), "Final");
+  if (globalConfig.MtMode) {
+    FUNC_WRAPPER(g->cppEmitterMt(), "Final");
+  } else {
+    FUNC_WRAPPER(g->cppEmitter(), "Final");
+  }
 
   TIMER_END(total);
 
