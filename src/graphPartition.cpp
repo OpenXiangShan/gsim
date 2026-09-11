@@ -384,3 +384,13 @@ void graph::graphPartition() {
   phaseSuper = sortedSuper.size();
   printf("[graphPartition] remove %ld superNodes (%ld -> %ld)\n", totalSuper - phaseSuper, totalSuper, phaseSuper);
 }
+
+void graph::graphPartitionMt() {
+  size_t totalSuper = sortedSuper.size();
+  orderAllNodes();
+
+  graphCoarsen();
+  resort();
+
+  printf("[graphPartitionMt] remove %ld superNodes (%ld -> %ld)\n", totalSuper - sortedSuper.size(), totalSuper, sortedSuper.size());
+}

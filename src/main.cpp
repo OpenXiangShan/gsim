@@ -375,20 +375,21 @@ int main(int argc, char** argv) {
 
   FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
 
-  FUNC_WRAPPER(g->graphPartition(), "graphPartition");
-
-  FUNC_WRAPPER(g->replicationOpt(), "Replication");
-
-  // FUNC_WRAPPER(g->mergeRegister(), "MergeRegister");
-
-  // FUNC_WRAPPER(g->constructRegs(), "ConstructRegs");
-  FUNC_TIMER(g->generateStmtTree());
-
-  FUNC_TIMER(g->instsGenerator());
-
   if (globalConfig.MtMode) {
+    FUNC_WRAPPER(g->graphPartitionMt(), "graphPartition");
+    FUNC_TIMER(g->generateStmtTree());
+
+    FUNC_TIMER(g->instsGenerator());
+
     FUNC_WRAPPER(g->cppEmitterMt(), "Final");
   } else {
+    FUNC_WRAPPER(g->graphPartition(), "graphPartition");
+
+    FUNC_WRAPPER(g->replicationOpt(), "Replication");
+
+    FUNC_TIMER(g->generateStmtTree());
+
+    FUNC_TIMER(g->instsGenerator());
     FUNC_WRAPPER(g->cppEmitter(), "Final");
   }
 

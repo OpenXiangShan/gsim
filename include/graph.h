@@ -114,6 +114,7 @@ class graph {
   void exprOpt();
   void patternDetect();
   void graphPartition();
+  void graphPartitionMt();
   void MFFCPartition();
   void mergeEssentSmallSubling(size_t maxSize, double sim);
   void essentPartition();

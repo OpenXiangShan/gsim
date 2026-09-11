@@ -570,7 +570,6 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
   fprintf(header, "void mtWorkerLoop(int worker);\nvoid mtRunWorker(int worker, uint8_t parity);\n");
   fprintf(header, "void mtPinWorker(int worker);\nvoid resetAllMt();\nvoid stepMt();\n");
   for (const Reset& reset : resets_) {
-    printf("reset.id %d, uint %d\n", reset.id, !reset.asynchronous);
     if (!reset.asynchronous) {
       fprintf(header, "void subResetMt%d();\n", reset.id);
       for (int chunk = 1; chunk <= reset.chunkCount; ++chunk) {
@@ -1368,6 +1367,5 @@ void graph::cppEmitterMt() {
   fclose(sigFileMt);
 #endif
 
-  printf("[cppEmitter] define %ld nodes %d superNodes\n", definedNode.size(), superId);
   std::cout << "[cppEmitter] finish writing " << srcFileIdx << " cpp files to " + globalConfig.OutputDir + "/" << std::endl;
 }
