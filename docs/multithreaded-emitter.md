@@ -1,6 +1,6 @@
 # GSIM 多线程 C++ Emitter 设计与使用
 
-本文介绍 `src/cppEmitter-mt.cpp` 的设计、生成流程、运行时协议、正确性约束、测试方法和性能调优方式。阅读前建议先了解 GSIM 的基本流水线：CHIRRTL 经 parser 和 `AST2Graph` 转为节点图，完成图优化、`graphPartition`、`generateStmtTree` 和 `instsGenerator` 后，再由 emitter 生成可编译的 C++ 模型。
+本文介绍 MT 后端三个阶段的设计、生成流程、运行时协议、正确性约束、测试方法和性能调优方式。阅读前建议先了解 GSIM 的基本流水线：CHIRRTL 经 parser 和 `AST2Graph` 转为节点图，完成图优化、`graphCoarsen`、`generateStmtTree` 和 `instsGenerator` 后，依次经过 MTask 划分、worker 调度，最后由 `cppEmitter-mt.cpp` 生成可编译的 C++ 模型。
 
 本文讨论的是当前仓库中的 MT-level dispatch 实现，而不是早期实验性线程池或旧版 lookahead 实现。核心结论可以先概括为：
 
@@ -34,8 +34,12 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| `src/cppEmitter-mt.cpp` | MT 规划、运行时代码生成，以及独立的稳定 C++ lowering |
-| `include/cppEmitter-mt.h` | `CppEmitterMt` 接口、Task/Reset 类型和 planner 状态 |
+| `src/mtTaskPartition.cpp` | 从 SuperNode 依赖图建立、拓扑排序并合并 MTask |
+| `include/mtTaskPartition.h` | MTask 结构和 partition builder 接口 |
+| `src/mtTaskSchedule.cpp` | worker owner 分配、token 表和同步/异步 reset 规划 |
+| `include/mtTaskSchedule.h` | worker、token、reset 计划结构和 builder 接口 |
+| `src/cppEmitter-mt.cpp` | 消费 task/worker 计划，生成 MT C++ 类、dispatch 表和线程池 |
+| `include/cppEmitter-mt.h` | `CppEmitterMt` 输出接口及三个阶段之间的组合边界 |
 | `src/cppEmitter.cpp` | 原单线程 emitter；MT 实现不修改它 |
 | `include/Node.h` | `Node`、`SuperNode`、`InstInfo` |
 | `include/graph.h` | `sortedSuper`、`allReset` 和 emitter 所需私有输出接口 |
@@ -49,7 +53,7 @@
 - 默认或 `--mt-mode=off` 调用 `graph::cppEmitter()`；
 - `--mt-mode=on` 调用 `graph::cppEmitterMt()`。
 
-MT 文件保留了一份稳定 lowering 的独立副本，而不是调用单线程 emitter。
+`cppEmitter-mt.cpp` 保留了一份稳定 lowering 的独立副本，而不是调用单线程 emitter。
 两种 emitter 可以分别演进；MT 使用带 `Mt` 后缀的 `graph` 输出接口，因此统一链接时不会与单线程实现产生重复符号。
 
 ## 3. 从电路图到 MTask
