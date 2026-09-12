@@ -32,6 +32,7 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
   void emitConstructorStart();
   void emitDefinitions();
   void emitStep();
+  bool isTaskLocal(Node* node) const;
 
  private:
   using Task = MtTask;
@@ -43,7 +44,8 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
                              const std::vector<Reset::Instruction>& body, int chunkCount);
   void emitResetFunction(const Reset& reset);
   void emitAsyncResetWorkerFunction(const Reset& reset, const Reset::Worker& worker);
-  void emitSuperNode(SuperNode* super, int indent);
+  void emitInstructions(const std::vector<InstInfo>& instructions, int indent);
+  void emitTask(const Task& task, int indent);
 
   graph& graph_;
   bool enabled_ = false;

@@ -4,15 +4,65 @@
 
 #include <algorithm>
 #include <set>
+#include <stack>
 #include <utility>
 
 namespace {
 
+int expressionOperationCount(const ExpTree* tree) {
+  int operations = 0;
+  std::stack<const ENode*> pending;
+  if (tree->getRoot() != nullptr) pending.push(tree->getRoot());
+  if (tree->getlval() != nullptr) {
+    for (ENode* child : tree->getlval()->child) {
+      if (child != nullptr) pending.push(child);
+    }
+  }
+  while (!pending.empty()) {
+    const ENode* expression = pending.top();
+    pending.pop();
+    if (expression->nodePtr == nullptr && expression->opType != OP_EMPTY &&
+        expression->opType != OP_INT && expression->opType != OP_INVALID) {
+      ++operations;
+    }
+    for (ENode* child : expression->child) {
+      if (child != nullptr) pending.push(child);
+    }
+  }
+  return std::max(1, operations);
+}
+
+int nodeOperationCount(const Node* node) {
+  int operations = 0;
+  for (const ExpTree* tree : node->assignTree) {
+    operations += expressionOperationCount(tree);
+  }
+  return std::max(1, operations);
+}
+
 int taskCost(const SuperNode* super) {
-  return std::max<int>(1, static_cast<int>(super->insts.size() + super->member.size()));
+  int operations = 0;
+  for (const Node* node : super->member) operations += nodeOperationCount(node);
+  return std::max(1, operations);
+}
+
+bool mustRemainStandalone(const SuperNode* super) {
+  return super->superType == SUPER_EXTMOD || super->superType == SUPER_ASYNC_RESET;
 }
 
 }  // namespace
+
+void MtTaskPartitioner::assignCppIds(graph& graph) {
+  int nextCppId = 0;
+  for (SuperNode* super : graph.sortedSuper) {
+    if (!super->member.empty() || super->superType == SUPER_EXTMOD ||
+        super->superType == SUPER_ASYNC_RESET) {
+      super->cppId = nextCppId++;
+    } else {
+      super->cppId = -1;
+    }
+  }
+}
 
 void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int maxTasks) {
   int taskCount = 0;
@@ -101,12 +151,22 @@ void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int maxTasks) {
     std::vector<MtTask> result;
     MtTask current;
     auto flush = [&]() {
-      if (!current.cppIds.empty()) result.push_back(std::move(current));
+      if (!current.cppIds.empty()) {
+        current.estimatedOperations = current.cost;
+        result.push_back(std::move(current));
+      }
       current = MtTask();
     };
     for (int cppId : plan.topologicalCppIds_) {
       SuperNode* super = plan.byCppId_[static_cast<size_t>(cppId)];
       int cost = taskCost(super);
+      if (mustRemainStandalone(super)) {
+        flush();
+        current.cppIds.push_back(cppId);
+        current.cost = cost;
+        flush();
+        continue;
+      }
       if (!current.cppIds.empty() && current.cost + cost > costLimit) {
         flush();
       }
@@ -118,6 +178,9 @@ void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int maxTasks) {
   };
 
   plan.tasks_ = formTasks(targetCost);
+  fprintf(stderr,
+          "[cppEmitter-mt] partition estimated_ops=%lld target_cost=%d mtasks=%zu\n",
+          totalCost, targetCost, plan.tasks_.size());
   if (static_cast<int>(plan.tasks_.size()) > maxTasks) {
     fprintf(stderr,
             "[cppEmitter-mt] target MAXMT=%d produced %zu dependency-safe tasks\n",
@@ -128,6 +191,7 @@ void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int maxTasks) {
   for (size_t taskId = 0; taskId < plan.tasks_.size(); ++taskId) {
     for (int cppId : plan.tasks_[taskId].cppIds) taskByCppId[static_cast<size_t>(cppId)] = taskId;
   }
+  plan.taskByCppId_ = taskByCppId;
   std::vector<std::set<int>> taskSuccessors(plan.tasks_.size());
   std::vector<std::set<int>> taskPredecessors(plan.tasks_.size());
   for (int from = 0; from < taskCount; ++from) {

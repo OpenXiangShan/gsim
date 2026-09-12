@@ -1,6 +1,7 @@
 #include "cppEmitter-mt.h"
 
 #include "common.h"
+#include "mtTaskLowering.h"
 #include "util.h"
 
 #include <algorithm>
@@ -57,9 +58,20 @@ bool CppEmitterMt::enabled() const { return enabled_; }
 
 void CppEmitterMt::prepare() {
   if (!enabled()) return;
+  MtTaskPartitioner::assignCppIds(graph_);
+  for (SuperNode* super : graph_.sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->status == VALID_NODE) member->updateActivate();
+    }
+  }
   MtTaskPartitioner::build(graph_, static_cast<MtTaskPlan&>(*this), maxTasks_);
+  MtTaskLowerer::generateStmtTrees(graph_, static_cast<MtTaskPlan&>(*this));
   MtWorkerBuilder::build(graph_, static_cast<MtTaskPlan&>(*this), static_cast<MtWorkerPlan&>(*this),
                          workerCount_, resetChunk_);
+}
+
+bool CppEmitterMt::isTaskLocal(Node* node) const {
+  return localNodes_.find(node) != localNodes_.end();
 }
 
 void CppEmitterMt::emitText(int indent, bool canStartFile, const std::string& text) {
@@ -199,19 +211,32 @@ void CppEmitterMt::emitAsyncResetWorkerFunction(const Reset& reset,
                         "", worker.body, worker.chunkCount);
 }
 
-void CppEmitterMt::emitSuperNode(SuperNode* super, int indent) {
-  auto emitInstructions = [&](const std::vector<InstInfo>& instructions) {
-    for (const InstInfo& inst : instructions) {
-      switch (inst.infoType) {
-        case SUPER_INFO_IF: emitText(indent++, false, inst.inst + "\n"); break;
-        case SUPER_INFO_ELSE: emitText(indent - 1, false, inst.inst + "\n"); break;
-        case SUPER_INFO_DEDENT: emitText(--indent, false, inst.inst + "\n"); break;
-        case SUPER_INFO_STR: emitText(indent, false, inst.inst + "\n"); break;
-        case SUPER_INFO_ASSIGN_BEG:
-        case SUPER_INFO_ASSIGN_END: break;
-      }
+void CppEmitterMt::emitInstructions(const std::vector<InstInfo>& instructions, int indent) {
+  const int initialIndent = indent;
+  for (const InstInfo& inst : instructions) {
+    switch (inst.infoType) {
+      case SUPER_INFO_IF: emitText(indent++, false, inst.inst + "\n"); break;
+      case SUPER_INFO_ELSE: emitText(indent - 1, false, inst.inst + "\n"); break;
+      case SUPER_INFO_DEDENT: emitText(--indent, false, inst.inst + "\n"); break;
+      case SUPER_INFO_STR: emitText(indent, false, inst.inst + "\n"); break;
+      case SUPER_INFO_ASSIGN_BEG:
+      case SUPER_INFO_ASSIGN_END: break;
     }
-  };
+  }
+  Assert(indent == initialIndent, "unbalanced MTask instruction tree");
+}
+
+void CppEmitterMt::emitTask(const Task& task, int indent) {
+  Assert(task.insts != nullptr, "MTask has no lowered instruction stream");
+  Assert(!task.cppIds.empty(), "cannot emit an empty MTask");
+  SuperNode* first = byCppId_[static_cast<size_t>(task.cppIds.front())];
+
+  for (Node* node : task.members) {
+    if (task.localNodes.count(node) != 0) {
+      emitText(indent, false, widthUType(node->width) + " " + node->name + "{};\n");
+    }
+  }
+
   auto resetValueName = [](Node* resetNode) {
     return resetNode->type == NODE_REG_SRC ? resetNode->name + "$RESET" : resetNode->name;
   };
@@ -233,23 +258,24 @@ void CppEmitterMt::emitSuperNode(SuperNode* super, int indent) {
                                 oldValue->second + " || " + resetValueName(resetNode) + ");\n");
   };
 
-  if (super->superType == SUPER_EXTMOD) {
+  if (first->superType == SUPER_EXTMOD) {
+    Assert(task.cppIds.size() == 1, "extmodule SuperNode must remain a standalone MTask");
     std::set<Node*> asyncResets;
-    for (size_t i = 1; i < super->member.size(); ++i) {
-      if (super->member[i]->isAsyncReset()) asyncResets.insert(super->member[i]);
+    for (size_t i = 1; i < first->member.size(); ++i) {
+      if (first->member[i]->isAsyncReset()) asyncResets.insert(first->member[i]);
     }
     for (Node* resetNode : asyncResets) saveAsyncResetValue(resetNode);
-    emitInstructions(super->insts);
+    emitInstructions(*task.insts, indent);
     for (Node* resetNode : asyncResets) emitAsyncReset(resetNode);
     return;
   }
 
-  if (super->superType == SUPER_ASYNC_RESET) saveAsyncResetValue(super->resetNode);
-  for (Node* node : super->member) {
-    if (node->isLocal()) emitText(indent, false, widthUType(node->width) + " " + node->name + "{};\n");
+  if (first->superType == SUPER_ASYNC_RESET) {
+    Assert(task.cppIds.size() == 1, "async reset SuperNode must remain a standalone MTask");
+    saveAsyncResetValue(first->resetNode);
   }
-  emitInstructions(super->insts);
-  if (super->superType == SUPER_ASYNC_RESET) emitAsyncReset(super->resetNode);
+  emitInstructions(*task.insts, indent);
+  if (first->superType == SUPER_ASYNC_RESET) emitAsyncReset(first->resetNode);
 }
 
 void CppEmitterMt::emitDefinitions() {
@@ -329,7 +355,7 @@ void CppEmitterMt::emitDefinitions() {
 
   for (size_t taskId = 0; taskId < tasks_.size(); ++taskId) {
     emitText(0, true, "void " + className + "::mtTask" + std::to_string(taskId) + "() {\n");
-    for (int cppId : tasks_[taskId].cppIds) emitSuperNode(byCppId_[static_cast<size_t>(cppId)], 1);
+    emitTask(tasks_[taskId], 1);
     emitText(0, false, "}\n");
   }
 
@@ -513,7 +539,6 @@ FILE* sigFileMt = nullptr;
 #define emitFuncDecl(indent, ...) __emitSrcMt(indent, true, true, NULL, __VA_ARGS__)
 #define emitBodyLock(indent, ...) __emitSrcMt(indent, false, false, NULL, __VA_ARGS__)
 
-static int superId = 0;
 static std::set<Node*> definedNode;
 
 extern int maxConcatNum;
@@ -688,11 +713,11 @@ void graph::genDiffSigMt(FILE* fp, Node* node) {
 }
 #endif
 
-void graph::genNodeDefMt(FILE* fp, Node* node) {
+void graph::genNodeDefMt(FILE* fp, Node* node, bool taskLocal) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || (node->status != VALID_NODE)) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
   if (node->type == NODE_WRITER) return;
-  if (node->isLocal()) return;
+  if (taskLocal) return;
 #if defined(GSIM_DIFF) || defined(VERILATOR_DIFF)
   genDiffSigMt(fp, node);
 #endif
@@ -797,20 +822,6 @@ void graph::cppEmitterMt() {
     Panic();
   }
 
-  for (SuperNode* super : sortedSuper) {
-    if (!super->instsEmpty() || super->superType == SUPER_EXTMOD || super->superType == SUPER_ASYNC_RESET) {
-      super->cppId = superId ++;
-    }
-  }
-
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      if (member->status == VALID_NODE) {
-        member->updateActivate();
-      }
-    }
-  }
-
   mtEmitter.prepare();
 
   srcFp = NULL;
@@ -853,14 +864,16 @@ void graph::cppEmitterMt() {
   for (SuperNode* super : sortedSuper) {
     // std::string insts;
     if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
-      for (Node* n : super->member) genNodeDefMt(header, n);
+      for (Node* n : super->member) genNodeDefMt(header, n, mtEmitter.isTaskLocal(n));
     }
     if (super->superType == SUPER_EXTMOD) {
-      for (size_t i = 1; i < super->member.size(); i ++) genNodeDefMt(header, super->member[i]);
+      for (size_t i = 1; i < super->member.size(); i ++) {
+        genNodeDefMt(header, super->member[i], mtEmitter.isTaskLocal(super->member[i]));
+      }
     }
   }
   /* memory definition */
-  for (Node* mem : memory) genNodeDefMt(header, mem);
+  for (Node* mem : memory) genNodeDefMt(header, mem, false);
   fprintf(header, "uint32_t _var_end;\n");
 
   emitBodyLock(0, "// initialize registers with reset value 0 to overwrite the rand() results\n" );

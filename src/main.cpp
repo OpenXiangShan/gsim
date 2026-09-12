@@ -377,10 +377,6 @@ int main(int argc, char** argv) {
 
   if (globalConfig.MtMode) {
     FUNC_WRAPPER(g->graphPartitionMt(), "graphPartition");
-    FUNC_TIMER(g->generateStmtTree());
-
-    FUNC_TIMER(g->instsGenerator());
-
     FUNC_WRAPPER(g->cppEmitterMt(), "Final");
   } else {
     FUNC_WRAPPER(g->graphPartition(), "graphPartition");

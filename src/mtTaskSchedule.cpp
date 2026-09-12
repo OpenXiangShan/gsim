@@ -10,6 +10,78 @@
 
 namespace {
 
+int loweredTaskCost(const MtTask& task) {
+  const size_t instructionCount = task.insts == nullptr ? 0 : task.insts->size();
+  return std::max<int>(1, static_cast<int>(instructionCount) + task.globalNodeCount);
+}
+
+bool taskEmitsCode(const MtTask& task, const MtTaskPlan& plan) {
+  if (task.insts != nullptr && !task.insts->empty()) return true;
+  for (int cppId : task.cppIds) {
+    const SuperType type = plan.byCppId_[static_cast<size_t>(cppId)]->superType;
+    if (type == SUPER_EXTMOD || type == SUPER_ASYNC_RESET) return true;
+  }
+  return false;
+}
+
+void compactEmptyTasks(MtTaskPlan& plan) {
+  const std::vector<MtTask> original = plan.tasks_;
+  std::vector<int> oldToNew(original.size(), -1);
+  std::vector<MtTask> compacted;
+  compacted.reserve(original.size());
+  for (size_t oldId = 0; oldId < original.size(); ++oldId) {
+    if (!taskEmitsCode(original[oldId], plan)) continue;
+    oldToNew[oldId] = static_cast<int>(compacted.size());
+    MtTask task = original[oldId];
+    task.predecessors.clear();
+    task.successors.clear();
+    task.waits.clear();
+    task.stores.clear();
+    task.waitBegin = task.waitEnd = task.storeBegin = task.storeEnd = 0;
+    compacted.push_back(std::move(task));
+  }
+  if (compacted.size() == original.size()) return;
+
+  std::vector<std::set<int>> successors(compacted.size());
+  for (size_t oldSource = 0; oldSource < original.size(); ++oldSource) {
+    const int newSource = oldToNew[oldSource];
+    if (newSource < 0) continue;
+    std::vector<int> pending = original[oldSource].successors;
+    std::set<int> visited;
+    while (!pending.empty()) {
+      const int oldTarget = pending.back();
+      pending.pop_back();
+      if (!visited.insert(oldTarget).second) continue;
+      const int newTarget = oldToNew[static_cast<size_t>(oldTarget)];
+      if (newTarget >= 0) {
+        if (newTarget != newSource) successors[static_cast<size_t>(newSource)].insert(newTarget);
+      } else {
+        const std::vector<int>& next = original[static_cast<size_t>(oldTarget)].successors;
+        pending.insert(pending.end(), next.begin(), next.end());
+      }
+    }
+  }
+
+  std::vector<std::set<int>> predecessors(compacted.size());
+  for (size_t source = 0; source < successors.size(); ++source) {
+    for (int target : successors[source]) {
+      predecessors[static_cast<size_t>(target)].insert(static_cast<int>(source));
+    }
+  }
+  for (size_t taskId = 0; taskId < compacted.size(); ++taskId) {
+    compacted[taskId].successors.assign(successors[taskId].begin(), successors[taskId].end());
+    compacted[taskId].predecessors.assign(predecessors[taskId].begin(), predecessors[taskId].end());
+  }
+  plan.tasks_.swap(compacted);
+
+  plan.taskByCppId_.assign(plan.byCppId_.size(), -1);
+  for (size_t taskId = 0; taskId < plan.tasks_.size(); ++taskId) {
+    for (int cppId : plan.tasks_[taskId].cppIds) {
+      plan.taskByCppId_[static_cast<size_t>(cppId)] = static_cast<int>(taskId);
+    }
+  }
+}
+
 std::pair<size_t, size_t> resetBodyRange(const std::vector<InstInfo>& instructions,
                                         const Node* resetNode) {
   if (instructions.size() < 2 || instructions.front().infoType != SUPER_INFO_IF ||
@@ -77,6 +149,8 @@ int countResetChunks(const std::vector<Instruction>& body, int chunkSize) {
 void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& workers,
                             int workerCount, int resetChunk) {
   const int taskCount = static_cast<int>(tasks.byCppId_.size());
+  compactEmptyTasks(tasks);
+  for (MtTask& task : tasks.tasks_) task.cost = loweredTaskCost(task);
   // Schedule only ready MTasks, then renumber by that schedule. This produces a
   // topological fixed-worker program order. Critical-path priority breaks equal
   // earliest-start times.
@@ -347,6 +421,17 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
 
   size_t edgeCount = 0;
   for (const MtTask& task : tasks.tasks_) edgeCount += task.successors.size();
+  size_t instructionCount = 0;
+  size_t globalNodeCount = 0;
+  size_t scheduleCost = 0;
+  for (const MtTask& task : tasks.tasks_) {
+    instructionCount += task.insts == nullptr ? 0 : task.insts->size();
+    globalNodeCount += static_cast<size_t>(std::max(0, task.globalNodeCount));
+    scheduleCost += static_cast<size_t>(std::max(0, task.cost));
+  }
+  fprintf(stderr,
+          "[cppEmitter-mt] cost insts=%zu global_nodes=%zu schedule=%zu\n",
+          instructionCount, globalNodeCount, scheduleCost);
   fprintf(stderr,
           "[cppEmitter-mt] workers=%d supernodes=%d mtasks=%zu edges=%zu tokens=%zu\n",
           workerCount, taskCount, tasks.tasks_.size(), edgeCount, groups.size());

@@ -1,6 +1,6 @@
 # GSIM 多线程 C++ Emitter 设计与使用
 
-本文介绍 MT 后端三个阶段的设计、生成流程、运行时协议、正确性约束、测试方法和性能调优方式。阅读前建议先了解 GSIM 的基本流水线：CHIRRTL 经 parser 和 `AST2Graph` 转为节点图，完成图优化、`graphCoarsen`、`generateStmtTree` 和 `instsGenerator` 后，依次经过 MTask 划分、worker 调度，最后由 `cppEmitter-mt.cpp` 生成可编译的 C++ 模型。
+本文介绍 MT 后端的设计、生成流程、运行时协议、正确性约束、测试方法和性能调优方式。阅读前建议先了解 GSIM 的基本流水线：CHIRRTL 经 parser 和 `AST2Graph` 转为节点图，完成图优化和 `graphPartitionMt` 后，先进行 MTask 划分，再以整个 MTask 为作用域构建 `StmtTree` 和 `InstInfo`，随后完成 worker 调度，最后由 `cppEmitter-mt.cpp` 生成可编译的 C++ 模型。
 
 本文讨论的是当前仓库中的 MT-level dispatch 实现，而不是早期实验性线程池或旧版 lookahead 实现。核心结论可以先概括为：
 
@@ -34,10 +34,11 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| `src/mtTaskPartition.cpp` | 从 SuperNode 依赖图建立、拓扑排序并合并 MTask |
+| `src/mtTaskPartition.cpp` | 在 lowering 前从 SuperNode 依赖图建立、拓扑排序并合并 MTask |
 | `include/mtTaskPartition.h` | MTask 结构和 partition builder 接口 |
 | `src/mtTaskSchedule.cpp` | worker owner 分配、token 表和同步/异步 reset 规划 |
 | `include/mtTaskSchedule.h` | worker、token、reset 计划结构和 builder 接口 |
+| `src/mtTaskLowering.cpp` | 将 MTask 的跨 SuperNode 成员合并为一个 `StmtTree` 和 `InstInfo` 流 |
 | `src/cppEmitter-mt.cpp` | 消费 task/worker 计划，生成 MT C++ 类、dispatch 表和线程池 |
 | `include/cppEmitter-mt.h` | `CppEmitterMt` 输出接口及三个阶段之间的组合边界 |
 | `src/cppEmitter.cpp` | 原单线程 emitter；MT 实现不修改它 |
@@ -53,10 +54,30 @@
 - 默认或 `--mt-mode=off` 调用 `graph::cppEmitter()`；
 - `--mt-mode=on` 调用 `graph::cppEmitterMt()`。
 
-`cppEmitter-mt.cpp` 保留了一份稳定 lowering 的独立副本，而不是调用单线程 emitter。
-两种 emitter 可以分别演进；MT 使用带 `Mt` 后缀的 `graph` 输出接口，因此统一链接时不会与单线程实现产生重复符号。
+`cppEmitter-mt.cpp` 保持独立的输出和运行时路径，但复用单线程 lowering 已有的
+`StmtTree::mergeExpTree()`、`StmtTree::compute()` 和表达式求值函数。MT 不调用或修改
+单线程 `graph::generateStmtTree()`；两种 emitter 仍可分别演进。
 
 ## 3. 从电路图到 MTask
+
+### 3.0 MTask lowering 的职责
+
+MT 后端不再调用单线程的 `generateStmtTree()` 和 `instsGenerator()`。`CppEmitterMt::prepare()` 先建立 MTask DAG，再调用 `MtTaskLowerer::generateStmtTrees()`，最后建立 worker 计划。
+
+它的处理顺序如下：
+
+1. 遍历 `sortedSuper`，为包含成员、extmodule 或异步 reset 的超节点分配连续 `cppId`；空超节点被标记为 `-1`。
+2. 调用 `Node::updateActivate()`，为 dense 依赖图准备正向 active 边。
+3. 从每个超节点的 `next/depNext` 建立 SuperNode 依赖图。
+4. 用 Kahn 算法计算依赖拓扑序，并加入拓扑序上向前的 `nextActiveId` 边。
+5. 根据 `GSIM_MT_DENSE_VCONTRACT_MAXMT` 和节点表达式树中的预估运算数，把拓扑连续的 SuperNode 合并成 MTask。
+6. 将 Node 依赖映射成 MTask 的 `predecessors/successors`，检查所有边都是向前的。
+7. 收集每个 MTask 的全部 Node，并按 task 内 `depPrev/depNext` 做稳定拓扑排序。
+8. 复用单线程的 `StmtTree::mergeExpTree()` 和 `StmtTree::compute()`，为每个 MTask 生成一棵语句树和一条 `InstInfo` 流。
+9. 将所有直接使用者都在当前 MTask、且不被 reset helper 引用的普通标量中间节点标记为 task-local。
+10. 使用 lowering 后的指令数重新估计任务成本，再进行 worker 调度和 token 规划。
+
+`StmtTree` 的 `prevPath` 约束现在覆盖同一 MTask 内的跨 SuperNode 依赖。因此，无依赖节点可以提前并合并到相同条件分支中，有依赖节点则不能越过其前驱。extmodule 和异步 reset SuperNode 保持为独立 MTask，reset 辅助树仍独立构建，以保持外部调用和复位握手的位置。
 
 ### 3.1 输入数据
 
@@ -68,7 +89,7 @@ MT planner 不向 `Node` 或 `SuperNode` 增加并行专用字段，而是读取
 - `SuperNode::depPrev/depNext`：非直接但必须保持的顺序依赖；
 - `Node::nextActiveId`：节点值变化时需要激活的后继超节点；dense planner 用其中的正向关系补充同周期顺序；
 - `SuperNode::member`：超节点包含的 RTL 节点；
-- `SuperNode::insts`：计算该超节点的 `InstInfo` 指令流；
+- `MtTask::stmtTree/insts`：lowering 后的 task 级语句树和指令流；
 - `graph::allReset`：同步和异步复位超节点。
 
 整体转换关系如下：
@@ -76,11 +97,13 @@ MT planner 不向 `Node` 或 `SuperNode` 增加并行专用字段，而是读取
 ```text
 CHIRRTL
    |
-parser -> AST2Graph -> 图优化 -> graphPartition
+parser -> AST2Graph -> 图优化 -> graphPartitionMt
                                       |
                               graph::sortedSuper
                                       |
                            连续合并为 MTask
+                                      |
+                    节点重排 -> StmtTree -> InstInfo
                                       |
                       静态分配到 worker chain
                                       |
@@ -98,19 +121,30 @@ parser -> AST2Graph -> 图优化 -> graphPartition
 
 assert/printf 只使用图中已有的真实数据依赖。不能把所有较早 `cppId` 连接到观察节点；这会把观察节点变成全局 barrier，正确性依据不充分且会严重损失并行度。
 
+MT 路径在 lowering 前为每个需要生成代码的 `SuperNode` 分配 `cppId` 并构建 `MtTaskPlan`。随后收集一个 MTask 中所有 SuperNode 的成员，以原顺序作为稳定 tie-break，对 task 内 Node 做 `depPrev/depNext` 拓扑排序。该顺序允许无依赖计算提前，但不允许越过任何 task 内数据或顺序依赖。
+
 ### 3.3 SuperNode 合并为 MTask
 
-MTask 是多线程运行时的最小 dispatch 单位。一个 MTask 可以包含多个 SuperNode；这些 SuperNode 被写入同一个 `mtTaskN()` 函数并严格顺序执行，因此它们之间不需要线程同步。当前实现采用“拓扑序上的连续、按代价贪心分组”算法，代码位于 `CppEmitterMt::prepare()`。
+MTask 是多线程运行时的最小 dispatch 单位。一个 MTask 可以包含多个 SuperNode；它们的节点被合入同一棵 `StmtTree` 和同一个 `mtTaskN()` 函数，因此内部依赖不需要线程同步。当前实现采用“拓扑序上的连续、按代价贪心分组”算法，代码位于 `mtTaskPartition.cpp`。
+
+MTask 成员确定后才调用 MT 专属的 `generateStmtTrees()`。划分阶段遍历每个 Node 的 `assignTree`，统计 RHS 和动态 lvalue index 中的运算节点；常量和普通信号引用不计为运算，没有显式运算的赋值至少计 1。worker scheduler 在 lowering 完成后再使用实际 `InstInfo` 数量和跨 MTask 全局节点数估计任务成本。同一 MTask 内跨 SuperNode 使用的普通标量中间节点会成为 `mtTaskN()` 的局部变量；被其他 MTask、reset helper 或其他外部作用域使用的节点仍保留为模型成员。
 
 #### 代价估计
 
-每个 SuperNode 的静态成本定义为：
+MTask 划分发生在 lowering 之前，因此初始成本定义为：
 
 ```text
-superCost = max(1, insts.size() + member.size())
+nodeEstimatedOps = max(1, expressionOperationCount(node.assignTree))
+superCost = sum(nodeEstimatedOps)
 ```
 
-`insts.size()` 近似生成的计算语句数量，`member.size()` 近似局部声明和节点维护成本。该成本只用于生成阶段的启发式规划，不是运行时间测量结果。
+这个成本近似生成代码中的计算量，不再把同一个计算同时计入 `member.size()` 和 `insts.size()`。`generateStmtTrees()` 完成后，worker scheduler 使用：
+
+```text
+scheduleCost = max(1, task.insts.size() + task.globalNodeCount)
+```
+
+`globalNodeCount` 统计存在跨 MTask 直接消费者或被 reset helper 引用的节点。它在 MTask 已形成后计算，只影响 worker 分配，不反向改变 MTask 边界，避免任务边界和全局节点判定形成循环依赖。两种成本都只是启发式估计，不是运行时间测量结果。
 
 planner 首先累加全部 SuperNode 的成本，再根据期望 MTask 数计算目标成本：
 
@@ -166,9 +200,8 @@ taskByCppId[A] -> taskByCppId[B]
 
 ```cpp
 void STop::mtTaskN() {
-  // 按 cppIds 顺序生成第一个 SuperNode
-  // 按 cppIds 顺序生成第二个 SuperNode
-  // ...
+  // task-local declarations
+  // 整个 MTask 的 StmtTree lowering 结果
 }
 ```
 
@@ -181,9 +214,14 @@ void STop::mtTaskN() {
 | 字段 | 含义 |
 | --- | --- |
 | `cppIds` | 当前 MTask 包含的连续依赖拓扑序片段 |
+| `members` | 所有成员 SuperNode 的节点，按 task 内依赖拓扑排序 |
+| `stmtTree/insts` | MTask 级语句树和 lowering 后的指令流 |
+| `localNodes` | 仅在当前 MTask 内使用、可从模型成员降为函数局部量的节点 |
+| `estimatedOperations` | MTask 划分时由节点表达式树估算的运算量 |
+| `globalNodeCount` | lowering 后统计的跨 MTask 或 reset helper 使用节点数 |
 | `predecessors/successors` | 收缩后的 MTask 图前驱和后继 |
 | `owner` | list scheduler 分配的固定 worker 编号 |
-| `cost` | 所含 SuperNode 的累计估算成本 |
+| `cost` | lowering 后的 `insts.size() + globalNodeCount` 调度成本 |
 | `waits/stores` | 跨 worker token 槽 |
 | `waitBegin/.../storeEnd` | 生成扁平静态数组时使用的区间 |
 
@@ -447,6 +485,8 @@ dense:
 
 ### 局部变量
 
+普通标量中间节点只有在所有直接 `next` 使用者都属于同一 MTask 时，才会从模型成员降为 `mtTaskN()` 的局部变量。`depNext` 只表示顺序约束，不会仅因为跨 MTask 而阻止局部化；但 lowering 会显式收集 reset helper 的表达式依赖，确保这些函数需要读取的值仍为模型成员。数组、reset、memory 和跨 MTask 使用的值不会局部化。
+
 task 内局部中间量使用 `T value{};` 值初始化。部分 external/memory 参数只在 enable 为真时才有语义，但未初始化参数在 C++ 层仍可能触发未定义行为。值初始化保证禁用路径不会把栈垃圾传给 helper；已在所有路径赋值的局部量通常会被优化器消除多余清零。
 
 ## 9. 配置接口
@@ -626,8 +666,12 @@ Ready-to-run 测试同样应独立生成单线程 active reference 和多线程 
 生成器会打印：
 
 ```text
+[cppEmitter-mt] partition estimated_ops=... target_cost=... mtasks=...
+[cppEmitter-mt] cost insts=... global_nodes=... schedule=...
 [cppEmitter-mt] workers=32 supernodes=... mtasks=... edges=... tokens=...
 ```
+
+第一行表示划分前的表达式运算总估计、每个 MTask 的目标成本和初始任务数；第二行表示 task-level `InstInfo` 总数、跨作用域全局节点数，以及 `insts + global_nodes` 得到的调度总成本。第三行的 `mtasks` 是删除空任务后的最终运行时任务数。
 
 指标含义：
 
