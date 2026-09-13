@@ -134,17 +134,17 @@ MTask 成员确定后才调用 MT 专属的 `generateStmtTrees()`。划分阶段
 MTask 划分发生在 lowering 之前，因此初始成本定义为：
 
 ```text
-nodeEstimatedOps = max(1, expressionOperationCount(node.assignTree))
+nodeEstimatedOps = max(1, expressionOperationCount(node.assignTree)) + partition_weight
 superCost = sum(nodeEstimatedOps)
 ```
 
-这个成本近似生成代码中的计算量，不再把同一个计算同时计入 `member.size()` 和 `insts.size()`。`generateStmtTrees()` 完成后，worker scheduler 使用：
+`partition_weight` 默认是 0，可通过 `--mt-partition-node-weight` 覆盖；默认成本因此就是表达式计算量。`generateStmtTrees()` 完成后，worker scheduler 使用 lowering 产生的指令数和跨 task 节点数：
 
 ```text
-scheduleCost = max(1, task.insts.size() + task.globalNodeCount)
+scheduleCost = max(1, task.insts.size() + 12 * task.globalNodeCount)
 ```
 
-`globalNodeCount` 统计存在跨 MTask 直接消费者或被 reset helper 引用的节点。它在 MTask 已形成后计算，只影响 worker 分配，不反向改变 MTask 边界，避免任务边界和全局节点判定形成循环依赖。两种成本都只是启发式估计，不是运行时间测量结果。
+`globalNodeCount` 统计存在跨 MTask 直接消费者或被 reset helper 引用的节点。它在 MTask 已形成后计算，只影响 worker 分配，不反向改变 MTask 边界，避免任务边界和全局节点判定形成循环依赖。默认权重 12 可通过 `--mt-schedule-global-weight` 覆盖；两种成本都只是启发式估计，不是运行时间测量结果。
 
 planner 首先累加全部 SuperNode 的成本，再根据期望 MTask 数计算目标成本：
 
@@ -217,11 +217,10 @@ void STop::mtTaskN() {
 | `members` | 所有成员 SuperNode 的节点，按 task 内依赖拓扑排序 |
 | `stmtTree/insts` | MTask 级语句树和 lowering 后的指令流 |
 | `localNodes` | 仅在当前 MTask 内使用、可从模型成员降为函数局部量的节点 |
-| `estimatedOperations` | MTask 划分时由节点表达式树估算的运算量 |
 | `globalNodeCount` | lowering 后统计的跨 MTask 或 reset helper 使用节点数 |
 | `predecessors/successors` | 收缩后的 MTask 图前驱和后继 |
 | `owner` | list scheduler 分配的固定 worker 编号 |
-| `cost` | lowering 后的 `insts.size() + globalNodeCount` 调度成本 |
+| `cost` | lowering 后的 `insts.size() + global_weight * globalNodeCount` 调度成本 |
 | `waits/stores` | 跨 worker token 槽 |
 | `waitBegin/.../storeEnd` | 生成扁平静态数组时使用的区间 |
 
@@ -498,6 +497,8 @@ task 内局部中间量使用 `T value{};` 值初始化。部分 external/memory
 | `--mt-mode=on` | `off` | 启用 MT 代码生成 |
 | `GSIM_THREADS` | `1` | 烘焙进生成模型的 worker 数 |
 | `GSIM_MT_DENSE_VCONTRACT_MAXMT` | `1600` | 期望 MTask 数，软限制 |
+| `--mt-partition-node-weight=N` | `0` | 划分成本中每个节点的固定权重 |
+| `--mt-schedule-global-weight=N` | `12` | worker 调度成本中每个跨 task 全局节点的权重 |
 | `GSIM_EMIT_RESET_CHUNK` | `4096` | reset 函数目标语句数；`0` 禁用 |
 | `--supernode-max-size=N` | 项目默认值 | 上游图划分粒度，会影响 task 数和并行度 |
 | `--cpp-max-size-KB=N` | 项目默认值 | 生成 C++ 文件切分大小 |
@@ -663,15 +664,13 @@ Ready-to-run 测试同样应独立生成单线程 active reference 和多线程 
 6. 关闭逐信号 difftest，用 `-O3 -march=native` 测量；
 7. 至少重复三次，比较中位数。
 
-生成器会打印：
+生成阶段只打印最终任务摘要：
 
 ```text
-[cppEmitter-mt] partition estimated_ops=... target_cost=... mtasks=...
-[cppEmitter-mt] cost insts=... global_nodes=... schedule=...
 [cppEmitter-mt] workers=32 supernodes=... mtasks=... edges=... tokens=...
 ```
 
-第一行表示划分前的表达式运算总估计、每个 MTask 的目标成本和初始任务数；第二行表示 task-level `InstInfo` 总数、跨作用域全局节点数，以及 `insts + global_nodes` 得到的调度总成本。第三行的 `mtasks` 是删除空任务后的最终运行时任务数。
+`mtasks` 是删除空任务后的运行时任务数；`edges` 和 `tokens` 分别表示收缩后的 MTask 依赖边数和跨 worker 同步槽数。
 
 指标含义：
 

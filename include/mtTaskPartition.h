@@ -21,7 +21,6 @@ struct MtTask {
   std::vector<InstInfo>* insts = nullptr;
   StmtTree* stmtTree = nullptr;
   std::unordered_set<Node*> localNodes;
-  int estimatedOperations = 0;
   int globalNodeCount = 0;
   int cost = 0;
   int owner = 0;

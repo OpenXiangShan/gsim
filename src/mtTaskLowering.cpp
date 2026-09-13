@@ -218,7 +218,6 @@ void buildTaskTree(MtTask& task) {
   }
   task.insts = new std::vector<InstInfo>();
   task.stmtTree->compute(*task.insts);
-  task.cost = std::max<int>(1, static_cast<int>(task.insts->size()) + task.globalNodeCount);
 }
 
 void buildResetTree(SuperNode* super) {
@@ -256,7 +255,6 @@ void MtTaskLowerer::generateStmtTrees(graph& graph, MtTaskPlan& plan) {
       first->insts.clear();
       graph.extDecl.push_back(computeExtMod(first));
       task.insts = new std::vector<InstInfo>(first->insts);
-      task.cost = std::max<int>(1, static_cast<int>(task.insts->size()) + task.globalNodeCount);
       continue;
     }
     if (first->superType == SUPER_ASYNC_RESET) {

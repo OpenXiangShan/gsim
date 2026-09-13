@@ -37,7 +37,7 @@ int nodeOperationCount(const Node* node) {
   for (const ExpTree* tree : node->assignTree) {
     operations += expressionOperationCount(tree);
   }
-  return std::max(1, operations);
+  return std::max(1, operations) + globalConfig.MtPartitionNodeWeight;
 }
 
 int taskCost(const SuperNode* super) {
@@ -151,10 +151,7 @@ void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int maxTasks) {
     std::vector<MtTask> result;
     MtTask current;
     auto flush = [&]() {
-      if (!current.cppIds.empty()) {
-        current.estimatedOperations = current.cost;
-        result.push_back(std::move(current));
-      }
+      if (!current.cppIds.empty()) result.push_back(std::move(current));
       current = MtTask();
     };
     for (int cppId : plan.topologicalCppIds_) {
@@ -178,9 +175,6 @@ void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int maxTasks) {
   };
 
   plan.tasks_ = formTasks(targetCost);
-  fprintf(stderr,
-          "[cppEmitter-mt] partition estimated_ops=%lld target_cost=%d mtasks=%zu\n",
-          totalCost, targetCost, plan.tasks_.size());
   if (static_cast<int>(plan.tasks_.size()) > maxTasks) {
     fprintf(stderr,
             "[cppEmitter-mt] target MAXMT=%d produced %zu dependency-safe tasks\n",

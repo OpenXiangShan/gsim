@@ -12,7 +12,8 @@ namespace {
 
 int loweredTaskCost(const MtTask& task) {
   const size_t instructionCount = task.insts == nullptr ? 0 : task.insts->size();
-  return std::max<int>(1, static_cast<int>(instructionCount) + task.globalNodeCount);
+  return std::max<int>(1, static_cast<int>(instructionCount) +
+                              task.globalNodeCount * globalConfig.MtScheduleGlobalWeight);
 }
 
 bool taskEmitsCode(const MtTask& task, const MtTaskPlan& plan) {
@@ -421,17 +422,6 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
 
   size_t edgeCount = 0;
   for (const MtTask& task : tasks.tasks_) edgeCount += task.successors.size();
-  size_t instructionCount = 0;
-  size_t globalNodeCount = 0;
-  size_t scheduleCost = 0;
-  for (const MtTask& task : tasks.tasks_) {
-    instructionCount += task.insts == nullptr ? 0 : task.insts->size();
-    globalNodeCount += static_cast<size_t>(std::max(0, task.globalNodeCount));
-    scheduleCost += static_cast<size_t>(std::max(0, task.cost));
-  }
-  fprintf(stderr,
-          "[cppEmitter-mt] cost insts=%zu global_nodes=%zu schedule=%zu\n",
-          instructionCount, globalNodeCount, scheduleCost);
   fprintf(stderr,
           "[cppEmitter-mt] workers=%d supernodes=%d mtasks=%zu edges=%zu tokens=%zu\n",
           workerCount, taskCount, tasks.tasks_.size(), edgeCount, groups.size());

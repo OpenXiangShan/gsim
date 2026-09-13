@@ -11,6 +11,9 @@
 #include <sstream>
 #include <thread>
 #include <getopt.h>
+#include <cerrno>
+#include <climits>
+#include <cstdlib>
 #include <sched.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -71,6 +74,8 @@ Config::Config() {
   When2muxBound = 2;
   LogLevel = 0;
   NumThreads = capThreads(10);
+  MtPartitionNodeWeight = 0;
+  MtScheduleGlobalWeight = 12;
 }
 Config globalConfig;
 
@@ -144,6 +149,10 @@ static void printUsage(const char* ProgName) {
             << "      --dump-const-status          Dump per-node constant-analysis status before removing constants.\n"
             << "      --mt-mode=off|on             Select the C++ emitter mode.\n"
             << "                                   off: single-thread active (default); on: multithread dense.\n"
+            << "      --mt-partition-node-weight=[num]\n"
+            << "                                   Fixed per-node weight in MT partition cost (default: 0).\n"
+            << "      --mt-schedule-global-weight=[num]\n"
+            << "                                   Weight for cross-MTask nodes in worker cost (default: 12).\n"
             ;
 }
 
@@ -174,6 +183,8 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_DUMP_ASSIGN_TREE,
     OPT_DUMP_CONST_STATUS,
     OPT_MT_MODE,
+    OPT_MT_PARTITION_NODE_WEIGHT,
+    OPT_MT_SCHEDULE_GLOBAL_WEIGHT,
   };
 
   const struct option Table[] = {
@@ -195,6 +206,8 @@ static char* parseCommandLine(int argc, char** argv) {
       {"dump-assign-tree", no_argument, nullptr, 0},
       {"dump-const-status", no_argument, nullptr, 0},
       {"mt-mode", required_argument, nullptr, 0},
+      {"mt-partition-node-weight", required_argument, nullptr, 0},
+      {"mt-schedule-global-weight", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -279,6 +292,8 @@ static char* parseCommandLine(int argc, char** argv) {
                   }
                   globalConfig.MtMode = strcmp(optarg, "on") == 0;
                   break;
+                case OPT_MT_PARTITION_NODE_WEIGHT: sscanf(optarg, "%d", &globalConfig.MtPartitionNodeWeight); break;
+                case OPT_MT_SCHEDULE_GLOBAL_WEIGHT: sscanf(optarg, "%d", &globalConfig.MtScheduleGlobalWeight); break;
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }
               break;
