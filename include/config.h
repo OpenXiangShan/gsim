@@ -17,6 +17,7 @@ struct Config {
   int When2muxBound;
   int LogLevel;
   int NumThreads;
+  int MtTargetTasks;
   int MtPartitionNodeWeight;
   int MtScheduleGlobalWeight;
   std::set<std::string> DumpStages;

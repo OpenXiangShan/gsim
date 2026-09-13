@@ -64,7 +64,7 @@ void MtTaskPartitioner::assignCppIds(graph& graph) {
   }
 }
 
-void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int maxTasks) {
+void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int targetTasks) {
   int taskCount = 0;
   for (SuperNode* super : graph.sortedSuper) {
     if (super->cppId >= 0) taskCount = std::max(taskCount, super->cppId + 1);
@@ -145,7 +145,7 @@ void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int maxTasks) {
 
   long long totalCost = 0;
   for (int cppId : plan.topologicalCppIds_) totalCost += taskCost(plan.byCppId_[static_cast<size_t>(cppId)]);
-  int targetCost = std::max<long long>(1, (totalCost + maxTasks - 1) / maxTasks);
+  int targetCost = std::max<long long>(1, (totalCost + targetTasks - 1) / targetTasks);
 
   auto formTasks = [&](int costLimit) {
     std::vector<MtTask> result;
@@ -175,10 +175,10 @@ void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int maxTasks) {
   };
 
   plan.tasks_ = formTasks(targetCost);
-  if (static_cast<int>(plan.tasks_.size()) > maxTasks) {
+  if (static_cast<int>(plan.tasks_.size()) > targetTasks) {
     fprintf(stderr,
-            "[cppEmitter-mt] target MAXMT=%d produced %zu dependency-safe tasks\n",
-            maxTasks, plan.tasks_.size());
+            "[cppEmitter-mt] target MTask count=%d produced %zu dependency-safe tasks\n",
+            targetTasks, plan.tasks_.size());
   }
 
   std::vector<int> taskByCppId(static_cast<size_t>(taskCount), -1);

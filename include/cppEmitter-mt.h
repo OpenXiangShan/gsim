@@ -50,7 +50,7 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
   graph& graph_;
   bool enabled_ = false;
   int workerCount_ = 1;
-  int maxTasks_ = 1600;
+  int targetTasks_ = 1600;
   int resetChunk_ = 4096;
 };
 

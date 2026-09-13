@@ -41,7 +41,7 @@ struct MtTaskPlan {
 class MtTaskPartitioner {
  public:
   static void assignCppIds(graph& graph);
-  static void build(graph& graph, MtTaskPlan& plan, int maxTasks);
+  static void build(graph& graph, MtTaskPlan& plan, int targetTasks);
 };
 
 #endif

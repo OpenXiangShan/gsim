@@ -74,6 +74,7 @@ Config::Config() {
   When2muxBound = 2;
   LogLevel = 0;
   NumThreads = capThreads(10);
+  MtTargetTasks = 1600;
   MtPartitionNodeWeight = 0;
   MtScheduleGlobalWeight = 12;
 }
@@ -149,6 +150,7 @@ static void printUsage(const char* ProgName) {
             << "      --dump-const-status          Dump per-node constant-analysis status before removing constants.\n"
             << "      --mt-mode=off|on             Select the C++ emitter mode.\n"
             << "                                   off: single-thread active (default); on: multithread dense.\n"
+            << "      --mt-target-tasks=[num]      Target number of MTasks used for MT partitioning (default: 1600).\n"
             << "      --mt-partition-node-weight=[num]\n"
             << "                                   Fixed per-node weight in MT partition cost (default: 0).\n"
             << "      --mt-schedule-global-weight=[num]\n"
@@ -183,6 +185,7 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_DUMP_ASSIGN_TREE,
     OPT_DUMP_CONST_STATUS,
     OPT_MT_MODE,
+    OPT_MT_TARGET_TASKS,
     OPT_MT_PARTITION_NODE_WEIGHT,
     OPT_MT_SCHEDULE_GLOBAL_WEIGHT,
   };
@@ -206,6 +209,7 @@ static char* parseCommandLine(int argc, char** argv) {
       {"dump-assign-tree", no_argument, nullptr, 0},
       {"dump-const-status", no_argument, nullptr, 0},
       {"mt-mode", required_argument, nullptr, 0},
+      {"mt-target-tasks", required_argument, nullptr, 0},
       {"mt-partition-node-weight", required_argument, nullptr, 0},
       {"mt-schedule-global-weight", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
@@ -292,6 +296,18 @@ static char* parseCommandLine(int argc, char** argv) {
                   }
                   globalConfig.MtMode = strcmp(optarg, "on") == 0;
                   break;
+                case OPT_MT_TARGET_TASKS: {
+                  int targetTasks = 0;
+                  if (sscanf(optarg, "%d", &targetTasks) != 1 || targetTasks < 1) {
+                    fprintf(stderr, "Error: --mt-target-tasks expects a positive number, got '%s'.\n", optarg);
+                    printUsage(argv[0]);
+                    std::cout.flush();
+                    fflush(nullptr);
+                    _exit(EXIT_FAILURE);
+                  }
+                  globalConfig.MtTargetTasks = targetTasks;
+                  break;
+                }
                 case OPT_MT_PARTITION_NODE_WEIGHT: sscanf(optarg, "%d", &globalConfig.MtPartitionNodeWeight); break;
                 case OPT_MT_SCHEDULE_GLOBAL_WEIGHT: sscanf(optarg, "%d", &globalConfig.MtScheduleGlobalWeight); break;
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);

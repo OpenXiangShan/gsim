@@ -50,7 +50,7 @@ CppEmitterMt::CppEmitterMt(graph& graph)
     : graph_(graph),
       enabled_(globalConfig.MtMode),
       workerCount_(positiveEnv("GSIM_THREADS", 1)),
-      maxTasks_(positiveEnv("GSIM_MT_DENSE_VCONTRACT_MAXMT", 1600)),
+      targetTasks_(globalConfig.MtTargetTasks),
       resetChunk_(resetChunkSize()) {}
 
 bool CppEmitterMt::enabled() const { return enabled_; }
@@ -64,7 +64,7 @@ void CppEmitterMt::prepare() {
       if (member->status == VALID_NODE) member->updateActivate();
     }
   }
-  MtTaskPartitioner::build(graph_, static_cast<MtTaskPlan&>(*this), maxTasks_);
+  MtTaskPartitioner::build(graph_, static_cast<MtTaskPlan&>(*this), targetTasks_);
   MtTaskLowerer::generateStmtTrees(graph_, static_cast<MtTaskPlan&>(*this));
   MtWorkerBuilder::build(graph_, static_cast<MtTaskPlan&>(*this), static_cast<MtWorkerPlan&>(*this),
                          workerCount_, resetChunk_);

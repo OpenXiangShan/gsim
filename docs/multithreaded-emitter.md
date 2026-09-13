@@ -70,7 +70,7 @@ MT 后端不再调用单线程的 `generateStmtTree()` 和 `instsGenerator()`。
 2. 调用 `Node::updateActivate()`，为 dense 依赖图准备正向 active 边。
 3. 从每个超节点的 `next/depNext` 建立 SuperNode 依赖图。
 4. 用 Kahn 算法计算依赖拓扑序，并加入拓扑序上向前的 `nextActiveId` 边。
-5. 根据 `GSIM_MT_DENSE_VCONTRACT_MAXMT` 和节点表达式树中的预估运算数，把拓扑连续的 SuperNode 合并成 MTask。
+5. 根据 `--mt-target-tasks` 和节点表达式树中的预估运算数，把拓扑连续的 SuperNode 合并成 MTask。
 6. 将 Node 依赖映射成 MTask 的 `predecessors/successors`，检查所有边都是向前的。
 7. 收集每个 MTask 的全部 Node，并按 task 内 `depPrev/depNext` 做稳定拓扑排序。
 8. 复用单线程的 `StmtTree::mergeExpTree()` 和 `StmtTree::compute()`，为每个 MTask 生成一棵语句树和一条 `InstInfo` 流。
@@ -150,10 +150,10 @@ planner 首先累加全部 SuperNode 的成本，再根据期望 MTask 数计算
 
 ```text
 totalCost = sum(superCost)
-targetCost = max(1, ceil(totalCost / maxTasks))
+targetCost = max(1, ceil(totalCost / targetTasks))
 ```
 
-其中 `maxTasks` 来自 `GSIM_MT_DENSE_VCONTRACT_MAXMT`。
+其中 `targetTasks` 来自 `--mt-target-tasks`。
 
 #### 连续贪心分组
 
@@ -224,7 +224,7 @@ void STop::mtTaskN() {
 | `waits/stores` | 跨 worker token 槽 |
 | `waitBegin/.../storeEnd` | 生成扁平静态数组时使用的区间 |
 
-`maxTasks` 是软目标而不是硬上限。不可拆分的高成本 SuperNode 和连续贪心分组产生的碎片都可能令实际 MTask 数超过目标，此时生成器只输出警告。增大 MTask 可以减少函数调用、dispatch 和 token 开销，但会降低可用并行度并加重负载不均；减小 MTask 则提供更多并行机会，同时增加调度与同步成本。当前算法没有直接考虑跨 worker 边、cache locality 或 profile 数据，这些因素由后续静态调度部分处理或留作进一步优化。
+`targetTasks` 是软目标而不是硬上限。不可拆分的高成本 SuperNode 和连续贪心分组产生的碎片都可能令实际 MTask 数超过目标，此时生成器只输出警告。增大目标任务数可以减少单个 MTask 的成本，但会增加函数调用、dispatch 和 token 同步开销；减小目标任务数则降低调度开销，同时可能减少并行度并加剧负载不均。当前算法没有直接考虑跨 worker 边、cache locality 或 profile 数据，这些因素由后续静态调度部分处理或留作进一步优化。
 
 ### 3.4 Worker 分配
 
@@ -496,7 +496,7 @@ task 内局部中间量使用 `T value{};` 值初始化。部分 external/memory
 | --- | --- | --- |
 | `--mt-mode=on` | `off` | 启用 MT 代码生成 |
 | `GSIM_THREADS` | `1` | 烘焙进生成模型的 worker 数 |
-| `GSIM_MT_DENSE_VCONTRACT_MAXMT` | `1600` | 期望 MTask 数，软限制 |
+| `--mt-target-tasks=N` | `1600` | 期望 MTask 数，软限制 |
 | `--mt-partition-node-weight=N` | `0` | 划分成本中每个节点的固定权重 |
 | `--mt-schedule-global-weight=N` | `12` | worker 调度成本中每个跨 task 全局节点的权重 |
 | `GSIM_EMIT_RESET_CHUNK` | `4096` | reset 函数目标语句数；`0` 禁用 |
@@ -516,7 +516,7 @@ task 内局部中间量使用 `T value{};` 值初始化。部分 external/memory
 `GSIM_MT_DENSE_XTHREAD_DEPS_ONLY`、`GSIM_MT_DENSE_OWNER_READY_FLAGS`、
 `GSIM_MT_DENSE_UNPIN_SPECIAL`、`GSIM_MT_WORKER_POOL_FLAG_JOIN` 等开关不再读取。
 `GSIM_MT_DENSE_LOOKAHEAD` 是有意删除的：worker 内乱序与隐含顺序不兼容。
-`GSIM_MT_DENSE_VCONTRACT_MAXMT` 仅为兼容旧脚本保留了原名称。
+`--mt-target-tasks` 是当前 MTask 划分使用的目标任务数参数，默认值为 `1600`。
 
 ## 10. 构建与运行
 
@@ -526,9 +526,9 @@ task 内局部中间量使用 `T value{};` 值初始化。部分 external/memory
 make -j"$(nproc)" build-gsim
 
 GSIM_THREADS=4 \
-GSIM_MT_DENSE_VCONTRACT_MAXMT=256 \
   build/gsim/gsim \
   --mt-mode=on \
+  --mt-target-tasks=256 \
   --dir out/model \
   design.fir
 ```
@@ -560,8 +560,8 @@ make -j"$(nproc)" build-gsim
 mkdir -p build/xiangshan-perf/gsim-compile/model
 
 GSIM_THREADS=32 \
-GSIM_MT_DENSE_VCONTRACT_MAXMT=2400 \
   build/gsim/gsim \
+  --mt-target-tasks=2400 \
   --supernode-max-size=30 \
   --cpp-max-size-KB=8192 \
   --sep-mod=__DOT__ \
@@ -659,7 +659,7 @@ Ready-to-run 测试同样应独立生成单线程 active reference 和多线程 
 1. 先用小模型或目标设计的 active/dense difftest 建立正确性基线；
 2. 固定 workload 和周期数，记录原单线程 active 模型时间；
 3. 分别为 2、4、8、16、32 worker 重新生成模型；
-4. 调整 `GSIM_MT_DENSE_VCONTRACT_MAXMT`，观察 task 数、token 数和各 worker 的负载；
+4. 调整 `--mt-target-tasks`，观察 task 数、token 数和各 worker 的负载；
 5. 使用固定 CPU 集合和 `GSIM_MT_CPU_AFFINITY=auto`；
 6. 关闭逐信号 difftest，用 `-O3 -march=native` 测量；
 7. 至少重复三次，比较中位数。
