@@ -2,6 +2,7 @@
 #define MT_TASK_PARTITION_H
 
 #include <cstdint>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -36,6 +37,7 @@ struct MtTaskPlan {
   std::vector<int> taskByCppId_;
   std::vector<MtTask> tasks_;
   std::unordered_set<Node*> localNodes_;
+  std::unordered_map<Node*, int> workerLocalOwners_;
 };
 
 class MtTaskPartitioner {

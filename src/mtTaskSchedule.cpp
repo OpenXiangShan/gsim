@@ -83,6 +83,50 @@ void compactEmptyTasks(MtTaskPlan& plan) {
   }
 }
 
+void collectWorkerLocalNodes(MtTaskPlan& plan, const graph& graph) {
+  plan.workerLocalOwners_.clear();
+
+  std::set<Node*> resetDependencies;
+  for (SuperNode* reset : graph.allReset) {
+    for (Node* member : reset->member) {
+      for (ExpTree* assignment : member->assignTree) {
+        assignment->getRelyNodes(resetDependencies);
+      }
+    }
+  }
+
+  std::unordered_map<Node*, int> ownerByNode;
+  std::unordered_set<Node*> ambiguousNodes;
+  for (const MtTask& task : plan.tasks_) {
+    for (Node* node : task.members) {
+      auto inserted = ownerByNode.emplace(node, task.owner);
+      if (!inserted.second && inserted.first->second != task.owner) {
+        ambiguousNodes.insert(node);
+      }
+    }
+  }
+
+  for (const MtTask& task : plan.tasks_) {
+    for (Node* node : task.members) {
+      if (task.localNodes.count(node) != 0 || ambiguousNodes.count(node) != 0 ||
+          node->status != VALID_NODE || node->type != NODE_OTHERS || node->isReset() ||
+          node->isClock || resetDependencies.count(node) != 0) {
+        continue;
+      }
+
+      bool workerLocal = true;
+      auto checkUse = [&](Node* use) {
+        if (!workerLocal || use == nullptr) return;
+        auto owner = ownerByNode.find(use);
+        if (owner == ownerByNode.end() || owner->second != task.owner) workerLocal = false;
+      };
+      for (Node* use : node->next) checkUse(use);
+      for (Node* use : node->depNext) checkUse(use);
+      if (workerLocal) plan.workerLocalOwners_[node] = task.owner;
+    }
+  }
+}
+
 std::pair<size_t, size_t> resetBodyRange(const std::vector<InstInfo>& instructions,
                                         const Node* resetNode) {
   if (instructions.size() < 2 || instructions.front().infoType != SUPER_INFO_IF ||
@@ -253,6 +297,8 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
       Assert(taskId < successor, "renumbered dense edge is not forward: %d -> %d", taskId, successor);
     }
   }
+
+  collectWorkerLocalNodes(tasks, graph);
 
   workers.workerTasks_.assign(static_cast<size_t>(workerCount), std::vector<int>());
   std::vector<int> workerPosition(tasks.tasks_.size(), -1);

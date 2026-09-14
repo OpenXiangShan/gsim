@@ -33,6 +33,8 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
   void emitDefinitions();
   void emitStep();
   bool isTaskLocal(Node* node) const;
+  bool isWorkerLocal(Node* node) const;
+  int workerLocalOwner(Node* node) const;
 
  private:
   using Task = MtTask;

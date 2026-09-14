@@ -43,6 +43,26 @@ void appendValues(std::string& text, const std::vector<int>& values) {
     text += std::to_string(values[i]);
   }
 }
+void collectReferencedNodes(ENode* root, std::set<Node*>& nodes) {
+  if (root == nullptr) return;
+  std::vector<ENode*> pending{root};
+  while (!pending.empty()) {
+    ENode* current = pending.back();
+    pending.pop_back();
+    if (current->nodePtr != nullptr) nodes.insert(current->nodePtr);
+    for (ENode* child : current->child) {
+      if (child != nullptr) pending.push_back(child);
+    }
+  }
+}
+
+std::string nodeDeclaration(Node* node) {
+  std::string declaration = widthUType(node->width) + " " + node->name;
+  for (int dimension : node->dimension) {
+    declaration += "[" + std::to_string(upperPower2(dimension)) + "]";
+  }
+  return declaration;
+}
 
 }  // namespace
 
@@ -74,6 +94,16 @@ bool CppEmitterMt::isTaskLocal(Node* node) const {
   return localNodes_.find(node) != localNodes_.end();
 }
 
+bool CppEmitterMt::isWorkerLocal(Node* node) const {
+  return workerLocalOwners_.find(node) != workerLocalOwners_.end();
+}
+
+int CppEmitterMt::workerLocalOwner(Node* node) const {
+  auto owner = workerLocalOwners_.find(node);
+  Assert(owner != workerLocalOwners_.end(), "missing worker-local owner for %s", node->name.c_str());
+  return owner->second;
+}
+
 void CppEmitterMt::emitText(int indent, bool canStartFile, const std::string& text) {
   graph_.__emitSrcMt(indent, canStartFile, true, nullptr, "%s", text.c_str());
 }
@@ -98,6 +128,15 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
   fprintf(header, "alignas(64) std::atomic<int> mtReadyWorkers{0};\n");
   fprintf(header, "alignas(64) std::atomic<bool> mtStop{false};\n");
   fprintf(header, "bool mtEnabled = false;\n");
+  for (int worker = 0; worker < workerCount_; ++worker) {
+    fprintf(header, "struct MtWorkerStateW%d {\n", worker);
+    for (const auto& entry : workerLocalOwners_) {
+      if (entry.second != worker) continue;
+      fprintf(header, "  %s;\n", nodeDeclaration(entry.first).c_str());
+    }
+    fprintf(header, "};\n");
+    fprintf(header, "alignas(64) MtWorkerStateW%d mtWorkerStateW%d{};\n", worker, worker);
+  }
   const size_t resetCount = std::max<size_t>(1, resets_.size());
   fprintf(header, "uint8_t mtAsyncResetValues[%zu]{};\n", resetCount);
   fprintf(header, "MtResetFlag mtAsyncResetReady[%zu];\n", resetCount);
@@ -233,11 +272,34 @@ void CppEmitterMt::emitTask(const Task& task, int indent) {
 
   for (Node* node : task.members) {
     if (task.localNodes.count(node) != 0) {
-      std::string declaration = widthUType(node->width) + " " + node->name;
-      for (int dimension : node->dimension) {
-        declaration += "[" + std::to_string(upperPower2(dimension)) + "]";
+      emitText(indent, false, nodeDeclaration(node) + "{};\n");
+    }
+  }
+
+  std::set<Node*> workerLocals;
+  for (Node* node : task.members) {
+    if (isWorkerLocal(node) && workerLocalOwner(node) == task.owner) workerLocals.insert(node);
+    for (ExpTree* tree : node->assignTree) {
+      std::set<Node*> referenced;
+      collectReferencedNodes(tree->getRoot(), referenced);
+      collectReferencedNodes(tree->getlval(), referenced);
+      for (Node* reference : referenced) {
+        if (isWorkerLocal(reference) && workerLocalOwner(reference) == task.owner) {
+          workerLocals.insert(reference);
+        }
       }
-      emitText(indent, false, declaration + "{};\n");
+    }
+  }
+  for (Node* node : workerLocals) {
+    const std::string state = "mtWorkerStateW" + std::to_string(task.owner) + "." + node->name;
+    if (node->dimension.empty()) {
+      emitText(indent, false, widthUType(node->width) + "& " + node->name + " = " + state + ";\n");
+    } else {
+      std::string alias = widthUType(node->width) + " (&" + node->name + ")";
+      for (int dimension : node->dimension) {
+        alias += "[" + std::to_string(upperPower2(dimension)) + "]";
+      }
+      emitText(indent, false, alias + " = " + state + ";\n");
     }
   }
 
@@ -868,11 +930,14 @@ void graph::cppEmitterMt() {
   for (SuperNode* super : sortedSuper) {
     // std::string insts;
     if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
-      for (Node* n : super->member) genNodeDefMt(header, n, mtEmitter.isTaskLocal(n));
+      for (Node* n : super->member) {
+        genNodeDefMt(header, n, mtEmitter.isTaskLocal(n) || mtEmitter.isWorkerLocal(n));
+      }
     }
     if (super->superType == SUPER_EXTMOD) {
       for (size_t i = 1; i < super->member.size(); i ++) {
-        genNodeDefMt(header, super->member[i], mtEmitter.isTaskLocal(super->member[i]));
+        Node* node = super->member[i];
+        genNodeDefMt(header, node, mtEmitter.isTaskLocal(node) || mtEmitter.isWorkerLocal(node));
       }
     }
   }
