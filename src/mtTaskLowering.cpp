@@ -146,7 +146,7 @@ void collectTaskLocalNodes(graph& graph, MtTaskPlan& plan) {
       task.globalNodeCount += crossesTask && hasModelStorage(node);
 
       if (node->status != VALID_NODE || node->type != NODE_OTHERS ||
-          node->isArray() || node->isReset() || resetDependencies.count(node) != 0) {
+          node->isReset() || resetDependencies.count(node) != 0) {
         continue;
       }
 
@@ -155,6 +155,14 @@ void collectTaskLocalNodes(graph& graph, MtTaskPlan& plan) {
         if (taskForNode(next, plan) != static_cast<int>(taskId)) {
           taskLocal = false;
           break;
+        }
+      }
+      if (taskLocal && node->isArray()) {
+        for (Node* next : node->depNext) {
+          if (taskForNode(next, plan) != static_cast<int>(taskId)) {
+            taskLocal = false;
+            break;
+          }
         }
       }
       if (!taskLocal) continue;

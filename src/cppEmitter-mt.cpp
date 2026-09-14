@@ -233,7 +233,11 @@ void CppEmitterMt::emitTask(const Task& task, int indent) {
 
   for (Node* node : task.members) {
     if (task.localNodes.count(node) != 0) {
-      emitText(indent, false, widthUType(node->width) + " " + node->name + "{};\n");
+      std::string declaration = widthUType(node->width) + " " + node->name;
+      for (int dimension : node->dimension) {
+        declaration += "[" + std::to_string(upperPower2(dimension)) + "]";
+      }
+      emitText(indent, false, declaration + "{};\n");
     }
   }
 
