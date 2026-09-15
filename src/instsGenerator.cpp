@@ -115,6 +115,22 @@ int memberConstant(valInfo* info) {
   return ret;
 }
 
+static std::string arrayElementValue(Node* node, valInfo* rinfo) {
+  if (node->sign && node->width != rinfo->width) {
+    // Normalize the retained sign bit to the C++ storage width, both when
+    // truncating a signed element and when extending one from unsigned storage.
+    int shift = widthBits(node->width) - MIN(node->width, rinfo->width);
+    return format("(%s(%s(%s)%s)%s)",
+                  Cast(node->width, true).c_str(), Cast(node->width, false).c_str(),
+                  rinfo->valStr.c_str(), shiftBits(shift, ShiftDir::Left).c_str(),
+                  shiftBits(shift, ShiftDir::Right).c_str());
+  }
+  if (node->width < rinfo->width) {
+    return format("(%s & %s)", rinfo->valStr.c_str(), bitMask(node->width).c_str());
+  }
+  return rinfo->valStr;
+}
+
 static std::string constantAssign(std::string lvalue, int dimIdx, Node* node, valInfo* rinfo) {
   std::string ret;
   if(node->width <= BASIC_WIDTH && mpz_sgn(rinfo->consVal) == 0) {
@@ -126,7 +142,7 @@ static std::string constantAssign(std::string lvalue, int dimIdx, Node* node, va
       idxStr += "[i" + std::to_string(i) + "]";
       bracket += "}\n";
     }
-    ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
+    ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), arrayElementValue(node, rinfo).c_str());
     ret += bracket;
   }
   return ret;
@@ -144,20 +160,22 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int
     if (consType == 0 || consType == 1) {
       for (int i = 0; i < num; i ++) {
         valInfo* assignInfo = rinfo->getMemberInfo(i);
-        ret += format("%s%s = %s;\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
+        ret += format("%s%s = %s;\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), arrayElementValue(node, assignInfo).c_str());
       }
     } else if (consType == 2) {
       ret = constantAssign(lvalue, dimIdx, node, rinfo->memberInfo[0]);
     } else Panic();
 
-  } else if (node->dimension.size() - dimIdx == 1 && rinfo->isArrayRef()) {
+  } else if (node->dimension.size() - dimIdx == 1 && rinfo->isArrayRef() &&
+             node->width >= rinfo->width && widthBits(node->width) == widthBits(rinfo->width) &&
+             (!node->sign || node->width == rinfo->width)) {
     /* A loop per copy gives the C++ compiler a basic block per assignment, and
        its value numbering scans those superlinearly. One block copy is
        equivalent here: a bare reference over a single dimension is contiguous,
        cannot overlap the destination since a register splits into current and
-       next state, and shares its type since a width change lowers to a mask or
-       a cast that stops it being bare. The count comes from the dimension
-       rather than sizeof, which keeps a prefix copy exact. */
+       next state. Element storage sizes must agree, and neither truncation nor
+       sign extension may be needed. The count comes from the dimension rather
+       than sizeof, which keeps a prefix copy exact. */
     ret = format("memcpy(%s, %s, %d * sizeof(%s[0]));",
                  lvalue.c_str(), rinfo->arrayRef().c_str(), num, lvalue.c_str());
   } else {
@@ -167,7 +185,7 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int
       idxStr += "[i" + std::to_string(i) + "]";
       bracket += "}";
     }
-    ret += format("%s%s = %s; ", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
+    ret += format("%s%s = %s; ", lvalue.c_str(), idxStr.c_str(), arrayElementValue(node, rinfo).c_str());
     ret += bracket;
   }
   return ret;
@@ -1546,8 +1564,9 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot, bool isLvalue)
     }
 
     if (getChildNum() < nodePtr->dimension.size()) {
-      if (computeInfo->width > width) computeInfo->width = width;
-      /* do nothing */
+      // Keep the actual source element width until arrayCopy emits each
+      // conversion. Changing only the metadata silently drops narrowing and
+      // can incorrectly make a width-changing array copy eligible for memcpy.
     } else if (!IS_INVALID_LVALUE(lvalue) && computeInfo->width <= BASIC_WIDTH) {
       if (computeInfo->width > width) {
         if (computeInfo->status == VAL_CONSTANT) {
