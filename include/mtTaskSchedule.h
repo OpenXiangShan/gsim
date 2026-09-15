@@ -41,11 +41,20 @@ struct MtResetJoin {
   size_t beforePosition = 0;
 };
 
+struct MtRegisterUpdate {
+  int worker = -1;
+  int chunkCount = 0;
+  size_t storageBytes = 0;
+  std::vector<Node*> registers;
+  std::vector<MtReset::Instruction> body;
+};
+
 struct MtWorkerPlan {
   int readySlotCount_ = 1;
   std::vector<std::vector<int>> workerTasks_;
   std::vector<int> waitSlots_;
   std::vector<int> storeSlots_;
+  std::vector<MtRegisterUpdate> registerUpdates_;
   std::vector<MtReset> resets_;
   std::vector<std::vector<MtResetJoin>> resetJoins_;
   std::map<Node*, int> asyncResetIds_;

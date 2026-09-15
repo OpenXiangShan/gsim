@@ -25,7 +25,8 @@ class graph {
   FILE* genHeaderStart();
   FILE* genHeaderStartMt();
   void genNodeDef(FILE* fp, Node* node);
-  void genNodeDefMt(FILE* fp, Node* node, bool taskLocal = false);
+  void genNodeDefMt(FILE* fp, Node* node, bool taskLocal = false,
+                    const std::string& emittedName = "");
   void genInterfaceInput(Node* input);
   void genInterfaceInputMt(Node* input);
   void genInterfaceOutput(Node* output);
@@ -63,7 +64,7 @@ class graph {
   void constantMemory();
   void orderAllNodes();
   void genDiffSig(FILE* fp, Node* node);
-  void genDiffSigMt(FILE* fp, Node* node);
+  void genDiffSigMt(FILE* fp, Node* node, const std::string& emittedName = "");
   void graphCoarsen();
   void graphInitPartition();
   void graphRefine();

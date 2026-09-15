@@ -127,10 +127,12 @@ std::pair<size_t, size_t> resetBodyRange(const std::vector<InstInfo>& instructio
       instructions.back().infoType != SUPER_INFO_DEDENT) {
     return {0, instructions.size()};
   }
-  const std::string resetName = resetNode->type == NODE_REG_SRC
-                                    ? resetNode->name + "$RESET"
-                                    : resetNode->name;
-  if (instructions.front().inst.find(resetName) == std::string::npos) return {0, instructions.size()};
+  // The lowered tree always names the real reset node. A register reset source
+  // is replaced by its $RESET snapshot only when the outer condition is
+  // emitted, after this common wrapper has been removed.
+  if (instructions.front().inst.find(resetNode->name) == std::string::npos) {
+    return {0, instructions.size()};
+  }
 
   int nesting = 0;
   for (size_t i = 0; i < instructions.size(); ++i) {
@@ -140,10 +142,6 @@ std::pair<size_t, size_t> resetBodyRange(const std::vector<InstInfo>& instructio
   }
   return nesting == 0 ? std::make_pair<size_t, size_t>(1, instructions.size() - 1)
                       : std::make_pair<size_t, size_t>(0, instructions.size());
-}
-
-std::pair<size_t, size_t> resetBodyRange(const SuperNode* super) {
-  return resetBodyRange(super->insts, super->resetNode);
 }
 
 std::vector<InstInfo> buildResetInstructions(const std::vector<Node*>& members) {
@@ -158,6 +156,29 @@ std::vector<InstInfo> buildResetInstructions(const std::vector<Node*>& members) 
   std::vector<InstInfo> instructions;
   tree.compute(instructions);
   return instructions;
+}
+
+void appendInstructions(std::vector<MtReset::Instruction>& destination,
+                        const std::vector<InstInfo>& source,
+                        size_t begin = 0, size_t end = SIZE_MAX) {
+  end = std::min(end, source.size());
+  for (size_t index = begin; index < end; ++index) {
+    destination.push_back(
+        {static_cast<uint8_t>(source[index].infoType), source[index].inst});
+  }
+}
+
+bool isCycleStartRegisterUpdate(const Node* node) {
+  return node->status == VALID_NODE && node->type == NODE_REG_SRC &&
+         node->reset != ASYRESET;
+}
+
+size_t registerStorageBytes(const Node* node) {
+  size_t bytes = static_cast<size_t>(widthBits(node->width)) / 8;
+  for (int dimension : node->dimension) {
+    bytes *= static_cast<size_t>(upperPower2(dimension));
+  }
+  return std::max<size_t>(1, bytes);
 }
 
 template <typename Instruction>
@@ -180,6 +201,120 @@ int countResetChunks(const std::vector<Instruction>& body, int chunkSize) {
   }
   Assert(nesting == 0, "unbalanced reset instructions while planning worker reset");
   return chunks;
+}
+
+void buildRegisterUpdates(graph& graph, MtWorkerPlan& workers, int workerCount,
+                          int chunkSize) {
+  workers.registerUpdates_.assign(static_cast<size_t>(workerCount), MtRegisterUpdate());
+  for (int worker = 0; worker < workerCount; ++worker) {
+    workers.registerUpdates_[static_cast<size_t>(worker)].worker = worker;
+  }
+
+  std::vector<Node*> registers;
+  for (Node* reg : graph.regsrc) {
+    if (!isCycleStartRegisterUpdate(reg)) continue;
+    Assert(reg->regSplit && reg->getDst()->status == VALID_NODE,
+           "packed MT register %s has no valid destination storage",
+           reg->name.c_str());
+    registers.push_back(reg);
+  }
+  std::sort(registers.begin(), registers.end(), [](Node* lhs, Node* rhs) {
+    const size_t lhsCost = registerStorageBytes(lhs);
+    const size_t rhsCost = registerStorageBytes(rhs);
+    if (lhsCost != rhsCost) return lhsCost > rhsCost;
+    return lhs->id < rhs->id;
+  });
+
+  std::vector<size_t> workerLoad(static_cast<size_t>(workerCount), 0);
+  std::map<Node*, int> ownerByRegister;
+  for (Node* reg : registers) {
+    const size_t cost = registerStorageBytes(reg);
+    const int worker =
+        static_cast<int>(std::min_element(workerLoad.begin(), workerLoad.end()) -
+                         workerLoad.begin());
+    workerLoad[static_cast<size_t>(worker)] += cost;
+    ownerByRegister[reg] = worker;
+    MtRegisterUpdate& update = workers.registerUpdates_[static_cast<size_t>(worker)];
+    update.storageBytes += cost;
+    update.registers.push_back(reg);
+  }
+
+  struct SyncResetGroup {
+    SuperNode* super = nullptr;
+    std::vector<std::vector<Node*>> resetDestinationsByWorker;
+  };
+  std::vector<SyncResetGroup> syncGroups;
+  for (SuperNode* super : graph.allReset) {
+    if (super->superType != SUPER_UINT_RESET ||
+        super->resetNode->status == CONSTANT_NODE) {
+      continue;
+    }
+    SyncResetGroup group;
+    group.super = super;
+    group.resetDestinationsByWorker.resize(static_cast<size_t>(workerCount));
+    for (Node* member : super->member) {
+      Assert(member->type == NODE_REG_RESET, "invalid sync reset member %s",
+             member->name.c_str());
+      Node* reg = member->getResetSrc();
+      auto owner = ownerByRegister.find(reg);
+      if (owner == ownerByRegister.end()) continue;
+      if (member->name != reg->getDst()->name) continue;
+      group.resetDestinationsByWorker[static_cast<size_t>(owner->second)].push_back(member);
+    }
+    syncGroups.push_back(std::move(group));
+  }
+
+  const size_t resetBatchSize =
+      chunkSize > 0 ? std::max<size_t>(1, static_cast<size_t>(chunkSize))
+                    : SIZE_MAX;
+  for (SyncResetGroup& group : syncGroups) {
+    Node* resetNode = group.super->resetNode;
+    const std::string resetName = resetNode->type == NODE_REG_SRC
+                                      ? resetNode->name + "$RESET"
+                                      : resetNode->name;
+    for (int worker = 0; worker < workerCount; ++worker) {
+      const std::vector<Node*>& resetDestinations =
+          group.resetDestinationsByWorker[static_cast<size_t>(worker)];
+      MtRegisterUpdate& update = workers.registerUpdates_[static_cast<size_t>(worker)];
+      for (size_t begin = 0; begin < resetDestinations.size();) {
+        const size_t end = std::min(resetDestinations.size(), begin + resetBatchSize);
+        std::vector<Node*> resetMembers(resetDestinations.begin() + begin,
+                                        resetDestinations.begin() + end);
+        const std::vector<InstInfo> resetInstructions = buildResetInstructions(resetMembers);
+        const auto resetRange = resetBodyRange(resetInstructions, resetNode);
+        Assert(resetRange.first == 1 && resetRange.second + 1 == resetInstructions.size(),
+               "sync reset %s does not have a single outer reset condition",
+               resetNode->name.c_str());
+        update.body.push_back(
+            {static_cast<uint8_t>(SUPER_INFO_IF), "if (unlikely(" + resetName + ")) {"});
+        appendInstructions(update.body, resetInstructions, resetRange.first,
+                           resetRange.second);
+        update.body.push_back(
+            {static_cast<uint8_t>(SUPER_INFO_DEDENT), "}"});
+        begin = end;
+      }
+    }
+  }
+
+  for (int worker = 0; worker < workerCount; ++worker) {
+    MtRegisterUpdate& update = workers.registerUpdates_[static_cast<size_t>(worker)];
+    if (!update.registers.empty()) {
+      const std::string source = "mtRegisterSrcW" + std::to_string(worker);
+      const std::string destination = "mtRegisterDstW" + std::to_string(worker);
+      update.body.push_back(
+          {static_cast<uint8_t>(SUPER_INFO_STR),
+           "memcpy(&" + source + ", &" + destination + ", sizeof(" + source + "));"});
+    }
+    update.chunkCount = countResetChunks(update.body, chunkSize);
+  }
+
+  const auto limits = std::minmax_element(workerLoad.begin(), workerLoad.end());
+  size_t totalBytes = 0;
+  for (size_t bytes : workerLoad) totalBytes += bytes;
+  fprintf(stderr,
+          "[cppEmitter-mt] register-blocks registers=%zu bytes=%zu min-worker-bytes=%zu "
+          "max-worker-bytes=%zu\n",
+          registers.size(), totalBytes, *limits.first, *limits.second);
 }
 
 
@@ -306,25 +441,19 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
     workers.workerTasks_[static_cast<size_t>(owner)].push_back(taskId);
   }
 
-  // MtReset each register on the worker that normally owns its update MTask.
-  // The trigger task is kept intact so oldReset || newReset is still computed once.
+  buildRegisterUpdates(graph, workers, workerCount, resetChunk);
+
+  // Async-reset registers retain their mid-cycle rendezvous. Normal and
+  // synchronous-reset registers were moved to the cycle-start phase above.
   int resetId = 0;
   for (SuperNode* super : graph.allReset) {
     if (super->resetNode->status == CONSTANT_NODE) continue;
+    if (super->superType != SUPER_ASYNC_RESET) continue;
     MtReset reset;
     reset.super = super;
     reset.id = resetId++;
     reset.asynchronous = super->superType == SUPER_ASYNC_RESET;
-    if (!reset.asynchronous) {
-      const auto range = resetBodyRange(super);
-      for (size_t i = range.first; i < range.second; ++i) {
-        reset.body.push_back(
-            {static_cast<uint8_t>(super->insts[i].infoType), super->insts[i].inst});
-      }
-      reset.chunkCount = countResetChunks(reset.body, resetChunk);
-      workers.resets_.push_back(std::move(reset));
-      continue;
-    }
+    Assert(reset.asynchronous, "non-async reset entered async reset planner");
 
     auto triggerTask = tasks.taskByNode_.find(super->resetNode);
     Assert(triggerTask != tasks.taskByNode_.end(),

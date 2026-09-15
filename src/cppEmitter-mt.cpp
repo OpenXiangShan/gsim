@@ -5,6 +5,7 @@
 #include "util.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <climits>
 #include <cstdlib>
@@ -82,6 +83,7 @@ void CppEmitterMt::prepare() {
   MtTaskLowerer::generateStmtTrees(graph_, static_cast<MtTaskPlan&>(*this));
   MtWorkerBuilder::build(graph_, static_cast<MtTaskPlan&>(*this), static_cast<MtWorkerPlan&>(*this),
                          workerCount_, resetChunk_);
+  buildRegisterStorageNames();
 }
 
 bool CppEmitterMt::isTaskLocal(Node* node) const {
@@ -96,6 +98,85 @@ int CppEmitterMt::workerLocalOwner(Node* node) const {
   auto owner = workerLocalOwners_.find(node);
   Assert(owner != workerLocalOwners_.end(), "missing worker-local owner for %s", node->name.c_str());
   return owner->second;
+}
+
+bool CppEmitterMt::isPackedRegister(Node* node) const {
+  return packedRegisterNames_.find(node) != packedRegisterNames_.end();
+}
+
+std::string CppEmitterMt::packedRegisterName(Node* node) const {
+  auto found = packedRegisterNames_.find(node);
+  Assert(found != packedRegisterNames_.end(), "missing packed register name for %s",
+         node->name.c_str());
+  return found->second;
+}
+
+void CppEmitterMt::buildRegisterStorageNames() {
+  packedRegisterNames_.clear();
+  packedRegisterNamesByText_.clear();
+  for (const RegisterUpdate& update : registerUpdates_) {
+    const std::string source = "mtRegisterSrcW" + std::to_string(update.worker) + ".";
+    const std::string destination = "mtRegisterDstW" + std::to_string(update.worker) + ".";
+    for (Node* reg : update.registers) {
+      Node* dst = reg->getDst();
+      const std::string sourceName = source + reg->name;
+      const std::string destinationName = destination + reg->name;
+      Assert(packedRegisterNames_.emplace(reg, sourceName).second,
+             "duplicate packed register source %s", reg->name.c_str());
+      Assert(packedRegisterNames_.emplace(dst, destinationName).second,
+             "duplicate packed register destination %s", dst->name.c_str());
+      Assert(packedRegisterNamesByText_.emplace(reg->name, sourceName).second,
+             "duplicate packed register source name %s", reg->name.c_str());
+      Assert(packedRegisterNamesByText_.emplace(dst->name, destinationName).second,
+             "duplicate packed register destination name %s", dst->name.c_str());
+    }
+  }
+}
+
+std::string CppEmitterMt::mapRegisterNames(const std::string& input) const {
+  if (packedRegisterNamesByText_.empty()) return input;
+  auto nameCharacter = [](unsigned char value) {
+    return std::isalnum(value) || value == '_' || value == '$';
+  };
+  std::string output;
+  output.reserve(input.size());
+  bool quoted = false;
+  char quote = 0;
+  for (size_t index = 0; index < input.size();) {
+    const char value = input[index];
+    if (quoted) {
+      output.push_back(value);
+      ++index;
+      if (value == '\\' && index < input.size()) {
+        output.push_back(input[index++]);
+      } else if (value == quote) {
+        quoted = false;
+      }
+      continue;
+    }
+    if (value == '\'' || value == '"') {
+      quoted = true;
+      quote = value;
+      output.push_back(value);
+      ++index;
+      continue;
+    }
+    if (!nameCharacter(static_cast<unsigned char>(value))) {
+      output.push_back(value);
+      ++index;
+      continue;
+    }
+    size_t end = index + 1;
+    while (end < input.size() &&
+           nameCharacter(static_cast<unsigned char>(input[end]))) {
+      ++end;
+    }
+    const std::string token = input.substr(index, end - index);
+    auto replacement = packedRegisterNamesByText_.find(token);
+    output += replacement == packedRegisterNamesByText_.end() ? token : replacement->second;
+    index = end;
+  }
+  return output;
 }
 
 const std::vector<Node*>& CppEmitterMt::emissionNodes() const { return emissionNodes_; }
@@ -119,11 +200,37 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
           graph_.name.c_str());
   fprintf(header, "alignas(64) MtReadyToken mtReadyTokens[%d];\n", readySlotCount_);
   fprintf(header, "MtDoneFlag mtDoneFlags[%d];\n", std::max(1, workerCount_ - 1));
+  fprintf(header, "MtDoneFlag mtRegisterDoneFlags[%d];\n", std::max(1, workerCount_ - 1));
+  fprintf(header, "MtDoneFlag mtRegistersReady;\n");
   fprintf(header, "std::vector<std::thread> mtThreads;\n");
   fprintf(header, "alignas(64) std::atomic<uint64_t> mtGeneration{0};\n");
   fprintf(header, "alignas(64) std::atomic<int> mtReadyWorkers{0};\n");
   fprintf(header, "alignas(64) std::atomic<bool> mtStop{false};\n");
   fprintf(header, "bool mtEnabled = false;\n");
+  for (const RegisterUpdate& update : registerUpdates_) {
+    fprintf(header, "struct MtRegisterBlockW%d {\n", update.worker);
+    if (update.registers.empty()) {
+      fprintf(header, "  uint8_t unused;\n");
+    } else {
+      for (Node* reg : update.registers) {
+        fprintf(header, "  %s; // width = %d, lineno = %d\n",
+                nodeDeclaration(reg).c_str(), reg->width, reg->lineno);
+      }
+    }
+    fprintf(header, "};\n");
+    fprintf(header, "alignas(64) MtRegisterBlockW%d mtRegisterSrcW%d{};\n",
+            update.worker, update.worker);
+    fprintf(header, "alignas(64) MtRegisterBlockW%d mtRegisterDstW%d{};\n",
+            update.worker, update.worker);
+    for (Node* reg : update.registers) {
+      if (!reg->isReset()) continue;
+      Assert(!reg->isArray() && reg->width <= BASIC_WIDTH,
+             "%s is treated as reset (isArray: %d width: %d)",
+             reg->name.c_str(), reg->isArray(), reg->width);
+      fprintf(header, "%s %s$RESET{};\n", widthUType(reg->width).c_str(),
+              reg->name.c_str());
+    }
+  }
   for (int worker = 0; worker < workerCount_; ++worker) {
     fprintf(header, "struct MtWorkerStateW%d {\n", worker);
     for (const auto& entry : workerLocalOwners_) {
@@ -148,7 +255,13 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
   }
   fprintf(header, "void mtInit();\nvoid mtStart();\nvoid mtStopWorkers();\n");
   fprintf(header, "void mtWorkerLoop(int worker);\nvoid mtRunWorker(int worker, uint8_t parity);\n");
-  fprintf(header, "void mtPinWorker(int worker);\nvoid resetAllMt();\nvoid stepMt();\n");
+  fprintf(header, "void mtPinWorker(int worker);\nvoid stepMt();\n");
+  for (const RegisterUpdate& update : registerUpdates_) {
+    fprintf(header, "void mtUpdateRegistersW%d();\n", update.worker);
+    for (int chunk = 1; chunk <= update.chunkCount; ++chunk) {
+      fprintf(header, "void mtUpdateRegistersW%d_c%d();\n", update.worker, chunk);
+    }
+  }
   for (const Reset& reset : resets_) {
     if (!reset.asynchronous) {
       fprintf(header, "void subResetMt%d();\n", reset.id);
@@ -182,6 +295,17 @@ void CppEmitterMt::emitConstructorStart() {
   }
 }
 
+void CppEmitterMt::emitRegisterInitialization() {
+  if (!enabled()) return;
+  for (const RegisterUpdate& update : registerUpdates_) {
+    if (update.registers.empty()) continue;
+    const std::string source = "mtRegisterSrcW" + std::to_string(update.worker);
+    const std::string destination = "mtRegisterDstW" + std::to_string(update.worker);
+    emitText(1, false, "memset(&" + source + ", 0, sizeof(" + source + "));\n");
+    emitText(1, false, "memset(&" + destination + ", 0, sizeof(" + destination + "));\n");
+  }
+}
+
 void CppEmitterMt::emitResetBodyFunction(const std::string& name, const std::string& condition,
                                          const std::vector<Reset::Instruction>& body,
                                          int chunkCount) {
@@ -209,15 +333,19 @@ void CppEmitterMt::emitResetBodyFunction(const std::string& name, const std::str
     }
     switch (type) {
       case SUPER_INFO_IF:
-        emitText(indent++, false, instruction.text + "\n");
+        emitText(indent++, false, mapRegisterNames(instruction.text) + "\n");
         ++nesting;
         break;
-      case SUPER_INFO_ELSE: emitText(indent - 1, false, instruction.text + "\n"); break;
+      case SUPER_INFO_ELSE:
+        emitText(indent - 1, false, mapRegisterNames(instruction.text) + "\n");
+        break;
       case SUPER_INFO_DEDENT:
-        emitText(--indent, false, instruction.text + "\n");
+        emitText(--indent, false, mapRegisterNames(instruction.text) + "\n");
         --nesting;
         break;
-      case SUPER_INFO_STR: emitText(indent, false, instruction.text + "\n"); break;
+      case SUPER_INFO_STR:
+        emitText(indent, false, mapRegisterNames(instruction.text) + "\n");
+        break;
       case SUPER_INFO_ASSIGN_BEG:
       case SUPER_INFO_ASSIGN_END: break;
     }
@@ -246,14 +374,23 @@ void CppEmitterMt::emitAsyncResetWorkerFunction(const Reset& reset,
                         "", worker.body, worker.chunkCount);
 }
 
+void CppEmitterMt::emitRegisterUpdateFunction(const RegisterUpdate& update) {
+  emitResetBodyFunction("mtUpdateRegistersW" + std::to_string(update.worker), "",
+                        update.body, update.chunkCount);
+}
+
 void CppEmitterMt::emitInstructions(const std::vector<InstInfo>& instructions, int indent) {
   const int initialIndent = indent;
   for (const InstInfo& inst : instructions) {
     switch (inst.infoType) {
-      case SUPER_INFO_IF: emitText(indent++, false, inst.inst + "\n"); break;
-      case SUPER_INFO_ELSE: emitText(indent - 1, false, inst.inst + "\n"); break;
-      case SUPER_INFO_DEDENT: emitText(--indent, false, inst.inst + "\n"); break;
-      case SUPER_INFO_STR: emitText(indent, false, inst.inst + "\n"); break;
+      case SUPER_INFO_IF: emitText(indent++, false, mapRegisterNames(inst.inst) + "\n"); break;
+      case SUPER_INFO_ELSE:
+        emitText(indent - 1, false, mapRegisterNames(inst.inst) + "\n");
+        break;
+      case SUPER_INFO_DEDENT:
+        emitText(--indent, false, mapRegisterNames(inst.inst) + "\n");
+        break;
+      case SUPER_INFO_STR: emitText(indent, false, mapRegisterNames(inst.inst) + "\n"); break;
       case SUPER_INFO_ASSIGN_BEG:
       case SUPER_INFO_ASSIGN_END: break;
     }
@@ -342,6 +479,10 @@ void CppEmitterMt::emitDefinitions() {
   if (!enabled()) return;
   const std::string className = "S" + graph_.name;
 
+  for (const RegisterUpdate& update : registerUpdates_) {
+    emitRegisterUpdateFunction(update);
+  }
+
   for (const Reset& reset : resets_) {
     if (!reset.asynchronous) {
       emitResetFunction(reset);
@@ -406,12 +547,6 @@ void CppEmitterMt::emitDefinitions() {
       emitText(0, false, "}\n");
     }
   }
-
-  emitText(0, true, "void " + className + "::resetAllMt() {\n");
-  for (const Reset& reset : resets_) {
-    if (!reset.asynchronous) emitText(1, false, "subResetMt" + std::to_string(reset.id) + "();\n");
-  }
-  emitText(0, false, "}\n");
 
   for (size_t taskId = 0; taskId < tasks_.size(); ++taskId) {
     emitText(0, true, "void " + className + "::mtTask" + std::to_string(taskId) + "() {\n");
@@ -530,6 +665,24 @@ void CppEmitterMt::emitDefinitions() {
       "}\n";
 
   runtime += "void " + className + "::mtRunWorker(int worker, uint8_t parity) {\n";
+  runtime += "  switch (worker) {\n";
+  for (int worker = 0; worker < workerCount_; ++worker) {
+    runtime += "    case " + std::to_string(worker) + ": mtUpdateRegistersW" +
+               std::to_string(worker) + "(); break;\n";
+  }
+  runtime += "    default: abort();\n  }\n";
+  runtime +=
+      "  if (worker == 0) {\n"
+      "    for (int other = 1; other < kMtWorkerCount; ++other) {\n"
+      "      while (mtRegisterDoneFlags[other - 1].parity.load(std::memory_order_acquire) != parity)\n"
+      "        __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
+      "    }\n"
+      "    mtRegistersReady.parity.store(parity, std::memory_order_release);\n"
+      "  } else {\n"
+      "    mtRegisterDoneFlags[worker - 1].parity.store(parity, std::memory_order_release);\n"
+      "    while (mtRegistersReady.parity.load(std::memory_order_acquire) != parity)\n"
+      "      __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
+      "  }\n";
   runtime += "  const MtDispatch* entries = nullptr; uint32_t count = 0;\n  switch (worker) {\n";
   for (int worker = 0; worker < workerCount_; ++worker) {
     runtime += "    case " + std::to_string(worker) + ": entries = mtDispatchW" + std::to_string(worker) +
@@ -556,10 +709,11 @@ void CppEmitterMt::emitDefinitions() {
       "}\n";
 
   runtime += "void " + className + "::stepMt() {\n";
-  runtime += "  resetAllMt();\n";
   for (Node* node : emissionNodes_) {
     if (node->isReset() && node->type == NODE_REG_SRC) {
-      runtime += "  " + node->name + "$RESET = " + node->name + ";\n";
+      const std::string value =
+          isPackedRegister(node) ? packedRegisterName(node) : node->name;
+      runtime += "  " + node->name + "$RESET = " + value + ";\n";
     }
   }
   runtime +=
@@ -688,10 +842,10 @@ void graph::genInterfaceOutputMt(Node* output) {
 }
 
 #if defined(DIFFTEST_PER_SIG) && defined(GSIM_DIFF)
-void graph::genDiffSigMt(FILE* fp, Node* node) {
-  std::set<std::string> allNames;
-  std::string diffNodeName = node->name;
-  std::string originName = node->name;
+void graph::genDiffSigMt(FILE* fp, Node* node, const std::string& emittedName) {
+  std::map<std::string, std::string> allNames;
+  const std::string diffNodeName = emittedName.empty() ? node->name : emittedName;
+  const std::string originName = node->name;
   if (node->type == NODE_MEMORY){
 
   } else if (node->isArray()) {
@@ -713,18 +867,19 @@ void graph::genDiffSigMt(FILE* fp, Node* node) {
       pairNum *= node->dimension[i];
     }
     for (size_t i = 0; i < suffix.size(); i ++) {
-      allNames.insert(diffNodeName + suffix[i]);
+      allNames[diffNodeName + suffix[i]] = originName + suffix[i];
     }
   } else {
-    allNames.insert(diffNodeName);
+    allNames[diffNodeName] = originName;
   }
   for (auto iter : allNames)
-    fprintf(sigFileMt, "%d %d %s %s\n", node->sign, node->width, iter.c_str(), iter.c_str());
+    fprintf(sigFileMt, "%d %d %s %s\n", node->sign, node->width,
+            iter.first.c_str(), iter.second.c_str());
 }
 #endif
 
 #if defined(DIFFTEST_PER_SIG) && defined(VERILATOR_DIFF)
-void graph::genDiffSigMt(FILE* fp, Node* node) {
+void graph::genDiffSigMt(FILE* fp, Node* node, const std::string& emittedName) {
   std::string verilatorName = name + "__DOT__" + node->name;
   size_t pos;
   while ((pos = verilatorName.find("$$")) != std::string::npos) {
@@ -734,7 +889,7 @@ void graph::genDiffSigMt(FILE* fp, Node* node) {
     verilatorName.replace(pos, 1, "__DOT__");
   }
   std::map<std::string, std::string> allNames;
-  std::string diffNodeName = node->name;
+  const std::string diffNodeName = emittedName.empty() ? node->name : emittedName;
   std::string originName = node->name;
   if (node->type == NODE_MEMORY){
 
@@ -771,14 +926,16 @@ void graph::genDiffSigMt(FILE* fp, Node* node) {
 }
 #endif
 
-void graph::genNodeDefMt(FILE* fp, Node* node, bool taskLocal) {
+void graph::genNodeDefMt(FILE* fp, Node* node, bool taskLocal,
+                         const std::string& emittedName) {
   if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || (node->status != VALID_NODE)) return;
   if (node->type == NODE_REG_DST && !node->regSplit) return;
   if (node->type == NODE_WRITER) return;
   if (taskLocal) return;
 #if defined(GSIM_DIFF) || defined(VERILATOR_DIFF)
-  genDiffSigMt(fp, node);
+  genDiffSigMt(fp, node, emittedName);
 #endif
+  if (!emittedName.empty()) return;
   if (definedNode.find(node) != definedNode.end()) return;
   definedNode.insert(node);
   fprintf(fp, "%s %s", widthUType(node->width).c_str(), node->name.c_str());
@@ -921,7 +1078,12 @@ void graph::cppEmitterMt() {
   fprintf(header, "uint32_t _var_start;\n");
   for (Node* node : mtEmitter.emissionNodes()) {
     if (node->type == NODE_EXT) continue;
-    genNodeDefMt(header, node, mtEmitter.isTaskLocal(node) || mtEmitter.isWorkerLocal(node));
+    const std::string emittedName = mtEmitter.isPackedRegister(node)
+                                        ? mtEmitter.packedRegisterName(node)
+                                        : std::string();
+    genNodeDefMt(header, node,
+                 mtEmitter.isTaskLocal(node) || mtEmitter.isWorkerLocal(node),
+                 emittedName);
   }
   /* memory definition */
   for (Node* mem : memory) genNodeDefMt(header, mem, false);
@@ -933,6 +1095,7 @@ void graph::cppEmitterMt() {
   emitBodyLock(0, "#else\n" // RANDOMIZE_INIT
                "  memset(&_var_start, 0, &_var_end - &_var_start);\n"
                "#endif\n");
+  mtEmitter.emitRegisterInitialization();
 
   fprintf(header, "S%s();\n", name.c_str());
   fprintf(header, "void init();\n");

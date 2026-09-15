@@ -36,7 +36,7 @@ Node 依赖图 -> 直接 MTask 收缩 -> 静态 MTask -> 固定 worker chain
 | --- | --- |
 | `src/mtTaskPartition.cpp` | 从 Node 边直接建立候选 MTask、执行收缩和拓扑排序 |
 | `include/mtTaskPartition.h` | MTask 结构和 partition builder 接口 |
-| `src/mtTaskSchedule.cpp` | worker owner 分配、token 表和同步/异步 reset 规划 |
+| `src/mtTaskSchedule.cpp` | worker owner 分配、并行寄存器更新、token 表和异步 reset 规划 |
 | `include/mtTaskSchedule.h` | worker、token、reset 计划结构和 builder 接口 |
 | `src/mtTaskLowering.cpp` | 将 MTask 成员合并为一个 `StmtTree` 和 `InstInfo` 流 |
 | `src/cppEmitter-mt.cpp` | 消费 task/worker 计划，生成 MT C++ 类、dispatch 表和线程池 |
@@ -75,7 +75,7 @@ MT 后端不再调用单线程的 `generateStmtTree()` 和 `instsGenerator()`。
 7. 按 task 内 `depPrev/depNext` 对成员 Node 做稳定拓扑排序。
 8. 复用单线程的 `StmtTree::mergeExpTree()` 和 `StmtTree::compute()`，为每个 MTask 生成一棵语句树和一条 `InstInfo` 流。
 9. 将所有直接使用者都在当前 MTask、且不被 reset helper 引用的普通标量中间节点标记为 task-local。
-10. 使用 lowering 后的指令数重新估计任务成本，再进行 worker 调度和 token 规划。
+10. 使用 lowering 后的指令数重新估计任务成本，再进行 worker 调度、寄存器更新分配和 token 规划。
 
 `StmtTree` 的 `prevPath` 约束覆盖同一 MTask 内的 Node 依赖。因此，无依赖节点可以提前并合并到相同条件分支中，有依赖节点则不能越过其前驱。extmodule 和异步 reset 候选组保持为独立 MTask，reset 辅助树仍独立构建，以保持外部调用和复位握手的位置。
 
@@ -358,6 +358,9 @@ worker 3: T6 -> T9
 | `MtReadyToken` | 跨 worker 依赖的奇偶 token，内部是 atomic byte |
 | `mtWaitSlots` | 所有 task 的等待 token 槽位扁平数组 |
 | `mtStoreSlots` | 所有 task 的发布 token 槽位扁平数组 |
+| `mtRegisterSrcW0...Wn` / `mtRegisterDstW0...Wn` | 每个 worker 连续排布的当前状态和下一状态块 |
+| `mtUpdateRegistersW0...Wn` | 按实际 C++ 存储字节数均衡分配、整块提交的寄存器更新函数 |
+| `mtRegisterDoneFlags` / `mtRegistersReady` | 寄存器更新 phase 与普通 MTask 之间的全局 barrier |
 | `mtDoneFlags` | worker 完成本周期后的 parity 标志 |
 | `mtGeneration` | 周期 generation；低位 parity 用于复用 token |
 | `mtThreads` | 后台 worker 线程对象；worker 0 使用调用线程 |
@@ -453,18 +456,21 @@ cycle k:
 
 `stepMt()` 的顺序如下：
 
-1. `resetAllMt()` 处理同步复位；
-2. 保存寄存器 reset 源值；
-3. 发布新 generation，worker 0 和后台 worker 执行各自的固定 chain；
-4. 等待所有后台 worker 完成；
-5. 增加 `cycles`。
+1. 保存作为 reset 源的寄存器旧值；
+2. 发布新 generation；
+3. 每个 worker 更新分配给自己的普通和同步复位寄存器；
+4. 所有 worker 在寄存器 barrier 会合后，执行各自的固定 MTask chain；
+5. 等待所有后台 worker 完成；
+6. 增加 `cycles`。
 
 MT emitter 只生成 dense 多线程执行器：
 
 ```text
 dense:
-  resetAllMt()
+  snapshot register reset sources
   generation++
+  all workers: apply sync reset values to dst block; memcpy(dst block, src block)
+  register barrier
   worker 0 执行自己的 chain
   worker 1..N-1 等待 token 后执行自己的 chain
   主线程等待所有 done parity
@@ -477,7 +483,26 @@ dense:
 
 ### Reset
 
-大型设计的 reset 指令可能形成非常大的 C++ 函数。默认情况下，`GSIM_EMIT_RESET_CHUNK=4096` 会在控制嵌套深度为 0 的位置拆分 reset body，生成 `subResetMtN_cM()`。不会在 if/else 内部切分，因此保持控制结构完整。
+普通寄存器和同步复位寄存器不再由普通 MTask 提交，也不再由主线程串行调用
+`resetAllMt()`。planner 使用 `widthBits(width) / 8` 和数组的实际 C++ 容量估计存储字节数，
+将寄存器贪心分配给当前字节负载最小的 worker。每个 worker 分别生成字段完全同构且按
+cache line 对齐的 `mtRegisterSrcWn` 和 `mtRegisterDstWn`；MTask 对寄存器的读写直接重定向到
+对应块字段。
+
+每周期先将触发的同步 reset value 写入 `DstBlock`，再用一次
+`memcpy(&SrcBlock, &DstBlock, sizeof(SrcBlock))` 提交该 worker 的全部寄存器。因此未触发
+reset 时不再逐寄存器执行标量赋值，reset 分支同时更新 next-state shadow 的语义也自然得到
+保留。若 reset 信号本身是寄存器，则 `stepMt()` 在发布 generation 前保存 `$RESET`，避免
+并行更新时读取正在被其他 worker 改写的 reset 源。寄存器 phase 完成后通过
+release/acquire barrier 发布全部新状态，普通 MTask 才开始计算本周期组合逻辑和下一状态。
+
+异步复位仍使用原来的 trigger/join/done/release rendezvous，可在 MTask chain 中间更新其
+寄存器；它不进入周期起始的同步寄存器 phase。
+
+大型设计的寄存器或异步 reset 指令可能形成非常大的 C++ 函数。默认情况下，
+`GSIM_EMIT_RESET_CHUNK=4096` 会在控制嵌套深度为 0 的位置拆分 body，生成
+`mtUpdateRegistersWn_cM()` 或 `subResetMtN_cM()`。不会在 if/else 内部切分，因此保持
+控制结构完整。
 
 若原 `InstInfo` 流整体已被同一个 reset 条件包裹，emitter 会识别并去除这一层，再由生成的 reset 函数统一添加条件，避免重复嵌套。
 

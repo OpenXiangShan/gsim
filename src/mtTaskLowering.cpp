@@ -11,6 +11,11 @@ std::string computeExtMod(Node* ext, std::vector<InstInfo>& instructions);
 
 namespace {
 
+bool isCycleStartRegisterUpdate(const Node* node) {
+  return node->status == VALID_NODE && node->type == NODE_REG_SRC &&
+         node->reset != ASYRESET;
+}
+
 int taskForNode(const Node* node, const MtTaskPlan& plan) {
   if (node == nullptr) return -1;
   auto found = plan.taskByNode_.find(const_cast<Node*>(node));
@@ -133,7 +138,8 @@ void collectTaskLocalNodes(graph& graph, MtTaskPlan& plan) {
           break;
         }
       }
-      task.globalNodeCount += crossesTask && hasModelStorage(node);
+      task.globalNodeCount += crossesTask && hasModelStorage(node) &&
+                              !isCycleStartRegisterUpdate(node);
 
       if (node->status != VALID_NODE || node->type != NODE_OTHERS ||
           node->isReset() || resetDependencies.count(node) != 0) {
@@ -166,6 +172,10 @@ void collectTaskLocalNodes(graph& graph, MtTaskPlan& plan) {
 void mergeNodeAssignments(StmtTree& tree, Node* node,
                           std::vector<int>& predecessorPath,
                           std::vector<int>& nodePath) {
+  // Normal and synchronous-reset register commits execute in the dedicated
+  // cycle-start phase. Async-reset registers must remain in the MTask program
+  // because their update is coordinated by the mid-cycle reset rendezvous.
+  if (isCycleStartRegisterUpdate(node)) return;
   for (ExpTree* assignment : node->assignTree) {
     tree.mergeExpTree(assignment, predecessorPath, nodePath, node);
     if (node->type != NODE_REG_SRC || node->reset != ASYRESET ||
