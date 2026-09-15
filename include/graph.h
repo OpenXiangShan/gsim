@@ -6,9 +6,11 @@
 #define GRAPH_H
 
 class CppEmitterMt;
+class MtTaskPartitioner;
 
 class graph {
   friend class CppEmitterMt;
+  friend class MtTaskPartitioner;
   FILE *srcFp;
   int srcFileIdx;
   int srcFileBytes;
@@ -114,7 +116,6 @@ class graph {
   void exprOpt();
   void patternDetect();
   void graphPartition();
-  void graphPartitionMt();
   void MFFCPartition();
   void mergeEssentSmallSubling(size_t maxSize, double sim);
   void essentPartition();

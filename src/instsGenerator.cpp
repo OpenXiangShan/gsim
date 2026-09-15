@@ -1778,21 +1778,21 @@ void Node::updateIsRoot() {
   }
 }
 
-std::string computeExtMod(SuperNode* super) {
-  Assert(super->member[0]->type == NODE_EXT && super->member[0]->assignTree.size() == 1, "invalid extmod\n");
+std::string computeExtMod(Node* ext, std::vector<InstInfo>& instructions) {
+  Assert(ext->type == NODE_EXT && ext->assignTree.size() == 1, "invalid extmod\n");
 
-  std::string funcName = (super->member[0]->extraInfo.length() ? super->member[0]->extraInfo : super->member[0]->name);
+  std::string funcName = ext->extraInfo.length() ? ext->extraInfo : ext->name;
 
   std::string funcDecl = "void " + funcName + "(";
   std::string inst = funcName + "(";
   int argIdx = 0;
-  for (auto param : super->member[0]->params) {
+  for (auto param : ext->params) {
     funcDecl += (param.first ? "int _" : "const char* _") + std::to_string(argIdx ++) + ", ";
     inst += param.second + ", ";
   }
 
-  for (size_t i = 0; i < super->member[0]->member.size(); i ++) {
-    Node* arg = super->member[0]->member[i];
+  for (size_t i = 0; i < ext->member.size(); i ++) {
+    Node* arg = ext->member[i];
     if (i != 0) {
       funcDecl += ", ";
       inst += ", ";
@@ -1828,8 +1828,13 @@ std::string computeExtMod(SuperNode* super) {
   }
   funcDecl += ");";
   inst += ");";
-  super->insts.push_back(inst);
+  instructions.push_back(inst);
   return funcDecl;
+}
+
+std::string computeExtMod(SuperNode* super) {
+  Assert(!super->member.empty(), "empty extmodule SuperNode\n");
+  return computeExtMod(super->member[0], super->insts);
 }
 
 void graph::instsGenerator() {

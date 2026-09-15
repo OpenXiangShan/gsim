@@ -1,11 +1,11 @@
 # GSIM 多线程 C++ Emitter 设计与使用
 
-本文介绍 MT 后端的设计、生成流程、运行时协议、正确性约束、测试方法和性能调优方式。阅读前建议先了解 GSIM 的基本流水线：CHIRRTL 经 parser 和 `AST2Graph` 转为节点图，完成图优化和 `graphPartitionMt` 后，先进行 MTask 划分，再以整个 MTask 为作用域构建 `StmtTree` 和 `InstInfo`，随后完成 worker 调度，最后由 `cppEmitter-mt.cpp` 生成可编译的 C++ 模型。
+本文介绍 MT 后端的设计、生成流程、运行时协议、正确性约束、测试方法和性能调优方式。CHIRRTL 经 parser 和 `AST2Graph` 转为节点图并完成通用图优化后，`MtTaskPartitioner` 直接把 Node 合并成 MTask；MT 路径不再先调用 `graphPartitionMt` 构造一层合并后的 SuperNode。
 
 本文讨论的是当前仓库中的 MT-level dispatch 实现，而不是早期实验性线程池或旧版 lookahead 实现。核心结论可以先概括为：
 
 ```text
-超节点图 -> 依赖拓扑序 -> 静态 MTask -> 固定 worker chain
+Node 依赖图 -> 直接 MTask 收缩 -> 静态 MTask -> 固定 worker chain
                                       |
                            跨 worker wait/store token
                                       |
@@ -16,11 +16,11 @@
 
 ## 1. 目标与非目标
 
-多线程 emitter 的目标是把完成优化的超节点图静态划分给固定数量的 worker，并在每个仿真周期并行计算整个电路。
+多线程 emitter 的目标是把完成优化的 Node 图静态划分给固定数量的 worker，并在每个仿真周期并行计算整个电路。
 
 它采用 dense 执行语义：
 
-- 每个有效超节点在每个周期都执行；
+- 每个有效 MTask 在每个周期都执行；
 - 不根据节点值是否变化决定是否运行；
 - 不进行动态任务窃取；
 - 不在 worker 内乱序执行任务；
@@ -34,11 +34,11 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| `src/mtTaskPartition.cpp` | 在 lowering 前从 SuperNode 依赖图建立、拓扑排序并合并 MTask |
+| `src/mtTaskPartition.cpp` | 从 Node 边直接建立候选 MTask、执行收缩和拓扑排序 |
 | `include/mtTaskPartition.h` | MTask 结构和 partition builder 接口 |
 | `src/mtTaskSchedule.cpp` | worker owner 分配、token 表和同步/异步 reset 规划 |
 | `include/mtTaskSchedule.h` | worker、token、reset 计划结构和 builder 接口 |
-| `src/mtTaskLowering.cpp` | 将 MTask 的跨 SuperNode 成员合并为一个 `StmtTree` 和 `InstInfo` 流 |
+| `src/mtTaskLowering.cpp` | 将 MTask 成员合并为一个 `StmtTree` 和 `InstInfo` 流 |
 | `src/cppEmitter-mt.cpp` | 消费 task/worker 计划，生成 MT C++ 类、dispatch 表和线程池 |
 | `include/cppEmitter-mt.h` | `CppEmitterMt` 输出接口及三个阶段之间的组合边界 |
 | `src/cppEmitter.cpp` | 原单线程 emitter；MT 实现不修改它 |
@@ -66,29 +66,28 @@ MT 后端不再调用单线程的 `generateStmtTree()` 和 `instsGenerator()`。
 
 它的处理顺序如下：
 
-1. 遍历 `sortedSuper`，为包含成员、extmodule 或异步 reset 的超节点分配连续 `cppId`；空超节点被标记为 `-1`。
-2. 调用 `Node::updateActivate()`，为 dense 依赖图准备正向 active 边。
-3. 从每个超节点的 `next/depNext` 建立 SuperNode 依赖图。
-4. 用 Kahn 算法计算依赖拓扑序，并加入拓扑序上向前的 `nextActiveId` 边。
-5. 根据 `--mt-target-tasks` 和节点表达式树中的预估运算数，把拓扑连续的 SuperNode 合并成 MTask。
-6. 将 Node 依赖映射成 MTask 的 `predecessors/successors`，检查所有边都是向前的。
-7. 收集每个 MTask 的全部 Node，并按 task 内 `depPrev/depNext` 做稳定拓扑排序。
+1. 从当前有效 Node 初始化候选 MTask，并从 Node 的 `prev/next/depPrev/depNext` 重建候选任务图。
+2. 在候选 MTask 上执行与旧 `graphPartitionMt` 等价的 when、单后继、单前驱和同前驱合并。
+3. 对收缩后的候选 MTask 做最终拓扑整理，再用 FIFO Kahn 算法得到规范依赖序。
+4. 直接从 Node 关系补充拓扑序上向前的寄存器和 memory activation 边。
+5. 根据 `--mt-target-tasks` 和节点表达式树中的预估运算数，把拓扑连续的候选组继续合并成最终 MTask。
+6. 通过 `taskByNode` 将 Node 依赖映射成 MTask 的 `predecessors/successors`，检查所有边都是向前的。
+7. 按 task 内 `depPrev/depNext` 对成员 Node 做稳定拓扑排序。
 8. 复用单线程的 `StmtTree::mergeExpTree()` 和 `StmtTree::compute()`，为每个 MTask 生成一棵语句树和一条 `InstInfo` 流。
 9. 将所有直接使用者都在当前 MTask、且不被 reset helper 引用的普通标量中间节点标记为 task-local。
 10. 使用 lowering 后的指令数重新估计任务成本，再进行 worker 调度和 token 规划。
 
-`StmtTree` 的 `prevPath` 约束现在覆盖同一 MTask 内的跨 SuperNode 依赖。因此，无依赖节点可以提前并合并到相同条件分支中，有依赖节点则不能越过其前驱。extmodule 和异步 reset SuperNode 保持为独立 MTask，reset 辅助树仍独立构建，以保持外部调用和复位握手的位置。
+`StmtTree` 的 `prevPath` 约束覆盖同一 MTask 内的 Node 依赖。因此，无依赖节点可以提前并合并到相同条件分支中，有依赖节点则不能越过其前驱。extmodule 和异步 reset 候选组保持为独立 MTask，reset 辅助树仍独立构建，以保持外部调用和复位握手的位置。
 
 ### 3.1 输入数据
 
-MT planner 不向 `Node` 或 `SuperNode` 增加并行专用字段，而是读取已有图信息：
+MT planner 不向 `Node` 或 `SuperNode` 增加并行专用字段，而是读取已有 Node 图信息：
 
-- `graph::sortedSuper`：完成图划分后的规范计算顺序；
-- `SuperNode::cppId`：对需要生成代码的超节点连续编号；
-- `SuperNode::prev/next`：直接数据依赖；
-- `SuperNode::depPrev/depNext`：非直接但必须保持的顺序依赖；
-- `Node::nextActiveId`：节点值变化时需要激活的后继超节点；dense planner 用其中的正向关系补充同周期顺序；
-- `SuperNode::member`：超节点包含的 RTL 节点；
+- `Node::prev/next`：直接数据依赖；
+- `Node::depPrev/depNext`：非直接但必须保持的顺序依赖；
+- register destination、memory reader/writer 关系：用于补充同周期 activation 顺序；
+- `MtTaskPlan::taskByNode_`：Node 到最终 MTask 的映射；
+- `MtTaskPlan::partitionGroupByNode_`：Node 到收缩候选组的映射；
 - `MtTask::stmtTree/insts`：lowering 后的 task 级语句树和指令流；
 - `graph::allReset`：同步和异步复位超节点。
 
@@ -97,11 +96,13 @@ MT planner 不向 `Node` 或 `SuperNode` 增加并行专用字段，而是读取
 ```text
 CHIRRTL
    |
-parser -> AST2Graph -> 图优化 -> graphPartitionMt
-                                      |
-                              graph::sortedSuper
-                                      |
-                           连续合并为 MTask
+parser -> AST2Graph -> 通用图优化
+                         |
+                 Node 直接收缩为 MTask
+                         |
+                    Kahn 拓扑排序
+                         |
+                   连续合并为 MTask
                                       |
                     节点重排 -> StmtTree -> InstInfo
                                       |
@@ -114,20 +115,19 @@ parser -> AST2Graph -> 图优化 -> graphPartitionMt
 
 ### 3.2 规范顺序
 
-`cppId` 按 `sortedSuper` 顺序分配，但 dense planner 不把编号当作计算顺序。它从
-`next/depNext` 构建数据依赖图，再用 Kahn 算法得到依赖拓扑序。`prev/depPrev` 是严格对称的反向索引，不重复扫描。
+候选 MTask 收缩完成后，dense planner 从 Node 的 `next/depNext` 构建依赖图，再用 Kahn 算法得到依赖拓扑序。`prev/depPrev` 用于重建反向索引和检查收缩条件。
 
-随后加入 `nextActiveId` 中拓扑序向前的边。向后的激活表示下一次活跃度扫描的影响，不能作为当前周期依赖，否则寄存器反馈会制造伪环。`nextNeedActivate` 是 active executor 为排除 always-active 目标维护的过滤集合，dense planner 不需要它。所有最终边都必须在依赖拓扑序中向前。
+随后直接从 register destination 和 memory port 关系加入拓扑序向前的 activation 边。向后的激活表示下一周期的影响，不能作为当前周期依赖，否则寄存器反馈会制造伪环。所有最终边都必须在依赖拓扑序中向前。
 
-assert/printf 只使用图中已有的真实数据依赖。不能把所有较早 `cppId` 连接到观察节点；这会把观察节点变成全局 barrier，正确性依据不充分且会严重损失并行度。
+assert/printf 只使用图中已有的真实数据依赖。不能把所有较早任务连接到观察节点；这会把观察节点变成全局 barrier，正确性依据不充分且会严重损失并行度。
 
-MT 路径在 lowering 前为每个需要生成代码的 `SuperNode` 分配 `cppId` 并构建 `MtTaskPlan`。随后收集一个 MTask 中所有 SuperNode 的成员，以原顺序作为稳定 tie-break，对 task 内 Node 做 `depPrev/depNext` 拓扑排序。该顺序允许无依赖计算提前，但不允许越过任何 task 内数据或顺序依赖。
+MT 路径在 lowering 前直接构建 `MtTaskPlan`。每个 MTask 已持有自己的 `members`，lowering 以原顺序作为稳定 tie-break，对 task 内 Node 做 `depPrev/depNext` 拓扑排序。该顺序允许无依赖计算提前，但不允许越过任何 task 内数据或顺序依赖。
 
-### 3.3 SuperNode 合并为 MTask
+### 3.3 Node 直接合并为 MTask
 
-MTask 是多线程运行时的最小 dispatch 单位。一个 MTask 可以包含多个 SuperNode；它们的节点被合入同一棵 `StmtTree` 和同一个 `mtTaskN()` 函数，因此内部依赖不需要线程同步。当前实现采用“拓扑序上的连续、按代价贪心分组”算法，代码位于 `mtTaskPartition.cpp`。
+MTask 是多线程运行时的最小 dispatch 单位。`MtTaskPartitioner` 先把 Node 直接收缩到候选 MTask，再采用“拓扑序连续、按代价贪心”的方式形成最终 MTask。成员被合入同一棵 `StmtTree` 和同一个 `mtTaskN()` 函数，因此内部依赖不需要线程同步。
 
-MTask 成员确定后才调用 MT 专属的 `generateStmtTrees()`。划分阶段遍历每个 Node 的 `assignTree`，统计 RHS 和动态 lvalue index 中的运算节点；常量和普通信号引用不计为运算，没有显式运算的赋值至少计 1。worker scheduler 在 lowering 完成后再使用实际 `InstInfo` 数量和跨 MTask 全局节点数估计任务成本。同一 MTask 内跨 SuperNode 使用的普通标量中间节点会成为 `mtTaskN()` 的局部变量；被其他 MTask、reset helper 或其他外部作用域使用的节点仍保留为模型成员。
+MTask 成员确定后才调用 MT 专属的 `generateStmtTrees()`。划分阶段遍历每个 Node 的 `assignTree`，统计 RHS 和动态 lvalue index 中的运算节点；常量和普通信号引用不计为运算，没有显式运算的赋值至少计 1。worker scheduler 在 lowering 完成后再使用实际 `InstInfo` 数量和跨 MTask 全局节点数估计任务成本。同一 MTask 内使用的普通标量中间节点会成为 `mtTaskN()` 的局部变量；被其他 MTask、reset helper 或其他外部作用域使用的节点仍保留为模型成员。
 
 #### 代价估计
 
@@ -135,7 +135,7 @@ MTask 划分发生在 lowering 之前，因此初始成本定义为：
 
 ```text
 nodeEstimatedOps = max(1, expressionOperationCount(node.assignTree)) + partition_weight
-superCost = sum(nodeEstimatedOps)
+groupCost = sum(nodeEstimatedOps)
 ```
 
 `partition_weight` 默认是 0，可通过 `--mt-partition-node-weight` 覆盖；默认成本因此就是表达式计算量。`generateStmtTrees()` 完成后，worker scheduler 使用 lowering 产生的指令数和跨 task 节点数：
@@ -146,10 +146,10 @@ scheduleCost = max(1, task.insts.size() + 12 * task.globalNodeCount)
 
 `globalNodeCount` 统计存在跨 MTask 直接消费者或被 reset helper 引用的节点。它在 MTask 已形成后计算，只影响 worker 分配，不反向改变 MTask 边界，避免任务边界和全局节点判定形成循环依赖。默认权重 12 可通过 `--mt-schedule-global-weight` 覆盖；两种成本都只是启发式估计，不是运行时间测量结果。
 
-planner 首先累加全部 SuperNode 的成本，再根据期望 MTask 数计算目标成本：
+planner 首先累加全部候选 MTask 组的成本，再根据期望 MTask 数计算目标成本：
 
 ```text
-totalCost = sum(superCost)
+totalCost = sum(groupCost)
 targetCost = max(1, ceil(totalCost / targetTasks))
 ```
 
@@ -157,39 +157,39 @@ targetCost = max(1, ceil(totalCost / targetTasks))
 
 #### 连续贪心分组
 
-planner 按 `topologicalCppIds_` 顺序扫描 SuperNode，维护当前 MTask 的 `cppIds` 和累计 `cost`：
+planner 按 Kahn 拓扑序扫描候选组，维护当前 MTask 的 `members` 和累计 `cost`：
 
 ```text
-for super in topological order:
-    if current 非空且 current.cost + super.cost > targetCost:
+for group in topological order:
+    if current 非空且 current.cost + group.cost > targetCost:
         输出 current
         新建空 MTask
 
-    current.cppIds.push(super.cppId)
-    current.cost += super.cost
+    current.members.append(group.members)
+    current.cost += group.cost
 
 输出最后一个 current
 ```
 
-因此只会合并依赖拓扑序上连续的 SuperNode。单个 SuperNode 若已经超过 `targetCost`，不会被拆分，而是独自构成一个超出目标成本的 MTask。
+因此只会合并依赖拓扑序上连续的候选组。单个候选组若已经超过 `targetCost`，不会被拆分，而是独自构成一个超出目标成本的 MTask。
 
 例如：
 
 ```text
-SuperNode cost:  2  1  3  1  2
+group cost:      2  1  3  1  2
 targetCost:      3
 
-MTask0 = [SN0, SN1]  cost=3
-MTask1 = [SN2]       cost=3
-MTask2 = [SN3, SN4]  cost=3
+MTask0 = [G0, G1]  cost=3
+MTask1 = [G2]      cost=3
+MTask2 = [G3, G4]  cost=3
 ```
 
 #### 收缩依赖图
 
-分组完成后，planner 建立 `taskByCppId[superCppId] = taskId`，将每条 SuperNode 依赖边 `A -> B` 映射为 MTask 依赖边：
+分组完成后，planner 建立 `taskByNode[node] = taskId`，将候选组依赖边 `A -> B` 映射为 MTask 依赖边：
 
 ```text
-taskByCppId[A] -> taskByCppId[B]
+taskByGroup[A] -> taskByGroup[B]
 ```
 
 若 A 和 B 位于同一个 MTask，边被删除，因为函数内部顺序已经保证依赖；若位于不同 MTask，则将边加入 `predecessors/successors`，并通过 `std::set` 去重。由于每个 MTask 都是拓扑序上的连续区间，所有跨 MTask 边都满足 `fromTask < toTask`，代码使用断言检查这一条件。
@@ -213,10 +213,11 @@ void STop::mtTaskN() {
 
 | 字段 | 含义 |
 | --- | --- |
-| `cppIds` | 当前 MTask 包含的连续依赖拓扑序片段 |
-| `members` | 所有成员 SuperNode 的节点，按 task 内依赖拓扑排序 |
+| `members` | 当前 MTask 的 Node，按 task 内依赖拓扑排序 |
+| `kind/resetNode` | 普通、extmodule、异步 reset 类型及 reset 触发节点 |
 | `stmtTree/insts` | MTask 级语句树和 lowering 后的指令流 |
 | `localNodes` | 仅在当前 MTask 内使用、可从模型成员降为函数局部量的节点 |
+| `workerLocalOwners_` | 跨多个 MTask 但只被同一个 worker 使用的节点及其 owner |
 | `globalNodeCount` | lowering 后统计的跨 MTask 或 reset helper 使用节点数 |
 | `predecessors/successors` | 收缩后的 MTask 图前驱和后继 |
 | `owner` | list scheduler 分配的固定 worker 编号 |
@@ -224,7 +225,7 @@ void STop::mtTaskN() {
 | `waits/stores` | 跨 worker token 槽 |
 | `waitBegin/.../storeEnd` | 生成扁平静态数组时使用的区间 |
 
-`targetTasks` 是软目标而不是硬上限。不可拆分的高成本 SuperNode 和连续贪心分组产生的碎片都可能令实际 MTask 数超过目标，此时生成器只输出警告。增大目标任务数可以减少单个 MTask 的成本，但会增加函数调用、dispatch 和 token 同步开销；减小目标任务数则降低调度开销，同时可能减少并行度并加剧负载不均。当前算法没有直接考虑跨 worker 边、cache locality 或 profile 数据，这些因素由后续静态调度部分处理或留作进一步优化。
+`targetTasks` 是软目标而不是硬上限。不可拆分的高成本候选组和连续贪心分组产生的碎片都可能令实际 MTask 数超过目标，此时生成器只输出警告。增大目标任务数可以减少单个 MTask 的成本，但会增加函数调用、dispatch 和 token 同步开销；减小目标任务数则降低调度开销，同时可能减少并行度并加剧负载不均。当前算法没有直接考虑跨 worker 边、cache locality 或 profile 数据，这些因素由后续静态调度部分处理或留作进一步优化。
 
 ### 3.4 Worker 分配
 
@@ -418,7 +419,7 @@ cycle k:
 
 修改 planner 或 runtime 时必须保持：
 
-1. MTask 中的 `cppIds` 保持依赖拓扑序；
+1. MTask 的 `members` 来自连续的依赖拓扑序片段；
 2. 每条 worker chain 严格按 MTask ID 递增执行；
 3. 每条跨 worker 同周期边都由 wait/store token 覆盖；
 4. 一个 consumer 等待 producer worker 上最晚相关前驱后，producer 的更早前驱必然已经完成；
@@ -484,7 +485,7 @@ dense:
 
 ### 局部变量
 
-普通标量中间节点只有在所有直接 `next` 使用者都属于同一 MTask 时，才会从模型成员降为 `mtTaskN()` 的局部变量。`depNext` 只表示顺序约束，不会仅因为跨 MTask 而阻止局部化；但 lowering 会显式收集 reset helper 的表达式依赖，确保这些函数需要读取的值仍为模型成员。数组、reset、memory 和跨 MTask 使用的值不会局部化。
+普通中间节点和数组只有在所有直接 `next` 使用者都属于同一 MTask 时，才会从模型成员降为 `mtTaskN()` 的局部变量。对于跨多个 MTask、但定义和所有 `next/depNext` 使用都属于同一个 worker 的普通节点，生成器会把它放入对应的 `MtWorkerStateW<N>`，task 函数通过引用别名访问。这样它不再是共享模型字段，也不需要跨 worker token；数组会保留 `dimension`。reset、memory、特殊节点和跨 worker 使用的值仍保留为模型成员。
 
 task 内局部中间量使用 `T value{};` 值初始化。部分 external/memory 参数只在 enable 为真时才有语义，但未初始化参数在 C++ 层仍可能触发未定义行为。值初始化保证禁用路径不会把栈垃圾传给 helper；已在所有路径赋值的局部量通常会被优化器消除多余清零。
 
@@ -637,7 +638,7 @@ Ready-to-run 测试同样应独立生成单线程 active reference 和多线程 
 
 ### 12.1 Dense 依赖拓扑
 
-早期精简版直接按 `cppId` 计算所有超节点。活跃度扫描允许向后激活留到下一次 `step()`，但 dense 全量执行若仍按该编号顺序，会把新状态和旧组合逻辑混在同一周期，最终触发 `MemRegCache` 等断言。
+早期精简版直接按旧 `cppId` 计算所有超节点。活跃度扫描允许向后激活留到下一次 `step()`，但 dense 全量执行若仍按该编号顺序，会把新状态和旧组合逻辑混在同一周期，最终触发 `MemRegCache` 等断言。当前直接 MTask planner 保留相同的依赖 Kahn 序，但不再生成 `cppId`。
 
 当前实现先对纯数据依赖做 Kahn 排序，再只加入该排序中向前的激活边。这个修改已通过独立单线程 active/MT 模型的香山逐信号比较，并且不依赖给 assertion/printf 添加全局前序边。
 
@@ -742,7 +743,7 @@ this model requires GSIM_MT_EXECUTOR=dense ...
 - CPU affinity 使用 Linux `sched_*affinity`；
 - spin pause 当前生成 x86 `pause` 指令，移植到非 x86 平台前需要增加对应实现；
 - 不支持并发调用同一个模型对象的 `step()`；
-- correctness 依赖跨 worker 的同周期数据边完整，同时依赖每条 worker chain 保持 `cppId` 顺序；
+- correctness 依赖跨 worker 的同周期数据边完整，同时依赖每条 worker chain 保持 MTask 拓扑顺序；
 - 目前正确性测试覆盖到 XiangShan 10,000 周期，尚不等于完整 CoreMark 跑完；
 - 尚未建立正式的线程扩展性和 NUMA 性能基准。
 

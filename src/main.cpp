@@ -407,7 +407,6 @@ int main(int argc, char** argv) {
   FUNC_WRAPPER(g->removeDeadNodes(), "RemoveDeadNodes");
 
   if (globalConfig.MtMode) {
-    FUNC_WRAPPER(g->graphPartitionMt(), "graphPartition");
     FUNC_WRAPPER(g->cppEmitterMt(), "Final");
   } else {
     FUNC_WRAPPER(g->graphPartition(), "graphPartition");

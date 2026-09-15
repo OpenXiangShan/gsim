@@ -7,24 +7,14 @@
 #include <set>
 
 extern int maxConcatNum;
-std::string computeExtMod(SuperNode* super);
+std::string computeExtMod(Node* ext, std::vector<InstInfo>& instructions);
 
 namespace {
 
 int taskForNode(const Node* node, const MtTaskPlan& plan) {
-  if (node == nullptr || node->super == nullptr || node->super->cppId < 0) return -1;
-  const size_t cppId = static_cast<size_t>(node->super->cppId);
-  return cppId < plan.taskByCppId_.size() ? plan.taskByCppId_[cppId] : -1;
-}
-
-void collectTaskMembers(MtTaskPlan& plan) {
-  for (MtTask& task : plan.tasks_) {
-    task.members.clear();
-    for (int cppId : task.cppIds) {
-      SuperNode* super = plan.byCppId_[static_cast<size_t>(cppId)];
-      task.members.insert(task.members.end(), super->member.begin(), super->member.end());
-    }
-  }
+  if (node == nullptr) return -1;
+  auto found = plan.taskByNode_.find(const_cast<Node*>(node));
+  return found == plan.taskByNode_.end() ? -1 : found->second;
 }
 
 // generateStmtTree() restores direct expression dependencies for values whose
@@ -240,33 +230,47 @@ void buildResetTree(SuperNode* super) {
   super->stmtTree->compute(super->insts);
 }
 
+void updateTaskRoots(const MtTaskPlan& plan) {
+  auto groupFor = [&](Node* node) {
+    auto found = plan.partitionGroupByNode_.find(node);
+    return found == plan.partitionGroupByNode_.end() ? -1 : found->second;
+  };
+  for (Node* node : plan.emissionNodes_) {
+    node->nodeIsRoot = node->next.size() != 1 || node->isReset() || node->isExt();
+    const int group = groupFor(node);
+    for (Node* next : node->next) {
+      if (groupFor(next) != group) node->nodeIsRoot = true;
+    }
+    for (Node* previous : node->prev) {
+      if (previous->type == NODE_REG_SRC && !previous->regSplit &&
+          groupFor(previous->getDst()) == group) {
+        node->nodeIsRoot = true;
+      }
+    }
+  }
+}
+
 }  // namespace
 
 void MtTaskLowerer::generateStmtTrees(graph& graph, MtTaskPlan& plan) {
   maxConcatNum = 0;
-  collectTaskMembers(plan);
   completeTaskLocalDependencies(graph, plan);
   for (MtTask& task : plan.tasks_) orderTaskMembers(task);
   collectTaskLocalNodes(graph, plan);
 
-  for (SuperNode* super : graph.sortedSuper) {
-    for (Node* node : super->member) node->updateIsRoot();
-  }
+  updateTaskRoots(plan);
 
   for (MtTask& task : plan.tasks_) {
-    Assert(!task.cppIds.empty(), "cannot lower an empty MTask");
-    SuperNode* first = plan.byCppId_[static_cast<size_t>(task.cppIds.front())];
-    if (first->superType == SUPER_EXTMOD) {
-      Assert(task.cppIds.size() == 1, "extmodule SuperNode must remain a standalone MTask");
+    Assert(!task.members.empty(), "cannot lower an empty MTask");
+    if (task.kind == MtTaskKind::ExtModule) {
+      Node* ext = task.members.front();
+      Assert(ext->type == NODE_EXT, "extmodule MTask must start with NODE_EXT");
       task.stmtTree = new StmtTree();
       task.stmtTree->root = new StmtNode(OP_STMT_SEQ);
-      first->insts.clear();
-      graph.extDecl.push_back(computeExtMod(first));
-      task.insts = new std::vector<InstInfo>(first->insts);
+      std::vector<InstInfo> instructions;
+      graph.extDecl.push_back(computeExtMod(ext, instructions));
+      task.insts = new std::vector<InstInfo>(std::move(instructions));
       continue;
-    }
-    if (first->superType == SUPER_ASYNC_RESET) {
-      Assert(task.cppIds.size() == 1, "async reset SuperNode must remain a standalone MTask");
     }
     buildTaskTree(task);
   }

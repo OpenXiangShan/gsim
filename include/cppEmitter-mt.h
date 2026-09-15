@@ -35,6 +35,7 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
   bool isTaskLocal(Node* node) const;
   bool isWorkerLocal(Node* node) const;
   int workerLocalOwner(Node* node) const;
+  const std::vector<Node*>& emissionNodes() const;
 
  private:
   using Task = MtTask;

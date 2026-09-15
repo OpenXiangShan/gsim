@@ -9,11 +9,15 @@
 class graph;
 class InstInfo;
 class Node;
-class SuperNode;
 class StmtTree;
 
+enum class MtTaskKind : uint8_t {
+  Normal,
+  ExtModule,
+  AsyncReset,
+};
+
 struct MtTask {
-  std::vector<int> cppIds;
   std::vector<Node*> members;
   std::vector<int> predecessors;
   std::vector<int> successors;
@@ -22,6 +26,8 @@ struct MtTask {
   std::vector<InstInfo>* insts = nullptr;
   StmtTree* stmtTree = nullptr;
   std::unordered_set<Node*> localNodes;
+  MtTaskKind kind = MtTaskKind::Normal;
+  Node* resetNode = nullptr;
   int globalNodeCount = 0;
   int cost = 0;
   int owner = 0;
@@ -32,17 +38,17 @@ struct MtTask {
 };
 
 struct MtTaskPlan {
-  std::vector<SuperNode*> byCppId_;
-  std::vector<int> topologicalCppIds_;
-  std::vector<int> taskByCppId_;
   std::vector<MtTask> tasks_;
+  std::unordered_map<Node*, int> taskByNode_;
+  std::unordered_map<Node*, int> partitionGroupByNode_;
+  std::vector<Node*> emissionNodes_;
   std::unordered_set<Node*> localNodes_;
   std::unordered_map<Node*, int> workerLocalOwners_;
+  int partitionGroupCount_ = 0;
 };
 
 class MtTaskPartitioner {
  public:
-  static void assignCppIds(graph& graph);
   static void build(graph& graph, MtTaskPlan& plan, int targetTasks);
 };
 

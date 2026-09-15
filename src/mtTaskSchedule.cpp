@@ -16,13 +16,9 @@ int loweredTaskCost(const MtTask& task) {
                               task.globalNodeCount * globalConfig.MtScheduleGlobalWeight);
 }
 
-bool taskEmitsCode(const MtTask& task, const MtTaskPlan& plan) {
+bool taskEmitsCode(const MtTask& task) {
   if (task.insts != nullptr && !task.insts->empty()) return true;
-  for (int cppId : task.cppIds) {
-    const SuperType type = plan.byCppId_[static_cast<size_t>(cppId)]->superType;
-    if (type == SUPER_EXTMOD || type == SUPER_ASYNC_RESET) return true;
-  }
-  return false;
+  return task.kind == MtTaskKind::ExtModule || task.kind == MtTaskKind::AsyncReset;
 }
 
 void compactEmptyTasks(MtTaskPlan& plan) {
@@ -31,7 +27,7 @@ void compactEmptyTasks(MtTaskPlan& plan) {
   std::vector<MtTask> compacted;
   compacted.reserve(original.size());
   for (size_t oldId = 0; oldId < original.size(); ++oldId) {
-    if (!taskEmitsCode(original[oldId], plan)) continue;
+    if (!taskEmitsCode(original[oldId])) continue;
     oldToNew[oldId] = static_cast<int>(compacted.size());
     MtTask task = original[oldId];
     task.predecessors.clear();
@@ -75,11 +71,9 @@ void compactEmptyTasks(MtTaskPlan& plan) {
   }
   plan.tasks_.swap(compacted);
 
-  plan.taskByCppId_.assign(plan.byCppId_.size(), -1);
+  plan.taskByNode_.clear();
   for (size_t taskId = 0; taskId < plan.tasks_.size(); ++taskId) {
-    for (int cppId : plan.tasks_[taskId].cppIds) {
-      plan.taskByCppId_[static_cast<size_t>(cppId)] = static_cast<int>(taskId);
-    }
+    for (Node* node : plan.tasks_[taskId].members) plan.taskByNode_[node] = taskId;
   }
 }
 
@@ -193,7 +187,7 @@ int countResetChunks(const std::vector<Instruction>& body, int chunkSize) {
 
 void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& workers,
                             int workerCount, int resetChunk) {
-  const int taskCount = static_cast<int>(tasks.byCppId_.size());
+  const int groupCount = tasks.partitionGroupCount_;
   compactEmptyTasks(tasks);
   for (MtTask& task : tasks.tasks_) task.cost = loweredTaskCost(task);
   // Schedule only ready MTasks, then renumber by that schedule. This produces a
@@ -292,6 +286,10 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
     std::sort(task.successors.begin(), task.successors.end());
   }
   tasks.tasks_.swap(reorderedTasks);
+  tasks.taskByNode_.clear();
+  for (size_t taskId = 0; taskId < tasks.tasks_.size(); ++taskId) {
+    for (Node* node : tasks.tasks_[taskId].members) tasks.taskByNode_[node] = taskId;
+  }
   for (int taskId = 0; taskId < denseTaskCount; ++taskId) {
     for (int successor : tasks.tasks_[static_cast<size_t>(taskId)].successors) {
       Assert(taskId < successor, "renumbered dense edge is not forward: %d -> %d", taskId, successor);
@@ -302,14 +300,10 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
 
   workers.workerTasks_.assign(static_cast<size_t>(workerCount), std::vector<int>());
   std::vector<int> workerPosition(tasks.tasks_.size(), -1);
-  std::vector<int> taskByFinalCppId(static_cast<size_t>(taskCount), -1);
   for (size_t taskId = 0; taskId < tasks.tasks_.size(); ++taskId) {
     int owner = tasks.tasks_[taskId].owner;
     workerPosition[taskId] = static_cast<int>(workers.workerTasks_[static_cast<size_t>(owner)].size());
     workers.workerTasks_[static_cast<size_t>(owner)].push_back(taskId);
-    for (int cppId : tasks.tasks_[taskId].cppIds) {
-      taskByFinalCppId[static_cast<size_t>(cppId)] = static_cast<int>(taskId);
-    }
   }
 
   // MtReset each register on the worker that normally owns its update MTask.
@@ -332,10 +326,10 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
       continue;
     }
 
-    const int triggerCppId = super->resetNode->super->cppId;
-    Assert(triggerCppId >= 0 && triggerCppId < taskCount,
-           "missing trigger SuperNode for async reset %s", super->resetNode->name.c_str());
-    reset.triggerTask = taskByFinalCppId[static_cast<size_t>(triggerCppId)];
+    auto triggerTask = tasks.taskByNode_.find(super->resetNode);
+    Assert(triggerTask != tasks.taskByNode_.end(),
+           "missing trigger MTask for async reset %s", super->resetNode->name.c_str());
+    reset.triggerTask = triggerTask->second;
     Assert(reset.triggerTask >= 0, "missing trigger MTask for async reset %s",
            super->resetNode->name.c_str());
     reset.triggerOwner = tasks.tasks_[static_cast<size_t>(reset.triggerTask)].owner;
@@ -347,11 +341,11 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
       Node* reg = member->getResetSrc();
       int owner = reset.triggerOwner;
       auto findOwner = [&](Node* candidate) {
-        if (candidate == nullptr || candidate->super == nullptr) return -1;
-        const int cppId = candidate->super->cppId;
-        if (cppId < 0 || cppId >= taskCount) return -1;
-        const int taskId = taskByFinalCppId[static_cast<size_t>(cppId)];
-        return taskId >= 0 ? tasks.tasks_[static_cast<size_t>(taskId)].owner : -1;
+        if (candidate == nullptr) return -1;
+        auto task = tasks.taskByNode_.find(candidate);
+        return task != tasks.taskByNode_.end()
+                   ? tasks.tasks_[static_cast<size_t>(task->second)].owner
+                   : -1;
       };
       int registerOwner = findOwner(reg);
       if (registerOwner < 0 && reg->regSplit && reg->getDst()->status == VALID_NODE) {
@@ -469,6 +463,6 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
   size_t edgeCount = 0;
   for (const MtTask& task : tasks.tasks_) edgeCount += task.successors.size();
   fprintf(stderr,
-          "[cppEmitter-mt] workers=%d supernodes=%d mtasks=%zu edges=%zu tokens=%zu\n",
-          workerCount, taskCount, tasks.tasks_.size(), edgeCount, groups.size());
+          "[cppEmitter-mt] workers=%d groups=%d mtasks=%zu edges=%zu tokens=%zu\n",
+          workerCount, groupCount, tasks.tasks_.size(), edgeCount, groups.size());
 }

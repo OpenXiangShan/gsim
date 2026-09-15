@@ -78,12 +78,6 @@ bool CppEmitterMt::enabled() const { return enabled_; }
 
 void CppEmitterMt::prepare() {
   if (!enabled()) return;
-  MtTaskPartitioner::assignCppIds(graph_);
-  for (SuperNode* super : graph_.sortedSuper) {
-    for (Node* member : super->member) {
-      if (member->status == VALID_NODE) member->updateActivate();
-    }
-  }
   MtTaskPartitioner::build(graph_, static_cast<MtTaskPlan&>(*this), targetTasks_);
   MtTaskLowerer::generateStmtTrees(graph_, static_cast<MtTaskPlan&>(*this));
   MtWorkerBuilder::build(graph_, static_cast<MtTaskPlan&>(*this), static_cast<MtWorkerPlan&>(*this),
@@ -103,6 +97,8 @@ int CppEmitterMt::workerLocalOwner(Node* node) const {
   Assert(owner != workerLocalOwners_.end(), "missing worker-local owner for %s", node->name.c_str());
   return owner->second;
 }
+
+const std::vector<Node*>& CppEmitterMt::emissionNodes() const { return emissionNodes_; }
 
 void CppEmitterMt::emitText(int indent, bool canStartFile, const std::string& text) {
   graph_.__emitSrcMt(indent, canStartFile, true, nullptr, "%s", text.c_str());
@@ -267,8 +263,7 @@ void CppEmitterMt::emitInstructions(const std::vector<InstInfo>& instructions, i
 
 void CppEmitterMt::emitTask(const Task& task, int indent) {
   Assert(task.insts != nullptr, "MTask has no lowered instruction stream");
-  Assert(!task.cppIds.empty(), "cannot emit an empty MTask");
-  SuperNode* first = byCppId_[static_cast<size_t>(task.cppIds.front())];
+  Assert(!task.members.empty(), "cannot emit an empty MTask");
 
   for (Node* node : task.members) {
     if (task.localNodes.count(node) != 0) {
@@ -324,11 +319,10 @@ void CppEmitterMt::emitTask(const Task& task, int indent) {
                                 oldValue->second + " || " + resetValueName(resetNode) + ");\n");
   };
 
-  if (first->superType == SUPER_EXTMOD) {
-    Assert(task.cppIds.size() == 1, "extmodule SuperNode must remain a standalone MTask");
+  if (task.kind == MtTaskKind::ExtModule) {
     std::set<Node*> asyncResets;
-    for (size_t i = 1; i < first->member.size(); ++i) {
-      if (first->member[i]->isAsyncReset()) asyncResets.insert(first->member[i]);
+    for (size_t i = 1; i < task.members.size(); ++i) {
+      if (task.members[i]->isAsyncReset()) asyncResets.insert(task.members[i]);
     }
     for (Node* resetNode : asyncResets) saveAsyncResetValue(resetNode);
     emitInstructions(*task.insts, indent);
@@ -336,12 +330,12 @@ void CppEmitterMt::emitTask(const Task& task, int indent) {
     return;
   }
 
-  if (first->superType == SUPER_ASYNC_RESET) {
-    Assert(task.cppIds.size() == 1, "async reset SuperNode must remain a standalone MTask");
-    saveAsyncResetValue(first->resetNode);
+  if (task.kind == MtTaskKind::AsyncReset) {
+    Assert(task.resetNode != nullptr, "async reset MTask has no reset node");
+    saveAsyncResetValue(task.resetNode);
   }
   emitInstructions(*task.insts, indent);
-  if (first->superType == SUPER_ASYNC_RESET) emitAsyncReset(first->resetNode);
+  if (task.kind == MtTaskKind::AsyncReset) emitAsyncReset(task.resetNode);
 }
 
 void CppEmitterMt::emitDefinitions() {
@@ -563,11 +557,9 @@ void CppEmitterMt::emitDefinitions() {
 
   runtime += "void " + className + "::stepMt() {\n";
   runtime += "  resetAllMt();\n";
-  for (SuperNode* super : graph_.sortedSuper) {
-    for (Node* member : super->member) {
-      if (member->isReset() && member->type == NODE_REG_SRC) {
-        runtime += "  " + member->name + "$RESET = " + member->name + ";\n";
-      }
+  for (Node* node : emissionNodes_) {
+    if (node->isReset() && node->type == NODE_REG_SRC) {
+      runtime += "  " + node->name + "$RESET = " + node->name + ";\n";
     }
   }
   runtime +=
@@ -927,19 +919,9 @@ void graph::cppEmitterMt() {
 
   // header: node definition; src: node evaluation
   fprintf(header, "uint32_t _var_start;\n");
-  for (SuperNode* super : sortedSuper) {
-    // std::string insts;
-    if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
-      for (Node* n : super->member) {
-        genNodeDefMt(header, n, mtEmitter.isTaskLocal(n) || mtEmitter.isWorkerLocal(n));
-      }
-    }
-    if (super->superType == SUPER_EXTMOD) {
-      for (size_t i = 1; i < super->member.size(); i ++) {
-        Node* node = super->member[i];
-        genNodeDefMt(header, node, mtEmitter.isTaskLocal(node) || mtEmitter.isWorkerLocal(node));
-      }
-    }
+  for (Node* node : mtEmitter.emissionNodes()) {
+    if (node->type == NODE_EXT) continue;
+    genNodeDefMt(header, node, mtEmitter.isTaskLocal(node) || mtEmitter.isWorkerLocal(node));
   }
   /* memory definition */
   for (Node* mem : memory) genNodeDefMt(header, mem, false);
