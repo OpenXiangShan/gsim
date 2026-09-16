@@ -206,7 +206,57 @@ void distributeTree(Node* node, ExpTree* tree, std::vector<Node*>& arrayMember) 
   Assert(arrayMember.size() == node->arrayEntryNum(), "arrayMember size %ld != arrayEntryNum %ld", arrayMember.size(), node->arrayEntryNum());
   int begin, end;
   std::tie(begin, end) = tree->getlval()->getIdx(node);
-  Assert(begin >= 0 && end >= begin, "Invalid index for array %s: %d-%d", node->name.c_str(), begin, end);
+  if (begin < 0) {
+    /* Dynamic-index write: when-expansion per member. The incoming tree is
+       arr[dynIdx] = when(cond, rhs, prev) (last-connect machinery guarantees the
+       else = previous value). For each member i emit:
+         arr[i] = when(dynIdx == i, when(cond, rhs, prev), <EMPTY>)
+       The EMPTY else is filled by mergeWhenTree with member[i]'s existing tree
+       (the whole-array default distributed earlier) - exactly how static
+       conditional connects merge. lvalue keeps the array ref with constant
+       index; updateWithSplittedArray rewrites it to member[i] later. */
+    ENode* lval = tree->getlval();
+    if (node->dimension.size() == 1 && lval->getChildNum() >= 1 &&
+        lval->getChild(0) && lval->getChild(0)->getChildNum() >= 1 &&
+        (int)node->arrayEntryNum() <= 4096) {
+      ENode* idxExprRaw = lval->getChild(0)->getChild(0); /* raw dynamic index expr */
+      int n = (int)node->arrayEntryNum();
+      fprintf(stderr, "[splitArray] when-expanding %s (dynamic index, %d entries)\n", node->name.c_str(), n);
+      for (int i = 0; i < n; i ++) {
+        /* lvalue: dup of array ref with index replaced by constant i */
+        ENode* lval_i = lval->dup();
+        ENode* constIdx = new ENode(OP_INDEX_INT);
+        constIdx->addVal(i);
+        lval_i->setChild(0, constIdx);
+        /* root: when(eq(idx, i), original_root, EMPTY) */
+        ENode* eq = new ENode(OP_EQ);
+        eq->addChild(idxExprRaw->dup());
+        ENode* idxI = new ENode(OP_INT);
+        idxI->strVal = std::to_string(i);
+        idxI->width = upperLog2(node->arrayEntryNum()); /* same as dynamic-read mux in updateWithSplittedArray */
+        eq->addChild(idxI);
+        eq->width = 1;
+        ENode* whenNode = new ENode(OP_WHEN);
+        whenNode->addChild(eq);
+        whenNode->addChild(tree->getRoot()->dup());
+        /* EMPTY else: last-connect machinery fills it (mergeWhenTree fills from
+           member[i]'s existing tree; at emission an unfilled else means "keep the
+           previous assignment" - validated: zero-mismatch full-workload run). */
+        whenNode->addChild(nullptr);
+        whenNode->width = node->width;
+        ExpTree* memberTree = new ExpTree(whenNode, lval_i);
+        if (arrayMember[(size_t)i]->assignTree.size() == 0) {
+          arrayMember[(size_t)i]->assignTree.push_back(memberTree);
+        } else {
+          ExpTree* replaceTree = mergeWhenTree(arrayMember[(size_t)i]->assignTree.back(), memberTree);
+          if (replaceTree) arrayMember[(size_t)i]->assignTree.back() = replaceTree;
+          else arrayMember[(size_t)i]->assignTree.push_back(memberTree);
+        }
+      }
+      return;
+    }
+    Assert(false, "dynamic multi-dimensional or oversized array write is unsupported for %s (%d entries)", node->name.c_str(), (int)node->arrayEntryNum());
+  }
   if (begin == end) {
     int idx = begin;
     if (arrayMember[idx]->assignTree.size() == 0) arrayMember[idx]->assignTree.push_back(tree);
