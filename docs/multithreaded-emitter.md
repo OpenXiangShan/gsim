@@ -36,7 +36,7 @@ Node 依赖图 -> 直接 MTask 收缩 -> 静态 MTask -> 固定 worker chain
 | --- | --- |
 | `src/mtTaskPartition.cpp` | 从 Node 边直接建立候选 MTask、执行收缩和拓扑排序 |
 | `include/mtTaskPartition.h` | MTask 结构和 partition builder 接口 |
-| `src/mtTaskSchedule.cpp` | worker owner 分配、并行寄存器更新、token 表和异步 reset 规划 |
+| `src/mtTaskSchedule.cpp` | worker owner 分配、并行状态提交、token 表和异步 reset 规划 |
 | `include/mtTaskSchedule.h` | worker、token、reset 计划结构和 builder 接口 |
 | `src/mtTaskLowering.cpp` | 将 MTask 成员合并为一个 `StmtTree` 和 `InstInfo` 流 |
 | `src/cppEmitter-mt.cpp` | 消费 task/worker 计划，生成 MT C++ 类、dispatch 表和线程池 |
@@ -75,7 +75,7 @@ MT 后端不再调用单线程的 `generateStmtTree()` 和 `instsGenerator()`。
 7. 按 task 内 `depPrev/depNext` 对成员 Node 做稳定拓扑排序。
 8. 复用单线程的 `StmtTree::mergeExpTree()` 和 `StmtTree::compute()`，为每个 MTask 生成一棵语句树和一条 `InstInfo` 流。
 9. 将所有直接使用者都在当前 MTask、且不被 reset helper 引用的普通标量中间节点标记为 task-local。
-10. 使用 lowering 后的指令数重新估计任务成本，再进行 worker 调度、寄存器更新分配和 token 规划。
+10. 使用 lowering 后的指令数重新估计任务成本，再进行 worker 调度、状态提交分配和 token 规划。
 
 `StmtTree` 的 `prevPath` 约束覆盖同一 MTask 内的 Node 依赖。因此，无依赖节点可以提前并合并到相同条件分支中，有依赖节点则不能越过其前驱。extmodule 和异步 reset 候选组保持为独立 MTask，reset 辅助树仍独立构建，以保持外部调用和复位握手的位置。
 
@@ -358,9 +358,10 @@ worker 3: T6 -> T9
 | `MtReadyToken` | 跨 worker 依赖的奇偶 token，内部是 atomic byte |
 | `mtWaitSlots` | 所有 task 的等待 token 槽位扁平数组 |
 | `mtStoreSlots` | 所有 task 的发布 token 槽位扁平数组 |
-| `mtRegisterSrcW0...Wn` / `mtRegisterDstW0...Wn` | 每个 worker 连续排布的当前状态和下一状态块 |
-| `mtUpdateRegistersW0...Wn` | 按实际 C++ 存储字节数均衡分配、整块提交的寄存器更新函数 |
-| `mtRegisterDoneFlags` / `mtRegistersReady` | 寄存器更新 phase 与普通 MTask 之间的全局 barrier |
+| `mtRegisterSrcW0...Wn` / `mtRegisterDstW0...Wn` | 每个 worker 连续排布的寄存器当前状态和下一状态块 |
+| `__gsim_mt_mem_write_*` | memory 写端口的 pending address/data/valid 缓冲 |
+| `mtUpdateStateW0...Wn` | 提交寄存器块和上一周期 memory pending writes 的状态更新函数 |
+| `mtStateDoneFlags` / `mtStateReady` | 状态提交 phase 与普通 MTask 之间的全局 barrier |
 | `mtDoneFlags` | worker 完成本周期后的 parity 标志 |
 | `mtGeneration` | 周期 generation；低位 parity 用于复用 token |
 | `mtThreads` | 后台 worker 线程对象；worker 0 使用调用线程 |
@@ -479,9 +480,9 @@ dense:
 
 `GSIM_MT_EXECUTOR` 不是 `dense`，或运行时线程数与生成时不同，模型会直接报错退出。单线程 active reference 必须由原 emitter 独立生成。
 
-## 8. Reset 与局部变量
+## 8. 状态提交、Reset 与局部变量
 
-### Reset
+### 寄存器和同步 Reset
 
 普通寄存器和同步复位寄存器不再由普通 MTask 提交，也不再由主线程串行调用
 `resetAllMt()`。planner 使用 `widthBits(width) / 8` 和数组的实际 C++ 容量估计存储字节数，
@@ -493,20 +494,36 @@ cache line 对齐的 `mtRegisterSrcWn` 和 `mtRegisterDstWn`；MTask 对寄存�
 `memcpy(&SrcBlock, &DstBlock, sizeof(SrcBlock))` 提交该 worker 的全部寄存器。因此未触发
 reset 时不再逐寄存器执行标量赋值，reset 分支同时更新 next-state shadow 的语义也自然得到
 保留。若 reset 信号本身是寄存器，则 `stepMt()` 在发布 generation 前保存 `$RESET`，避免
-并行更新时读取正在被其他 worker 改写的 reset 源。寄存器 phase 完成后通过
-release/acquire barrier 发布全部新状态，普通 MTask 才开始计算本周期组合逻辑和下一状态。
+并行更新时读取正在被其他 worker 改写的 reset 源。
 
 异步复位仍使用原来的 trigger/join/done/release rendezvous，可在 MTask chain 中间更新其
-寄存器；它不进入周期起始的同步寄存器 phase。
+寄存器；异步复位寄存器不进入周期起始的同步寄存器提交部分。
 
-大型设计的寄存器或异步 reset 指令可能形成非常大的 C++ 函数。默认情况下，
+大型设计的寄存器、memory 提交或异步 reset 指令可能形成非常大的 C++ 函数。默认情况下，
 `GSIM_EMIT_RESET_CHUNK=4096` 会在控制嵌套深度为 0 的位置拆分 body，生成
-`mtUpdateRegistersWn_cM()` 或 `subResetMtN_cM()`。不会在 if/else 内部切分，因此保持
+`mtUpdateStateWn_cM()` 或 `subResetMtN_cM()`。不会在 if/else 内部切分，因此保持
 控制结构完整。
 
 若原 `InstInfo` 流整体已被同一个 reset 条件包裹，emitter 会识别并去除这一层，再由生成的 reset 函数统一添加条件，避免重复嵌套。
 
 设置 `GSIM_EMIT_RESET_CHUNK=0` 可关闭切分；有效的显式 chunk 大小不得小于 256。
+
+### Memory
+
+memory 和寄存器一样属于跨周期状态，但不复制整个 memory。每个有效 writer/readwriter
+端口拥有一组 pending address、data 和逐 lane valid 缓冲。普通 MTask 中的
+`OP_WRITE_MEM` 只更新该缓冲，不再直接修改 memory 数组。下一周期开始时，memory 的固定
+owner worker 根据 valid lane 将 pending data 稀疏提交到真实数组并清空 valid。
+
+同一个 memory 的全部写端口固定交给同一个 state owner，提交阶段不存在多个 worker
+并发写同一数组。不同 memory 可以分配到不同 worker；负载估计同时计入寄存器块字节数和
+写端口缓冲字节数。`readwrite` 端口的 `new` 模式使用同端口 pending forwarding，保持原有
+write-first 行为；普通 `old/undefined` 读取继续访问当前 memory。Chisel/FIRRTL 未定义的
+同地址多端口冲突不保证特定覆盖顺序。
+
+寄存器提交和 memory 提交都在 `mtUpdateStateWn()` 中完成。所有 worker 随后通过同一个
+release/acquire state barrier 发布完整状态，普通 MTask 才开始计算本周期组合逻辑、寄存器
+下一状态和 memory 下一批 pending writes。因此 MTask 运行期间不再改变真实 memory 状态。
 
 ### 局部变量
 
@@ -543,6 +560,7 @@ task 内局部中间量使用 `T value{};` 值初始化。部分 external/memory
 `GSIM_MT_DENSE_UNPIN_SPECIAL`、`GSIM_MT_WORKER_POOL_FLAG_JOIN` 等开关不再读取。
 `GSIM_MT_DENSE_LOOKAHEAD` 是有意删除的：worker 内乱序与隐含顺序不兼容。
 `--mt-target-tasks` 是当前 MTask 划分使用的目标任务数参数，默认值为 `1600`。
+尚未接入的 RepCut 方案和原型验证记录见 [mt-repcut.md](mt-repcut.md)。
 
 ## 10. 构建与运行
 
@@ -763,7 +781,8 @@ this model requires GSIM_MT_EXECUTOR=dense ...
 - 线程数在生成时固定，修改线程数必须重新生成模型；
 - 当前是 dense executor，不利用节点活跃度；
 - 调度成本是静态近似值，没有 profile feedback；
-- external、memory、printf 和 assert 都可分配到任意 worker；helper 的并发安全由集成方保证；
+- memory 读和写端口计算仍可分配到任意 worker，但真实 memory 写只由固定 state owner 在周期开始提交；
+- external、printf 和 assert 可分配到任意 worker，helper 的并发安全由集成方保证；
 - worker 使用忙等同步，会占满所分配 CPU；
 - CPU affinity 使用 Linux `sched_*affinity`；
 - spin pause 当前生成 x86 `pause` 指令，移植到非 x86 平台前需要增加对应实现；
