@@ -187,7 +187,9 @@ void CppEmitterMt::emitText(int indent, bool canStartFile, const std::string& te
 
 void CppEmitterMt::emitHeaderPreamble(FILE* header) const {
   if (!enabled()) return;
-  fprintf(header, "#include <atomic>\n#include <thread>\n#include <sched.h>\n\n");
+  fprintf(header,
+          "#include <atomic>\n#include <cstdio>\n#include <thread>\n#include <sched.h>\n"
+          "#include <string>\n#include <utility>\n\n");
 }
 
 void CppEmitterMt::emitClassMembers(FILE* header) const {
@@ -200,6 +202,7 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
           graph_.name.c_str());
   fprintf(header, "alignas(64) MtReadyToken mtReadyTokens[%d];\n", readySlotCount_);
   fprintf(header, "MtDoneFlag mtDoneFlags[%d];\n", std::max(1, workerCount_ - 1));
+  fprintf(header, "std::atomic<uint8_t> mtDeferredFailures[%d]{};\n", workerCount_);
   fprintf(header, "MtDoneFlag mtStateDoneFlags[%d];\n", std::max(1, workerCount_ - 1));
   fprintf(header, "MtDoneFlag mtStateReady;\n");
   fprintf(header, "std::vector<std::thread> mtThreads;\n");
@@ -679,6 +682,7 @@ void CppEmitterMt::emitDefinitions() {
       "    } while (generation == seen);\n"
       "    if (mtStop.load(std::memory_order_acquire)) return;\n"
       "    mtRunWorker(worker, static_cast<uint8_t>(generation & 1));\n"
+      "    mtDeferredFailures[worker].store(mtFlushDeferredEvents(), std::memory_order_relaxed);\n"
       "    mtDoneFlags[worker - 1].parity.store(static_cast<uint8_t>(generation & 1),\n"
       "                                         std::memory_order_release);\n"
       "    seen = generation;\n"
@@ -742,9 +746,18 @@ void CppEmitterMt::emitDefinitions() {
       "  uint8_t parity = static_cast<uint8_t>(generation & 1);\n";
   runtime += "  mtRunWorker(0, parity);\n";
   runtime +=
+      "  mtDeferredFailures[0].store(mtFlushDeferredEvents(), std::memory_order_relaxed);\n";
+  runtime +=
       "  for (int worker = 1; worker < kMtWorkerCount; ++worker) {\n"
       "    while (mtDoneFlags[worker - 1].parity.load(std::memory_order_acquire) != parity)\n"
       "      __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
+      "  }\n"
+      "  bool assertionFailed = false;\n"
+      "  for (int worker = 0; worker < kMtWorkerCount; ++worker)\n"
+      "    assertionFailed |= mtDeferredFailures[worker].load(std::memory_order_relaxed) != 0;\n"
+      "  if (assertionFailed) {\n"
+      "    assert(!\"deferred RTL assertion failure\");\n"
+      "    abort();\n"
       "  }\n";
   runtime += "  ++cycles;\n}\n";
   emitText(0, true, runtime);
@@ -807,13 +820,12 @@ FILE* graph::genHeaderStartMt() {
   fprintf(header, "//#define ENABLE_LOG\n");
   fprintf(header, "//#define RANDOMIZE_INIT\n");
 
-  fprintf(header, "\n#define gAssert(cond, ...) do {"
-                     "if (!(cond)) {"
-                       "fprintf(stderr, \"\\33[1;31m\");"
-                       "fprintf(stderr, __VA_ARGS__);"
-                       "fprintf(stderr, \"\\33[0m\\n\");"
-                       "assert(cond);"
-                     "}"
+  fprintf(header, "\nstruct MtDeferredEvent { bool assertion; std::string text; };\n");
+  fprintf(header, "inline thread_local std::vector<MtDeferredEvent> mtDeferredEvents;\n");
+  fprintf(header, "void mtDeferAssert(const char *fmt, ...);\n");
+  fprintf(header, "bool mtFlushDeferredEvents();\n");
+  fprintf(header, "#define gAssert(cond, ...) do {"
+                     "if (!(cond)) mtDeferAssert(__VA_ARGS__);"
                    "} while (0)\n");
   fprintf(header, "#define gdiv(a, b) ((b) == 0 ? 0 : (a) / (b))\n");
 
@@ -1019,34 +1031,72 @@ bool graph::__emitSrcMt(int indent, bool canNewFile, bool alreadyEndFunc, const 
 }
 
 void graph::emitPrintfMt() {
-  emitFuncDecl(0, "void gprintf(const char *fmt, ...) {\n");
+  emitFuncDecl(0, "static std::string mtFormatDeferred(const char *fmt, va_list args) {\n");
   emitBodyLock(0,
-  "  FILE *fp = stderr;\n"
+  "  std::string result;\n"
+  "  while (*fmt != 0) {\n"
+  "    if (*fmt != '%%') { result.push_back(*fmt++); continue; }\n"
+  "    ++fmt;\n"
+  "    if (*fmt == '%%') { result.push_back(*fmt++); continue; }\n"
+  "    const uint32_t bits = va_arg(args, uint32_t);\n"
+  "    uint64_t value = 0;\n"
+  "    if (bits <= 32) value = va_arg(args, uint32_t);\n"
+  "    else if (bits <= 64) value = va_arg(args, uint64_t);\n"
+  "    else { result += \"<unsupported-width>\"; ++fmt; continue; }\n"
+  "    char buffer[64];\n"
+  "    switch (*fmt) {\n"
+  "      case 'd': std::snprintf(buffer, sizeof(buffer), \"%%lld\", static_cast<long long>(value)); result += buffer; break;\n"
+  "      case 'c': result.push_back(static_cast<char>(value & 0xff)); break;\n"
+  "      case 'x': std::snprintf(buffer, sizeof(buffer), \"%%llx\", static_cast<unsigned long long>(value)); result += buffer; break;\n"
+  "      default: result.push_back('%%'); result.push_back(*fmt); break;\n"
+  "    }\n"
+  "    ++fmt;\n"
+  "  }\n"
+  "  return result;\n"
+  "}\n"
+  );
+  emitFuncDecl(0, "void mtDeferAssert(const char *fmt, ...) {\n");
+  emitBodyLock(0,
   "  va_list args;\n"
   "  va_start(args, fmt);\n"
-  "  int fmt_idx = 0;\n"
-  "  while (true) {\n"
-  "    char c = fmt[fmt_idx ++];\n"
-  "    switch (c) {\n"
-  "      case '%%': break;\n"
-  "      case 0: return;\n"
-  "      default: fputc(c, fp); continue;\n"
-  "    }\n"
-  "\n"
-  "    uint64_t lval = 0;\n"
-  "    int bits = va_arg(args, uint32_t);\n"
-  "    if      (bits <= 32) { lval = va_arg(args, uint32_t); }\n"
-  "    else if (bits <= 64) { lval = va_arg(args, uint64_t); }\n"
-  "    else                 { assert(0); }\n"
-  "\n"
-  "    c = fmt[fmt_idx ++];\n"
-  "    switch (c) {\n"
-  "      case 'd': fprintf(fp, \"%%ld\", lval); break;\n"
-  "      case 'c': fputc(lval & 0xff, fp); break;\n"
-  "      case 'x': fprintf(fp, \"%%lx\", lval); break;\n"
-  "      default: assert(0);\n"
+  "  va_list measure;\n"
+  "  va_copy(measure, args);\n"
+  "  const int length = std::vsnprintf(nullptr, 0, fmt, measure);\n"
+  "  va_end(measure);\n"
+  "  std::string text;\n"
+  "  if (length >= 0) {\n"
+  "    std::vector<char> buffer(static_cast<size_t>(length) + 1);\n"
+  "    std::vsnprintf(buffer.data(), buffer.size(), fmt, args);\n"
+  "    text.assign(buffer.data(), static_cast<size_t>(length));\n"
+  "  } else {\n"
+  "    text = fmt;\n"
+  "  }\n"
+  "  mtDeferredEvents.push_back({true, std::move(text)});\n"
+  "  va_end(args);\n"
+  "}\n"
+  );
+  emitFuncDecl(0, "void gprintf(const char *fmt, ...) {\n");
+  emitBodyLock(0,
+  "  va_list args;\n"
+  "  va_start(args, fmt);\n"
+  "  mtDeferredEvents.push_back({false, mtFormatDeferred(fmt, args)});\n"
+  "  va_end(args);\n"
+  "}\n"
+  );
+  emitFuncDecl(0, "bool mtFlushDeferredEvents() {\n");
+  emitBodyLock(0,
+  "  bool failed = false;\n"
+  "  for (const MtDeferredEvent& event : mtDeferredEvents) {\n"
+  "    if (event.assertion) {\n"
+  "      fprintf(stderr, \"\\33[1;31m%%s\\33[0m\\n\", event.text.c_str());\n"
+  "      failed = true;\n"
+  "    } else {\n"
+  "      fputs(event.text.c_str(), stderr);\n"
   "    }\n"
   "  }\n"
+  "  fflush(stderr);\n"
+  "  mtDeferredEvents.clear();\n"
+  "  return failed;\n"
   "}\n"
   );
 }
