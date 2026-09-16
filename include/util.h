@@ -4,6 +4,8 @@
 #include <sys/time.h>
 #include <string>
 
+class Node;
+
 enum class ShiftDir{
   Left,
   Right,
@@ -22,6 +24,9 @@ std::string format(const char *fmt, ...);
 std::string bitMask(int width);
 std::string shiftBits(unsigned int bits, ShiftDir dir);
 std::string shiftBits(std::string bits, ShiftDir dir);
+std::string mtMemoryWriteAddressName(const Node* port);
+std::string mtMemoryWriteDataName(const Node* port);
+std::string mtMemoryWriteValidName(const Node* port);
 void print_stacktrace();
 
 static inline struct timeval getTime() {

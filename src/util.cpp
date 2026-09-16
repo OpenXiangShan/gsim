@@ -144,6 +144,18 @@ std::string shiftBits(std:: string bits, ShiftDir dir){
   return (dir == ShiftDir::Left? " << " : " >> ") + bits;
 }
 
+std::string mtMemoryWriteAddressName(const Node* port) {
+  return "__gsim_mt_mem_write_" + std::to_string(port->id) + "_address";
+}
+
+std::string mtMemoryWriteDataName(const Node* port) {
+  return "__gsim_mt_mem_write_" + std::to_string(port->id) + "_data";
+}
+
+std::string mtMemoryWriteValidName(const Node* port) {
+  return "__gsim_mt_mem_write_" + std::to_string(port->id) + "_valid";
+}
+
 void print_stacktrace() {
   int size = 16;
   void * array[16];

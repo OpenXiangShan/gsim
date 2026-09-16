@@ -1323,9 +1323,26 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   valInfo* ret = computeInfo;
   Assert(node->type == NODE_READER || node->type == NODE_READWRITER, "invalid type %d", node->type);
   Node* memory = memoryNode;
-  ret->valStr = memory->name + "[" + ChildInfo(0, valStr) + "]";
+  const std::string address = ChildInfo(0, valStr);
+  const std::string memoryValue = memory->name + "[" + address + "]";
+  ret->valStr = memoryValue;
+  std::string indexStr;
   for (size_t i = 0; i < memory->dimension.size(); i ++) {
-    computeInfo->valStr += "[i" + std::to_string(i) + "]";
+    indexStr += "[i" + std::to_string(i) + "]";
+  }
+  ret->valStr += indexStr;
+
+  // A readwrite port on a write-first memory used to update the memory array
+  // before evaluating its read expression. MT memory writes are now staged, so
+  // preserve that behavior with same-port forwarding without changing the
+  // single-thread active emitter.
+  if (globalConfig.MtMode && node->type == NODE_READWRITER &&
+      memory->extraInfo == "new") {
+    const std::string valid = mtMemoryWriteValidName(node) + indexStr;
+    const std::string data = mtMemoryWriteDataName(node) + indexStr;
+    const std::string stagedAddress = mtMemoryWriteAddressName(node);
+    ret->valStr = "((" + valid + " && " + stagedAddress + " == " + address +
+                  ") ? " + data + " : " + ret->valStr + ")";
   }
 
   if (memory->width > width) {
@@ -1345,6 +1362,27 @@ valInfo* ENode::instsWriteMem(Node* node, std::string lvalue, bool isRoot) {
     Assert(lvalue.compare(0, node->name.length(), node->name) == 0, "writer lvalue %s does not start with %s", lvalue.c_str(), node->name.c_str());
     indexStr = lvalue.substr(node->name.length());
   }
+
+  if (globalConfig.MtMode) {
+    const std::string address = mtMemoryWriteAddressName(node);
+    const std::string data = mtMemoryWriteDataName(node) + indexStr;
+    const std::string valid = mtMemoryWriteValidName(node) + indexStr;
+    ret->valStr = address + " = " + ChildInfo(0, valStr) + ";\n";
+    if (isSubArray(lvalue, node)) {
+      ret->valStr += arrayCopy(data, node, Child(1, computeInfo),
+                               countArrayIndex(lvalue));
+      ret->valStr += "\nmemset(" + valid + ", 1, sizeof(" + valid + "));";
+    } else {
+      std::string value = ChildInfo(1, valStr);
+      if (memory->width < width) value += " & " + bitMask(memory->width);
+      ret->valStr += data + " = " + value + ";\n";
+      ret->valStr += valid + " = 1;";
+    }
+    ret->opNum = -1;
+    ret->type = TYPE_STMT;
+    return ret;
+  }
+
   if (isSubArray(lvalue, node)) {
     std::string arraylvalue = format("%s[%s]%s", memory->name.c_str(), ChildInfo(0, valStr).c_str(), indexStr.c_str());
     ret->valStr = arrayCopy(arraylvalue, node, Child(1, computeInfo), countArrayIndex(arraylvalue) - 1);

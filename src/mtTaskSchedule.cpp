@@ -181,6 +181,50 @@ size_t registerStorageBytes(const Node* node) {
   return std::max<size_t>(1, bytes);
 }
 
+size_t memoryWriteStorageBytes(const Node* port) {
+  size_t entries = 1;
+  for (int dimension : port->dimension) {
+    entries *= static_cast<size_t>(upperPower2(dimension));
+  }
+  const size_t dataBytes = static_cast<size_t>(widthBits(port->width)) / 8;
+  return sizeof(uint64_t) + entries * (std::max<size_t>(1, dataBytes) + 1);
+}
+
+void appendMemoryCommit(MtStateUpdate& update, Node* port) {
+  Assert(port->type == NODE_WRITER || port->type == NODE_READWRITER,
+         "invalid staged memory writer %s", port->name.c_str());
+  Assert(port->parent != nullptr && port->parent->type == NODE_MEMORY,
+         "memory writer %s has no memory parent", port->name.c_str());
+
+  std::string suffix;
+  for (size_t dimension = 0; dimension < port->dimension.size(); ++dimension) {
+    const std::string index = "__gsim_mw_i" + std::to_string(dimension);
+    update.body.push_back(
+        {static_cast<uint8_t>(SUPER_INFO_IF),
+         "for (int " + index + " = 0; " + index + " < " +
+             std::to_string(port->dimension[dimension]) + "; ++" + index + ") {"});
+    suffix += "[" + index + "]";
+  }
+
+  const std::string valid = mtMemoryWriteValidName(port) + suffix;
+  const std::string data = mtMemoryWriteDataName(port) + suffix;
+  const std::string destination = port->parent->name + "[" +
+                                  mtMemoryWriteAddressName(port) + "]" + suffix;
+  update.body.push_back(
+      {static_cast<uint8_t>(SUPER_INFO_IF), "if (" + valid + ") {"});
+  update.body.push_back(
+      {static_cast<uint8_t>(SUPER_INFO_STR), destination + " = " + data + ";"});
+  update.body.push_back({static_cast<uint8_t>(SUPER_INFO_DEDENT), "}"});
+
+  for (size_t dimension = 0; dimension < port->dimension.size(); ++dimension) {
+    update.body.push_back({static_cast<uint8_t>(SUPER_INFO_DEDENT), "}"});
+  }
+  const std::string validBase = mtMemoryWriteValidName(port);
+  update.body.push_back(
+      {static_cast<uint8_t>(SUPER_INFO_STR),
+       "memset(&" + validBase + ", 0, sizeof(" + validBase + "));"});
+}
+
 template <typename Instruction>
 int countResetChunks(const std::vector<Instruction>& body, int chunkSize) {
   if (chunkSize <= 0) return 0;
@@ -203,11 +247,11 @@ int countResetChunks(const std::vector<Instruction>& body, int chunkSize) {
   return chunks;
 }
 
-void buildRegisterUpdates(graph& graph, MtWorkerPlan& workers, int workerCount,
-                          int chunkSize) {
-  workers.registerUpdates_.assign(static_cast<size_t>(workerCount), MtRegisterUpdate());
+void buildStateUpdates(graph& graph, MtWorkerPlan& workers, int workerCount,
+                       int chunkSize) {
+  workers.stateUpdates_.assign(static_cast<size_t>(workerCount), MtStateUpdate());
   for (int worker = 0; worker < workerCount; ++worker) {
-    workers.registerUpdates_[static_cast<size_t>(worker)].worker = worker;
+    workers.stateUpdates_[static_cast<size_t>(worker)].worker = worker;
   }
 
   std::vector<Node*> registers;
@@ -234,9 +278,50 @@ void buildRegisterUpdates(graph& graph, MtWorkerPlan& workers, int workerCount,
                          workerLoad.begin());
     workerLoad[static_cast<size_t>(worker)] += cost;
     ownerByRegister[reg] = worker;
-    MtRegisterUpdate& update = workers.registerUpdates_[static_cast<size_t>(worker)];
-    update.storageBytes += cost;
+    MtStateUpdate& update = workers.stateUpdates_[static_cast<size_t>(worker)];
+    update.registerStorageBytes += cost;
     update.registers.push_back(reg);
+  }
+
+  const std::vector<size_t> registerLoad = workerLoad;
+  size_t memoryWriterCount = 0;
+  size_t memoryWriteBytes = 0;
+  std::vector<std::pair<Node*, std::vector<Node*>>> memoryWriters;
+  for (Node* memory : graph.memory) {
+    if (memory->status != VALID_NODE) continue;
+    std::vector<Node*> writers;
+    for (Node* port : memory->member) {
+      if (port->status == VALID_NODE &&
+          (port->type == NODE_WRITER || port->type == NODE_READWRITER)) {
+        writers.push_back(port);
+      }
+    }
+    if (!writers.empty()) memoryWriters.emplace_back(memory, std::move(writers));
+  }
+  std::sort(memoryWriters.begin(), memoryWriters.end(), [](const auto& lhs, const auto& rhs) {
+    auto cost = [](const std::vector<Node*>& writers) {
+      size_t result = 0;
+      for (Node* writer : writers) result += memoryWriteStorageBytes(writer);
+      return result;
+    };
+    const size_t lhsCost = cost(lhs.second);
+    const size_t rhsCost = cost(rhs.second);
+    if (lhsCost != rhsCost) return lhsCost > rhsCost;
+    return lhs.first->id < rhs.first->id;
+  });
+  for (const auto& entry : memoryWriters) {
+    size_t cost = 0;
+    for (Node* writer : entry.second) cost += memoryWriteStorageBytes(writer);
+    const int worker =
+        static_cast<int>(std::min_element(workerLoad.begin(), workerLoad.end()) -
+                         workerLoad.begin());
+    workerLoad[static_cast<size_t>(worker)] += cost;
+    MtStateUpdate& update = workers.stateUpdates_[static_cast<size_t>(worker)];
+    update.memoryWriteBytes += cost;
+    update.memoryWriters.insert(update.memoryWriters.end(), entry.second.begin(),
+                                entry.second.end());
+    memoryWriterCount += entry.second.size();
+    memoryWriteBytes += cost;
   }
 
   struct SyncResetGroup {
@@ -275,7 +360,7 @@ void buildRegisterUpdates(graph& graph, MtWorkerPlan& workers, int workerCount,
     for (int worker = 0; worker < workerCount; ++worker) {
       const std::vector<Node*>& resetDestinations =
           group.resetDestinationsByWorker[static_cast<size_t>(worker)];
-      MtRegisterUpdate& update = workers.registerUpdates_[static_cast<size_t>(worker)];
+      MtStateUpdate& update = workers.stateUpdates_[static_cast<size_t>(worker)];
       for (size_t begin = 0; begin < resetDestinations.size();) {
         const size_t end = std::min(resetDestinations.size(), begin + resetBatchSize);
         std::vector<Node*> resetMembers(resetDestinations.begin() + begin,
@@ -297,7 +382,7 @@ void buildRegisterUpdates(graph& graph, MtWorkerPlan& workers, int workerCount,
   }
 
   for (int worker = 0; worker < workerCount; ++worker) {
-    MtRegisterUpdate& update = workers.registerUpdates_[static_cast<size_t>(worker)];
+    MtStateUpdate& update = workers.stateUpdates_[static_cast<size_t>(worker)];
     if (!update.registers.empty()) {
       const std::string source = "mtRegisterSrcW" + std::to_string(worker);
       const std::string destination = "mtRegisterDstW" + std::to_string(worker);
@@ -305,16 +390,22 @@ void buildRegisterUpdates(graph& graph, MtWorkerPlan& workers, int workerCount,
           {static_cast<uint8_t>(SUPER_INFO_STR),
            "memcpy(&" + source + ", &" + destination + ", sizeof(" + source + "));"});
     }
+    for (Node* writer : update.memoryWriters) appendMemoryCommit(update, writer);
     update.chunkCount = countResetChunks(update.body, chunkSize);
   }
 
-  const auto limits = std::minmax_element(workerLoad.begin(), workerLoad.end());
-  size_t totalBytes = 0;
-  for (size_t bytes : workerLoad) totalBytes += bytes;
+  const auto registerLimits = std::minmax_element(registerLoad.begin(), registerLoad.end());
+  const auto stateLimits = std::minmax_element(workerLoad.begin(), workerLoad.end());
+  size_t registerBytes = 0;
+  for (size_t bytes : registerLoad) registerBytes += bytes;
   fprintf(stderr,
           "[cppEmitter-mt] register-blocks registers=%zu bytes=%zu min-worker-bytes=%zu "
           "max-worker-bytes=%zu\n",
-          registers.size(), totalBytes, *limits.first, *limits.second);
+          registers.size(), registerBytes, *registerLimits.first, *registerLimits.second);
+  fprintf(stderr,
+          "[cppEmitter-mt] memory-commits writers=%zu pending-bytes=%zu "
+          "min-worker-state-bytes=%zu max-worker-state-bytes=%zu\n",
+          memoryWriterCount, memoryWriteBytes, *stateLimits.first, *stateLimits.second);
 }
 
 
@@ -441,10 +532,11 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
     workers.workerTasks_[static_cast<size_t>(owner)].push_back(taskId);
   }
 
-  buildRegisterUpdates(graph, workers, workerCount, resetChunk);
+  buildStateUpdates(graph, workers, workerCount, resetChunk);
 
-  // Async-reset registers retain their mid-cycle rendezvous. Normal and
-  // synchronous-reset registers were moved to the cycle-start phase above.
+  // Async-reset registers retain their mid-cycle rendezvous. Normal registers,
+  // synchronous-reset registers, and memory writes use the cycle-start state
+  // phase built above.
   int resetId = 0;
   for (SuperNode* super : graph.allReset) {
     if (super->resetNode->status == CONSTANT_NODE) continue;

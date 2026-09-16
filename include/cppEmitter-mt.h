@@ -31,7 +31,7 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
   void emitClassMembers(FILE* header) const;
   void emitConstructorInit();
   void emitConstructorStart();
-  void emitRegisterInitialization();
+  void emitStateInitialization();
   void emitDefinitions();
   void emitStep();
   bool isTaskLocal(Node* node) const;
@@ -43,7 +43,7 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
 
  private:
   using Task = MtTask;
-  using RegisterUpdate = MtRegisterUpdate;
+  using StateUpdate = MtStateUpdate;
   using Reset = MtReset;
   using ResetJoin = MtResetJoin;
 
@@ -52,7 +52,7 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
                              const std::vector<Reset::Instruction>& body, int chunkCount);
   void emitResetFunction(const Reset& reset);
   void emitAsyncResetWorkerFunction(const Reset& reset, const Reset::Worker& worker);
-  void emitRegisterUpdateFunction(const RegisterUpdate& update);
+  void emitStateUpdateFunction(const StateUpdate& update);
   void emitInstructions(const std::vector<InstInfo>& instructions, int indent);
   void emitTask(const Task& task, int indent);
   void buildRegisterStorageNames();

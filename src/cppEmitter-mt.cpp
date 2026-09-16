@@ -114,7 +114,7 @@ std::string CppEmitterMt::packedRegisterName(Node* node) const {
 void CppEmitterMt::buildRegisterStorageNames() {
   packedRegisterNames_.clear();
   packedRegisterNamesByText_.clear();
-  for (const RegisterUpdate& update : registerUpdates_) {
+  for (const StateUpdate& update : stateUpdates_) {
     const std::string source = "mtRegisterSrcW" + std::to_string(update.worker) + ".";
     const std::string destination = "mtRegisterDstW" + std::to_string(update.worker) + ".";
     for (Node* reg : update.registers) {
@@ -200,14 +200,14 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
           graph_.name.c_str());
   fprintf(header, "alignas(64) MtReadyToken mtReadyTokens[%d];\n", readySlotCount_);
   fprintf(header, "MtDoneFlag mtDoneFlags[%d];\n", std::max(1, workerCount_ - 1));
-  fprintf(header, "MtDoneFlag mtRegisterDoneFlags[%d];\n", std::max(1, workerCount_ - 1));
-  fprintf(header, "MtDoneFlag mtRegistersReady;\n");
+  fprintf(header, "MtDoneFlag mtStateDoneFlags[%d];\n", std::max(1, workerCount_ - 1));
+  fprintf(header, "MtDoneFlag mtStateReady;\n");
   fprintf(header, "std::vector<std::thread> mtThreads;\n");
   fprintf(header, "alignas(64) std::atomic<uint64_t> mtGeneration{0};\n");
   fprintf(header, "alignas(64) std::atomic<int> mtReadyWorkers{0};\n");
   fprintf(header, "alignas(64) std::atomic<bool> mtStop{false};\n");
   fprintf(header, "bool mtEnabled = false;\n");
-  for (const RegisterUpdate& update : registerUpdates_) {
+  for (const StateUpdate& update : stateUpdates_) {
     fprintf(header, "struct MtRegisterBlockW%d {\n", update.worker);
     if (update.registers.empty()) {
       fprintf(header, "  uint8_t unused;\n");
@@ -229,6 +229,21 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
              reg->name.c_str(), reg->isArray(), reg->width);
       fprintf(header, "%s %s$RESET{};\n", widthUType(reg->width).c_str(),
               reg->name.c_str());
+    }
+    for (Node* writer : update.memoryWriters) {
+      fprintf(header, "alignas(64) uint64_t %s{};\n",
+              mtMemoryWriteAddressName(writer).c_str());
+      fprintf(header, "%s %s", widthUType(writer->width).c_str(),
+              mtMemoryWriteDataName(writer).c_str());
+      for (int dimension : writer->dimension) {
+        fprintf(header, "[%d]", upperPower2(dimension));
+      }
+      fprintf(header, "{};\n");
+      fprintf(header, "uint8_t %s", mtMemoryWriteValidName(writer).c_str());
+      for (int dimension : writer->dimension) {
+        fprintf(header, "[%d]", upperPower2(dimension));
+      }
+      fprintf(header, "{};\n");
     }
   }
   for (int worker = 0; worker < workerCount_; ++worker) {
@@ -256,10 +271,10 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
   fprintf(header, "void mtInit();\nvoid mtStart();\nvoid mtStopWorkers();\n");
   fprintf(header, "void mtWorkerLoop(int worker);\nvoid mtRunWorker(int worker, uint8_t parity);\n");
   fprintf(header, "void mtPinWorker(int worker);\nvoid stepMt();\n");
-  for (const RegisterUpdate& update : registerUpdates_) {
-    fprintf(header, "void mtUpdateRegistersW%d();\n", update.worker);
+  for (const StateUpdate& update : stateUpdates_) {
+    fprintf(header, "void mtUpdateStateW%d();\n", update.worker);
     for (int chunk = 1; chunk <= update.chunkCount; ++chunk) {
-      fprintf(header, "void mtUpdateRegistersW%d_c%d();\n", update.worker, chunk);
+      fprintf(header, "void mtUpdateStateW%d_c%d();\n", update.worker, chunk);
     }
   }
   for (const Reset& reset : resets_) {
@@ -295,14 +310,20 @@ void CppEmitterMt::emitConstructorStart() {
   }
 }
 
-void CppEmitterMt::emitRegisterInitialization() {
+void CppEmitterMt::emitStateInitialization() {
   if (!enabled()) return;
-  for (const RegisterUpdate& update : registerUpdates_) {
-    if (update.registers.empty()) continue;
-    const std::string source = "mtRegisterSrcW" + std::to_string(update.worker);
-    const std::string destination = "mtRegisterDstW" + std::to_string(update.worker);
-    emitText(1, false, "memset(&" + source + ", 0, sizeof(" + source + "));\n");
-    emitText(1, false, "memset(&" + destination + ", 0, sizeof(" + destination + "));\n");
+  for (const StateUpdate& update : stateUpdates_) {
+    if (!update.registers.empty()) {
+      const std::string source = "mtRegisterSrcW" + std::to_string(update.worker);
+      const std::string destination = "mtRegisterDstW" + std::to_string(update.worker);
+      emitText(1, false, "memset(&" + source + ", 0, sizeof(" + source + "));\n");
+      emitText(1, false,
+               "memset(&" + destination + ", 0, sizeof(" + destination + "));\n");
+    }
+    for (Node* writer : update.memoryWriters) {
+      const std::string valid = mtMemoryWriteValidName(writer);
+      emitText(1, false, "memset(&" + valid + ", 0, sizeof(" + valid + "));\n");
+    }
   }
 }
 
@@ -374,8 +395,8 @@ void CppEmitterMt::emitAsyncResetWorkerFunction(const Reset& reset,
                         "", worker.body, worker.chunkCount);
 }
 
-void CppEmitterMt::emitRegisterUpdateFunction(const RegisterUpdate& update) {
-  emitResetBodyFunction("mtUpdateRegistersW" + std::to_string(update.worker), "",
+void CppEmitterMt::emitStateUpdateFunction(const StateUpdate& update) {
+  emitResetBodyFunction("mtUpdateStateW" + std::to_string(update.worker), "",
                         update.body, update.chunkCount);
 }
 
@@ -479,8 +500,8 @@ void CppEmitterMt::emitDefinitions() {
   if (!enabled()) return;
   const std::string className = "S" + graph_.name;
 
-  for (const RegisterUpdate& update : registerUpdates_) {
-    emitRegisterUpdateFunction(update);
+  for (const StateUpdate& update : stateUpdates_) {
+    emitStateUpdateFunction(update);
   }
 
   for (const Reset& reset : resets_) {
@@ -667,20 +688,20 @@ void CppEmitterMt::emitDefinitions() {
   runtime += "void " + className + "::mtRunWorker(int worker, uint8_t parity) {\n";
   runtime += "  switch (worker) {\n";
   for (int worker = 0; worker < workerCount_; ++worker) {
-    runtime += "    case " + std::to_string(worker) + ": mtUpdateRegistersW" +
+    runtime += "    case " + std::to_string(worker) + ": mtUpdateStateW" +
                std::to_string(worker) + "(); break;\n";
   }
   runtime += "    default: abort();\n  }\n";
   runtime +=
       "  if (worker == 0) {\n"
       "    for (int other = 1; other < kMtWorkerCount; ++other) {\n"
-      "      while (mtRegisterDoneFlags[other - 1].parity.load(std::memory_order_acquire) != parity)\n"
+      "      while (mtStateDoneFlags[other - 1].parity.load(std::memory_order_acquire) != parity)\n"
       "        __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
       "    }\n"
-      "    mtRegistersReady.parity.store(parity, std::memory_order_release);\n"
+      "    mtStateReady.parity.store(parity, std::memory_order_release);\n"
       "  } else {\n"
-      "    mtRegisterDoneFlags[worker - 1].parity.store(parity, std::memory_order_release);\n"
-      "    while (mtRegistersReady.parity.load(std::memory_order_acquire) != parity)\n"
+      "    mtStateDoneFlags[worker - 1].parity.store(parity, std::memory_order_release);\n"
+      "    while (mtStateReady.parity.load(std::memory_order_acquire) != parity)\n"
       "      __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
       "  }\n";
   runtime += "  const MtDispatch* entries = nullptr; uint32_t count = 0;\n  switch (worker) {\n";
@@ -1095,7 +1116,7 @@ void graph::cppEmitterMt() {
   emitBodyLock(0, "#else\n" // RANDOMIZE_INIT
                "  memset(&_var_start, 0, &_var_end - &_var_start);\n"
                "#endif\n");
-  mtEmitter.emitRegisterInitialization();
+  mtEmitter.emitStateInitialization();
 
   fprintf(header, "S%s();\n", name.c_str());
   fprintf(header, "void init();\n");
