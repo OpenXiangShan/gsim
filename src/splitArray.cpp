@@ -562,8 +562,15 @@ void graph::checkNodeSplit(Node* node) {
 /* splitted separately assigned, no variable index acceesing arrays */
 void graph::splitOptionalArray() {
   int num = 0;
-  for (Node* node : fullyVisited) {
-    checkNodeSplit(node);
+  // Determinism: checkNodeSplit marks arraySplitMap entries while iterating
+  // fullyVisited (pointer-ordered std::set) - the MARK ORDER is allocation-
+  // dependent even though the final marked SET is not. Iterate in name order.
+  {
+    std::vector<Node*> fv(fullyVisited.begin(), fullyVisited.end());
+    std::sort(fv.begin(), fv.end(), [](const Node* a, const Node* b){ return a->name < b->name; });
+    for (Node* node : fv) {
+      checkNodeSplit(node);
+    }
   }
   regsrc.erase(
     std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
