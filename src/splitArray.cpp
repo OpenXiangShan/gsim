@@ -380,8 +380,14 @@ void graph::splitArrayNode(Node* node) {
     if (n->resetTree) n->resetTree->updateWithSplittedArray(n, node, arrayMember);
   }
 
+  // Two passes, not an interleave: updateDep(R) propagates dep edges through
+  // R->next, which is only complete after EVERY consumer's updateConnect has
+  // run. Interleaving connect/dep made the propagated dep-edge set depend on
+  // iteration order (consumers sorting after their reg were silently missed).
   for (Node* n : checkNodes) {
     n->updateConnect();
+  }
+  for (Node* n : checkNodes) {
     if (n->type == NODE_REG_SRC) {
       n->updateDep();
     }

@@ -1644,8 +1644,16 @@ graph* AST2Graph(PNode* root) {
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     it->second->invalidArrayOptimize();
   }
+  // Two passes, not an interleave: updateDep(R) propagates ASYRESET dep
+  // edges through R->next, which is only complete after every consumer's
+  // updateConnect (updatePrevNext) has run. Interleaving them made the
+  // propagated dep-edge set depend on node iteration order (name order
+  // happens to place $NEXT nodes before their regs, but any consumer sorting
+  // after its reg was silently missed by the propagation).
   for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     updatePrevNext(it->second);
+  }
+  for (auto it = allSignals.begin(); it != allSignals.end(); it ++) {
     if (it->second->type == NODE_REG_SRC) it->second->updateDep();
   }
 
