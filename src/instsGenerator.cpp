@@ -1565,10 +1565,10 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       computeInfo->opNum = 1;
     }
 
-    MUX_DEBUG(printf("  %p(node) width %d info->width %d status %d val %s sameConstant %d opNum %d instsNum %ld %p\n", this, width, computeInfo->width, computeInfo->status, computeInfo->valStr.c_str(), computeInfo->sameConstant, computeInfo->opNum, computeInfo->insts.size(), computeInfo));
+    MUX_DEBUG(printf("  %p(node) width %d info->width %d status %d val %s sameConstant %d opNum %d %p\n", this, width, computeInfo->width, computeInfo->status, computeInfo->valStr.c_str(), computeInfo->sameConstant, computeInfo->opNum, computeInfo));
     for (size_t i = 0; i < computeInfo->memberInfo.size(); i ++) {
       if (computeInfo->memberInfo[i]) {
-        MUX_DEBUG(printf("idx %ld %s instNum %ld %p\n", i, computeInfo->memberInfo[i]->valStr.c_str(), computeInfo->memberInfo[i]->insts.size(), computeInfo->memberInfo[i]));
+        MUX_DEBUG(printf("idx %ld %s %p\n", i, computeInfo->memberInfo[i]->valStr.c_str(), computeInfo->memberInfo[i]));
       }
     }
     return computeInfo;
@@ -1630,7 +1630,7 @@ valInfo* ENode::compute(Node* n, std::string lvalue, bool isRoot) {
       Assert(0, "invalid opType %d\n", opType);
       Panic();
   }
-  MUX_DEBUG(printf("  %p %s op %d width %d val %s status %d sameConstant %d instsNum %ld opNum %d %p\n", this, n ? n->name.c_str() : "null", opType, width, computeInfo->valStr.c_str(), computeInfo->status, computeInfo->sameConstant, computeInfo->insts.size(), computeInfo->opNum, computeInfo));
+  MUX_DEBUG(printf("  %p %s op %d width %d val %s status %d sameConstant %d opNum %d %p\n", this, n ? n->name.c_str() : "null", opType, width, computeInfo->valStr.c_str(), computeInfo->status, computeInfo->sameConstant, computeInfo->opNum, computeInfo));
   return computeInfo;
 
 }
