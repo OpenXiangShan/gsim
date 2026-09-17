@@ -88,15 +88,19 @@ bool point2self(Node* node) {
 }
 
 Node* getSplitArray(graph* g) {
-  /* array points to itself */
-  for (Node* node : partialVisited) {
-    if (node->isArray() && node->next.find(node) != node->next.end()) return node; // point to self directly
+  /* Determinism: partialVisited is a pointer-ordered std::set, so the CHOICE
+     among tied candidates depended on allocation addresses. Iterate candidates
+     in NAME order (names are unique -> pure function of the graph). */
+  std::vector<Node*> candidates;
+  for (Node* node : partialVisited) if (node->isArray()) candidates.push_back(node);
+  std::sort(candidates.begin(), candidates.end(), [](const Node* a, const Node* b){ return a->name < b->name; });
+  for (Node* node : candidates) {
+    if (node->next.find(node) != node->next.end()) return node; // point to self directly
   }
 
-  for (Node* node : partialVisited) {
-    if (node->isArray() && point2self(node)) return node;
+  for (Node* node : candidates) {
+    if (point2self(node)) return node;
   }
-
   for (Node* node : g->halfConstantArray) {
     if (fullyVisited.find(node) != fullyVisited.end() || splitArrayMap.find(node) != splitArrayMap.end()) continue;
     if (point2self(node)) return node;
