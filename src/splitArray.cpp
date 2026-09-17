@@ -352,21 +352,29 @@ void graph::splitArrayNode(Node* node) {
     }
   }
 
-  std::set<Node*> checkNodes;
+  // Determinism fix: a pointer-ordered std::set here makes the
+  // updateConnect/updateDep/updateWithSplittedArray iteration order
+  // allocation-dependent -> super construction order -> SuperNode id
+  // assignment -> DFS seed stack order. Collect into the pointer set (cheap
+  // dedup) but iterate in NAME order so repeated runs of the same FIR
+  // produce identical output.
+  std::set<Node*> checkNodesSet;
   /* construct connections */
   if ((node->type == NODE_REG_SRC || node->type == NODE_REG_DST) && splitArrayMap.find(node->getBindReg()) != splitArrayMap.end()) {
     Node* regBind = node->getBindReg();
     for (Node* member : splitArrayMap[regBind]) {
-      checkNodes.insert(member);
+      checkNodesSet.insert(member);
     }
   }
   for (Node* member : arrayMember) {
-    checkNodes.insert(member);
+    checkNodesSet.insert(member);
   }
   for (Node* next : node->depNext) {
-    checkNodes.insert(next);
+    checkNodesSet.insert(next);
     if (next != node) next->erasePrev(node);
   }
+  std::vector<Node*> checkNodes(checkNodesSet.begin(), checkNodesSet.end());
+  std::sort(checkNodes.begin(), checkNodes.end(), [](const Node* a, const Node* b) { return a->name < b->name; });
   for (Node* n : checkNodes) {
     for (ExpTree* tree : n->assignTree) tree->updateWithSplittedArray(n, node, arrayMember);
     if (n->resetTree) n->resetTree->updateWithSplittedArray(n, node, arrayMember);
