@@ -14,7 +14,6 @@ class StmtTree;
 enum class MtTaskKind : uint8_t {
   Normal,
   ExtModule,
-  AsyncReset,
 };
 
 struct MtTask {
@@ -27,7 +26,6 @@ struct MtTask {
   StmtTree* stmtTree = nullptr;
   std::unordered_set<Node*> localNodes;
   MtTaskKind kind = MtTaskKind::Normal;
-  Node* resetNode = nullptr;
   int globalNodeCount = 0;
   int cost = 0;
   int owner = 0;
@@ -50,6 +48,7 @@ struct MtTaskPlan {
 class MtTaskPartitioner {
  public:
   static void build(graph& graph, MtTaskPlan& plan, int targetTasks);
+  static void removeAsyncResetDependencies(graph& graph);
 };
 
 #endif

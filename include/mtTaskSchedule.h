@@ -19,26 +19,10 @@ struct MtReset {
     std::string text;
   };
 
-  struct Worker {
-    int id = -1;
-    int chunkCount = 0;
-    std::vector<Instruction> body;
-  };
-
   SuperNode* super = nullptr;
   int id = -1;
-  bool asynchronous = false;
   int chunkCount = 0;
-  int triggerTask = -1;
-  int triggerOwner = -1;
   std::vector<Instruction> body;
-  std::vector<Worker> workers;
-  std::vector<int> participants;
-};
-
-struct MtResetJoin {
-  int resetId = -1;
-  size_t beforePosition = 0;
 };
 
 struct MtStateUpdate {
@@ -58,8 +42,6 @@ struct MtWorkerPlan {
   std::vector<int> storeSlots_;
   std::vector<MtStateUpdate> stateUpdates_;
   std::vector<MtReset> resets_;
-  std::vector<std::vector<MtResetJoin>> resetJoins_;
-  std::map<Node*, int> asyncResetIds_;
 };
 
 class MtWorkerBuilder {

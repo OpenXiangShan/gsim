@@ -165,7 +165,8 @@ void StmtTree::mergeExpTree(ExpTree* tree, std::vector<int>& prevPath, std::vect
         Node* node = tree->getlval()->getNode();
         Assert(stmtNode->type == OP_STMT_SEQ, "stmtNode %d is not seq", stmtNode->type);
         /* For non-array, first try to deduplicate it. Avoid xxx = yyy; ... ... xxx = zzz; */
-        if (!node->isArray() && enode->opType != OP_INVALID) {
+        if (!node->isArray() && enode->opType != OP_INVALID &&
+            !(globalConfig.MtMode && node->type == NODE_READWRITER)) {
           for (int i = 0; i < stmtNode->getChildNum(); i ++) {
             StmtNode* child = stmtNode->getChild(i);
             if (child->type == OP_STMT_NODE) {

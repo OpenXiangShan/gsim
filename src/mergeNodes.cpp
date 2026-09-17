@@ -261,8 +261,9 @@ void graph::mergeResetAll() {
     if (asyncSuper->member.size() != 0) {
       allReset.push_back(asyncSuper);
       iter.first->setAsyncReset();
-      /* Keep special super types such as extmodules on their own emit path. */
-      if (iter.first->super->superType == SUPER_VALID) {
+      /* MT handles async reset speculatively at cycle end, so its trigger stays
+       * a normal task. The active emitter retains the mid-cycle reset point. */
+      if (!globalConfig.MtMode && iter.first->super->superType == SUPER_VALID) {
         iter.first->super->superType = SUPER_ASYNC_RESET;
         iter.first->super->resetNode = asyncSuper->resetNode;
       }

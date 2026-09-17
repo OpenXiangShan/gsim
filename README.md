@@ -32,8 +32,8 @@ GSIM accepts chirrtl, and compiles it to C++
 the multithreaded dense emitter. Generate an MT model with a fixed worker count:
 
 ```
-GSIM_THREADS=4 GSIM_MT_DENSE_VCONTRACT_MAXMT=256 \
-  build/gsim/gsim --mt-mode=on \
+GSIM_THREADS=4 \
+  build/gsim/gsim --mt-mode=on --mt-target-tasks=256 \
   --dir out/model design.fir
 ```
 
@@ -44,6 +44,10 @@ Makefile targets. Per-signal comparison uses an independently generated single-t
 
 See [Multithreaded C++ Emitter Design and Usage](docs/multithreaded-emitter.md) for the scheduler,
 runtime synchronization protocol, XiangShan workflow, correctness tests, and tuning guidance.
+
+For an end-to-end description of the simulator, including CHIRRTL parsing, graph optimization,
+the single-thread active backend, and the multithreaded dense backend, see
+[GSIM Simulator Work Principle](docs/simulator-work-principle.md).
 
 ## Debug logs & dumps
 

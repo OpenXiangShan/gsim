@@ -36,7 +36,7 @@ Node 依赖图 -> 直接 MTask 收缩 -> 静态 MTask -> 固定 worker chain
 | --- | --- |
 | `src/mtTaskPartition.cpp` | 从 Node 边直接建立候选 MTask、执行收缩和拓扑排序 |
 | `include/mtTaskPartition.h` | MTask 结构和 partition builder 接口 |
-| `src/mtTaskSchedule.cpp` | worker owner 分配、并行状态提交、token 表和异步 reset 规划 |
+| `src/mtTaskSchedule.cpp` | worker owner 分配、并行状态提交、token 表和异步 reset replay 规划 |
 | `include/mtTaskSchedule.h` | worker、token、reset 计划结构和 builder 接口 |
 | `src/mtTaskLowering.cpp` | 将 MTask 成员合并为一个 `StmtTree` 和 `InstInfo` 流 |
 | `src/cppEmitter-mt.cpp` | 消费 task/worker 计划，生成 MT C++ 类、dispatch 表和线程池 |
@@ -77,7 +77,7 @@ MT 后端不再调用单线程的 `generateStmtTree()` 和 `instsGenerator()`。
 9. 将所有直接使用者都在当前 MTask、且不被 reset helper 引用的普通标量中间节点标记为 task-local。
 10. 使用 lowering 后的指令数重新估计任务成本，再进行 worker 调度、状态提交分配和 token 规划。
 
-`StmtTree` 的 `prevPath` 约束覆盖同一 MTask 内的 Node 依赖。因此，无依赖节点可以提前并合并到相同条件分支中，有依赖节点则不能越过其前驱。extmodule 和异步 reset 候选组保持为独立 MTask，reset 辅助树仍独立构建，以保持外部调用和复位握手的位置。
+`StmtTree` 的 `prevPath` 约束覆盖同一 MTask 内的 Node 依赖。因此，无依赖节点可以提前并合并到相同条件分支中，有依赖节点则不能越过其前驱。extmodule 候选组保持为独立 MTask；异步 reset 不再形成特殊 MTask，其 reset 辅助树仅用于周期末慢路径。
 
 ### 3.1 输入数据
 
@@ -214,7 +214,7 @@ void STop::mtTaskN() {
 | 字段 | 含义 |
 | --- | --- |
 | `members` | 当前 MTask 的 Node，按 task 内依赖拓扑排序 |
-| `kind/resetNode` | 普通、extmodule、异步 reset 类型及 reset 触发节点 |
+| `kind` | 普通或 extmodule task 类型 |
 | `stmtTree/insts` | MTask 级语句树和 lowering 后的指令流 |
 | `localNodes` | 仅在当前 MTask 内使用、可从模型成员降为函数局部量的节点 |
 | `workerLocalOwners_` | 跨多个 MTask 但只被同一个 worker 使用的节点及其 owner |
@@ -496,8 +496,24 @@ reset 时不再逐寄存器执行标量赋值，reset 分支同时更新 next-st
 保留。若 reset 信号本身是寄存器，则 `stepMt()` 在发布 generation 前保存 `$RESET`，避免
 并行更新时读取正在被其他 worker 改写的 reset 源。
 
-异步复位仍使用原来的 trigger/join/done/release rendezvous，可在 MTask chain 中间更新其
-寄存器；异步复位寄存器不进入周期起始的同步寄存器提交部分。
+### 异步 Reset
+
+正常周期按异步 reset 不触发执行。MT partition 在公共优化完成后删除 async reset condition
+和 reset value 引入的调度边，运行时也不生成 trigger/join/done/release rendezvous。所有
+worker 完成正常 MTask 后，worker 0 检查每个异步 reset 信号。
+
+若没有信号为高，直接提交本周期 deferred printf/assert。若任一信号为高，则进入罕见慢路径：
+
+1. 丢弃所有 worker 首轮记录的 printf/assert；
+2. 执行所有当前为高的 async reset body，同时更新对应寄存器 `src` 和 `dst`；
+3. replay 每个 memory writer task，以新的写使能直接覆盖该端口的 pending-write valid；
+4. 按全局拓扑 task ID 串行重算普通节点、输出和寄存器 `dst`；
+5. 提交 replay 产生的 printf/assert。
+
+extmodule task 不在 replay 中重复调用，保留首轮计算出的输出，以避免 DPI/external helper
+副作用执行两次。memory 真正状态只在周期开始提交；writer task 无条件计算 address/data，并将
+pending valid 直接赋值为完整写使能，因此 replay 不需要额外遍历并清除全部 memory writer。
+异步复位寄存器仍不进入周期起始的普通寄存器块提交。
 
 大型设计的寄存器、memory 提交或异步 reset 指令可能形成非常大的 C++ 函数。默认情况下，
 `GSIM_EMIT_RESET_CHUNK=4096` 会在控制嵌套深度为 0 的位置拆分 body，生成

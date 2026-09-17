@@ -15,6 +15,43 @@ namespace {
 constexpr size_t kMaxNodesPerGroup = 7000;
 constexpr size_t kMaxSiblingNodes = 30;
 
+void removeAsyncResetDependenciesFromNodes(graph& graph) {
+  for (Node* reg : graph.regsrc) {
+    if (reg->status != VALID_NODE || reg->reset != ASYRESET || reg->resetTree == nullptr) {
+      continue;
+    }
+    Assert(reg->resetTree->getRoot()->opType == OP_RESET,
+           "invalid async reset tree for %s", reg->name.c_str());
+
+    std::set<Node*> conditionNodes;
+    getENodeRelyNodes(reg->resetTree->getRoot()->getChild(0), conditionNodes);
+    for (Node* condition : conditionNodes) {
+      reg->depNext.erase(condition);
+      condition->depPrev.erase(reg);
+      for (Node* consumer : reg->next) {
+        consumer->depPrev.erase(condition);
+        condition->depNext.erase(consumer);
+      }
+      if (reg->regSplit && reg->getDst() != nullptr) {
+        reg->getDst()->depPrev.erase(condition);
+        condition->depNext.erase(reg->getDst());
+      }
+    }
+
+    std::set<Node*> valueNodes;
+    getENodeRelyNodes(reg->resetTree->getRoot()->getChild(1), valueNodes);
+    for (Node* value : valueNodes) {
+      if (value->type == NODE_REG_SRC) {
+        reg->depNext.erase(value);
+        value->depPrev.erase(reg);
+      } else {
+        reg->depPrev.erase(value);
+        value->depNext.erase(reg);
+      }
+    }
+  }
+}
+
 int expressionOperationCount(const ExpTree* tree) {
   int operations = 0;
   std::stack<const ENode*> pending;
@@ -52,7 +89,6 @@ int groupCost(const std::vector<Node*>& members) {
 
 MtTaskKind taskKind(const SuperNode* super) {
   if (super->superType == SUPER_EXTMOD) return MtTaskKind::ExtModule;
-  if (super->superType == SUPER_ASYNC_RESET) return MtTaskKind::AsyncReset;
   return MtTaskKind::Normal;
 }
 
@@ -102,14 +138,12 @@ class DirectMTaskCoarsener {
   void initialize() {
     groups_.reserve(graph_.sortedSuper.size());
     for (SuperNode* super : graph_.sortedSuper) {
-      if (super->member.empty() && super->superType != SUPER_EXTMOD &&
-          super->superType != SUPER_ASYNC_RESET) {
+      if (super->member.empty() && super->superType != SUPER_EXTMOD) {
         continue;
       }
       Group group;
       group.members = super->member;
       group.kind = taskKind(super);
-      group.resetNode = super->resetNode;
       group.orderKey = reinterpret_cast<uintptr_t>(super);
       group.topologyKey = super->id;
       const int id = static_cast<int>(groups_.size());
@@ -653,7 +687,6 @@ class DirectMTaskCoarsener {
         flush();
         current.members = group.members;
         current.kind = group.kind;
-        current.resetNode = group.resetNode;
         current.cost = cost;
         flush();
         continue;
@@ -702,5 +735,10 @@ class DirectMTaskCoarsener {
 void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int targetTasks) {
   graph.orderAllNodes();
   graph.mergeResetAll();
+  removeAsyncResetDependencies(graph);
   DirectMTaskCoarsener(graph).build(plan, targetTasks);
+}
+
+void MtTaskPartitioner::removeAsyncResetDependencies(graph& graph) {
+  removeAsyncResetDependenciesFromNodes(graph);
 }

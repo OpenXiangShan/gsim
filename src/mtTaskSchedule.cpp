@@ -18,7 +18,7 @@ int loweredTaskCost(const MtTask& task) {
 
 bool taskEmitsCode(const MtTask& task) {
   if (task.insts != nullptr && !task.insts->empty()) return true;
-  return task.kind == MtTaskKind::ExtModule || task.kind == MtTaskKind::AsyncReset;
+  return task.kind == MtTaskKind::ExtModule;
 }
 
 void compactEmptyTasks(MtTaskPlan& plan) {
@@ -219,10 +219,6 @@ void appendMemoryCommit(MtStateUpdate& update, Node* port) {
   for (size_t dimension = 0; dimension < port->dimension.size(); ++dimension) {
     update.body.push_back({static_cast<uint8_t>(SUPER_INFO_DEDENT), "}"});
   }
-  const std::string validBase = mtMemoryWriteValidName(port);
-  update.body.push_back(
-      {static_cast<uint8_t>(SUPER_INFO_STR),
-       "memset(&" + validBase + ", 0, sizeof(" + validBase + "));"});
 }
 
 template <typename Instruction>
@@ -534,9 +530,8 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
 
   buildStateUpdates(graph, workers, workerCount, resetChunk);
 
-  // Async-reset registers retain their mid-cycle rendezvous. Normal registers,
-  // synchronous-reset registers, and memory writes use the cycle-start state
-  // phase built above.
+  // Async reset is checked after the speculative task pass. Its body is kept
+  // independent of worker ownership because the rare replay path is serial.
   int resetId = 0;
   for (SuperNode* super : graph.allReset) {
     if (super->resetNode->status == CONSTANT_NODE) continue;
@@ -544,88 +539,21 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
     MtReset reset;
     reset.super = super;
     reset.id = resetId++;
-    reset.asynchronous = super->superType == SUPER_ASYNC_RESET;
-    Assert(reset.asynchronous, "non-async reset entered async reset planner");
-
-    auto triggerTask = tasks.taskByNode_.find(super->resetNode);
-    Assert(triggerTask != tasks.taskByNode_.end(),
-           "missing trigger MTask for async reset %s", super->resetNode->name.c_str());
-    reset.triggerTask = triggerTask->second;
-    Assert(reset.triggerTask >= 0, "missing trigger MTask for async reset %s",
-           super->resetNode->name.c_str());
-    reset.triggerOwner = tasks.tasks_[static_cast<size_t>(reset.triggerTask)].owner;
-
-    std::map<int, std::vector<Node*>> membersByWorker;
     for (Node* member : super->member) {
       Assert(member->type == NODE_REG_RESET, "invalid async reset member %s",
              member->name.c_str());
-      Node* reg = member->getResetSrc();
-      int owner = reset.triggerOwner;
-      auto findOwner = [&](Node* candidate) {
-        if (candidate == nullptr) return -1;
-        auto task = tasks.taskByNode_.find(candidate);
-        return task != tasks.taskByNode_.end()
-                   ? tasks.tasks_[static_cast<size_t>(task->second)].owner
-                   : -1;
-      };
-      int registerOwner = findOwner(reg);
-      if (registerOwner < 0 && reg->regSplit && reg->getDst()->status == VALID_NODE) {
-        registerOwner = findOwner(reg->getDst());
-      }
-      if (registerOwner >= 0) owner = registerOwner;
-      membersByWorker[owner].push_back(member);
     }
-
-    for (const auto& entry : membersByWorker) {
-      std::vector<InstInfo> instructions = buildResetInstructions(entry.second);
-      const auto range = resetBodyRange(instructions, super->resetNode);
-      Assert(range.first == 1 && range.second + 1 == instructions.size(),
-             "async reset %s does not have a single outer reset condition",
-             super->resetNode->name.c_str());
-      MtReset::Worker worker;
-      worker.id = entry.first;
-      for (size_t i = range.first; i < range.second; ++i) {
-        worker.body.push_back(
-            {static_cast<uint8_t>(instructions[i].infoType), instructions[i].inst});
-      }
-      worker.chunkCount = countResetChunks(worker.body, resetChunk);
-      reset.workers.push_back(std::move(worker));
+    std::vector<InstInfo> instructions = buildResetInstructions(super->member);
+    const auto range = resetBodyRange(instructions, super->resetNode);
+    Assert(range.first == 1 && range.second + 1 == instructions.size(),
+           "async reset %s does not have a single outer reset condition",
+           super->resetNode->name.c_str());
+    for (size_t i = range.first; i < range.second; ++i) {
+      reset.body.push_back(
+          {static_cast<uint8_t>(instructions[i].infoType), instructions[i].inst});
     }
-
-    for (int worker = 0; worker < workerCount; ++worker) {
-      if (worker == reset.triggerOwner) continue;
-      const std::vector<int>& chain = workers.workerTasks_[static_cast<size_t>(worker)];
-      const bool ownsResetState = membersByWorker.find(worker) != membersByWorker.end();
-      auto position = std::upper_bound(chain.begin(), chain.end(), reset.triggerTask);
-      if (position == chain.end() && !ownsResetState) continue;
-      reset.participants.push_back(worker);
-    }
-
-    workers.asyncResetIds_[super->resetNode] = reset.id;
+    reset.chunkCount = countResetChunks(reset.body, resetChunk);
     workers.resets_.push_back(std::move(reset));
-  }
-
-  // A remote worker rendezvous before its first post-trigger task. This keeps
-  // pre-trigger work ahead of reset and prevents post-trigger work from seeing
-  // partially reset state.
-  workers.resetJoins_.assign(static_cast<size_t>(workerCount), std::vector<MtResetJoin>());
-  for (const MtReset& reset : workers.resets_) {
-    if (!reset.asynchronous) continue;
-    for (int worker : reset.participants) {
-      const std::vector<int>& chain = workers.workerTasks_[static_cast<size_t>(worker)];
-      const auto position = std::upper_bound(chain.begin(), chain.end(), reset.triggerTask);
-      workers.resetJoins_[static_cast<size_t>(worker)].push_back(
-          {reset.id, static_cast<size_t>(position - chain.begin())});
-    }
-  }
-  for (std::vector<MtResetJoin>& joins : workers.resetJoins_) {
-    std::sort(joins.begin(), joins.end(), [&](const MtResetJoin& lhs, const MtResetJoin& rhs) {
-      if (lhs.beforePosition != rhs.beforePosition) return lhs.beforePosition < rhs.beforePosition;
-      const int lhsTrigger = workers.resets_[static_cast<size_t>(lhs.resetId)].triggerTask;
-      const int rhsTrigger = workers.resets_[static_cast<size_t>(rhs.resetId)].triggerTask;
-      if (lhsTrigger != rhsTrigger) return lhsTrigger < rhsTrigger;
-      return lhs.resetId < rhs.resetId;
-    });
   }
 
   struct TokenGroup {

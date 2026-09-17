@@ -22,6 +22,72 @@ int taskForNode(const Node* node, const MtTaskPlan& plan) {
   return found == plan.taskByNode_.end() ? -1 : found->second;
 }
 
+ENode* combineMtWriteCondition(ENode* lhs, ENode* rhs) {
+  if (lhs == nullptr) return rhs;
+  ENode* condition = new ENode(OP_AND);
+  condition->setWidth(1, false);
+  condition->addChild(lhs);
+  condition->addChild(rhs);
+  return condition;
+}
+
+ENode* negateMtWriteCondition(ENode* condition) {
+  ENode* result = new ENode(OP_NOT);
+  result->setWidth(1, false);
+  result->addChild(condition);
+  return result;
+}
+
+void collectMtMemoryWrites(ENode* root, ENode* condition,
+                           std::vector<ENode*>& writes) {
+  if (root == nullptr) return;
+  if (root->opType == OP_WHEN || root->opType == OP_RESET) {
+    Assert(root->getChildNum() >= 2, "invalid conditional memory write");
+    ENode* branchCondition = root->getChild(0);
+    collectMtMemoryWrites(
+        root->getChild(1),
+        combineMtWriteCondition(condition == nullptr ? nullptr : condition->dup(),
+                                branchCondition->dup()),
+        writes);
+    if (root->getChildNum() >= 3) {
+      collectMtMemoryWrites(
+          root->getChild(2),
+          combineMtWriteCondition(condition == nullptr ? nullptr : condition->dup(),
+                                  negateMtWriteCondition(branchCondition->dup())),
+          writes);
+    }
+    return;
+  }
+  if (root->opType == OP_INVALID || root->opType == OP_EMPTY ||
+      root->opType == OP_READ_MEM) {
+    return;
+  }
+  Assert(root->opType == OP_WRITE_MEM,
+         "unexpected operation %d in MT memory writer", root->opType);
+  ENode* write = root->dup();
+  Assert(write->getChildNum() == 2, "MT memory writer already has an enable");
+  write->addChild(condition == nullptr ? allocIntEnode(1, "1") : condition->dup());
+  writes.push_back(write);
+}
+
+void makeMtMemoryWriteEnablesExplicit(MtTaskPlan& plan) {
+  for (MtTask& task : plan.tasks_) {
+    for (Node* node : task.members) {
+      if (node->type != NODE_WRITER && node->type != NODE_READWRITER) continue;
+      for (ExpTree* assignment : node->assignTree) {
+        std::vector<ENode*> writes;
+        collectMtMemoryWrites(assignment->getRoot(), nullptr, writes);
+        if (writes.empty()) continue;
+        Assert(writes.size() == 1,
+               "MT memory writer %s has %zu writes in one assignment tree",
+               node->name.c_str(), writes.size());
+        assignment->setRoot(writes.front());
+        assignment->clearInfo();
+      }
+    }
+  }
+}
+
 // generateStmtTree() restores direct expression dependencies for values whose
 // only consumer is in the same SuperNode. At MTask granularity the equivalent
 // scope is the complete task, so these edges may cross a SuperNode boundary but
@@ -48,6 +114,7 @@ void completeTaskLocalDependencies(graph& graph, MtTaskPlan& plan) {
     }
   }
   graph.connectDep();
+  MtTaskPartitioner::removeAsyncResetDependencies(graph);
 
   // A cross-task dependency discovered here would make the scheduler DAG that
   // was built before lowering stale.
@@ -265,6 +332,7 @@ void updateTaskRoots(const MtTaskPlan& plan) {
 void MtTaskLowerer::generateStmtTrees(graph& graph, MtTaskPlan& plan) {
   maxConcatNum = 0;
   completeTaskLocalDependencies(graph, plan);
+  makeMtMemoryWriteEnablesExplicit(plan);
   for (MtTask& task : plan.tasks_) orderTaskMembers(task);
   collectTaskLocalNodes(graph, plan);
 

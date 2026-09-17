@@ -1364,19 +1364,35 @@ valInfo* ENode::instsWriteMem(Node* node, std::string lvalue, bool isRoot) {
   }
 
   if (globalConfig.MtMode) {
+    Assert(getChildNum() == 3, "MT memory writer %s has no explicit enable",
+           node->name.c_str());
     const std::string address = mtMemoryWriteAddressName(node);
     const std::string data = mtMemoryWriteDataName(node) + indexStr;
     const std::string valid = mtMemoryWriteValidName(node) + indexStr;
+    const std::string enable = ChildInfo(2, valStr);
     ret->valStr = address + " = " + ChildInfo(0, valStr) + ";\n";
     if (isSubArray(lvalue, node)) {
-      ret->valStr += arrayCopy(data, node, Child(1, computeInfo),
-                               countArrayIndex(lvalue));
-      ret->valStr += "\nmemset(" + valid + ", 1, sizeof(" + valid + "));";
+      const int assignedDimensions = countArrayIndex(lvalue);
+      ret->valStr += arrayCopy(data, node, Child(1, computeInfo), assignedDimensions);
+      std::string suffix;
+      for (size_t dimension = static_cast<size_t>(assignedDimensions);
+           dimension < node->dimension.size(); ++dimension) {
+        const std::string index = "__gsim_mwv_i" + std::to_string(
+            dimension - static_cast<size_t>(assignedDimensions));
+        ret->valStr += "\nfor (int " + index + " = 0; " + index + " < " +
+                       std::to_string(node->dimension[dimension]) + "; ++" + index + ") {";
+        suffix += "[" + index + "]";
+      }
+      ret->valStr += "\n" + valid + suffix + " = " + enable + ";";
+      for (size_t dimension = static_cast<size_t>(assignedDimensions);
+           dimension < node->dimension.size(); ++dimension) {
+        ret->valStr += "\n}";
+      }
     } else {
       std::string value = ChildInfo(1, valStr);
       if (memory->width < width) value += " & " + bitMask(memory->width);
       ret->valStr += data + " = " + value + ";\n";
-      ret->valStr += valid + " = 1;";
+      ret->valStr += valid + " = " + enable + ";";
     }
     ret->opNum = -1;
     ret->type = TYPE_STMT;

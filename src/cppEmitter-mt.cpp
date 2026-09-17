@@ -197,12 +197,12 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
   fprintf(header, "static constexpr int kMtWorkerCount = %d;\n", workerCount_);
   fprintf(header, "struct MtReadyToken { std::atomic<uint8_t> value{0}; };\n");
   fprintf(header, "struct alignas(64) MtDoneFlag { std::atomic<uint8_t> parity{0}; };\n");
-  fprintf(header, "struct alignas(64) MtResetFlag { std::atomic<uint64_t> generation{0}; };\n");
   fprintf(header, "struct MtDispatch { void (S%s::*fn)(); uint32_t waitBegin, waitEnd, storeBegin, storeEnd; };\n",
           graph_.name.c_str());
   fprintf(header, "alignas(64) MtReadyToken mtReadyTokens[%d];\n", readySlotCount_);
   fprintf(header, "MtDoneFlag mtDoneFlags[%d];\n", std::max(1, workerCount_ - 1));
-  fprintf(header, "std::atomic<uint8_t> mtDeferredFailures[%d]{};\n", workerCount_);
+  fprintf(header, "std::vector<MtDeferredEvent> mtDeferredEventsByWorker[%d];\n",
+          workerCount_);
   fprintf(header, "MtDoneFlag mtStateDoneFlags[%d];\n", std::max(1, workerCount_ - 1));
   fprintf(header, "MtDoneFlag mtStateReady;\n");
   fprintf(header, "std::vector<std::thread> mtThreads;\n");
@@ -258,18 +258,11 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
     fprintf(header, "};\n");
     fprintf(header, "alignas(64) MtWorkerStateW%d mtWorkerStateW%d{};\n", worker, worker);
   }
-  const size_t resetCount = std::max<size_t>(1, resets_.size());
-  fprintf(header, "uint8_t mtAsyncResetValues[%zu]{};\n", resetCount);
-  fprintf(header, "MtResetFlag mtAsyncResetReady[%zu];\n", resetCount);
-  fprintf(header, "MtResetFlag mtAsyncResetRelease[%zu];\n", resetCount);
-  fprintf(header, "MtResetFlag mtAsyncResetDone[%zu];\n",
-          std::max<size_t>(1, resets_.size() * static_cast<size_t>(workerCount_)));
   fprintf(header, "static const uint32_t mtWaitSlots[%zu];\n", std::max<size_t>(1, waitSlots_.size()));
   fprintf(header, "static const uint32_t mtStoreSlots[%zu];\n", std::max<size_t>(1, storeSlots_.size()));
   for (int worker = 0; worker < workerCount_; ++worker) {
     fprintf(header, "static const MtDispatch mtDispatchW%d[%zu];\n", worker,
-            std::max<size_t>(1, workerTasks_[static_cast<size_t>(worker)].size() +
-                                   resetJoins_[static_cast<size_t>(worker)].size()));
+            std::max<size_t>(1, workerTasks_[static_cast<size_t>(worker)].size()));
   }
   fprintf(header, "void mtInit();\nvoid mtStart();\nvoid mtStopWorkers();\n");
   fprintf(header, "void mtWorkerLoop(int worker);\nvoid mtRunWorker(int worker, uint8_t parity);\n");
@@ -281,24 +274,14 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
     }
   }
   for (const Reset& reset : resets_) {
-    if (!reset.asynchronous) {
-      fprintf(header, "void subResetMt%d();\n", reset.id);
-      for (int chunk = 1; chunk <= reset.chunkCount; ++chunk) {
-        fprintf(header, "void subResetMt%d_c%d();\n", reset.id, chunk);
-      }
-      continue;
-    }
-    fprintf(header, "void mtTriggerAsyncReset%d(bool resetValue);\n", reset.id);
-    for (const Reset::Worker& worker : reset.workers) {
-      fprintf(header, "void subResetMt%dW%d();\n", reset.id, worker.id);
-      for (int chunk = 1; chunk <= worker.chunkCount; ++chunk) {
-        fprintf(header, "void subResetMt%dW%d_c%d();\n", reset.id, worker.id, chunk);
-      }
-    }
-    for (int worker : reset.participants) {
-      fprintf(header, "void mtJoinAsyncReset%dW%d();\n", reset.id, worker);
+    fprintf(header, "void subResetMt%d();\n", reset.id);
+    for (int chunk = 1; chunk <= reset.chunkCount; ++chunk) {
+      fprintf(header, "void subResetMt%d_c%d();\n", reset.id, chunk);
     }
   }
+  fprintf(header, "bool mtAnyAsyncResetAsserted();\n");
+  fprintf(header, "void mtApplyAsyncResets();\n");
+  fprintf(header, "void mtReplayAfterAsyncReset();\n");
   for (size_t taskId = 0; taskId < tasks_.size(); ++taskId) fprintf(header, "void mtTask%zu();\n", taskId);
   fprintf(header, "~S%s();\n", graph_.name.c_str());
 }
@@ -382,20 +365,9 @@ void CppEmitterMt::emitResetBodyFunction(const std::string& name, const std::str
   emitText(--indent, false, "}\n");
 }
 
-void CppEmitterMt::emitResetFunction(const Reset& reset) {
-  Assert(!reset.asynchronous, "async reset %d requires worker functions", reset.id);
-  Node* resetNode = reset.super->resetNode;
-  const std::string condition =
-      resetNode->type == NODE_REG_SRC ? resetNode->name + "$RESET" : resetNode->name;
-  emitResetBodyFunction("subResetMt" + std::to_string(reset.id), condition,
+void CppEmitterMt::emitAsyncResetFunction(const Reset& reset) {
+  emitResetBodyFunction("subResetMt" + std::to_string(reset.id), "",
                         reset.body, reset.chunkCount);
-}
-
-void CppEmitterMt::emitAsyncResetWorkerFunction(const Reset& reset,
-                                                const Reset::Worker& worker) {
-  emitResetBodyFunction("subResetMt" + std::to_string(reset.id) + "W" +
-                            std::to_string(worker.id),
-                        "", worker.body, worker.chunkCount);
 }
 
 void CppEmitterMt::emitStateUpdateFunction(const StateUpdate& update) {
@@ -459,44 +431,7 @@ void CppEmitterMt::emitTask(const Task& task, int indent) {
     }
   }
 
-  auto resetValueName = [](Node* resetNode) {
-    return resetNode->type == NODE_REG_SRC ? resetNode->name + "$RESET" : resetNode->name;
-  };
-  std::map<Node*, std::string> savedAsyncResetValues;
-  auto saveAsyncResetValue = [&](Node* resetNode) {
-    auto reset = asyncResetIds_.find(resetNode);
-    Assert(reset != asyncResetIds_.end(), "missing MT async reset for %s", resetNode->name.c_str());
-    std::string oldName = "__gsim_async_reset_old_" + std::to_string(reset->second);
-    if (savedAsyncResetValues.emplace(resetNode, oldName).second) {
-      emitText(indent, false, "uint8_t " + oldName + " = " + resetValueName(resetNode) + ";\n");
-    }
-  };
-  auto emitAsyncReset = [&](Node* resetNode) {
-    auto reset = asyncResetIds_.find(resetNode);
-    Assert(reset != asyncResetIds_.end(), "missing MT async reset for %s", resetNode->name.c_str());
-    auto oldValue = savedAsyncResetValues.find(resetNode);
-    Assert(oldValue != savedAsyncResetValues.end(), "missing old value for MT async reset %s", resetNode->name.c_str());
-    emitText(indent, false, "mtTriggerAsyncReset" + std::to_string(reset->second) + "(" +
-                                oldValue->second + " || " + resetValueName(resetNode) + ");\n");
-  };
-
-  if (task.kind == MtTaskKind::ExtModule) {
-    std::set<Node*> asyncResets;
-    for (size_t i = 1; i < task.members.size(); ++i) {
-      if (task.members[i]->isAsyncReset()) asyncResets.insert(task.members[i]);
-    }
-    for (Node* resetNode : asyncResets) saveAsyncResetValue(resetNode);
-    emitInstructions(*task.insts, indent);
-    for (Node* resetNode : asyncResets) emitAsyncReset(resetNode);
-    return;
-  }
-
-  if (task.kind == MtTaskKind::AsyncReset) {
-    Assert(task.resetNode != nullptr, "async reset MTask has no reset node");
-    saveAsyncResetValue(task.resetNode);
-  }
   emitInstructions(*task.insts, indent);
-  if (task.kind == MtTaskKind::AsyncReset) emitAsyncReset(task.resetNode);
 }
 
 void CppEmitterMt::emitDefinitions() {
@@ -508,68 +443,7 @@ void CppEmitterMt::emitDefinitions() {
   }
 
   for (const Reset& reset : resets_) {
-    if (!reset.asynchronous) {
-      emitResetFunction(reset);
-      continue;
-    }
-    for (const Reset::Worker& worker : reset.workers) {
-      emitAsyncResetWorkerFunction(reset, worker);
-    }
-
-    const auto workerReset = [&](int worker) -> const Reset::Worker* {
-      for (const Reset::Worker& candidate : reset.workers) {
-        if (candidate.id == worker) return &candidate;
-      }
-      return nullptr;
-    };
-
-    // Ready is published every cycle. The more expensive done/release barrier
-    // is entered only while reset is asserted.
-    emitText(0, true, "void " + className + "::mtTriggerAsyncReset" +
-                          std::to_string(reset.id) + "(bool resetValue) {\n");
-    emitText(1, false,
-             "const uint64_t generation = mtGeneration.load(std::memory_order_relaxed);\n");
-    emitText(1, false, "mtAsyncResetValues[" + std::to_string(reset.id) + "] = resetValue;\n");
-    emitText(1, false, "mtAsyncResetReady[" + std::to_string(reset.id) +
-                           "].generation.store(generation, std::memory_order_release);\n");
-    emitText(1, false, "if (!resetValue) return;\n");
-    if (workerReset(reset.triggerOwner) != nullptr) {
-      emitText(1, false, "subResetMt" + std::to_string(reset.id) + "W" +
-                             std::to_string(reset.triggerOwner) + "();\n");
-    }
-    for (int worker : reset.participants) {
-      const size_t index = static_cast<size_t>(reset.id) * static_cast<size_t>(workerCount_) +
-                           static_cast<size_t>(worker);
-      emitText(1, false, "while (mtAsyncResetDone[" + std::to_string(index) +
-                             "].generation.load(std::memory_order_acquire) != generation)\n");
-      emitText(2, false, "__asm__ __volatile__(\"pause\" ::: \"memory\");\n");
-    }
-    emitText(1, false, "mtAsyncResetRelease[" + std::to_string(reset.id) +
-                           "].generation.store(generation, std::memory_order_release);\n");
-    emitText(0, false, "}\n");
-
-    for (int worker : reset.participants) {
-      const size_t index = static_cast<size_t>(reset.id) * static_cast<size_t>(workerCount_) +
-                           static_cast<size_t>(worker);
-      emitText(0, true, "void " + className + "::mtJoinAsyncReset" +
-                            std::to_string(reset.id) + "W" + std::to_string(worker) + "() {\n");
-      emitText(1, false,
-               "const uint64_t generation = mtGeneration.load(std::memory_order_relaxed);\n");
-      emitText(1, false, "while (mtAsyncResetReady[" + std::to_string(reset.id) +
-                             "].generation.load(std::memory_order_acquire) != generation)\n");
-      emitText(2, false, "__asm__ __volatile__(\"pause\" ::: \"memory\");\n");
-      emitText(1, false, "if (!mtAsyncResetValues[" + std::to_string(reset.id) + "]) return;\n");
-      if (workerReset(worker) != nullptr) {
-        emitText(1, false, "subResetMt" + std::to_string(reset.id) + "W" +
-                               std::to_string(worker) + "();\n");
-      }
-      emitText(1, false, "mtAsyncResetDone[" + std::to_string(index) +
-                             "].generation.store(generation, std::memory_order_release);\n");
-      emitText(1, false, "while (mtAsyncResetRelease[" + std::to_string(reset.id) +
-                             "].generation.load(std::memory_order_acquire) != generation)\n");
-      emitText(2, false, "__asm__ __volatile__(\"pause\" ::: \"memory\");\n");
-      emitText(0, false, "}\n");
-    }
+    emitAsyncResetFunction(reset);
   }
 
   for (size_t taskId = 0; taskId < tasks_.size(); ++taskId) {
@@ -577,6 +451,37 @@ void CppEmitterMt::emitDefinitions() {
     emitTask(tasks_[taskId], 1);
     emitText(0, false, "}\n");
   }
+
+  emitText(0, true, "bool " + className + "::mtAnyAsyncResetAsserted() {\n");
+  std::string anyReset = "false";
+  for (const Reset& reset : resets_) {
+    Node* resetNode = reset.super->resetNode;
+    const std::string condition = isPackedRegister(resetNode)
+                                      ? packedRegisterName(resetNode)
+                                      : resetNode->name;
+    anyReset += " || " + condition;
+  }
+  emitText(1, false, "return " + anyReset + ";\n");
+  emitText(0, false, "}\n");
+
+  emitText(0, true, "void " + className + "::mtApplyAsyncResets() {\n");
+  for (const Reset& reset : resets_) {
+    Node* resetNode = reset.super->resetNode;
+    const std::string condition = isPackedRegister(resetNode)
+                                      ? packedRegisterName(resetNode)
+                                      : resetNode->name;
+    emitText(1, false, "if (unlikely(" + condition + ")) {\n");
+    emitText(2, false, "subResetMt" + std::to_string(reset.id) + "();\n");
+    emitText(1, false, "}\n");
+  }
+  emitText(0, false, "}\n");
+
+  emitText(0, true, "void " + className + "::mtReplayAfterAsyncReset() {\n");
+  for (size_t taskId = 0; taskId < tasks_.size(); ++taskId) {
+    if (tasks_[taskId].kind == MtTaskKind::ExtModule) continue;
+    emitText(1, false, "mtTask" + std::to_string(taskId) + "();\n");
+  }
+  emitText(0, false, "}\n");
 
   auto emitArray = [&](const std::string& type, const std::string& name, const std::vector<int>& values) {
     std::string text = "const " + type + " " + className + "::" + name + "[" +
@@ -590,29 +495,19 @@ void CppEmitterMt::emitDefinitions() {
 
   for (int worker = 0; worker < workerCount_; ++worker) {
     const std::vector<int>& chain = workerTasks_[static_cast<size_t>(worker)];
-    const std::vector<ResetJoin>& joins = resetJoins_[static_cast<size_t>(worker)];
-    const size_t dispatchCount = chain.size() + joins.size();
+    const size_t dispatchCount = chain.size();
     std::string text = "const " + className + "::MtDispatch " + className + "::mtDispatchW" +
                        std::to_string(worker) + "[" +
                        std::to_string(std::max<size_t>(1, dispatchCount)) + "] = {\n";
     if (dispatchCount == 0) {
       text += "  {nullptr, 0, 0, 0, 0}\n";
     } else {
-      size_t joinIndex = 0;
-      for (size_t position = 0; position <= chain.size(); ++position) {
-        while (joinIndex < joins.size() && joins[joinIndex].beforePosition == position) {
-          const ResetJoin& join = joins[joinIndex++];
-          text += "  {&" + className + "::mtJoinAsyncReset" + std::to_string(join.resetId) +
-                  "W" + std::to_string(worker) + ",0,0,0,0},\n";
-        }
-        if (position == chain.size()) break;
-        const int taskId = chain[position];
+      for (int taskId : chain) {
         const Task& task = tasks_[static_cast<size_t>(taskId)];
         text += "  {&" + className + "::mtTask" + std::to_string(taskId) + "," +
                 std::to_string(task.waitBegin) + "," + std::to_string(task.waitEnd) + "," +
                 std::to_string(task.storeBegin) + "," + std::to_string(task.storeEnd) + "},\n";
       }
-      Assert(joinIndex == joins.size(), "unemitted async reset joins for worker %d", worker);
     }
     text += "};\n";
     emitText(0, true, text);
@@ -682,7 +577,7 @@ void CppEmitterMt::emitDefinitions() {
       "    } while (generation == seen);\n"
       "    if (mtStop.load(std::memory_order_acquire)) return;\n"
       "    mtRunWorker(worker, static_cast<uint8_t>(generation & 1));\n"
-      "    mtDeferredFailures[worker].store(mtFlushDeferredEvents(), std::memory_order_relaxed);\n"
+      "    mtDeferredEventsByWorker[worker] = mtTakeDeferredEvents();\n"
       "    mtDoneFlags[worker - 1].parity.store(static_cast<uint8_t>(generation & 1),\n"
       "                                         std::memory_order_release);\n"
       "    seen = generation;\n"
@@ -712,8 +607,7 @@ void CppEmitterMt::emitDefinitions() {
   for (int worker = 0; worker < workerCount_; ++worker) {
     runtime += "    case " + std::to_string(worker) + ": entries = mtDispatchW" + std::to_string(worker) +
                "; count = " +
-               std::to_string(workerTasks_[static_cast<size_t>(worker)].size() +
-                              resetJoins_[static_cast<size_t>(worker)].size()) +
+               std::to_string(workerTasks_[static_cast<size_t>(worker)].size()) +
                "; break;\n";
   }
   runtime += "    default: abort();\n  }\n";
@@ -746,15 +640,22 @@ void CppEmitterMt::emitDefinitions() {
       "  uint8_t parity = static_cast<uint8_t>(generation & 1);\n";
   runtime += "  mtRunWorker(0, parity);\n";
   runtime +=
-      "  mtDeferredFailures[0].store(mtFlushDeferredEvents(), std::memory_order_relaxed);\n";
+      "  mtDeferredEventsByWorker[0] = mtTakeDeferredEvents();\n";
   runtime +=
       "  for (int worker = 1; worker < kMtWorkerCount; ++worker) {\n"
       "    while (mtDoneFlags[worker - 1].parity.load(std::memory_order_acquire) != parity)\n"
       "      __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
       "  }\n"
+      "  if (mtAnyAsyncResetAsserted()) {\n"
+      "    for (int worker = 0; worker < kMtWorkerCount; ++worker)\n"
+      "      mtDeferredEventsByWorker[worker].clear();\n"
+      "    mtApplyAsyncResets();\n"
+      "    mtReplayAfterAsyncReset();\n"
+      "    mtDeferredEventsByWorker[0] = mtTakeDeferredEvents();\n"
+      "  }\n"
       "  bool assertionFailed = false;\n"
       "  for (int worker = 0; worker < kMtWorkerCount; ++worker)\n"
-      "    assertionFailed |= mtDeferredFailures[worker].load(std::memory_order_relaxed) != 0;\n"
+      "    assertionFailed |= mtFlushDeferredEvents(mtDeferredEventsByWorker[worker]);\n"
       "  if (assertionFailed) {\n"
       "    assert(!\"deferred RTL assertion failure\");\n"
       "    abort();\n"
@@ -823,7 +724,8 @@ FILE* graph::genHeaderStartMt() {
   fprintf(header, "\nstruct MtDeferredEvent { bool assertion; std::string text; };\n");
   fprintf(header, "inline thread_local std::vector<MtDeferredEvent> mtDeferredEvents;\n");
   fprintf(header, "void mtDeferAssert(const char *fmt, ...);\n");
-  fprintf(header, "bool mtFlushDeferredEvents();\n");
+  fprintf(header, "std::vector<MtDeferredEvent> mtTakeDeferredEvents();\n");
+  fprintf(header, "bool mtFlushDeferredEvents(std::vector<MtDeferredEvent>& events);\n");
   fprintf(header, "#define gAssert(cond, ...) do {"
                      "if (!(cond)) mtDeferAssert(__VA_ARGS__);"
                    "} while (0)\n");
@@ -1083,10 +985,18 @@ void graph::emitPrintfMt() {
   "  va_end(args);\n"
   "}\n"
   );
-  emitFuncDecl(0, "bool mtFlushDeferredEvents() {\n");
+  emitFuncDecl(0, "std::vector<MtDeferredEvent> mtTakeDeferredEvents() {\n");
   emitBodyLock(0,
+  "  std::vector<MtDeferredEvent> result;\n"
+  "  result.swap(mtDeferredEvents);\n"
+  "  return result;\n"
+  "}\n"
+  );
+  emitFuncDecl(0, "bool mtFlushDeferredEvents(std::vector<MtDeferredEvent>& events) {\n");
+  emitBodyLock(0,
+  "  if (events.empty()) return false;\n"
   "  bool failed = false;\n"
-  "  for (const MtDeferredEvent& event : mtDeferredEvents) {\n"
+  "  for (const MtDeferredEvent& event : events) {\n"
   "    if (event.assertion) {\n"
   "      fprintf(stderr, \"\\33[1;31m%%s\\33[0m\\n\", event.text.c_str());\n"
   "      failed = true;\n"
@@ -1095,7 +1005,7 @@ void graph::emitPrintfMt() {
   "    }\n"
   "  }\n"
   "  fflush(stderr);\n"
-  "  mtDeferredEvents.clear();\n"
+  "  events.clear();\n"
   "  return failed;\n"
   "}\n"
   );
