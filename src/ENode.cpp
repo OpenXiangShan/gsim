@@ -308,20 +308,21 @@ if the lvalue is also an array(e.g. a[1], a defined as a[2][2]), return the rang
 */
 std::pair<int, int> ENode::getIdx(Node* node) {
   Assert(node->isArray(), "%s is not array", node->name.c_str());
-  std::vector<int>index;
-
+  /* The index children are read in order and never outlive the call, so they
+     are used in place. Staging them in a vector costs one heap round trip per
+     call, and array connections call this quadratically in Node::addArrayVal. */
   for (ENode* indexENode : child) {
     if (indexENode->opType != OP_INDEX_INT) return std::make_pair(-1, -1);
-    index.push_back(indexENode->values[0]);
   }
-  Assert(index.size() <= node->dimension.size(), "invalid index");
+  const size_t idxNum = child.size();
+  Assert(idxNum <= node->dimension.size(), "invalid index");
   int num = 1;
-  for (int i = (int)node->dimension.size() - 1; i >= (int)index.size(); i --) {
+  for (int i = (int)node->dimension.size() - 1; i >= (int)idxNum; i --) {
     num *= node->dimension[i];
   }
   int base = 0;
-  for (size_t i = 0; i < index.size(); i ++) {
-    base = base * node->dimension[i] + index[i];
+  for (size_t i = 0; i < idxNum; i ++) {
+    base = base * node->dimension[i] + child[i]->values[0];
   }
   return std::make_pair(base * num, (base + 1) * num - 1);
 }
