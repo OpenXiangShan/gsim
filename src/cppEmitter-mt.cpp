@@ -296,6 +296,18 @@ void CppEmitterMt::emitConstructorStart() {
   }
 }
 
+size_t CppEmitterMt::initPartCount() const {
+  if (emissionNodes_.empty()) return 0;
+  return (emissionNodes_.size() + kInitNodesPerPart - 1) / kInitNodesPerPart;
+}
+
+void CppEmitterMt::emitInitPartDeclarations(FILE* header) const {
+  if (!enabled()) return;
+  for (size_t part = 0; part < initPartCount(); ++part) {
+    fprintf(header, "void initPart%zu() __attribute__((noinline));\n", part);
+  }
+}
+
 void CppEmitterMt::emitStateInitialization() {
   if (!enabled()) return;
   for (const StateUpdate& update : stateUpdates_) {
@@ -1035,6 +1047,7 @@ void graph::cppEmitterMt() {
   fprintf(header, "uint64_t cycles;\n");
   fprintf(header, "uint64_t LOG_START, LOG_END;\n");
   mtEmitter.emitClassMembers(header);
+  mtEmitter.emitInitPartDeclarations(header);
   emitPrintfMt();
   /* constrcutor */
   emitFuncDecl(0, "S%s::S%s() {\n", name.c_str(), name.c_str());
@@ -1055,20 +1068,12 @@ void graph::cppEmitterMt() {
                "  }\n"
                "// mask out the bits out of the width range\n");
 
+  for (size_t part = 0; part < mtEmitter.initPartCount(); ++part) {
+    emitBodyLock(1, "initPart%zu();\n", part);
+  }
+
   // header: node definition; src: node evaluation
   fprintf(header, "uint32_t _var_start;\n");
-  for (Node* node : mtEmitter.emissionNodes()) {
-    if (node->type == NODE_EXT) continue;
-    const std::string emittedName = mtEmitter.isPackedRegister(node)
-                                        ? mtEmitter.packedRegisterName(node)
-                                        : std::string();
-    genNodeDefMt(header, node,
-                 mtEmitter.isTaskLocal(node) || mtEmitter.isWorkerLocal(node),
-                 emittedName);
-  }
-  /* memory definition */
-  for (Node* mem : memory) genNodeDefMt(header, mem, false);
-  fprintf(header, "uint32_t _var_end;\n");
 
   emitBodyLock(0, "// initialize registers with reset value 0 to overwrite the rand() results\n" );
   emitBodyLock(1, "memset(&_var_start, 0, &_var_end - &_var_start);\n");
@@ -1082,6 +1087,28 @@ void graph::cppEmitterMt() {
   fprintf(header, "void init();\n");
 
   emitBodyLock(0, "}\n");
+
+  for (size_t part = 0; part < mtEmitter.initPartCount(); ++part) {
+    emitFuncDecl(0, "void S%s::initPart%zu() {\n", name.c_str(), part);
+    const size_t begin = part * CppEmitterMt::kInitNodesPerPart;
+    const size_t end = std::min(begin + CppEmitterMt::kInitNodesPerPart,
+                                mtEmitter.emissionNodes().size());
+    for (size_t index = begin; index < end; ++index) {
+      Node* node = mtEmitter.emissionNodes()[index];
+      if (node->type == NODE_EXT) continue;
+      const std::string emittedName = mtEmitter.isPackedRegister(node)
+                                          ? mtEmitter.packedRegisterName(node)
+                                          : std::string();
+      genNodeDefMt(header, node,
+                   mtEmitter.isTaskLocal(node) || mtEmitter.isWorkerLocal(node),
+                   emittedName);
+    }
+    emitBodyLock(0, "}\n");
+  }
+
+  /* memory definition */
+  for (Node* mem : memory) genNodeDefMt(header, mem, false);
+  fprintf(header, "uint32_t _var_end;\n");
 
    /* input/output interface */
   for (Node* node : input) {

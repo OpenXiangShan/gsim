@@ -32,6 +32,7 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
   void emitConstructorInit();
   void emitConstructorStart();
   void emitStateInitialization();
+  void emitInitPartDeclarations(FILE* header) const;
   void emitDefinitions();
   void emitStep();
   bool isTaskLocal(Node* node) const;
@@ -40,6 +41,8 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
   bool isPackedRegister(Node* node) const;
   std::string packedRegisterName(Node* node) const;
   const std::vector<Node*>& emissionNodes() const;
+  static constexpr size_t kInitNodesPerPart = 256;
+  size_t initPartCount() const;
 
  private:
   using Task = MtTask;
