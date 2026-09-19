@@ -72,7 +72,9 @@ CppEmitterMt::CppEmitterMt(graph& graph)
       enabled_(globalConfig.MtMode),
       workerCount_(positiveEnv("GSIM_THREADS", 1)),
       targetTasks_(globalConfig.MtTargetTasks),
-      resetChunk_(resetChunkSize()) {}
+      resetChunk_(resetChunkSize()),
+      lookaheadWindow_(globalConfig.MtLookaheadWindow),
+      lookaheadStats_(globalConfig.MtLookaheadStats) {}
 
 bool CppEmitterMt::enabled() const { return enabled_; }
 
@@ -197,7 +199,7 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
   fprintf(header, "static constexpr int kMtWorkerCount = %d;\n", workerCount_);
   fprintf(header, "struct MtReadyToken { std::atomic<uint8_t> value{0}; };\n");
   fprintf(header, "struct alignas(64) MtDoneFlag { std::atomic<uint8_t> parity{0}; };\n");
-  fprintf(header, "struct MtDispatch { void (S%s::*fn)(); uint32_t waitBegin, waitEnd, storeBegin, storeEnd; };\n",
+  fprintf(header, "struct MtDispatch { void (S%s::*fn)(); uint32_t waitBegin, waitEnd, storeBegin, storeEnd, localWaitBegin, localWaitEnd; };\n",
           graph_.name.c_str());
   fprintf(header, "alignas(64) MtReadyToken mtReadyTokens[%d];\n", readySlotCount_);
   fprintf(header, "MtDoneFlag mtDoneFlags[%d];\n", std::max(1, workerCount_ - 1));
@@ -210,6 +212,10 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
   fprintf(header, "alignas(64) std::atomic<int> mtReadyWorkers{0};\n");
   fprintf(header, "alignas(64) std::atomic<bool> mtStop{false};\n");
   fprintf(header, "bool mtEnabled = false;\n");
+  if (lookaheadStats_ && lookaheadWindow_ > 0) {
+    fprintf(header, "struct alignas(64) MtLookaheadStats { uint64_t calls{}, scanned{}, found{}, fullMiss{}; };\n");
+    fprintf(header, "MtLookaheadStats mtLookaheadStats[%d];\n", workerCount_);
+  }
   for (const StateUpdate& update : stateUpdates_) {
     fprintf(header, "struct MtRegisterBlockW%d {\n", update.worker);
     if (update.registers.empty()) {
@@ -260,12 +266,19 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
   }
   fprintf(header, "static const uint32_t mtWaitSlots[%zu];\n", std::max<size_t>(1, waitSlots_.size()));
   fprintf(header, "static const uint32_t mtStoreSlots[%zu];\n", std::max<size_t>(1, storeSlots_.size()));
+  fprintf(header, "static const uint32_t mtLocalWaitSlots[%zu];\n",
+          std::max<size_t>(1, localWaitSlots_.size()));
   for (int worker = 0; worker < workerCount_; ++worker) {
     fprintf(header, "static const MtDispatch mtDispatchW%d[%zu];\n", worker,
             std::max<size_t>(1, workerTasks_[static_cast<size_t>(worker)].size()));
   }
   fprintf(header, "void mtInit();\nvoid mtStart();\nvoid mtStopWorkers();\n");
   fprintf(header, "void mtWorkerLoop(int worker);\nvoid mtRunWorker(int worker, uint8_t parity);\n");
+  if (lookaheadWindow_ > 0) {
+    fprintf(header,
+            "void mtRunLookaheadTail(const MtDispatch* entries, uint32_t count, "
+            "uint32_t head, uint8_t parity, int worker);\n");
+  }
   fprintf(header, "void mtPinWorker(int worker);\nvoid stepMt();\n");
   for (const StateUpdate& update : stateUpdates_) {
     fprintf(header, "void mtUpdateStateW%d();\n", update.worker);
@@ -458,9 +471,31 @@ void CppEmitterMt::emitDefinitions() {
     emitAsyncResetFunction(reset);
   }
 
-  for (size_t taskId = 0; taskId < tasks_.size(); ++taskId) {
+  std::vector<int> taskEmissionOrder;
+  taskEmissionOrder.reserve(tasks_.size());
+  if (lookaheadWindow_ > 0) {
+    std::vector<uint8_t> emitted(tasks_.size(), 0);
+    for (const std::vector<int>& chain : workerTasks_) {
+      for (int taskId : chain) {
+        Assert(taskId >= 0 && taskId < static_cast<int>(tasks_.size()),
+               "invalid worker-major MTask id %d", taskId);
+        Assert(!emitted[static_cast<size_t>(taskId)],
+               "duplicate worker-major MTask id %d", taskId);
+        emitted[static_cast<size_t>(taskId)] = 1;
+        taskEmissionOrder.push_back(taskId);
+      }
+    }
+    Assert(taskEmissionOrder.size() == tasks_.size(),
+           "worker-major MTask emission covered %zu/%zu tasks",
+           taskEmissionOrder.size(), tasks_.size());
+  } else {
+    for (size_t taskId = 0; taskId < tasks_.size(); ++taskId) {
+      taskEmissionOrder.push_back(static_cast<int>(taskId));
+    }
+  }
+  for (int taskId : taskEmissionOrder) {
     emitText(0, true, "void " + className + "::mtTask" + std::to_string(taskId) + "() {\n");
-    emitTask(tasks_[taskId], 1);
+    emitTask(tasks_[static_cast<size_t>(taskId)], 1);
     emitText(0, false, "}\n");
   }
 
@@ -504,6 +539,7 @@ void CppEmitterMt::emitDefinitions() {
   };
   emitArray("uint32_t", "mtWaitSlots", waitSlots_);
   emitArray("uint32_t", "mtStoreSlots", storeSlots_);
+  emitArray("uint32_t", "mtLocalWaitSlots", localWaitSlots_);
 
   for (int worker = 0; worker < workerCount_; ++worker) {
     const std::vector<int>& chain = workerTasks_[static_cast<size_t>(worker)];
@@ -512,13 +548,15 @@ void CppEmitterMt::emitDefinitions() {
                        std::to_string(worker) + "[" +
                        std::to_string(std::max<size_t>(1, dispatchCount)) + "] = {\n";
     if (dispatchCount == 0) {
-      text += "  {nullptr, 0, 0, 0, 0}\n";
+      text += "  {nullptr, 0, 0, 0, 0, 0, 0}\n";
     } else {
       for (int taskId : chain) {
         const Task& task = tasks_[static_cast<size_t>(taskId)];
         text += "  {&" + className + "::mtTask" + std::to_string(taskId) + "," +
                 std::to_string(task.waitBegin) + "," + std::to_string(task.waitEnd) + "," +
-                std::to_string(task.storeBegin) + "," + std::to_string(task.storeEnd) + "},\n";
+                std::to_string(task.storeBegin) + "," + std::to_string(task.storeEnd) + "," +
+                std::to_string(task.localWaitBegin) + "," +
+                std::to_string(task.localWaitEnd) + "},\n";
       }
     }
     text += "};\n";
@@ -573,7 +611,19 @@ void CppEmitterMt::emitDefinitions() {
       "  for (std::thread& thread : mtThreads) if (thread.joinable()) thread.join();\n"
       "  mtThreads.clear();\n"
       "}\n";
-  runtime += className + "::~" + className + "() { mtStopWorkers(); }\n";
+  runtime += className + "::~" + className + "() {\n  mtStopWorkers();\n";
+  if (lookaheadStats_ && lookaheadWindow_ > 0) {
+    runtime +=
+        "  for (int worker = 0; worker < kMtWorkerCount; ++worker) {\n"
+        "    const MtLookaheadStats& stats = mtLookaheadStats[worker];\n"
+        "    fprintf(stderr, \"[mt-lookahead] worker=%d calls=%llu scanned=%llu found=%llu fullmiss=%llu\\n\",\n"
+        "            worker, static_cast<unsigned long long>(stats.calls),\n"
+        "            static_cast<unsigned long long>(stats.scanned),\n"
+        "            static_cast<unsigned long long>(stats.found),\n"
+        "            static_cast<unsigned long long>(stats.fullMiss));\n"
+        "  }\n";
+  }
+  runtime += "}\n";
 
   runtime += "void " + className + "::mtWorkerLoop(int worker) {\n";
   runtime +=
@@ -596,6 +646,72 @@ void CppEmitterMt::emitDefinitions() {
       "  }\n"
       "}\n";
 
+  if (lookaheadWindow_ > 0) {
+    size_t maxWorkerTasks = 1;
+    for (const std::vector<int>& chain : workerTasks_) {
+      maxWorkerTasks = std::max(maxWorkerTasks, chain.size());
+    }
+    const size_t doneWordCount = (maxWorkerTasks + 63) / 64;
+    runtime += "void " + className +
+               "::mtRunLookaheadTail(const MtDispatch* entries, uint32_t count, "
+               "uint32_t head, uint8_t parity, int worker) {\n";
+    if (lookaheadStats_) runtime += "  ++mtLookaheadStats[worker].calls;\n";
+    runtime +=
+        "  uint64_t doneBits[" + std::to_string(doneWordCount) + "]{};\n"
+        "  auto remoteReady = [&](const MtDispatch& candidate) {\n"
+        "    for (uint32_t i = candidate.waitBegin; i < candidate.waitEnd; ++i)\n"
+        "      if (mtReadyTokens[mtWaitSlots[i]].value.load(std::memory_order_acquire) != parity) return false;\n"
+        "    return true;\n"
+        "  };\n"
+        "  auto candidateReady = [&](const MtDispatch& candidate, uint32_t currentHead) {\n"
+        "    for (uint32_t i = candidate.localWaitBegin; i < candidate.localWaitEnd; ++i)\n"
+        "      { const uint32_t predecessor = mtLocalWaitSlots[i];\n"
+        "        if (predecessor >= currentHead && (doneBits[predecessor >> 6] & (uint64_t{1} << (predecessor & 63))) == 0) return false; }\n"
+        "    return remoteReady(candidate);\n"
+        "  };\n"
+        "  auto runTask = [&](const MtDispatch& entry) {\n"
+        "    (this->*entry.fn)();\n"
+        "    for (uint32_t i = entry.storeBegin; i < entry.storeEnd; ++i)\n"
+        "      mtReadyTokens[mtStoreSlots[i]].value.store(parity, std::memory_order_release);\n"
+        "  };\n"
+        "  while (head < count) {\n"
+        "    while (head < count && (doneBits[head >> 6] & (uint64_t{1} << (head & 63))) != 0) {\n"
+        "      doneBits[head >> 6] &= ~(uint64_t{1} << (head & 63));\n"
+        "      ++head;\n"
+        "    }\n"
+        "    if (head >= count) break;\n"
+        "    const MtDispatch& headEntry = entries[head];\n"
+        "    if (remoteReady(headEntry)) {\n"
+        "      runTask(headEntry);\n"
+        "      ++head;\n"
+        "      continue;\n"
+        "    }\n"
+        "    bool progressed = false;\n"
+        "    uint32_t scanEnd = head + 1u + " + std::to_string(lookaheadWindow_) + ";\n"
+        "    if (scanEnd > count) scanEnd = count;\n"
+        "    for (uint32_t position = head + 1; position < scanEnd; ++position) {\n";
+    if (lookaheadStats_) runtime += "      ++mtLookaheadStats[worker].scanned;\n";
+    runtime +=
+        "      if ((doneBits[position >> 6] & (uint64_t{1} << (position & 63))) != 0) continue;\n"
+        "      const MtDispatch& candidate = entries[position];\n"
+        "      if (!candidateReady(candidate, head)) continue;\n"
+        "      runTask(candidate);\n"
+        "      doneBits[position >> 6] |= uint64_t{1} << (position & 63);\n";
+    if (lookaheadStats_) runtime += "      ++mtLookaheadStats[worker].found;\n";
+    runtime +=
+        "      progressed = true;\n"
+        "      break;\n"
+        "    }\n"
+        "    if (progressed) continue;\n";
+    if (lookaheadStats_) runtime += "    ++mtLookaheadStats[worker].fullMiss;\n";
+    runtime +=
+        "    for (uint32_t i = headEntry.waitBegin; i < headEntry.waitEnd; ++i)\n"
+        "      while (mtReadyTokens[mtWaitSlots[i]].value.load(std::memory_order_acquire) != parity)\n"
+        "        __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
+        "  }\n"
+        "}\n";
+  }
+
   runtime += "void " + className + "::mtRunWorker(int worker, uint8_t parity) {\n";
   runtime += "  switch (worker) {\n";
   for (int worker = 0; worker < workerCount_; ++worker) {
@@ -615,29 +731,58 @@ void CppEmitterMt::emitDefinitions() {
       "    while (mtStateReady.parity.load(std::memory_order_acquire) != parity)\n"
       "      __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
       "  }\n";
-  runtime += "  const MtDispatch* entries = nullptr; uint32_t count = 0;\n  switch (worker) {\n";
-  for (int worker = 0; worker < workerCount_; ++worker) {
-    runtime += "    case " + std::to_string(worker) + ": entries = mtDispatchW" + std::to_string(worker) +
-               "; count = " +
-               std::to_string(workerTasks_[static_cast<size_t>(worker)].size()) +
-               "; break;\n";
+  if (lookaheadWindow_ <= 0) {
+    // Strict fixed-order fast path. This is the baseline protocol and avoids
+    // all per-task ready scanning when lookahead is disabled.
+    runtime += "  const MtDispatch* entries = nullptr; uint32_t count = 0;\n  switch (worker) {\n";
+    for (int worker = 0; worker < workerCount_; ++worker) {
+      runtime += "    case " + std::to_string(worker) + ": entries = mtDispatchW" +
+                 std::to_string(worker) + "; count = " +
+                 std::to_string(workerTasks_[static_cast<size_t>(worker)].size()) +
+                 "; break;\n";
+    }
+    runtime += "    default: abort();\n  }\n";
+    runtime +=
+        "  for (uint32_t position = 0; position < count; ++position) {\n"
+        "    const MtDispatch& entry = entries[position];\n"
+        "    for (uint32_t i = entry.waitBegin; i < entry.waitEnd; ++i) {\n"
+        "      while (mtReadyTokens[mtWaitSlots[i]].value.load(std::memory_order_acquire) != parity)\n"
+        "        __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
+        "    }\n"
+        "    (this->*entry.fn)();\n"
+        "    for (uint32_t i = entry.storeBegin; i < entry.storeEnd; ++i)\n"
+        "      mtReadyTokens[mtStoreSlots[i]].value.store(parity, std::memory_order_release);\n"
+        "  }\n"
+        "}\n";
+  } else {
+    runtime += "  switch (worker) {\n";
+    for (int worker = 0; worker < workerCount_; ++worker) {
+      const std::vector<int>& chain = workerTasks_[static_cast<size_t>(worker)];
+      runtime += "    case " + std::to_string(worker) + ": {\n";
+      for (size_t position = 0; position < chain.size(); ++position) {
+        const int taskId = chain[position];
+        const Task& task = tasks_[static_cast<size_t>(taskId)];
+        if (!task.waits.empty()) {
+          runtime += "      { bool ready = true;\n";
+          for (int slot : task.waits) {
+            runtime += "        ready &= mtReadyTokens[" + std::to_string(slot) +
+                       "].value.load(std::memory_order_acquire) == parity;\n";
+          }
+          runtime += "        if (!ready) { mtRunLookaheadTail(mtDispatchW" +
+                     std::to_string(worker) + ", " + std::to_string(chain.size()) +
+                     ", " + std::to_string(position) + ", parity, worker); return; }\n"
+                     "      }\n";
+        }
+        runtime += "      mtTask" + std::to_string(taskId) + "();\n";
+        for (int slot : task.stores) {
+          runtime += "      mtReadyTokens[" + std::to_string(slot) +
+                     "].value.store(parity, std::memory_order_release);\n";
+        }
+      }
+      runtime += "      return;\n    }\n";
+    }
+    runtime += "    default: abort();\n  }\n}\n";
   }
-  runtime += "    default: abort();\n  }\n";
-  // A worker's task order is part of correctness: sortedSuper contains ordering
-  // constraints that are not all represented by graph edges.
-  runtime += "  for (uint32_t position = 0; position < count; ++position) {\n";
-  runtime += "    const MtDispatch& entry = entries[position];\n";
-  runtime +=
-      "    for (uint32_t i = entry.waitBegin; i < entry.waitEnd; ++i) {\n"
-      "      while (mtReadyTokens[mtWaitSlots[i]].value.load(std::memory_order_acquire) != parity)\n"
-      "        __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
-      "    }\n";
-  runtime += "    (this->*entry.fn)();\n";
-  runtime +=
-      "    for (uint32_t i = entry.storeBegin; i < entry.storeEnd; ++i)\n"
-      "      mtReadyTokens[mtStoreSlots[i]].value.store(parity, std::memory_order_release);\n"
-      "  }\n"
-      "}\n";
 
   runtime += "void " + className + "::stepMt() {\n";
   for (Node* node : emissionNodes_) {

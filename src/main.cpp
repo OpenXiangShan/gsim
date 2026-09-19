@@ -74,9 +74,11 @@ Config::Config() {
   When2muxBound = 2;
   LogLevel = 0;
   NumThreads = capThreads(10);
-  MtTargetTasks = 1600;
+  MtTargetTasks = 2400;
   MtPartitionNodeWeight = 0;
   MtScheduleGlobalWeight = 12;
+  MtLookaheadWindow = 128;
+  MtLookaheadStats = false;
 }
 Config globalConfig;
 
@@ -150,11 +152,13 @@ static void printUsage(const char* ProgName) {
             << "      --dump-const-status          Dump per-node constant-analysis status before removing constants.\n"
             << "      --mt-mode=off|on             Select the C++ emitter mode.\n"
             << "                                   off: single-thread active (default); on: multithread dense.\n"
-            << "      --mt-target-tasks=[num]      Target number of MTasks used for MT partitioning (default: 1600).\n"
+            << "      --mt-target-tasks=[num]      Target number of MTasks used for MT partitioning (default: 2400).\n"
             << "      --mt-partition-node-weight=[num]\n"
             << "                                   Fixed per-node weight in MT partition cost (default: 0).\n"
             << "      --mt-schedule-global-weight=[num]\n"
             << "                                   Weight for cross-MTask nodes in worker cost (default: 12).\n"
+            << "      --mt-lookahead-window=[num]   Ready-task lookahead window when the chain head blocks (default: 128, 0 disables).\n"
+            << "      --mt-lookahead-stats=off|on  Emit per-worker lookahead hit/miss counters (default: off).\n"
             ;
 }
 
@@ -188,6 +192,8 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_MT_TARGET_TASKS,
     OPT_MT_PARTITION_NODE_WEIGHT,
     OPT_MT_SCHEDULE_GLOBAL_WEIGHT,
+    OPT_MT_LOOKAHEAD_WINDOW,
+    OPT_MT_LOOKAHEAD_STATS,
   };
 
   const struct option Table[] = {
@@ -212,6 +218,8 @@ static char* parseCommandLine(int argc, char** argv) {
       {"mt-target-tasks", required_argument, nullptr, 0},
       {"mt-partition-node-weight", required_argument, nullptr, 0},
       {"mt-schedule-global-weight", required_argument, nullptr, 0},
+      {"mt-lookahead-window", required_argument, nullptr, 0},
+      {"mt-lookahead-stats", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -310,6 +318,25 @@ static char* parseCommandLine(int argc, char** argv) {
                 }
                 case OPT_MT_PARTITION_NODE_WEIGHT: sscanf(optarg, "%d", &globalConfig.MtPartitionNodeWeight); break;
                 case OPT_MT_SCHEDULE_GLOBAL_WEIGHT: sscanf(optarg, "%d", &globalConfig.MtScheduleGlobalWeight); break;
+                case OPT_MT_LOOKAHEAD_WINDOW: {
+                  int window = -1;
+                  if (sscanf(optarg, "%d", &window) != 1 || window < 0) {
+                    fprintf(stderr, "Error: --mt-lookahead-window expects a non-negative number, got '%s'.\n", optarg);
+                    printUsage(argv[0]);
+                    std::cout.flush();
+                    fflush(nullptr);
+                    _exit(EXIT_FAILURE);
+                  }
+                  globalConfig.MtLookaheadWindow = window;
+                  break;
+                }
+                case OPT_MT_LOOKAHEAD_STATS:
+                  if (strcmp(optarg, "off") != 0 && strcmp(optarg, "on") != 0) {
+                    fprintf(stderr, "Error: --mt-lookahead-stats expects off or on, got '%s'.\n", optarg);
+                    _exit(EXIT_FAILURE);
+                  }
+                  globalConfig.MtLookaheadStats = strcmp(optarg, "on") == 0;
+                  break;
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }
               break;

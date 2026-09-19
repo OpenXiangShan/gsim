@@ -20,6 +20,8 @@ struct Config {
   int MtTargetTasks;
   int MtPartitionNodeWeight;
   int MtScheduleGlobalWeight;
+  int MtLookaheadWindow;
+  bool MtLookaheadStats;
   std::set<std::string> DumpStages;
   Config();
 };

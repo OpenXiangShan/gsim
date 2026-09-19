@@ -62,8 +62,10 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
   graph& graph_;
   bool enabled_ = false;
   int workerCount_ = 1;
-  int targetTasks_ = 1600;
+  int targetTasks_ = 2400;
   int resetChunk_ = 4096;
+  int lookaheadWindow_ = 128;
+  bool lookaheadStats_ = false;
   std::map<Node*, std::string> packedRegisterNames_;
   std::unordered_map<std::string, std::string> packedRegisterNamesByText_;
 };

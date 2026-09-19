@@ -40,6 +40,7 @@ struct MtWorkerPlan {
   std::vector<std::vector<int>> workerTasks_;
   std::vector<int> waitSlots_;
   std::vector<int> storeSlots_;
+  std::vector<int> localWaitSlots_;
   std::vector<MtStateUpdate> stateUpdates_;
   std::vector<MtReset> resets_;
 };

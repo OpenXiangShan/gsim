@@ -34,7 +34,9 @@ void compactEmptyTasks(MtTaskPlan& plan) {
     task.successors.clear();
     task.waits.clear();
     task.stores.clear();
+    task.localWaits.clear();
     task.waitBegin = task.waitEnd = task.storeBegin = task.storeEnd = 0;
+    task.localWaitBegin = task.localWaitEnd = 0;
     compacted.push_back(std::move(task));
   }
   if (compacted.size() == original.size()) return;
@@ -75,6 +77,58 @@ void compactEmptyTasks(MtTaskPlan& plan) {
   for (size_t taskId = 0; taskId < plan.tasks_.size(); ++taskId) {
     for (Node* node : plan.tasks_[taskId].members) plan.taskByNode_[node] = taskId;
   }
+}
+
+size_t transitivelyReduceTaskEdges(MtTaskPlan& plan) {
+  const size_t taskCount = plan.tasks_.size();
+  if (taskCount == 0) return 0;
+  const size_t wordCount = (taskCount + 63) / 64;
+  std::vector<std::vector<uint64_t>> reachable(
+      taskCount, std::vector<uint64_t>(wordCount, 0));
+  size_t removed = 0;
+
+  for (size_t reverse = taskCount; reverse > 0; --reverse) {
+    const size_t source = reverse - 1;
+    std::vector<int> successors = plan.tasks_[source].successors;
+    std::sort(successors.begin(), successors.end());
+    successors.erase(std::unique(successors.begin(), successors.end()),
+                     successors.end());
+
+    std::vector<uint64_t> covered(wordCount, 0);
+    std::vector<int> reduced;
+    reduced.reserve(successors.size());
+    for (int successor : successors) {
+      Assert(successor > static_cast<int>(source) &&
+                 successor < static_cast<int>(taskCount),
+             "cannot reduce non-forward MTask edge %zu -> %d", source,
+             successor);
+      const size_t successorIndex = static_cast<size_t>(successor);
+      const uint64_t bit = uint64_t{1} << (successorIndex & 63);
+      if ((covered[successorIndex >> 6] & bit) != 0) {
+        ++removed;
+        continue;
+      }
+      reduced.push_back(successor);
+      covered[successorIndex >> 6] |= bit;
+      for (size_t word = 0; word < wordCount; ++word) {
+        covered[word] |= reachable[successorIndex][word];
+      }
+    }
+    plan.tasks_[source].successors.swap(reduced);
+    reachable[source].swap(covered);
+  }
+
+  std::vector<std::vector<int>> predecessors(taskCount);
+  for (size_t source = 0; source < taskCount; ++source) {
+    for (int successor : plan.tasks_[source].successors) {
+      predecessors[static_cast<size_t>(successor)].push_back(
+          static_cast<int>(source));
+    }
+  }
+  for (size_t taskId = 0; taskId < taskCount; ++taskId) {
+    plan.tasks_[taskId].predecessors.swap(predecessors[taskId]);
+  }
+  return removed;
 }
 
 void collectWorkerLocalNodes(MtTaskPlan& plan, const graph& graph) {
@@ -518,6 +572,8 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
     }
   }
 
+  const size_t transitiveEdgesRemoved = transitivelyReduceTaskEdges(tasks);
+
   collectWorkerLocalNodes(tasks, graph);
 
   workers.workerTasks_.assign(static_cast<size_t>(workerCount), std::vector<int>());
@@ -526,6 +582,21 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
     int owner = tasks.tasks_[taskId].owner;
     workerPosition[taskId] = static_cast<int>(workers.workerTasks_[static_cast<size_t>(owner)].size());
     workers.workerTasks_[static_cast<size_t>(owner)].push_back(taskId);
+  }
+
+  for (size_t taskId = 0; taskId < tasks.tasks_.size(); ++taskId) {
+    MtTask& task = tasks.tasks_[taskId];
+    task.localWaits.clear();
+    for (int predecessor : task.predecessors) {
+      const MtTask& source = tasks.tasks_[static_cast<size_t>(predecessor)];
+      if (source.owner != task.owner) continue;
+      Assert(workerPosition[static_cast<size_t>(predecessor)] < workerPosition[taskId],
+             "same-worker predecessor is not earlier: %d -> %zu", predecessor, taskId);
+      task.localWaits.push_back(workerPosition[static_cast<size_t>(predecessor)]);
+    }
+    std::sort(task.localWaits.begin(), task.localWaits.end());
+    task.localWaits.erase(std::unique(task.localWaits.begin(), task.localWaits.end()),
+                          task.localWaits.end());
   }
 
   buildStateUpdates(graph, workers, workerCount, resetChunk);
@@ -582,6 +653,15 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
       group.consumerOwner = tasks.tasks_[consumer].owner;
       group.consumer = consumer;
       group.publisher = publisher;
+      // A compressed cross-worker token is published by the last source in
+      // the producer's static chain. With out-of-order ready scanning, make
+      // that ordering assumption explicit: the publisher cannot run until
+      // every source represented by its token has completed locally.
+      for (int source : entry.second) {
+        if (source == publisher) continue;
+        tasks.tasks_[static_cast<size_t>(publisher)].localWaits.push_back(
+            workerPosition[static_cast<size_t>(source)]);
+      }
       int groupId = static_cast<int>(groups.size());
       groups.push_back(group);
       groupsByOwnerPair[{group.producerOwner, group.consumerOwner}].push_back(groupId);
@@ -601,17 +681,28 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
   }
 
   for (MtTask& task : tasks.tasks_) {
+    std::sort(task.localWaits.begin(), task.localWaits.end());
+    task.localWaits.erase(std::unique(task.localWaits.begin(), task.localWaits.end()),
+                          task.localWaits.end());
     task.waitBegin = workers.waitSlots_.size();
     workers.waitSlots_.insert(workers.waitSlots_.end(), task.waits.begin(), task.waits.end());
     task.waitEnd = workers.waitSlots_.size();
     task.storeBegin = workers.storeSlots_.size();
     workers.storeSlots_.insert(workers.storeSlots_.end(), task.stores.begin(), task.stores.end());
     task.storeEnd = workers.storeSlots_.size();
+    task.localWaitBegin = workers.localWaitSlots_.size();
+    workers.localWaitSlots_.insert(workers.localWaitSlots_.end(), task.localWaits.begin(),
+                                   task.localWaits.end());
+    task.localWaitEnd = workers.localWaitSlots_.size();
   }
 
   size_t edgeCount = 0;
   for (const MtTask& task : tasks.tasks_) edgeCount += task.successors.size();
+  size_t localEdgeCount = 0;
+  for (const MtTask& task : tasks.tasks_) localEdgeCount += task.localWaits.size();
   fprintf(stderr,
-          "[cppEmitter-mt] workers=%d groups=%d mtasks=%zu edges=%zu tokens=%zu\n",
-          workerCount, groupCount, tasks.tasks_.size(), edgeCount, groups.size());
+          "[cppEmitter-mt] workers=%d groups=%d mtasks=%zu edges=%zu tokens=%zu "
+          "local-edges=%zu transitive-edges-removed=%zu\n",
+          workerCount, groupCount, tasks.tasks_.size(), edgeCount, groups.size(),
+          localEdgeCount, transitiveEdgesRemoved);
 }

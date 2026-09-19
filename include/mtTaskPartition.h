@@ -22,6 +22,7 @@ struct MtTask {
   std::vector<int> successors;
   std::vector<int> waits;
   std::vector<int> stores;
+  std::vector<int> localWaits;
   std::vector<InstInfo>* insts = nullptr;
   StmtTree* stmtTree = nullptr;
   std::unordered_set<Node*> localNodes;
@@ -33,6 +34,8 @@ struct MtTask {
   uint32_t waitEnd = 0;
   uint32_t storeBegin = 0;
   uint32_t storeEnd = 0;
+  uint32_t localWaitBegin = 0;
+  uint32_t localWaitEnd = 0;
 };
 
 struct MtTaskPlan {
