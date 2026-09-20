@@ -493,9 +493,17 @@ dense:
 
 所有具有有效或常量 `reg-dst` 的寄存器（包括异步复位寄存器）都不再由普通 MTask 提交，也不再由主线程串行调用
 `resetAllMt()`。planner 使用 `widthBits(width) / 8` 和数组的实际 C++ 容量估计存储字节数，
-将寄存器贪心分配给当前字节负载最小的 worker。每个 worker 分别生成字段完全同构且按
-cache line 对齐的 `mtRegisterSrcWn` 和 `mtRegisterDstWn`；MTask 对寄存器的读写直接重定向到
-对应块字段。
+在 MTask 调度完成后再分配寄存器 owner。有效 `reg-dst` 所在 MTask 的 owner 是该寄存器的
+preferred owner；planner 按寄存器字节数从大到小处理，在 preferred owner 不超过平均目标
+字节数时优先本地放置，否则退回当前字节负载最小的 worker。大于平均目标的不可拆分数组
+允许独占其 preferred owner。这样同时限制每个 worker 的状态块大小，并让计算 `dst` 的
+MTask 尽量写本 worker 随后提交的 `DstBlock`，减少跨核 dirty cache-line 转移。常量
+`reg-dst` 没有写入 MTask，继续只按负载均衡分配。
+
+生成日志中的 `register-locality` 会同时报告旧 size-only LPT 基线和新分配的本地寄存器数、
+本地字节数以及平均目标字节数；`register-blocks` 继续报告最终 min/max worker bytes。每个
+worker 分别生成字段完全同构且按 cache line 对齐的 `mtRegisterSrcWn` 和
+`mtRegisterDstWn`；MTask 对寄存器的读写直接重定向到对应块字段。
 
 每周期先将触发的同步 reset value 写入 `DstBlock`，再用一次
 `memcpy(&SrcBlock, &DstBlock, sizeof(SrcBlock))` 提交该 worker 的全部寄存器。因此未触发

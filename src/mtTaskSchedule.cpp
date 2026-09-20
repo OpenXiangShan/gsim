@@ -299,8 +299,8 @@ int countResetChunks(const std::vector<Instruction>& body, int chunkSize) {
   return chunks;
 }
 
-void buildStateUpdates(graph& graph, MtWorkerPlan& workers, int workerCount,
-                       int chunkSize) {
+void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
+                       MtWorkerPlan& workers, int workerCount, int chunkSize) {
   workers.stateUpdates_.assign(static_cast<size_t>(workerCount), MtStateUpdate());
   for (int worker = 0; worker < workerCount; ++worker) {
     workers.stateUpdates_[static_cast<size_t>(worker)].worker = worker;
@@ -323,14 +323,77 @@ void buildStateUpdates(graph& graph, MtWorkerPlan& workers, int workerCount,
     return lhs->id < rhs->id;
   });
 
+  size_t totalRegisterBytes = 0;
+  for (Node* reg : registers) totalRegisterBytes += registerStorageBytes(reg);
+  const size_t targetRegisterBytes = std::max<size_t>(
+      1, (totalRegisterBytes + static_cast<size_t>(workerCount) - 1) /
+             static_cast<size_t>(workerCount));
+
+  std::vector<int> preferredOwner(registers.size(), -1);
+  for (size_t index = 0; index < registers.size(); ++index) {
+    Node* dst = registers[index]->getDst();
+    if (dst->status != VALID_NODE) continue;
+    auto task = tasks.taskByNode_.find(dst);
+    Assert(task != tasks.taskByNode_.end(),
+           "register destination %s has no MTask owner", dst->name.c_str());
+    const int taskId = task->second;
+    Assert(taskId >= 0 && taskId < static_cast<int>(tasks.tasks_.size()),
+           "invalid MTask %d for register destination %s", taskId,
+           dst->name.c_str());
+    preferredOwner[index] = tasks.tasks_[static_cast<size_t>(taskId)].owner;
+  }
+
+  // Preserve the old size-only LPT placement as a baseline for locality
+  // reporting. The affinity-aware placement below retains the same descending
+  // size order, but admits a preferred owner while it remains within the
+  // average register-byte target. An indivisible register larger than the
+  // target may occupy an otherwise empty preferred worker.
+  std::vector<size_t> baselineLoad(static_cast<size_t>(workerCount), 0);
+  size_t baselineLocalRegisters = 0;
+  size_t baselineLocalBytes = 0;
+  for (size_t index = 0; index < registers.size(); ++index) {
+    const size_t cost = registerStorageBytes(registers[index]);
+    const int worker = static_cast<int>(
+        std::min_element(baselineLoad.begin(), baselineLoad.end()) -
+        baselineLoad.begin());
+    baselineLoad[static_cast<size_t>(worker)] += cost;
+    if (worker == preferredOwner[index]) {
+      ++baselineLocalRegisters;
+      baselineLocalBytes += cost;
+    }
+  }
+
   std::vector<size_t> workerLoad(static_cast<size_t>(workerCount), 0);
   std::map<Node*, int> ownerByRegister;
-  for (Node* reg : registers) {
+  size_t preferredRegisters = 0;
+  size_t preferredBytes = 0;
+  size_t localRegisters = 0;
+  size_t localBytes = 0;
+  for (size_t index = 0; index < registers.size(); ++index) {
+    Node* reg = registers[index];
     const size_t cost = registerStorageBytes(reg);
-    const int worker =
-        static_cast<int>(std::min_element(workerLoad.begin(), workerLoad.end()) -
-                         workerLoad.begin());
+    const int preferred = preferredOwner[index];
+    if (preferred >= 0) {
+      ++preferredRegisters;
+      preferredBytes += cost;
+    }
+    const int lightest = static_cast<int>(
+        std::min_element(workerLoad.begin(), workerLoad.end()) -
+        workerLoad.begin());
+    int worker = lightest;
+    if (preferred >= 0) {
+      const size_t preferredLoad = workerLoad[static_cast<size_t>(preferred)];
+      if ((preferredLoad <= targetRegisterBytes &&
+           cost <= targetRegisterBytes - preferredLoad) ||
+          (preferredLoad == 0 && cost > targetRegisterBytes)) {
+        worker = preferred;
+      }
+    }
     workerLoad[static_cast<size_t>(worker)] += cost;
+    if (worker == preferred) {
+      ++localRegisters;
+      localBytes += cost;
+    }
     ownerByRegister[reg] = worker;
     MtStateUpdate& update = workers.stateUpdates_[static_cast<size_t>(worker)];
     update.registerStorageBytes += cost;
@@ -465,6 +528,11 @@ void buildStateUpdates(graph& graph, MtWorkerPlan& workers, int workerCount,
           "[cppEmitter-mt] register-blocks registers=%zu bytes=%zu min-worker-bytes=%zu "
           "max-worker-bytes=%zu\n",
           registers.size(), registerBytes, *registerLimits.first, *registerLimits.second);
+  fprintf(stderr,
+          "[cppEmitter-mt] register-locality mapped-registers=%zu local-registers=%zu->%zu "
+          "local-bytes=%zu->%zu/%zu target-worker-bytes=%zu\n",
+          preferredRegisters, baselineLocalRegisters, localRegisters,
+          baselineLocalBytes, localBytes, preferredBytes, targetRegisterBytes);
   fprintf(stderr,
           "[cppEmitter-mt] memory-commits writers=%zu pending-bytes=%zu "
           "min-worker-state-bytes=%zu max-worker-state-bytes=%zu\n",
@@ -612,7 +680,7 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
                           task.localWaits.end());
   }
 
-  buildStateUpdates(graph, workers, workerCount, resetChunk);
+  buildStateUpdates(graph, tasks, workers, workerCount, resetChunk);
 
   // Async reset is checked after the speculative task pass. Its body is kept
   // independent of worker ownership because the rare replay path is serial.
