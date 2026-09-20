@@ -224,7 +224,9 @@ void appendInstructions(std::vector<MtReset::Instruction>& destination,
 
 bool isCycleStartRegisterUpdate(const Node* node) {
   return node->status == VALID_NODE && node->type == NODE_REG_SRC &&
-         node->reset != ASYRESET;
+         node->regSplit && node->regNext != nullptr &&
+         (node->regNext->status == VALID_NODE ||
+          node->regNext->status == CONSTANT_NODE);
 }
 
 size_t registerStorageBytes(const Node* node) {
@@ -307,8 +309,10 @@ void buildStateUpdates(graph& graph, MtWorkerPlan& workers, int workerCount,
   std::vector<Node*> registers;
   for (Node* reg : graph.regsrc) {
     if (!isCycleStartRegisterUpdate(reg)) continue;
-    Assert(reg->regSplit && reg->getDst()->status == VALID_NODE,
-           "packed MT register %s has no valid destination storage",
+    Assert(reg->regSplit &&
+               (reg->getDst()->status == VALID_NODE ||
+                reg->getDst()->status == CONSTANT_NODE),
+           "packed MT register %s has neither valid nor constant destination storage",
            reg->name.c_str());
     registers.push_back(reg);
   }
@@ -331,6 +335,15 @@ void buildStateUpdates(graph& graph, MtWorkerPlan& workers, int workerCount,
     MtStateUpdate& update = workers.stateUpdates_[static_cast<size_t>(worker)];
     update.registerStorageBytes += cost;
     update.registers.push_back(reg);
+    Node* dst = reg->getDst();
+    if (dst->status == CONSTANT_NODE) {
+      Assert(reg->dimension.empty() && dst->computeInfo != nullptr,
+             "constant MT register destination %s is not a scalar constant",
+             dst->name.c_str());
+      update.body.push_back(
+          {static_cast<uint8_t>(SUPER_INFO_STR),
+           dst->name + " = " + dst->computeInfo->valStr + ";"});
+    }
   }
 
   const std::vector<size_t> registerLoad = workerLoad;

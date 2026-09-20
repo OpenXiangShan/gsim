@@ -13,7 +13,9 @@ namespace {
 
 bool isCycleStartRegisterUpdate(const Node* node) {
   return node->status == VALID_NODE && node->type == NODE_REG_SRC &&
-         node->reset != ASYRESET;
+         node->regSplit && node->regNext != nullptr &&
+         (node->regNext->status == VALID_NODE ||
+          node->regNext->status == CONSTANT_NODE);
 }
 
 int taskForNode(const Node* node, const MtTaskPlan& plan) {
@@ -113,8 +115,7 @@ void completeTaskLocalDependencies(graph& graph, MtTaskPlan& plan) {
       if (!leavesTask) node->updateConnect();
     }
   }
-  graph.connectDep();
-  MtTaskPartitioner::removeAsyncResetDependencies(graph);
+  MtTaskPartitioner::useDirectDependencies(graph);
 
   // A cross-task dependency discovered here would make the scheduler DAG that
   // was built before lowering stale.
@@ -239,9 +240,8 @@ void collectTaskLocalNodes(graph& graph, MtTaskPlan& plan) {
 void mergeNodeAssignments(StmtTree& tree, Node* node,
                           std::vector<int>& predecessorPath,
                           std::vector<int>& nodePath) {
-  // Normal and synchronous-reset register commits execute in the dedicated
-  // cycle-start phase. Async-reset registers must remain in the MTask program
-  // because their update is coordinated by the mid-cycle reset rendezvous.
+  // Every register with stored or constant next-state commits in the
+  // cycle-start phase. A late async reset overwrites src before replay.
   if (isCycleStartRegisterUpdate(node)) return;
   for (ExpTree* assignment : node->assignTree) {
     tree.mergeExpTree(assignment, predecessorPath, nodePath, node);

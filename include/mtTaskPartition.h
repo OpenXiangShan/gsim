@@ -51,7 +51,7 @@ struct MtTaskPlan {
 class MtTaskPartitioner {
  public:
   static void build(graph& graph, MtTaskPlan& plan, int targetTasks);
-  static void removeAsyncResetDependencies(graph& graph);
+  static void useDirectDependencies(graph& graph);
 };
 
 #endif

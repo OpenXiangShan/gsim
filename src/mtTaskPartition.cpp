@@ -15,43 +15,6 @@ namespace {
 constexpr size_t kMaxNodesPerGroup = 7000;
 constexpr size_t kMaxSiblingNodes = 30;
 
-void removeAsyncResetDependenciesFromNodes(graph& graph) {
-  for (Node* reg : graph.regsrc) {
-    if (reg->status != VALID_NODE || reg->reset != ASYRESET || reg->resetTree == nullptr) {
-      continue;
-    }
-    Assert(reg->resetTree->getRoot()->opType == OP_RESET,
-           "invalid async reset tree for %s", reg->name.c_str());
-
-    std::set<Node*> conditionNodes;
-    getENodeRelyNodes(reg->resetTree->getRoot()->getChild(0), conditionNodes);
-    for (Node* condition : conditionNodes) {
-      reg->depNext.erase(condition);
-      condition->depPrev.erase(reg);
-      for (Node* consumer : reg->next) {
-        consumer->depPrev.erase(condition);
-        condition->depNext.erase(consumer);
-      }
-      if (reg->regSplit && reg->getDst() != nullptr) {
-        reg->getDst()->depPrev.erase(condition);
-        condition->depNext.erase(reg->getDst());
-      }
-    }
-
-    std::set<Node*> valueNodes;
-    getENodeRelyNodes(reg->resetTree->getRoot()->getChild(1), valueNodes);
-    for (Node* value : valueNodes) {
-      if (value->type == NODE_REG_SRC) {
-        reg->depNext.erase(value);
-        value->depPrev.erase(reg);
-      } else {
-        reg->depPrev.erase(value);
-        value->depNext.erase(reg);
-      }
-    }
-  }
-}
-
 int expressionOperationCount(const ExpTree* tree) {
   int operations = 0;
   std::stack<const ENode*> pending;
@@ -623,7 +586,6 @@ class DirectMTaskCoarsener {
       for (Node* node : groups_[static_cast<size_t>(source)].members) {
         if (node->status != VALID_NODE) continue;
         for (Node* next : node->next) add(source, next);
-        if (node->type == NODE_REG_DST) add(source, node->getSrc());
         if (node->type == NODE_WRITER) {
           for (Node* port : node->parent->member) {
             if (port->type == NODE_READER && port->status == VALID_NODE) add(source, port);
@@ -735,10 +697,15 @@ class DirectMTaskCoarsener {
 void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int targetTasks) {
   graph.orderAllNodes();
   graph.mergeResetAll();
-  removeAsyncResetDependencies(graph);
+  useDirectDependencies(graph);
   DirectMTaskCoarsener(graph).build(plan, targetTasks);
 }
 
-void MtTaskPartitioner::removeAsyncResetDependencies(graph& graph) {
-  removeAsyncResetDependenciesFromNodes(graph);
+void MtTaskPartitioner::useDirectDependencies(graph& graph) {
+  for (SuperNode* super : graph.sortedSuper) {
+    for (Node* node : super->member) {
+      node->depPrev = node->prev;
+      node->depNext = node->next;
+    }
+  }
 }
