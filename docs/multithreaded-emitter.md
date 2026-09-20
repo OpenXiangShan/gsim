@@ -66,11 +66,11 @@ MT 后端不再调用单线程的 `generateStmtTree()` 和 `instsGenerator()`。
 
 它的处理顺序如下：
 
-1. 从当前有效 Node 初始化候选 MTask，并从 Node 的 `prev/next/depPrev/depNext` 重建候选任务图。
+1. 将 MT 图中的 `depPrev/depNext` 归一化为 `prev/next`，再从直接数据边初始化候选 MTask。
 2. 在候选 MTask 上执行与旧 `graphPartitionMt` 等价的 when、单后继、单前驱和同前驱合并。
 3. 对收缩后的候选 MTask 做最终拓扑整理，再用 FIFO Kahn 算法得到规范依赖序。
-4. 直接从 Node 关系补充拓扑序上向前的寄存器和 memory activation 边。
-5. 根据 `--mt-target-tasks` 和节点表达式树中的预估运算数，把拓扑连续的候选组继续合并成最终 MTask。
+4. 直接从 Node 关系补充拓扑序上向前的 memory activation 边；寄存器提交由周期起始 state barrier 保证。
+5. 根据 `--mt-target-tasks` 和节点表达式树中的预估运算数，把候选组继续合并成最终 MTask；启用 critical-path contraction 时先形成更细的 seed MTask，再按关键路径收缩 DAG。
 6. 通过 `taskByNode` 将 Node 依赖映射成 MTask 的 `predecessors/successors`，检查所有边都是向前的。
 7. 按 task 内 `depPrev/depNext` 对成员 Node 做稳定拓扑排序。
 8. 复用单线程的 `StmtTree::mergeExpTree()` 和 `StmtTree::compute()`，为每个 MTask 生成一棵语句树和一条 `InstInfo` 流。
@@ -84,7 +84,7 @@ MT 后端不再调用单线程的 `generateStmtTree()` 和 `instsGenerator()`。
 MT planner 不向 `Node` 或 `SuperNode` 增加并行专用字段，而是读取已有 Node 图信息：
 
 - `Node::prev/next`：直接数据依赖；
-- `Node::depPrev/depNext`：非直接但必须保持的顺序依赖；
+- `Node::depPrev/depNext`：进入 MT partition 时被归一化为 `prev/next`，供现有收缩和 lowering 代码复用；
 - register destination、memory reader/writer 关系：用于补充同周期 activation 顺序；
 - `MtTaskPlan::taskByNode_`：Node 到最终 MTask 的映射；
 - `MtTaskPlan::partitionGroupByNode_`：Node 到收缩候选组的映射；
@@ -115,13 +115,13 @@ parser -> AST2Graph -> 通用图优化
 
 ### 3.2 规范顺序
 
-候选 MTask 收缩完成后，dense planner 从 Node 的 `next/depNext` 构建依赖图，再用 Kahn 算法得到依赖拓扑序。`prev/depPrev` 用于重建反向索引和检查收缩条件。
+候选 MTask 收缩完成后，dense planner 从 Node 的 `next` 构建依赖图，再用 Kahn 算法得到依赖拓扑序。MT 路径中的 `depNext` 与 `next` 相同，`depPrev` 与 `prev` 相同。
 
-随后直接从 register destination 和 memory port 关系加入拓扑序向前的 activation 边。向后的激活表示下一周期的影响，不能作为当前周期依赖，否则寄存器反馈会制造伪环。所有最终边都必须在依赖拓扑序中向前。
+随后直接从 memory port 关系加入拓扑序向前的 activation 边。寄存器 `dst -> src` 属于下一周期状态提交，不再加入 MTask DAG，否则寄存器反馈会制造伪依赖。所有最终边都必须在依赖拓扑序中向前。
 
 assert/printf 只使用图中已有的真实数据依赖。不能把所有较早任务连接到观察节点；这会把观察节点变成全局 barrier，正确性依据不充分且会严重损失并行度。
 
-MT 路径在 lowering 前直接构建 `MtTaskPlan`。每个 MTask 已持有自己的 `members`，lowering 以原顺序作为稳定 tie-break，对 task 内 Node 做 `depPrev/depNext` 拓扑排序。该顺序允许无依赖计算提前，但不允许越过任何 task 内数据或顺序依赖。
+MT 路径在 lowering 前直接构建 `MtTaskPlan`。每个 MTask 已持有自己的 `members`，lowering 以原顺序作为稳定 tie-break，对 task 内 Node 做直接依赖拓扑排序。实现仍读取 `depPrev/depNext`，但两者已归一化为 `prev/next`。该顺序允许无依赖计算提前，但不允许越过任何 task 内数据依赖。
 
 ### 3.3 Node 直接合并为 MTask
 
@@ -332,7 +332,14 @@ worker 2: T2 -> T5
 worker 3: T6 -> T9
 ```
 
-生成模型将每条 chain 固化成 `mtDispatchW0...Wn`。同一 worker 内按数组顺序执行；跨 worker 前驱由后续章节介绍的 wait/store token 保序。
+生成模型将每条 chain 固化成 `mtDispatchW0...Wn`。默认情况下 worker 先按固定顺序执行队头任务；只有队头被跨 worker token 阻塞时，才在其后有限的 lookahead window 内寻找 ready MTask。默认窗口为 128，可通过 `--mt-lookahead-window=N` 修改，设置为 `0` 可恢复严格固定顺序。
+
+为了在允许越过阻塞任务后仍保持正确性，dispatch 同时记录两类就绪条件：
+
+- 跨 worker 前驱由后续章节介绍的 wait/store token 保序；
+- 同一 worker 的前驱由 `mtLocalWaitSlots` 和每周期的 `mtTaskDoneW<N>` 状态保序。
+
+只有两类条件都满足的任务才能执行。窗口内没有 ready 任务时，worker 直接等待当前队头的 token，避免在每次任务完成后重复扫描整个 worker chain。
 
 #### 可分配的任务范围
 
@@ -484,7 +491,7 @@ dense:
 
 ### 寄存器和同步 Reset
 
-普通寄存器和同步复位寄存器不再由普通 MTask 提交，也不再由主线程串行调用
+所有具有有效或常量 `reg-dst` 的寄存器（包括异步复位寄存器）都不再由普通 MTask 提交，也不再由主线程串行调用
 `resetAllMt()`。planner 使用 `widthBits(width) / 8` 和数组的实际 C++ 容量估计存储字节数，
 将寄存器贪心分配给当前字节负载最小的 worker。每个 worker 分别生成字段完全同构且按
 cache line 对齐的 `mtRegisterSrcWn` 和 `mtRegisterDstWn`；MTask 对寄存器的读写直接重定向到
@@ -498,14 +505,19 @@ reset 时不再逐寄存器执行标量赋值，reset 分支同时更新 next-st
 
 ### 异步 Reset
 
-正常周期按异步 reset 不触发执行。MT partition 在公共优化完成后删除 async reset condition
-和 reset value 引入的调度边，运行时也不生成 trigger/join/done/release rendezvous。所有
-worker 完成正常 MTask 后，worker 0 检查每个异步 reset 信号。
+正常周期按异步 reset 不触发执行。MT partition 在公共优化完成后将 `depPrev/depNext`
+归一化为 `prev/next`，因此 async reset condition、reset value 和 `reg-src -> reg-dst` 都不再
+形成额外调度边；运行时也不生成 trigger/join/done/release rendezvous。所有
+worker 完成正常 MTask 后，worker 0 检查每个异步 reset 信号。异步复位寄存器和其他寄存器
+一样，只要仍有有效或常量 `reg-dst`，就已经在周期起始 state phase 中执行状态提交；普通
+MTask 不再包含这类复制。若 next-state 被优化成常量，state phase 会先将该常量写入
+`DstBlock`，再统一复制到 `SrcBlock`。因此异步复位可在周期末覆盖两者，而下一周期正常
+提交仍会恢复编译期 next-state 常量。
 
 若没有信号为高，直接提交本周期 deferred printf/assert。若任一信号为高，则进入罕见慢路径：
 
 1. 丢弃所有 worker 首轮记录的 printf/assert；
-2. 执行所有当前为高的 async reset body，同时更新对应寄存器 `src` 和 `dst`；
+2. 执行所有当前为高的 async reset body，更新对应寄存器 `src` 和仍有存储的动态 `dst`；
 3. replay 每个 memory writer task，以新的写使能直接覆盖该端口的 pending-write valid；
 4. 按全局拓扑 task ID 串行重算普通节点、输出和寄存器 `dst`；
 5. 提交 replay 产生的 printf/assert。
@@ -513,7 +525,10 @@ worker 完成正常 MTask 后，worker 0 检查每个异步 reset 信号。
 extmodule task 不在 replay 中重复调用，保留首轮计算出的输出，以避免 DPI/external helper
 副作用执行两次。memory 真正状态只在周期开始提交；writer task 无条件计算 address/data，并将
 pending valid 直接赋值为完整写使能，因此 replay 不需要额外遍历并清除全部 memory writer。
-异步复位寄存器仍不进入周期起始的普通寄存器块提交。
+若复位触发，async reset body 会覆盖首次 state phase 提交的值，同时写入寄存器 `src` 和
+仍有存储的动态 `dst`；常量 `dst` 无需保存复位值，下一周期 state phase 会重新生成其 normal
+next-state 常量。随后的 replay 从复位后的 `src` 重算组合逻辑和下一状态。由于周期起始 state
+barrier 先于所有 MTask，寄存器不再需要 `reg-src -> reg-dst` 的纯调度边。
 
 大型设计的寄存器、memory 提交或异步 reset 指令可能形成非常大的 C++ 函数。默认情况下，
 `GSIM_EMIT_RESET_CHUNK=4096` 会在控制嵌套深度为 0 的位置拆分 body，生成
@@ -558,6 +573,8 @@ task 内局部中间量使用 `T value{};` 值初始化。部分 external/memory
 | `--mt-target-tasks=N` | `1600` | 期望 MTask 数，软限制 |
 | `--mt-partition-node-weight=N` | `0` | 划分成本中每个节点的固定权重 |
 | `--mt-schedule-global-weight=N` | `12` | worker 调度成本中每个跨 task 全局节点的权重 |
+| `--mt-lookahead-window=N` | `128` | 队头 token 阻塞时最多检查的后继任务数；`0` 恢复严格顺序 |
+| `--mt-lookahead-stats=on|off` | `off` | 生成 per-worker lookahead calls/scanned/found/fullmiss 统计 |
 | `GSIM_EMIT_RESET_CHUNK` | `4096` | reset 函数目标语句数；`0` 禁用 |
 | `--supernode-max-size=N` | 项目默认值 | 上游图划分粒度，会影响 task 数和并行度 |
 | `--cpp-max-size-KB=N` | 项目默认值 | 生成 C++ 文件切分大小 |
@@ -574,8 +591,8 @@ task 内局部中间量使用 `T value{};` 值初始化。部分 external/memory
 `GSIM_MT_DENSE_EXECUTOR_CODEGEN`、`GSIM_MT_DENSE_LOOKAHEAD`、
 `GSIM_MT_DENSE_XTHREAD_DEPS_ONLY`、`GSIM_MT_DENSE_OWNER_READY_FLAGS`、
 `GSIM_MT_DENSE_UNPIN_SPECIAL`、`GSIM_MT_WORKER_POOL_FLAG_JOIN` 等开关不再读取。
-`GSIM_MT_DENSE_LOOKAHEAD` 是有意删除的：worker 内乱序与隐含顺序不兼容。
-`--mt-target-tasks` 是当前 MTask 划分使用的目标任务数参数，默认值为 `1600`。
+lookahead 只通过上述命令行参数配置；同 worker 依赖由 `mtLocalWaitSlots` 保序。
+`--mt-target-tasks` 是当前 MTask 划分使用的目标任务数参数，默认值为 `2400`。critical-path contraction 仅通过上述命令行参数配置，不读取环境变量。
 尚未接入的 RepCut 方案和原型验证记录见 [mt-repcut.md](mt-repcut.md)。
 
 ## 10. 构建与运行
