@@ -74,7 +74,8 @@ class DirectMTaskCoarsener {
 
   void build(MtTaskPlan& plan, int targetTasks) {
     initialize();
-    mergeWhenGroups();
+    topologicalOrder();
+    // mergeWhenGroups();
     mergeOut1Groups();
     mergeIn1Groups();
     mergeSiblingGroups();
