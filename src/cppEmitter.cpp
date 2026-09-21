@@ -213,6 +213,17 @@ FILE* graph::genHeaderStart() {
 void graph::genInterfaceInput(Node* input) {
   /* set by string */
   emitFuncDecl(0, "void S%s::set_%s(%s val) {\n", name.c_str(), input->name.c_str(), widthUType(input->width).c_str());
+  // usedBits can narrow a port below its C++ storage width.
+  if (input->width == 0) {
+    emitBodyLock(1, "val = 0;\n");
+  } else if (input->width < (int)widthBits(input->width)) {
+    if (input->sign) {
+      int shift = widthBits(input->width) - input->width;
+      emitBodyLock(1, "val = %s(val << %d) >> %d;\n", Cast(input->width, true).c_str(), shift, shift);
+    } else {
+      emitBodyLock(1, "val &= %s;\n", bitMask(input->width).c_str());
+    }
+  }
   emitBodyLock(1, "if (%s != val) { \n", input->name.c_str());
   emitBodyLock(2, "%s = val;\n", input->name.c_str());
   /* update nodes in the same superNode */
