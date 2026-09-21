@@ -519,7 +519,19 @@ valInfo* ENode::instsSub(Node* node, std::string lvalue, bool isRoot) {
       else
         rstr = format("(%s(%s%s << %d) >> %d)", Cast(width, true).c_str(), Cast(ChildInfo(1, width), false).c_str(), rstr.c_str(), rshiftBits, rshiftBits);
     }
-    ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign) + lstr + " - " + rstr + ")";
+    if (sign) {
+      // FIRRTL subtraction wraps after narrowing; signed C++ overflow does not.
+      int arithmeticWidth = MAX(width, MAX(ChildInfo(0, width), ChildInfo(1, width)));
+      std::string cast = Cast(arithmeticWidth, false);
+      std::string difference = "(" + cast + "(" + lstr + ") - " + cast + "(" + rstr + "))";
+      int shift = widthBits(width) - width;
+      ret->valStr = format("(%s(%s(%s)%s)%s)",
+                          Cast(width, true).c_str(), Cast(width, false).c_str(),
+                          difference.c_str(), shiftBits(shift, ShiftDir::Left).c_str(),
+                          shiftBits(shift, ShiftDir::Right).c_str());
+    } else {
+      ret->valStr = "(" + upperCast(width, ChildInfo(0, width), false) + lstr + " - " + rstr + ")";
+    }
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
     if (!sign) {
       ret->valStr = format("(%s & %s)", ret->valStr.c_str(), bitMask(width).c_str());
