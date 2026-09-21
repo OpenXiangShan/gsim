@@ -6,6 +6,8 @@
 - array-narrowing.fir: Checks element-width truncation on two-dimensional
   register row connects, plus unsigned and signed whole-array narrowing and
   extension across native C++ storage widths.
+- array-widening.fir: Checks signed and unsigned widening of vectors rebuilt
+  from scalar members, including mixed constant/runtime elements.
 - dshr-overshift.fir: Checks FIRRTL-defined dynamic right shifts at and beyond
   the operand width for both unsigned and signed values.
 - dynamic-vector-index.fir: Checks in-bounds reads plus deterministic,

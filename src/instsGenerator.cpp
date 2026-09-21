@@ -925,6 +925,8 @@ valInfo* ENode::instsAsUInt(Node* node, std::string lvalue, bool isRoot) {
 }
 
 valInfo* ENode::instsAsSInt(Node* node, std::string lvalue, bool isRoot) {
+  // Aggregate connects are converted element by element in arrayCopy.
+  if (ChildInfo(0, type) == TYPE_ARRAY) return computeInfo = Child(0, computeInfo);
   valInfo* ret = computeInfo;
 
   bool isConstant = ChildInfo(0, status) == VAL_CONSTANT;
@@ -1090,6 +1092,8 @@ valInfo* ENode::instsXorr(Node* node, std::string lvalue, bool isRoot) {
 }
 
 valInfo* ENode::instsPad(Node* node, std::string lvalue, bool isRoot) {
+  // Preserve each member's source width until arrayCopy emits its conversion.
+  if (ChildInfo(0, type) == TYPE_ARRAY) return computeInfo = Child(0, computeInfo);
   /* no operation for UInt variable */
   if (!sign || (width <= ChildInfo(0, width))) {
     if (ChildInfo(0, opNum) >= 0 && (int)widthBits(ChildInfo(0, width)) < width) {
