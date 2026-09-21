@@ -581,6 +581,13 @@ valInfo* ENode::instsRem(Node* node, std::string lvalue, bool isRoot) {
   } else {
     ret->valStr = "(" + upperCast(width, ChildInfo(0, width), sign)+ ChildInfo(0, valStr) + " % " + ChildInfo(1, valStr) + ")";
     ret->opNum = ChildInfo(0, opNum) + ChildInfo(1, opNum) + 1;
+    if (sign) {
+      // Any signed value rem -1 is zero, including the host MIN / -1 overflow.
+      ret->valStr = format("((%s(%s) == -1) ? 0 : %s)",
+                           Cast(ChildInfo(1, width), true).c_str(),
+                           ChildInfo(1, valStr).c_str(), ret->valStr.c_str());
+      ret->opNum++;
+    }
   }
   return ret;
 }

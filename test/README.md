@@ -21,5 +21,7 @@
   whose operand is a node reference.
 - signed-sub-wrap.fir: Checks signed subtraction across overflow boundaries,
   including truncated comparisons and full-width/shifted results.
+- signed-rem-overflow.fir: Checks signed remainder for MIN/-1 and ordinary
+  positive/negative operands, including constant divisors and narrowed results.
 - signed-constant-slice.fir: Checks node splitting of shifts, bit selections,
   and padding applied to negative signed constants.
