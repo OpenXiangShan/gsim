@@ -12,6 +12,8 @@
   the operand width for both unsigned and signed values.
 - dynamic-vector-index.fir: Checks in-bounds reads plus deterministic,
   memory-safe out-of-bounds reads and writes through dynamic vector indices.
+- input-narrowing.fir: Checks input normalization after used-width optimization,
+  including comparisons and signed extension from narrowed ports.
 - cat-eq-constant.fir: Checks constant slicing in the
   `cat(lhs, rhs) == constant` optimization.
 - repro-usefulreset.fir: Minimized FIR reproducer for GSIM issue #106, used to guard against ConstantAnalysis hangs and OOM regressions.
