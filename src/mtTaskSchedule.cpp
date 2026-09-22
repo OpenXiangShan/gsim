@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <climits>
 #include <map>
+#include <numeric>
 #include <set>
+#include <unordered_map>
 #include <utility>
 
 namespace {
@@ -539,6 +541,266 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
           memoryWriterCount, memoryWriteBytes, *stateLimits.first, *stateLimits.second);
 }
 
+struct ScheduledInterval {
+  int task = -1;
+  long long start = 0;
+  long long finish = 0;
+};
+
+struct WorkerSchedule {
+  std::vector<int> owner;
+  std::vector<std::vector<int>> chains;
+  long long makespan = 0;
+};
+
+using EdgeCommunicationNodes =
+    std::vector<std::unordered_map<int, std::unordered_set<Node*>>>;
+
+EdgeCommunicationNodes buildEdgeCommunicationNodes(const MtTaskPlan& tasks) {
+  const size_t taskCount = tasks.tasks_.size();
+  EdgeCommunicationNodes nodes(taskCount);
+  for (size_t consumerId = 0; consumerId < taskCount; ++consumerId) {
+    const MtTask& consumer = tasks.tasks_[consumerId];
+    std::unordered_map<int, std::unordered_set<Node*>> nodesByProducer;
+    for (Node* consumerNode : consumer.members) {
+      for (Node* predecessorNode : consumerNode->prev) {
+        auto found = tasks.taskByNode_.find(predecessorNode);
+        if (found == tasks.taskByNode_.end()) continue;
+        const int producerId = found->second;
+        if (producerId < 0 || producerId == static_cast<int>(consumerId) ||
+            producerId >= static_cast<int>(taskCount)) {
+          continue;
+        }
+        const MtTask& producer = tasks.tasks_[static_cast<size_t>(producerId)];
+        if (producer.localNodes.count(predecessorNode) == 0) {
+          nodesByProducer[producerId].insert(predecessorNode);
+        }
+      }
+    }
+    for (auto& entry : nodesByProducer) {
+      nodes[consumerId][entry.first] = std::move(entry.second);
+    }
+  }
+  return nodes;
+}
+
+size_t edgeCommunicationNodeCount(const EdgeCommunicationNodes& nodes,
+                                  int consumer, int producer) {
+  const auto& byProducer = nodes[static_cast<size_t>(consumer)];
+  auto found = byProducer.find(producer);
+  return found == byProducer.end() ? 0 : found->second.size();
+}
+
+long long workerCommunicationReadyTime(
+    const MtTaskPlan& tasks, const EdgeCommunicationNodes& nodes,
+    int consumer, int candidateWorker, const std::vector<int>& owner,
+    const std::vector<long long>& completion, long long readyAt) {
+  std::unordered_map<int, long long> producerCompletion;
+  std::unordered_map<int, std::unordered_set<Node*>> nodesByWorker;
+  for (int predecessor : tasks.tasks_[static_cast<size_t>(consumer)].predecessors) {
+    const int producerWorker = owner[static_cast<size_t>(predecessor)];
+    if (producerWorker < 0 || producerWorker == candidateWorker) continue;
+    producerCompletion[producerWorker] = std::max(
+        producerCompletion[producerWorker], completion[static_cast<size_t>(predecessor)]);
+    const auto& byProducer = nodes[static_cast<size_t>(consumer)];
+    auto found = byProducer.find(predecessor);
+    if (found != byProducer.end()) {
+      auto& remoteNodes = nodesByWorker[producerWorker];
+      remoteNodes.insert(found->second.begin(), found->second.end());
+    }
+  }
+  for (const auto& entry : producerCompletion) {
+    const size_t nodeCount = nodesByWorker[entry.first].size();
+    const long long communication =
+        static_cast<long long>(nodeCount) * globalConfig.MtScheduleCommNodeWeight;
+    readyAt = std::max(readyAt, entry.second + communication);
+  }
+  return readyAt;
+}
+
+size_t actualCrossWorkerCommunicationNodes(
+    const MtTaskPlan& tasks, const EdgeCommunicationNodes& nodes) {
+  size_t total = 0;
+  for (size_t consumer = 0; consumer < tasks.tasks_.size(); ++consumer) {
+    const int consumerWorker = tasks.tasks_[consumer].owner;
+    std::unordered_map<int, std::unordered_set<Node*>> remoteNodes;
+    for (const auto& entry : nodes[consumer]) {
+      const int producer = entry.first;
+      if (tasks.tasks_[static_cast<size_t>(producer)].owner == consumerWorker) continue;
+      const int producerWorker = tasks.tasks_[static_cast<size_t>(producer)].owner;
+      auto& workerNodes = remoteNodes[producerWorker];
+      workerNodes.insert(entry.second.begin(), entry.second.end());
+    }
+    for (const auto& entry : remoteNodes) total += entry.second.size();
+  }
+  return total;
+}
+
+WorkerSchedule scheduleList(const MtTaskPlan& tasks, int workerCount,
+                            const EdgeCommunicationNodes& communicationNodes) {
+  const int taskCount = static_cast<int>(tasks.tasks_.size());
+  WorkerSchedule result;
+  result.owner.assign(static_cast<size_t>(taskCount), -1);
+  result.chains.assign(static_cast<size_t>(workerCount), std::vector<int>());
+
+  std::vector<int> remaining(static_cast<size_t>(taskCount), 0);
+  std::vector<long long> completion(static_cast<size_t>(taskCount), 0);
+  std::vector<long long> workerAvailable(static_cast<size_t>(workerCount), 0);
+  std::vector<long long> priority(static_cast<size_t>(taskCount), 0);
+  for (int taskId = taskCount - 1; taskId >= 0; --taskId) {
+    long long successorPriority = 0;
+    for (int successor : tasks.tasks_[static_cast<size_t>(taskId)].successors) {
+      successorPriority = std::max(successorPriority, priority[static_cast<size_t>(successor)]);
+    }
+    priority[static_cast<size_t>(taskId)] =
+        std::max(1, tasks.tasks_[static_cast<size_t>(taskId)].cost) + successorPriority;
+  }
+  std::vector<int> ready;
+  for (int taskId = 0; taskId < taskCount; ++taskId) {
+    remaining[static_cast<size_t>(taskId)] =
+        static_cast<int>(tasks.tasks_[static_cast<size_t>(taskId)].predecessors.size());
+    if (remaining[static_cast<size_t>(taskId)] == 0) ready.push_back(taskId);
+  }
+
+  while (!ready.empty()) {
+    int bestIndex = -1;
+    int bestTask = -1;
+    int bestWorker = -1;
+    long long bestStart = LLONG_MAX;
+    for (size_t index = 0; index < ready.size(); ++index) {
+      const int taskId = ready[index];
+      const MtTask& task = tasks.tasks_[static_cast<size_t>(taskId)];
+      for (int worker = 0; worker < workerCount; ++worker) {
+        long long start = workerAvailable[static_cast<size_t>(worker)];
+        for (int predecessor : task.predecessors) {
+          start = std::max(start, completion[static_cast<size_t>(predecessor)]);
+        }
+        start = workerCommunicationReadyTime(
+            tasks, communicationNodes, taskId, worker, result.owner, completion, start);
+        bool better = start < bestStart;
+        if (start == bestStart && bestTask >= 0) {
+          better = priority[static_cast<size_t>(taskId)] >
+                       priority[static_cast<size_t>(bestTask)] ||
+                   (priority[static_cast<size_t>(taskId)] ==
+                        priority[static_cast<size_t>(bestTask)] &&
+                    taskId < bestTask);
+        }
+        if (better) {
+          bestStart = start;
+          bestIndex = static_cast<int>(index);
+          bestTask = taskId;
+          bestWorker = worker;
+        }
+      }
+    }
+    Assert(bestTask >= 0, "list scheduler failed with %zu ready tasks", ready.size());
+    const long long finish = bestStart + std::max(1, tasks.tasks_[static_cast<size_t>(bestTask)].cost);
+    result.owner[static_cast<size_t>(bestTask)] = bestWorker;
+    completion[static_cast<size_t>(bestTask)] = finish;
+    workerAvailable[static_cast<size_t>(bestWorker)] = finish;
+    result.chains[static_cast<size_t>(bestWorker)].push_back(bestTask);
+    result.makespan = std::max(result.makespan, finish);
+
+    ready[static_cast<size_t>(bestIndex)] = ready.back();
+    ready.pop_back();
+    for (int successor : tasks.tasks_[static_cast<size_t>(bestTask)].successors) {
+      if (--remaining[static_cast<size_t>(successor)] == 0) ready.push_back(successor);
+    }
+  }
+  return result;
+}
+
+WorkerSchedule scheduleHeft(const MtTaskPlan& tasks, int workerCount,
+                            const EdgeCommunicationNodes& communicationNodes) {
+  const int taskCount = static_cast<int>(tasks.tasks_.size());
+  WorkerSchedule result;
+  result.owner.assign(static_cast<size_t>(taskCount), -1);
+  result.chains.assign(static_cast<size_t>(workerCount), std::vector<int>());
+
+  // HEFT upward rank. Task IDs are already a forward topological order, so
+  // successors have larger IDs and can be processed in reverse order.
+  std::vector<long long> rank(static_cast<size_t>(taskCount), 0);
+  for (int taskId = taskCount - 1; taskId >= 0; --taskId) {
+    long long tail = 0;
+    for (int successor : tasks.tasks_[static_cast<size_t>(taskId)].successors) {
+      const long long averageCommunication =
+          static_cast<long long>(edgeCommunicationNodeCount(communicationNodes, successor, taskId)) *
+          globalConfig.MtScheduleCommNodeWeight * std::max(0, workerCount - 1) /
+          std::max(1, workerCount);
+      tail = std::max(tail, averageCommunication + rank[static_cast<size_t>(successor)]);
+    }
+    rank[static_cast<size_t>(taskId)] =
+        std::max(1, tasks.tasks_[static_cast<size_t>(taskId)].cost) + tail;
+  }
+
+  std::vector<int> order(static_cast<size_t>(taskCount));
+  std::iota(order.begin(), order.end(), 0);
+  std::sort(order.begin(), order.end(), [&](int lhs, int rhs) {
+    if (rank[static_cast<size_t>(lhs)] != rank[static_cast<size_t>(rhs)]) {
+      return rank[static_cast<size_t>(lhs)] > rank[static_cast<size_t>(rhs)];
+    }
+    return lhs < rhs;
+  });
+
+  std::vector<long long> completion(static_cast<size_t>(taskCount), 0);
+  std::vector<std::map<long long, ScheduledInterval>> timelines(
+      static_cast<size_t>(workerCount));
+
+  for (int taskId : order) {
+    const MtTask& task = tasks.tasks_[static_cast<size_t>(taskId)];
+    const long long duration = std::max(1, task.cost);
+    int bestWorker = -1;
+    long long bestStart = LLONG_MAX;
+    long long bestFinish = LLONG_MAX;
+
+    for (int worker = 0; worker < workerCount; ++worker) {
+      long long readyAt = 0;
+      for (int predecessor : task.predecessors) {
+        readyAt = std::max(readyAt, completion[static_cast<size_t>(predecessor)]);
+      }
+      readyAt = workerCommunicationReadyTime(
+          tasks, communicationNodes, taskId, worker, result.owner, completion, readyAt);
+
+      long long start = readyAt;
+      auto& timeline = timelines[static_cast<size_t>(worker)];
+      auto next = timeline.lower_bound(start);
+      if (next != timeline.begin()) {
+        auto previous = std::prev(next);
+        if (previous->second.finish > start) {
+          start = previous->second.finish;
+          next = std::next(previous);
+        }
+      }
+      while (next != timeline.end() && start + duration > next->second.start) {
+        start = std::max(start, next->second.finish);
+        ++next;
+      }
+      const long long finish = start + duration;
+      if (finish < bestFinish ||
+          (finish == bestFinish &&
+           (start < bestStart || (start == bestStart && worker < bestWorker)))) {
+        bestWorker = worker;
+        bestStart = start;
+        bestFinish = finish;
+      }
+    }
+
+    Assert(bestWorker >= 0, "HEFT scheduler failed to place task %d", taskId);
+    result.owner[static_cast<size_t>(taskId)] = bestWorker;
+    completion[static_cast<size_t>(taskId)] = bestFinish;
+    result.makespan = std::max(result.makespan, bestFinish);
+    ScheduledInterval placed{taskId, bestStart, bestFinish};
+    timelines[static_cast<size_t>(bestWorker)].emplace(placed.start, placed);
+  }
+
+  for (int worker = 0; worker < workerCount; ++worker) {
+    for (const auto& entry : timelines[static_cast<size_t>(worker)]) {
+      result.chains[static_cast<size_t>(worker)].push_back(entry.second.task);
+    }
+  }
+  return result;
+}
+
 
 }  // namespace
 
@@ -547,122 +809,46 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
   const int groupCount = tasks.partitionGroupCount_;
   compactEmptyTasks(tasks);
   for (MtTask& task : tasks.tasks_) task.cost = loweredTaskCost(task);
-  // Schedule only ready MTasks, then renumber by that schedule. This produces a
-  // topological fixed-worker program order. Critical-path priority breaks equal
-  // earliest-start times.
-  const int denseTaskCount = static_cast<int>(tasks.tasks_.size());
-  std::vector<int> remainingPredecessors(static_cast<size_t>(denseTaskCount), 0);
-  std::vector<long long> priority(static_cast<size_t>(denseTaskCount), 0);
-  for (int taskId = 0; taskId < denseTaskCount; ++taskId) {
-    remainingPredecessors[static_cast<size_t>(taskId)] =
-        static_cast<int>(tasks.tasks_[static_cast<size_t>(taskId)].predecessors.size());
+  const EdgeCommunicationNodes communicationNodes = buildEdgeCommunicationNodes(tasks);
+  size_t communicationEdges = 0;
+  long long communicationUnits = 0;
+  for (const auto& byProducer : communicationNodes) {
+    communicationEdges += byProducer.size();
+    for (const auto& entry : byProducer) communicationUnits += entry.second.size();
   }
-  for (int taskId = denseTaskCount - 1; taskId >= 0; --taskId) {
-    long long successorPriority = 0;
-    for (int successor : tasks.tasks_[static_cast<size_t>(taskId)].successors) {
-      successorPriority = std::max(successorPriority, priority[static_cast<size_t>(successor)]);
-    }
-    priority[static_cast<size_t>(taskId)] =
-        tasks.tasks_[static_cast<size_t>(taskId)].cost + successorPriority;
-  }
-
-  std::vector<int> readyTasks;
-  for (int taskId = 0; taskId < denseTaskCount; ++taskId) {
-    if (remainingPredecessors[static_cast<size_t>(taskId)] == 0) readyTasks.push_back(taskId);
-  }
-  std::vector<long long> completion(static_cast<size_t>(denseTaskCount), 0);
-  std::vector<long long> workerAvailable(static_cast<size_t>(workerCount), 0);
-  std::vector<int> scheduledOwner(static_cast<size_t>(denseTaskCount), -1);
-  std::vector<int> scheduleOrder;
-  scheduleOrder.reserve(static_cast<size_t>(denseTaskCount));
-  while (!readyTasks.empty()) {
-    int bestReadyIndex = -1;
-    int bestTask = -1;
-    int bestWorker = 0;
-    long long bestStart = LLONG_MAX;
-    for (size_t readyIndex = 0; readyIndex < readyTasks.size(); ++readyIndex) {
-      int taskId = readyTasks[readyIndex];
-      const MtTask& task = tasks.tasks_[static_cast<size_t>(taskId)];
-      for (int worker = 0; worker < workerCount; ++worker) {
-        long long start = workerAvailable[static_cast<size_t>(worker)];
-        for (int predecessor : task.predecessors) {
-          long long predecessorEnd = completion[static_cast<size_t>(predecessor)];
-          if (scheduledOwner[static_cast<size_t>(predecessor)] != worker) {
-            predecessorEnd += tasks.tasks_[static_cast<size_t>(predecessor)].cost * 30LL / 100LL;
-          }
-          start = std::max(start, predecessorEnd);
-        }
-        bool better = start < bestStart;
-        if (start == bestStart && bestTask >= 0) {
-          better = priority[static_cast<size_t>(taskId)] > priority[static_cast<size_t>(bestTask)] ||
-                   (priority[static_cast<size_t>(taskId)] == priority[static_cast<size_t>(bestTask)] &&
-                    taskId < bestTask);
-        }
-        if (better || bestTask < 0) {
-          bestStart = start;
-          bestReadyIndex = static_cast<int>(readyIndex);
-          bestTask = taskId;
-          bestWorker = worker;
-        }
-      }
-    }
-    Assert(bestTask >= 0, "dense list scheduler failed with %zu ready tasks", readyTasks.size());
-    scheduledOwner[static_cast<size_t>(bestTask)] = bestWorker;
-    completion[static_cast<size_t>(bestTask)] =
-        bestStart + std::max(1, tasks.tasks_[static_cast<size_t>(bestTask)].cost);
-    workerAvailable[static_cast<size_t>(bestWorker)] = completion[static_cast<size_t>(bestTask)];
-    scheduleOrder.push_back(bestTask);
-    readyTasks[static_cast<size_t>(bestReadyIndex)] = readyTasks.back();
-    readyTasks.pop_back();
-    for (int successor : tasks.tasks_[static_cast<size_t>(bestTask)].successors) {
-      int& remaining = remainingPredecessors[static_cast<size_t>(successor)];
-      if (--remaining == 0) readyTasks.push_back(successor);
-    }
-  }
-  Assert(static_cast<int>(scheduleOrder.size()) == denseTaskCount,
-         "dense list scheduler covered %zu/%d tasks", scheduleOrder.size(), denseTaskCount);
-
-  std::vector<int> newTaskId(static_cast<size_t>(denseTaskCount), -1);
-  for (int newId = 0; newId < denseTaskCount; ++newId) {
-    newTaskId[static_cast<size_t>(scheduleOrder[static_cast<size_t>(newId)])] = newId;
-  }
-  std::vector<MtTask> reorderedTasks(static_cast<size_t>(denseTaskCount));
-  for (int oldId = 0; oldId < denseTaskCount; ++oldId) {
-    int newId = newTaskId[static_cast<size_t>(oldId)];
-    reorderedTasks[static_cast<size_t>(newId)] = std::move(tasks.tasks_[static_cast<size_t>(oldId)]);
-    reorderedTasks[static_cast<size_t>(newId)].owner = scheduledOwner[static_cast<size_t>(oldId)];
-  }
-  for (MtTask& task : reorderedTasks) {
-    for (int& predecessor : task.predecessors) {
-      predecessor = newTaskId[static_cast<size_t>(predecessor)];
-    }
-    for (int& successor : task.successors) {
-      successor = newTaskId[static_cast<size_t>(successor)];
-    }
-    std::sort(task.predecessors.begin(), task.predecessors.end());
-    std::sort(task.successors.begin(), task.successors.end());
-  }
-  tasks.tasks_.swap(reorderedTasks);
-  tasks.taskByNode_.clear();
+  WorkerSchedule schedule = globalConfig.MtScheduler == "list"
+                                ? scheduleList(tasks, workerCount, communicationNodes)
+                                : scheduleHeft(tasks, workerCount, communicationNodes);
   for (size_t taskId = 0; taskId < tasks.tasks_.size(); ++taskId) {
-    for (Node* node : tasks.tasks_[taskId].members) tasks.taskByNode_[node] = taskId;
+    tasks.tasks_[taskId].owner = schedule.owner[taskId];
   }
-  for (int taskId = 0; taskId < denseTaskCount; ++taskId) {
-    for (int successor : tasks.tasks_[static_cast<size_t>(taskId)].successors) {
-      Assert(taskId < successor, "renumbered dense edge is not forward: %d -> %d", taskId, successor);
-    }
-  }
+  const size_t actualCrossWorkerNodes =
+      actualCrossWorkerCommunicationNodes(tasks, communicationNodes);
+  fprintf(stderr,
+          "[cppEmitter-mt] scheduler=%s estimated-makespan=%lld "
+          "potential-comm-edges=%zu potential-comm-nodes=%lld "
+          "actual-cross-worker-nodes=%zu comm-node-weight=%d\n",
+          globalConfig.MtScheduler.c_str(), schedule.makespan, communicationEdges,
+          communicationUnits, actualCrossWorkerNodes,
+          globalConfig.MtScheduleCommNodeWeight);
 
   const size_t transitiveEdgesRemoved = transitivelyReduceTaskEdges(tasks);
 
   collectWorkerLocalNodes(tasks, graph);
 
-  workers.workerTasks_.assign(static_cast<size_t>(workerCount), std::vector<int>());
+  workers.workerTasks_ = std::move(schedule.chains);
   std::vector<int> workerPosition(tasks.tasks_.size(), -1);
-  for (size_t taskId = 0; taskId < tasks.tasks_.size(); ++taskId) {
-    int owner = tasks.tasks_[taskId].owner;
-    workerPosition[taskId] = static_cast<int>(workers.workerTasks_[static_cast<size_t>(owner)].size());
-    workers.workerTasks_[static_cast<size_t>(owner)].push_back(taskId);
+  for (int worker = 0; worker < workerCount; ++worker) {
+    const std::vector<int>& chain = workers.workerTasks_[static_cast<size_t>(worker)];
+    for (size_t position = 0; position < chain.size(); ++position) {
+      const int taskId = chain[position];
+      Assert(taskId >= 0 && taskId < static_cast<int>(tasks.tasks_.size()),
+             "worker %d contains invalid task %d", worker, taskId);
+      Assert(tasks.tasks_[static_cast<size_t>(taskId)].owner == worker,
+             "task %d owner mismatch: task=%d worker=%d", taskId,
+             tasks.tasks_[static_cast<size_t>(taskId)].owner, worker);
+      workerPosition[static_cast<size_t>(taskId)] = static_cast<int>(position);
+    }
   }
 
   for (size_t taskId = 0; taskId < tasks.tasks_.size(); ++taskId) {

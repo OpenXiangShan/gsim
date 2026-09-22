@@ -77,6 +77,8 @@ Config::Config() {
   MtTargetTasks = 2400;
   MtPartitionNodeWeight = 0;
   MtScheduleGlobalWeight = 12;
+  MtScheduleCommNodeWeight = 30;
+  MtScheduler = "heft";
   MtLookaheadWindow = 128;
   MtLookaheadStats = false;
 }
@@ -157,6 +159,9 @@ static void printUsage(const char* ProgName) {
             << "                                   Fixed per-node weight in MT partition cost (default: 0).\n"
             << "      --mt-schedule-global-weight=[num]\n"
             << "                                   Weight for cross-MTask nodes in worker cost (default: 12).\n"
+            << "      --mt-schedule-comm-node-weight=[num]\n"
+            << "                                   Communication cost per cross-worker node (default: 20).\n"
+            << "      --mt-scheduler=heft|list     Worker assignment algorithm (default: heft).\n"
             << "      --mt-lookahead-window=[num]   Ready-task lookahead window when the chain head blocks (default: 128, 0 disables).\n"
             << "      --mt-lookahead-stats=off|on  Emit per-worker lookahead hit/miss counters (default: off).\n"
             ;
@@ -192,6 +197,8 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_MT_TARGET_TASKS,
     OPT_MT_PARTITION_NODE_WEIGHT,
     OPT_MT_SCHEDULE_GLOBAL_WEIGHT,
+    OPT_MT_SCHEDULE_COMM_NODE_WEIGHT,
+    OPT_MT_SCHEDULER,
     OPT_MT_LOOKAHEAD_WINDOW,
     OPT_MT_LOOKAHEAD_STATS,
   };
@@ -218,6 +225,8 @@ static char* parseCommandLine(int argc, char** argv) {
       {"mt-target-tasks", required_argument, nullptr, 0},
       {"mt-partition-node-weight", required_argument, nullptr, 0},
       {"mt-schedule-global-weight", required_argument, nullptr, 0},
+      {"mt-schedule-comm-node-weight", required_argument, nullptr, 0},
+      {"mt-scheduler", required_argument, nullptr, 0},
       {"mt-lookahead-window", required_argument, nullptr, 0},
       {"mt-lookahead-stats", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
@@ -318,6 +327,23 @@ static char* parseCommandLine(int argc, char** argv) {
                 }
                 case OPT_MT_PARTITION_NODE_WEIGHT: sscanf(optarg, "%d", &globalConfig.MtPartitionNodeWeight); break;
                 case OPT_MT_SCHEDULE_GLOBAL_WEIGHT: sscanf(optarg, "%d", &globalConfig.MtScheduleGlobalWeight); break;
+                case OPT_MT_SCHEDULE_COMM_NODE_WEIGHT:
+                  sscanf(optarg, "%d", &globalConfig.MtScheduleCommNodeWeight);
+                  if (globalConfig.MtScheduleCommNodeWeight < 0) {
+                    fprintf(stderr, "Error: --mt-schedule-comm-node-weight expects a non-negative number, got '%s'.\n", optarg);
+                    _exit(EXIT_FAILURE);
+                  }
+                  break;
+                case OPT_MT_SCHEDULER:
+                  if (strcmp(optarg, "heft") != 0 && strcmp(optarg, "list") != 0) {
+                    fprintf(stderr, "Error: --mt-scheduler expects heft or list, got '%s'.\n", optarg);
+                    printUsage(argv[0]);
+                    std::cout.flush();
+                    fflush(nullptr);
+                    _exit(EXIT_FAILURE);
+                  }
+                  globalConfig.MtScheduler = optarg;
+                  break;
                 case OPT_MT_LOOKAHEAD_WINDOW: {
                   int window = -1;
                   if (sscanf(optarg, "%d", &window) != 1 || window < 0) {

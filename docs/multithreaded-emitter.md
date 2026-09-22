@@ -225,7 +225,7 @@ void STop::mtTaskN() {
 | `waits/stores` | 跨 worker token 槽 |
 | `waitBegin/.../storeEnd` | 生成扁平静态数组时使用的区间 |
 
-`targetTasks` 是软目标而不是硬上限。不可拆分的高成本候选组和连续贪心分组产生的碎片都可能令实际 MTask 数超过目标，此时生成器只输出警告。增大目标任务数可以减少单个 MTask 的成本，但会增加函数调用、dispatch 和 token 同步开销；减小目标任务数则降低调度开销，同时可能减少并行度并加剧负载不均。当前算法没有直接考虑跨 worker 边、cache locality 或 profile 数据，这些因素由后续静态调度部分处理或留作进一步优化。
+`targetTasks` 是软目标而不是硬上限。不可拆分的高成本候选组和连续贪心分组产生的碎片都可能令实际 MTask 数超过目标，此时生成器只输出警告。增大目标任务数可以减少单个 MTask 的成本，但会增加函数调用、dispatch 和 token 同步开销；减小目标任务数则降低调度开销，同时可能减少并行度并加剧负载不均。MTask 划分阶段不使用 worker 归属；worker 级通信估计、cache locality 和 profile 数据只在后续 worker 调度阶段或未来优化中处理。
 
 ### 3.4 Worker 分配
 
@@ -274,23 +274,32 @@ priority[task] = task.cost + max(priority[successor])
 
 #### 枚举 Task/Worker 组合
 
-每轮不是先选任务再选线程，而是评估笛卡尔积 `readyTasks x workers`。任务在候选 worker 上的预计开始时间先取该 worker 的空闲时间，再受所有前驱约束：
+每轮评估笛卡尔积 `readyTasks × workers`。MTask 的 lowering 成本为：
 
 ```text
-start(task, worker) = max(
-    workerAvailable[worker],
-    completion[pred0] + crossWorkerPenalty(pred0, worker),
-    completion[pred1] + crossWorkerPenalty(pred1, worker),
-    ...)
+cost(T) = max(1,
+              instCount(T)
+              + globalNodeCount(T) × MtScheduleGlobalWeight)
 ```
 
-前驱和候选 worker 相同时，惩罚为零；不同时，当前启发式增加前驱成本的 30%：
+`instCount` 是 `InstInfo` 数量，`globalNodeCount` 是跨 MTask 或被 reset helper 使用的模型节点数。这个 cost 是生成期估计，不是运行时采样得到的真实时间。
+
+对于 ready 任务 `T` 和候选 worker `w`，先计算所有前驱的完成约束，再加入 worker 自身的可用时间：
 
 ```text
-crossWorkerPenalty = predecessor.cost * 30 / 100
+start(T, w) = max(
+    workerAvailable[w],
+    max(completion[P]),
+    max(
+        producerCompletion[wp, T]
+        + |remoteNodes(wp, T)| × MtScheduleCommNodeWeight
+    )
+)
 ```
 
-它近似 atomic token、cache line 传递和等待成本，并非 profile 得到的实测值。同一 worker 上的依赖不增加该惩罚，因为固定 worker chain 会顺序执行。
+这里 `wp` 遍历 T 的远程 producer worker。`remoteNodes(wp,T)` 是 T 使用到的、由 worker `wp` 产生的全局节点集合，集合内部去重。同一个 producer worker 上的多个 producer MTask 贡献的相同节点只计算一次；若 producer worker 与候选 worker 相同，则不产生通信代价。
+
+当前通信常量由 `--mt-schedule-comm-node-weight` 控制，默认值为 20。它表示每个跨 worker 全局节点的静态通信代价。
 
 所有组合按以下顺序选择：
 
@@ -298,7 +307,7 @@ crossWorkerPenalty = predecessor.cost * 30 / 100
 2. `start` 相同时，任务的 `priority` 更大；
 3. `priority` 仍相同时，原 `taskId` 更小。
 
-若 task 和上述条件完全相同，worker 遍历顺序会自然保留编号更小的 worker。当前实现比较的是预计开始时间而不是预计结束时间：同一个 task 在不同 worker 上成本相同，所以选择 owner 时两者等价；不同 ready task 之间的自身成本只通过关键路径优先级间接影响选择。
+若 task 和上述条件完全相同，worker 遍历顺序会自然保留编号更小的 worker。list 没有每个 worker 的任务数、代码量或 cost 上限。
 
 #### 提交分配
 
@@ -315,13 +324,16 @@ scheduleOrder.push_back(bestTask)
 
 #### 重新编号与固定 Worker Chain
 
-`scheduleOrder` 仍然是合法拓扑序，因为每次只选择 ready task。planner 按该顺序重新编号 MTask，同时重写全部 `predecessors/successors`，并断言每条边满足 `taskId < successor`。
-
-最后按新 task ID 从小到大扫描：
+`scheduleOrder` 仍然是合法拓扑序，因为每次只选择 ready task。list 提交任务时直接把它追加到选定 worker 的 chain 尾部：
 
 ```text
-workerTasks_[task.owner].push_back(taskId)
+owner[T] = w
+completion[T] = start(T,w) + cost(T)
+workerAvailable[w] = completion[T]
+workerChain[w].push_back(T)
 ```
+
+list 不建立 HEFT 那样的 worker 时间表，也不把任务插入已有任务之间的空闲区间。worker chain 是生成期确定的追加序列；`--mt-lookahead-window=0` 时，运行时严格按该序列执行。
 
 例如四个 worker 的结果可能为：
 
@@ -352,7 +364,186 @@ worker 3: T6 -> T9
 
 注意：来自不同 worker 的 printf 文本可能交错，多个同时失败的 assertion 报告顺序也不保证稳定。
 
-### 3.5 生成结果中有哪些多线程数据结构
+#### list 的边界和运行时含义
+
+list 优化的是生成期估计的最早开始时间，不直接最小化最终最长 worker 的实际运行时间。`start(T,w)` 和 `completion[T]` 都是虚拟调度时间。实际运行时间还会受到以下因素影响：
+
+- MTask 完成到函数返回前才发布 token；
+- 队头 token 等待阻塞同一 worker 后续任务；
+- atomic token load/store 和 cache line 传递；
+- 周期末 worker barrier；
+- memory helper、extmodule 和条件路径的真实执行时间。
+
+因此静态 start/finish 与实际仿真周期时间并不等价。owner 分配完成后，生成器才按 producer worker 和 consumer worker 分组生成 wait/store token；通信节点估计和最终 token 数是相关但不同的两个指标。
+
+### 3.5 HEFT Worker 分配
+
+`--mt-scheduler=heft` 使用 HEFT 风格的静态调度。它与 list 共用已经 lowering 完成的 MTask、cost、依赖图和通信节点集合，不会重新构建 MTask。
+
+HEFT 的流程是：
+
+```text
+MTask DAG
+    |
+    +-> 计算 cost
+    +-> 计算 upward rank
+    +-> 按 rank 从高到低处理任务
+    +-> 为当前任务枚举所有 worker
+    +-> 计算每个 worker 的最早完成时间
+    +-> 选择 finish 最小的 worker
+    +-> 插入该 worker 的时间表
+    `-> 时间表排序结果形成 worker chain
+```
+
+#### Upward rank
+
+设 MTask `T` 的 cost 为 `cost(T)`，`S` 是其后继。rank 从拓扑序末端向前计算：
+
+```text
+rank(T) = cost(T) + max(
+    averageComm(T,S) + rank(S)
+    | S ∈ successors(T)
+)
+```
+
+无后继任务的 rank 等于自身 cost。rank 中的平均通信估计为：
+
+```text
+averageComm(T,S) =
+    |N(S,T)| × MtScheduleCommNodeWeight
+    × (workerCount - 1) / workerCount
+```
+
+`N(S,T)` 是 S 使用到的、由 T 产生的去重全局节点集合。rank 计算时还没有确定 owner，因此使用任务位于不同 worker 的平均比例 `(workerCount-1)/workerCount`。
+
+任务按以下顺序处理：
+
+```text
+rank 大的任务优先；
+rank 相同时 task ID 小的优先。
+```
+
+#### 候选 worker 的就绪时间
+
+对于当前任务 `T` 和候选 worker `w`，先计算所有前驱的预计完成时间：
+
+```text
+predReady(T) = max(completion(P))
+                P ∈ predecessors(T)
+```
+
+随后按 producer worker 合并通信节点。对于每个远程 producer worker `wp`：
+
+```text
+producerCompletion(wp,T) =
+    max(completion(P))
+    where owner(P) = wp
+```
+
+```text
+remoteNodes(wp,T) =
+    union N(T,P)
+    where owner(P) = wp
+```
+
+同一个 producer worker 上多个 producer MTask 的相同节点只计算一次。候选 worker `w` 的通信就绪时间为：
+
+```text
+communicationReady(T,w) = max(
+    producerCompletion(wp,T)
+    + |remoteNodes(wp,T)| × MtScheduleCommNodeWeight
+    | wp != w
+)
+```
+
+最终的最早开始时间为：
+
+```text
+start(T,w) = max(
+    predReady(T),
+    communicationReady(T,w)
+)
+```
+
+#### 时间表插入
+
+每个 worker 都维护一张按 start 排序的区间表。对候选 worker `w`：
+
+```text
+duration(T) = cost(T)
+finish(T,w) = start(T,w) + duration(T)
+```
+
+HEFT 从 `start(T,w)` 开始检查 worker 时间表：
+
+```text
+如果任务与已有区间重叠：
+    start = 重叠区间的 finish
+    继续检查后继区间
+否则：
+    将任务插入当前空闲区间
+```
+
+例如：
+
+```text
+worker: [A: 0,100] [空闲: 100,200] [B: 200,300]
+T 的 readyAt = 120，cost = 50
+
+插入后：
+worker: [A: 0,100] [T: 120,170] [B: 200,300]
+```
+
+实际代码使用 `std::map<long long, ScheduledInterval>` 保存区间，避免插入时搬移整个 vector。
+
+#### Owner 选择
+
+HEFT 对当前任务计算所有候选 worker 的 `finish`，选择：
+
+```text
+argmin finish(T,w)
+```
+
+平局时依次选择：
+
+1. `finish` 更小；
+2. `finish` 相同，`start` 更小；
+3. 仍相同，worker 编号更小。
+
+提交后更新：
+
+```text
+owner[T] = w
+completion[T] = finish(T,w)
+workerTimeline[w].insert(T, start(T,w), finish(T,w))
+```
+
+HEFT 没有每个 worker 的任务数量、代码量或 cost 上限，因此 worker 负载仍可能不均衡。
+
+#### Worker chain 和 token
+
+所有任务分配完成后，HEFT 按每个 worker 的时间表 start 顺序生成固定 chain：
+
+```text
+worker 0: T3 -> T8 -> T1 -> ...
+worker 1: T0 -> T5 -> T9 -> ...
+```
+
+这些 chain 被输出为 `mtDispatchW0...mtDispatchWn`。owner 分配完成后，生成器再按照 producer worker、consumer worker 和 consumer task 生成 token group。同一 producer worker 的多个 producer MTask 可以压缩到一个 token。
+
+#### HEFT 与实际运行时的差异
+
+HEFT 的优化目标是生成期静态估计的 `finish` 和 makespan：
+
+```text
+makespan = max(finish(T,w))
+```
+
+这不等价于严格 worker chain runtime 的真实时间。特别是 `--mt-lookahead-window=0` 时，worker 不能跳过队头阻塞任务去执行后续任务，MTask 也要到函数结束时才发布 token。实际时间还会包含 atomic token 操作、cache line 传递、spin wait、周期 barrier、memory helper 和 worker 负载不均衡。
+
+因此 HEFT 可能降低静态 estimated-makespan，却增加实际 token 或队头等待；`actual-cross-worker-nodes`、最终 token 数和实际周期耗时需要分别测量。
+
+### 3.6 生成结果中有哪些多线程数据结构
 
 生成的 `SimTop.h` 和 `SimTop*.cpp` 中，多线程实现主要由以下结构组成：
 
@@ -389,7 +580,7 @@ worker 3: T6 -> T9
 - 动态活跃 task 队列；
 - 根据历史 profile 重新分配。
 
-当前成本模型也不感知 NUMA、共享 cache、CPU 拓扑或输入相关的真实任务耗时。30% 跨 worker 惩罚是经验参数，因此生成的分配是启发式结果，不保证全局最优。这些能力只有在补齐依赖证明和性能数据后才适合加入。
+当前成本模型也不感知 NUMA、共享 cache、CPU 拓扑或输入相关的真实任务耗时。跨 worker 通信使用“去重全局节点数 × `MtScheduleCommNodeWeight`”的启发式估计，因此生成的分配不保证全局最优。这些能力只有在补齐依赖证明和性能数据后才适合加入。
 
 ## 5. 跨 Worker 同步
 
