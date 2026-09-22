@@ -101,9 +101,13 @@ Node* getSplitArray(graph* g) {
   for (Node* node : candidates) {
     if (point2self(node)) return node;
   }
-  for (Node* node : g->halfConstantArray) {
-    if (fullyVisited.find(node) != fullyVisited.end() || splitArrayMap.find(node) != splitArrayMap.end()) continue;
-    if (point2self(node)) return node;
+  {
+    std::vector<Node*> hca(g->halfConstantArray.begin(), g->halfConstantArray.end());
+    std::sort(hca.begin(), hca.end(), [](const Node* a, const Node* b){ return a->name < b->name; });
+    for (Node* node : hca) {
+      if (fullyVisited.find(node) != fullyVisited.end() || splitArrayMap.find(node) != splitArrayMap.end()) continue;
+      if (point2self(node)) return node;
+    }
   }
   for (Node* node : partialVisited) {
     int time = 0;
