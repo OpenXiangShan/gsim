@@ -231,6 +231,7 @@ FIR_TEST_CASES ?= $(basename $(notdir $(wildcard $(FIR_TEST_INPUT_DIR)/*.fir)))
 FIR_TEST_TIMEOUT ?=
 FIR_TEST ?=
 FIR_TEST_CXXFLAGS ?= --std=c++20 -O1 -fsanitize=address,undefined -fno-sanitize-recover=all
+FIR_TEST_LDFLAGS ?= -pthread -lz
 FIR_TEST_TIMEOUT_PREFIX = $(if $(strip $(FIR_TEST_TIMEOUT)),timeout $(FIR_TEST_TIMEOUT),)
 FIR_TEST_TARGETS = $(addprefix $(FIR_TEST_OUTPUT_DIR)/,$(addsuffix /.done,$(FIR_TEST_CASES)))
 
@@ -253,7 +254,7 @@ $(FIR_TEST_OUTPUT_DIR)/%/.done: $(FIR_TEST_INPUT_DIR)/%.fir $(GSIM_BIN) $$(wildc
 		set -e; \
 		echo "+ CXX/RUN $*"; \
 		$(CXX) $(FIR_TEST_CXXFLAGS) -I$(@D) $(@D)/*.cpp \
-			$(FIR_TEST_INPUT_DIR)/$*.cpp -o $(@D)/runtime-test; \
+			$(FIR_TEST_INPUT_DIR)/$*.cpp $(FIR_TEST_LDFLAGS) -o $(@D)/runtime-test; \
 		$(FIR_TEST_TIMEOUT_PREFIX) $(@D)/runtime-test; \
 	fi
 	@touch $@
