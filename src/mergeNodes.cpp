@@ -140,12 +140,21 @@ void graph::mergeWhenNodes() {
     }
     while (s.empty() && (!cond.empty() || condWait.size() > 0)) {
       if (cond.empty()) {
-        cond2Queue(*condWait.begin());
+        // Determinism: condWait is a pointer-ordered std::set, so the
+        // tie-break choice depended on allocation addresses. Pick the
+        // candidate with the smallest super id instead (ids are unique).
+        SuperNode* best = nullptr;
+        for (SuperNode* cand : condWait) {
+          if (best == nullptr || cand->id < best->id) best = cand;
+        }
+        cond2Queue(best);
       }
       SuperNode* mergeCond = cond.front();
       cond.pop();
       std::vector<SuperNode*> mergeSuper;
-      for (SuperNode* next : mergeCond->depNext) {
+      std::vector<SuperNode*> depNextOrdered(mergeCond->depNext.begin(), mergeCond->depNext.end());
+      std::sort(depNextOrdered.begin(), depNextOrdered.end(), [](const SuperNode* a, const SuperNode* b){ return a->id < b->id; });
+      for (SuperNode* next : depNextOrdered) {
         times[next] ++;
         if (times[next] == next->depPrev.size()) {
           if (allCond[mergeCond].find(next) != allCond[mergeCond].end()) mergeSuper.push_back(next);
@@ -155,7 +164,12 @@ void graph::mergeWhenNodes() {
       if (mergeSuper.size() > globalConfig.MergeWhenSize) whenMap[mergeCond] = mergeSuper;
     }
   }
-  for (auto iter : whenMap) {
+  // Determinism: whenMap is keyed by SuperNode* (pointer-ordered), so the
+  // merge application order depended on allocation addresses. Apply in id
+  // order instead (ids are unique).
+  std::vector<std::pair<SuperNode*, std::vector<SuperNode*>>> whenOrdered(whenMap.begin(), whenMap.end());
+  std::sort(whenOrdered.begin(), whenOrdered.end(), [](const auto& a, const auto& b){ return a.first->id < b.first->id; });
+  for (auto iter : whenOrdered) {
     std::vector<SuperNode*> allSuper = iter.second;
     SuperNode* mergeSuper = allSuper[0];
     for (size_t i = 1; i < allSuper.size(); i ++) {

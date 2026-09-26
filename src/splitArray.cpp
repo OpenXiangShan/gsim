@@ -88,18 +88,26 @@ bool point2self(Node* node) {
 }
 
 Node* getSplitArray(graph* g) {
-  /* array points to itself */
-  for (Node* node : partialVisited) {
-    if (node->isArray() && node->next.find(node) != node->next.end()) return node; // point to self directly
+  /* Determinism: partialVisited is a pointer-ordered std::set, so the CHOICE
+     among tied candidates depended on allocation addresses. Iterate candidates
+     in NAME order (names are unique -> pure function of the graph). */
+  std::vector<Node*> candidates;
+  for (Node* node : partialVisited) if (node->isArray()) candidates.push_back(node);
+  std::sort(candidates.begin(), candidates.end(), [](const Node* a, const Node* b){ return a->name < b->name; });
+  for (Node* node : candidates) {
+    if (node->next.find(node) != node->next.end()) return node; // point to self directly
   }
 
-  for (Node* node : partialVisited) {
-    if (node->isArray() && point2self(node)) return node;
-  }
-
-  for (Node* node : g->halfConstantArray) {
-    if (fullyVisited.find(node) != fullyVisited.end() || splitArrayMap.find(node) != splitArrayMap.end()) continue;
+  for (Node* node : candidates) {
     if (point2self(node)) return node;
+  }
+  {
+    std::vector<Node*> hca(g->halfConstantArray.begin(), g->halfConstantArray.end());
+    std::sort(hca.begin(), hca.end(), [](const Node* a, const Node* b){ return a->name < b->name; });
+    for (Node* node : hca) {
+      if (fullyVisited.find(node) != fullyVisited.end() || splitArrayMap.find(node) != splitArrayMap.end()) continue;
+      if (point2self(node)) return node;
+    }
   }
   for (Node* node : partialVisited) {
     int time = 0;
@@ -202,7 +210,57 @@ void distributeTree(Node* node, ExpTree* tree, std::vector<Node*>& arrayMember) 
   Assert(arrayMember.size() == node->arrayEntryNum(), "arrayMember size %ld != arrayEntryNum %ld", arrayMember.size(), node->arrayEntryNum());
   int begin, end;
   std::tie(begin, end) = tree->getlval()->getIdx(node);
-  Assert(begin >= 0 && end >= begin, "Invalid index for array %s: %d-%d", node->name.c_str(), begin, end);
+  if (begin < 0) {
+    /* Dynamic-index write: when-expansion per member. The incoming tree is
+       arr[dynIdx] = when(cond, rhs, prev) (last-connect machinery guarantees the
+       else = previous value). For each member i emit:
+         arr[i] = when(dynIdx == i, when(cond, rhs, prev), <EMPTY>)
+       The EMPTY else is filled by mergeWhenTree with member[i]'s existing tree
+       (the whole-array default distributed earlier) - exactly how static
+       conditional connects merge. lvalue keeps the array ref with constant
+       index; updateWithSplittedArray rewrites it to member[i] later. */
+    ENode* lval = tree->getlval();
+    if (node->dimension.size() == 1 && lval->getChildNum() >= 1 &&
+        lval->getChild(0) && lval->getChild(0)->getChildNum() >= 1 &&
+        (int)node->arrayEntryNum() <= 4096) {
+      ENode* idxExprRaw = lval->getChild(0)->getChild(0); /* raw dynamic index expr */
+      int n = (int)node->arrayEntryNum();
+      fprintf(stderr, "[splitArray] when-expanding %s (dynamic index, %d entries)\n", node->name.c_str(), n);
+      for (int i = 0; i < n; i ++) {
+        /* lvalue: dup of array ref with index replaced by constant i */
+        ENode* lval_i = lval->dup();
+        ENode* constIdx = new ENode(OP_INDEX_INT);
+        constIdx->addVal(i);
+        lval_i->setChild(0, constIdx);
+        /* root: when(eq(idx, i), original_root, EMPTY) */
+        ENode* eq = new ENode(OP_EQ);
+        eq->addChild(idxExprRaw->dup());
+        ENode* idxI = new ENode(OP_INT);
+        idxI->strVal = std::to_string(i);
+        idxI->width = upperLog2(node->arrayEntryNum()); /* same as dynamic-read mux in updateWithSplittedArray */
+        eq->addChild(idxI);
+        eq->width = 1;
+        ENode* whenNode = new ENode(OP_WHEN);
+        whenNode->addChild(eq);
+        whenNode->addChild(tree->getRoot()->dup());
+        /* EMPTY else: last-connect machinery fills it (mergeWhenTree fills from
+           member[i]'s existing tree; at emission an unfilled else means "keep the
+           previous assignment" - validated: zero-mismatch full-workload run). */
+        whenNode->addChild(nullptr);
+        whenNode->width = node->width;
+        ExpTree* memberTree = new ExpTree(whenNode, lval_i);
+        if (arrayMember[(size_t)i]->assignTree.size() == 0) {
+          arrayMember[(size_t)i]->assignTree.push_back(memberTree);
+        } else {
+          ExpTree* replaceTree = mergeWhenTree(arrayMember[(size_t)i]->assignTree.back(), memberTree);
+          if (replaceTree) arrayMember[(size_t)i]->assignTree.back() = replaceTree;
+          else arrayMember[(size_t)i]->assignTree.push_back(memberTree);
+        }
+      }
+      return;
+    }
+    Assert(false, "dynamic multi-dimensional or oversized array write is unsupported for %s (%d entries)", node->name.c_str(), (int)node->arrayEntryNum());
+  }
   if (begin == end) {
     int idx = begin;
     if (arrayMember[idx]->assignTree.size() == 0) arrayMember[idx]->assignTree.push_back(tree);
@@ -348,28 +406,42 @@ void graph::splitArrayNode(Node* node) {
     }
   }
 
-  std::set<Node*> checkNodes;
+  // Determinism fix: a pointer-ordered std::set here makes the
+  // updateConnect/updateDep/updateWithSplittedArray iteration order
+  // allocation-dependent -> super construction order -> SuperNode id
+  // assignment -> DFS seed stack order. Collect into the pointer set (cheap
+  // dedup) but iterate in NAME order so repeated runs of the same FIR
+  // produce identical output.
+  std::set<Node*> checkNodesSet;
   /* construct connections */
   if ((node->type == NODE_REG_SRC || node->type == NODE_REG_DST) && splitArrayMap.find(node->getBindReg()) != splitArrayMap.end()) {
     Node* regBind = node->getBindReg();
     for (Node* member : splitArrayMap[regBind]) {
-      checkNodes.insert(member);
+      checkNodesSet.insert(member);
     }
   }
   for (Node* member : arrayMember) {
-    checkNodes.insert(member);
+    checkNodesSet.insert(member);
   }
   for (Node* next : node->depNext) {
-    checkNodes.insert(next);
+    checkNodesSet.insert(next);
     if (next != node) next->erasePrev(node);
   }
+  std::vector<Node*> checkNodes(checkNodesSet.begin(), checkNodesSet.end());
+  std::sort(checkNodes.begin(), checkNodes.end(), [](const Node* a, const Node* b) { return a->name < b->name; });
   for (Node* n : checkNodes) {
     for (ExpTree* tree : n->assignTree) tree->updateWithSplittedArray(n, node, arrayMember);
     if (n->resetTree) n->resetTree->updateWithSplittedArray(n, node, arrayMember);
   }
 
+  // Two passes, not an interleave: updateDep(R) propagates dep edges through
+  // R->next, which is only complete after EVERY consumer's updateConnect has
+  // run. Interleaving connect/dep made the propagated dep-edge set depend on
+  // iteration order (consumers sorting after their reg were silently missed).
   for (Node* n : checkNodes) {
     n->updateConnect();
+  }
+  for (Node* n : checkNodes) {
     if (n->type == NODE_REG_SRC) {
       n->updateDep();
     }
@@ -544,8 +616,15 @@ void graph::checkNodeSplit(Node* node) {
 /* splitted separately assigned, no variable index acceesing arrays */
 void graph::splitOptionalArray() {
   int num = 0;
-  for (Node* node : fullyVisited) {
-    checkNodeSplit(node);
+  // Determinism: checkNodeSplit marks arraySplitMap entries while iterating
+  // fullyVisited (pointer-ordered std::set) - the MARK ORDER is allocation-
+  // dependent even though the final marked SET is not. Iterate in name order.
+  {
+    std::vector<Node*> fv(fullyVisited.begin(), fullyVisited.end());
+    std::sort(fv.begin(), fv.end(), [](const Node* a, const Node* b){ return a->name < b->name; });
+    for (Node* node : fv) {
+      checkNodeSplit(node);
+    }
   }
   regsrc.erase(
     std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
