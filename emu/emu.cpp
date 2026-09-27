@@ -14,9 +14,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#ifdef GSIM
-#include "gsimFst.h"
-#endif
 
 #define CYCLE_STEP_PERCENT 1
 
@@ -127,8 +124,10 @@ extern "C" void sd_read(int* data){
 #if defined(GSIM)
 #include DUT_HEADER
 static DUT_NAME* dut;
+#ifdef GSIM_TRACE_FST
 static bool waveform_enabled = false;
 static std::string waveform_path;
+#endif
 
 void dut_init(DUT_NAME *dut) {
 #if defined(__DUT_NutShell__)
@@ -162,21 +161,24 @@ void dut_hook(DUT_NAME *dut) {
 static void maybe_enable_waveform(DUT_NAME *dut) {
   const char* env_enable = std::getenv("GSIM_ENABLE_WAVEFORM");
   if (env_enable == nullptr || env_enable[0] == '0') return;
-  if (!DUT_NAME::kTraceFstCompiled) {
-    fprintf(stderr, "[gsim] warning: waveform requested, but the model was generated without --trace-fst; ignore request\n");
-    return;
-  }
+#ifdef GSIM_TRACE_FST
   const char* env_path = std::getenv("GSIM_WAVEFORM_PATH");
   waveform_path = env_path ? std::string(env_path) : std::string("waveform.fst");
   dut->setWaveformPath(waveform_path);
   dut->enableWaveform();
   waveform_enabled = true;
+#else
+  (void)dut;
+  fprintf(stderr, "[gsim] warning: waveform requested, but the model was generated without --trace-fst; ignore request\n");
+#endif
 }
 
 static void flush_waveform_if_needed() {
+#ifdef GSIM_TRACE_FST
   if (waveform_enabled && dut) {
     dut->flushWaveform();
   }
+#endif
 }
 #else
 static inline void flush_waveform_if_needed() {}
@@ -410,12 +412,14 @@ int main(int argc, char** argv) {
   flush_waveform_if_needed();
 #if defined(GSIM)
   if (dut) {
+#ifdef GSIM_TRACE_FST
     /* Explicitly close FST to ensure profiling dump is printed */
     if (dut->fstCtx) {
       fstWriterFlushContext(dut->fstCtx);
       fstWriterClose(dut->fstCtx);
       dut->fstCtx = nullptr;
     }
+#endif
     delete dut;
     dut = nullptr;
   }
