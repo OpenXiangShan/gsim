@@ -76,10 +76,10 @@ Config::Config() {
   NumThreads = capThreads(10);
   MtTargetTasks = 2400;
   MtPartitionNodeWeight = 0;
-  MtScheduleGlobalWeight = 12;
-  MtScheduleCommNodeWeight = 30;
+  MtScheduleGlobalWeight = 16;
+  MtScheduleCommNodeWeight = 20;
   MtScheduler = "heft";
-  MtLookaheadWindow = 128;
+  MtLookaheadWindow = 16;
   MtLookaheadStats = false;
 }
 Config globalConfig;
