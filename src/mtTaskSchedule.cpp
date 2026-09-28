@@ -1,9 +1,12 @@
 #include "mtTaskSchedule.h"
 
 #include "common.h"
+#include "mtCostModel.h"
 
 #include <algorithm>
 #include <climits>
+#include <cmath>
+#include <cstdio>
 #include <map>
 #include <numeric>
 #include <set>
@@ -13,9 +16,20 @@
 namespace {
 
 int loweredTaskCost(const MtTask& task) {
-  const size_t instructionCount = task.insts == nullptr ? 0 : task.insts->size();
-  return std::max<int>(1, static_cast<int>(instructionCount) +
-                              task.globalNodeCount * globalConfig.MtScheduleGlobalWeight);
+  mtcost::Accumulator features;
+  if (task.insts != nullptr) {
+    for (const InstInfo& instruction : *task.insts) {
+      switch (instruction.infoType) {
+        case SUPER_INFO_IF: features.begin(instruction.inst); break;
+        case SUPER_INFO_DEDENT: features.end(); break;
+        case SUPER_INFO_ELSE: break;
+        case SUPER_INFO_STR: features.statement(instruction.inst); break;
+        case SUPER_INFO_ASSIGN_BEG: case SUPER_INFO_ASSIGN_END: break;
+      }
+    }
+  }
+  return mtcost::bounded(mtcost::taskOverhead + mtcost::score(features.all) +
+      static_cast<double>(task.globalNodeCount) * globalConfig.MtScheduleGlobalWeight);
 }
 
 bool taskEmitsCode(const MtTask& task) {
@@ -613,9 +627,43 @@ long long workerCommunicationReadyTime(
     const size_t nodeCount = nodesByWorker[entry.first].size();
     const long long communication =
         static_cast<long long>(nodeCount) * globalConfig.MtScheduleCommNodeWeight;
-    readyAt = std::max(readyAt, entry.second + communication);
+    readyAt = std::max(readyAt, entry.second + communication + mtcost::tokenLatency);
   }
   return readyAt;
+}
+
+double expectedRemoteGroups(size_t neighbors, int workerCount) {
+  if (neighbors == 0 || workerCount <= 1) return 0;
+  return (workerCount - 1) *
+      (1.0 - std::pow(1.0 - 1.0 / workerCount, static_cast<double>(neighbors)));
+}
+
+long long candidateTaskCost(const MtTaskPlan& tasks, int taskId, int worker,
+                            const std::vector<int>& owners, int workerCount) {
+  const MtTask& task = tasks.tasks_[static_cast<size_t>(taskId)];
+  std::set<int> remoteWorkers;
+  for (int predecessor : task.predecessors) {
+    const int owner = owners[static_cast<size_t>(predecessor)];
+    if (owner >= 0 && owner != worker) remoteWorkers.insert(owner);
+  }
+  const long long checkCost =
+      static_cast<long long>(remoteWorkers.size()) * mtcost::remoteCheck;
+  // Successor owners are not known yet in predecessor-first HEFT/list order.
+  // Charge their expected distinct remote owner groups so producer-side token
+  // publication consumes worker time instead of disappearing from the model.
+  const long long publishCost = static_cast<long long>(std::ceil(
+      expectedRemoteGroups(task.successors.size(), workerCount) *
+      mtcost::remotePublish));
+  return std::max(1, task.cost) + checkCost + publishCost;
+}
+
+long long rankTaskCost(const MtTask& task, int workerCount) {
+  if (workerCount <= 1) return std::max(1, task.cost);
+  const double incoming = expectedRemoteGroups(task.predecessors.size(), workerCount);
+  const double outgoing = expectedRemoteGroups(task.successors.size(), workerCount);
+  return std::max(1, task.cost) +
+      static_cast<long long>(std::ceil(incoming * mtcost::remoteCheck)) +
+      static_cast<long long>(std::ceil(outgoing * mtcost::remotePublish));
 }
 
 size_t actualCrossWorkerCommunicationNodes(
@@ -653,7 +701,7 @@ WorkerSchedule scheduleList(const MtTaskPlan& tasks, int workerCount,
       successorPriority = std::max(successorPriority, priority[static_cast<size_t>(successor)]);
     }
     priority[static_cast<size_t>(taskId)] =
-        std::max(1, tasks.tasks_[static_cast<size_t>(taskId)].cost) + successorPriority;
+        rankTaskCost(tasks.tasks_[static_cast<size_t>(taskId)], workerCount) + successorPriority;
   }
   std::vector<int> ready;
   for (int taskId = 0; taskId < taskCount; ++taskId) {
@@ -694,7 +742,8 @@ WorkerSchedule scheduleList(const MtTaskPlan& tasks, int workerCount,
       }
     }
     Assert(bestTask >= 0, "list scheduler failed with %zu ready tasks", ready.size());
-    const long long finish = bestStart + std::max(1, tasks.tasks_[static_cast<size_t>(bestTask)].cost);
+    const long long finish = bestStart +
+        candidateTaskCost(tasks, bestTask, bestWorker, result.owner, workerCount);
     result.owner[static_cast<size_t>(bestTask)] = bestWorker;
     completion[static_cast<size_t>(bestTask)] = finish;
     workerAvailable[static_cast<size_t>(bestWorker)] = finish;
@@ -724,13 +773,15 @@ WorkerSchedule scheduleHeft(const MtTaskPlan& tasks, int workerCount,
     long long tail = 0;
     for (int successor : tasks.tasks_[static_cast<size_t>(taskId)].successors) {
       const long long averageCommunication =
-          static_cast<long long>(edgeCommunicationNodeCount(communicationNodes, successor, taskId)) *
-          globalConfig.MtScheduleCommNodeWeight * std::max(0, workerCount - 1) /
+          (static_cast<long long>(edgeCommunicationNodeCount(communicationNodes, successor, taskId)) *
+               globalConfig.MtScheduleCommNodeWeight +
+           mtcost::tokenLatency) *
+          std::max(0, workerCount - 1) /
           std::max(1, workerCount);
       tail = std::max(tail, averageCommunication + rank[static_cast<size_t>(successor)]);
     }
     rank[static_cast<size_t>(taskId)] =
-        std::max(1, tasks.tasks_[static_cast<size_t>(taskId)].cost) + tail;
+        rankTaskCost(tasks.tasks_[static_cast<size_t>(taskId)], workerCount) + tail;
   }
 
   std::vector<int> order(static_cast<size_t>(taskCount));
@@ -748,12 +799,13 @@ WorkerSchedule scheduleHeft(const MtTaskPlan& tasks, int workerCount,
 
   for (int taskId : order) {
     const MtTask& task = tasks.tasks_[static_cast<size_t>(taskId)];
-    const long long duration = std::max(1, task.cost);
     int bestWorker = -1;
     long long bestStart = LLONG_MAX;
     long long bestFinish = LLONG_MAX;
 
     for (int worker = 0; worker < workerCount; ++worker) {
+      const long long duration =
+          candidateTaskCost(tasks, taskId, worker, result.owner, workerCount);
       long long readyAt = 0;
       for (int predecessor : task.predecessors) {
         readyAt = std::max(readyAt, completion[static_cast<size_t>(predecessor)]);

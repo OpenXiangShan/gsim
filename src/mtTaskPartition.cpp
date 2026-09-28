@@ -1,6 +1,7 @@
 #include "mtTaskPartition.h"
 
 #include "common.h"
+#include "mtCostModel.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -15,39 +16,61 @@ namespace {
 constexpr size_t kMaxNodesPerGroup = 7000;
 constexpr size_t kMaxSiblingNodes = 30;
 
-int expressionOperationCount(const ExpTree* tree) {
-  int operations = 0;
-  std::stack<const ENode*> pending;
-  if (tree->getRoot() != nullptr) pending.push(tree->getRoot());
-  if (tree->getlval() != nullptr) {
-    for (ENode* child : tree->getlval()->child) {
-      if (child != nullptr) pending.push(child);
-    }
-  }
+double structuralExpressionCost(const ENode* root) {
+  if (!root) return 0;
+  std::vector<const ENode*> pending{root};
+  double work = 0;
   while (!pending.empty()) {
-    const ENode* expression = pending.top();
-    pending.pop();
-    if (expression->nodePtr == nullptr && expression->opType != OP_EMPTY &&
-        expression->opType != OP_INT && expression->opType != OP_INVALID) {
-      ++operations;
+    const ENode* node = pending.back();
+    pending.pop_back();
+    const double words = std::max(1, (node->width + 63) / 64);
+    if (node->nodePtr != nullptr) {
+      work += 0.5 * mtcost::defaultWeights[mtcost::Simple] * words;
+    } else {
+      switch (node->opType) {
+        case OP_EMPTY: case OP_INT: case OP_INVALID:
+        case OP_ASUINT: case OP_ASSINT: case OP_ASCLOCK: case OP_ASASYNCRESET:
+        case OP_INDEX_INT: break;
+        case OP_MUL: work += mtcost::defaultWeights[mtcost::Multiply] * words * words; break;
+        case OP_DIV: case OP_REM:
+          work += mtcost::defaultWeights[mtcost::Divide] * words * words;
+          break;
+        case OP_READ_MEM: case OP_WRITE_MEM: case OP_INDEX:
+          work += mtcost::defaultWeights[mtcost::Index] * words;
+          break;
+        case OP_EXT_FUNC: case OP_PRINTF: case OP_ASSERT: case OP_EXIT:
+          work += mtcost::defaultWeights[mtcost::Call];
+          break;
+        case OP_WHEN: case OP_RESET:
+          work += mtcost::defaultWeights[mtcost::Branch];
+          break;
+        default: work += mtcost::defaultWeights[mtcost::Simple] * words; break;
+      }
     }
-    for (ENode* child : expression->child) {
-      if (child != nullptr) pending.push(child);
-    }
+    for (const ENode* child : node->child) if (child) pending.push_back(child);
   }
-  return std::max(1, operations);
+  return work;
 }
 
 int nodeOperationCount(const Node* node) {
-  int operations = 0;
-  for (const ExpTree* tree : node->assignTree) operations += expressionOperationCount(tree);
-  return std::max(1, operations) + globalConfig.MtPartitionNodeWeight;
+  double work = 0;
+  for (const ExpTree* tree : node->assignTree) {
+    work += structuralExpressionCost(tree->getRoot());
+    if (tree->getlval()) {
+      for (const ENode* index : tree->getlval()->child) {
+        work += structuralExpressionCost(index);
+      }
+    }
+    work += mtcost::defaultWeights[mtcost::Assign] *
+            std::max(1LL, (static_cast<long long>(node->width) + 63) / 64);
+  }
+  return mtcost::bounded(work + globalConfig.MtPartitionNodeWeight);
 }
 
 int groupCost(const std::vector<Node*>& members) {
-  int operations = 0;
-  for (const Node* node : members) operations += nodeOperationCount(node);
-  return std::max(1, operations);
+  double work = 0;
+  for (const Node* node : members) work += nodeOperationCount(node);
+  return mtcost::bounded(work);
 }
 
 MtTaskKind taskKind(const SuperNode* super) {
@@ -654,7 +677,7 @@ class DirectMTaskCoarsener {
         flush();
         continue;
       }
-      if (!current.members.empty() && current.cost + cost > targetCost) flush();
+      if (!current.members.empty() && static_cast<long long>(current.cost) + cost > targetCost) flush();
       current.members.insert(current.members.end(), group.members.begin(), group.members.end());
       current.cost += cost;
     }

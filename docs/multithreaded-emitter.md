@@ -225,7 +225,7 @@ void STop::mtTaskN() {
 | `waits/stores` | 跨 worker token 槽 |
 | `waitBegin/.../storeEnd` | 生成扁平静态数组时使用的区间 |
 
-`targetTasks` 是软目标而不是硬上限。不可拆分的高成本候选组和连续贪心分组产生的碎片都可能令实际 MTask 数超过目标，此时生成器只输出警告。增大目标任务数可以减少单个 MTask 的成本，但会增加函数调用、dispatch 和 token 同步开销；减小目标任务数则降低调度开销，同时可能减少并行度并加剧负载不均。MTask 划分阶段不使用 worker 归属；worker 级通信估计、cache locality 和 profile 数据只在后续 worker 调度阶段或未来优化中处理。
+`targetTasks` 是软目标而不是硬上限。不可拆分的高成本候选组和连续贪心分组产生的碎片都可能令实际 MTask 数超过目标，此时生成器只输出警告。增大目标任务数可以减少单个 MTask 的成本，但会增加函数调用、dispatch 和 token 同步开销；减小目标任务数则降低调度开销，同时可能减少并行度并加剧负载不均。MTask 划分阶段不使用 worker 归属；worker 级通信估计和 cache locality 在后续 worker 调度阶段处理。运行数据只用于离线校准共享静态常量，不是生成新模型的输入。
 
 ### 3.4 Worker 分配
 
@@ -769,10 +769,11 @@ task 内局部中间量使用 `T value{};` 值初始化。部分 external/memory
 | --- | --- | --- |
 | `--mt-mode=on` | `off` | 启用 MT 代码生成 |
 | `GSIM_THREADS` | `1` | 烘焙进生成模型的 worker 数 |
-| `--mt-target-tasks=N` | `1600` | 期望 MTask 数，软限制 |
+| `--mt-target-tasks=N` | `2400` | 期望 MTask 数，软限制 |
 | `--mt-partition-node-weight=N` | `0` | 划分成本中每个节点的固定权重 |
-| `--mt-schedule-global-weight=N` | `12` | worker 调度成本中每个跨 task 全局节点的权重 |
-| `--mt-lookahead-window=N` | `128` | 队头 token 阻塞时最多检查的后继任务数；`0` 恢复严格顺序 |
+| `--mt-schedule-global-weight=N` | `16` | worker 调度成本中每个跨 task 全局节点的权重 |
+| `--mt-schedule-comm-node-weight=N` | `20` | 跨 worker 通信节点的启发式权重 |
+| `--mt-lookahead-window=N` | `16` | 队头 token 阻塞时最多检查的后继任务数；`0` 恢复严格顺序 |
 | `--mt-lookahead-stats=on|off` | `off` | 生成 per-worker lookahead calls/scanned/found/fullmiss 统计 |
 | `GSIM_EMIT_RESET_CHUNK` | `4096` | reset 函数目标语句数；`0` 禁用 |
 | `--supernode-max-size=N` | 项目默认值 | 上游图划分粒度，会影响 task 数和并行度 |

@@ -158,11 +158,11 @@ static void printUsage(const char* ProgName) {
             << "      --mt-partition-node-weight=[num]\n"
             << "                                   Fixed per-node weight in MT partition cost (default: 0).\n"
             << "      --mt-schedule-global-weight=[num]\n"
-            << "                                   Weight for cross-MTask nodes in worker cost (default: 12).\n"
+            << "                                   Weight for cross-MTask nodes in worker cost (default: 16).\n"
             << "      --mt-schedule-comm-node-weight=[num]\n"
             << "                                   Communication cost per cross-worker node (default: 20).\n"
             << "      --mt-scheduler=heft|list     Worker assignment algorithm (default: heft).\n"
-            << "      --mt-lookahead-window=[num]   Ready-task lookahead window when the chain head blocks (default: 128, 0 disables).\n"
+            << "      --mt-lookahead-window=[num]   Ready-task lookahead window when the chain head blocks (default: 16, 0 disables).\n"
             << "      --mt-lookahead-stats=off|on  Emit per-worker lookahead hit/miss counters (default: off).\n"
             ;
 }
