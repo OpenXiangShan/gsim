@@ -19,6 +19,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo ./scripts/install-dependencies.sh
+          sudo apt-get install -y zlib1g-dev
       - name: Install LLVM toolchain
         uses: KyleMayes/install-llvm-action@v2
         with:
@@ -48,6 +49,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo ./scripts/install-dependencies.sh
+          sudo apt-get install -y zlib1g-dev
       - name: Install LLVM toolchain
         uses: KyleMayes/install-llvm-action@v2
         with:
@@ -90,6 +92,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo ./scripts/install-dependencies.sh
+          sudo apt-get install -y zlib1g-dev
       - name: Install LLVM toolchain
         uses: KyleMayes/install-llvm-action@v2
         with:
