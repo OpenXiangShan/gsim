@@ -954,7 +954,6 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
     int slot = -1;
   };
   std::vector<TokenGroup> groups;
-  std::map<std::pair<int, int>, std::vector<int>> groupsByOwnerPair;
   for (size_t consumer = 0; consumer < tasks.tasks_.size(); ++consumer) {
     std::map<int, std::vector<int>> sourcesByOwner;
     for (int predecessor : tasks.tasks_[consumer].predecessors) {
@@ -972,19 +971,54 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
       group.consumerOwner = tasks.tasks_[consumer].owner;
       group.consumer = consumer;
       group.publisher = publisher;
-      // A compressed cross-worker token is published by the last source in
-      // the producer's static chain. With out-of-order ready scanning, make
-      // that ordering assumption explicit: the publisher cannot run until
-      // every source represented by its token has completed locally.
-      for (int source : entry.second) {
-        if (source == publisher) continue;
-        tasks.tasks_[static_cast<size_t>(publisher)].localWaits.push_back(
-            workerPosition[static_cast<size_t>(source)]);
+      if (globalConfig.MtLookaheadWindow > 0) {
+        // Out-of-order ready scanning needs to make the token compression
+        // assumption explicit: the publisher cannot run before every source
+        // represented by its token has completed locally.
+        for (int source : entry.second) {
+          if (source == publisher) continue;
+          tasks.tasks_[static_cast<size_t>(publisher)].localWaits.push_back(
+              workerPosition[static_cast<size_t>(source)]);
+        }
       }
-      int groupId = static_cast<int>(groups.size());
       groups.push_back(group);
-      groupsByOwnerPair[{group.producerOwner, group.consumerOwner}].push_back(groupId);
     }
+  }
+
+  const size_t uncompressedTokenGroups = groups.size();
+  if (globalConfig.MtLookaheadWindow == 0) {
+    std::vector<std::vector<int>> groupsByConsumer(tasks.tasks_.size());
+    for (size_t groupId = 0; groupId < groups.size(); ++groupId) {
+      groupsByConsumer[static_cast<size_t>(groups[groupId].consumer)].push_back(
+          static_cast<int>(groupId));
+    }
+    std::vector<TokenGroup> compressed;
+    compressed.reserve(groups.size());
+    for (int consumerOwner = 0; consumerOwner < workerCount; ++consumerOwner) {
+      std::vector<int> completedPosition(static_cast<size_t>(workerCount), -1);
+      for (int consumer : workers.workerTasks_[static_cast<size_t>(consumerOwner)]) {
+        for (int groupId : groupsByConsumer[static_cast<size_t>(consumer)]) {
+          const TokenGroup& group = groups[static_cast<size_t>(groupId)];
+          Assert(group.consumerOwner == consumerOwner,
+                 "token consumer owner mismatch for task %d", consumer);
+          const int publisherPosition =
+              workerPosition[static_cast<size_t>(group.publisher)];
+          int& completed =
+              completedPosition[static_cast<size_t>(group.producerOwner)];
+          if (publisherPosition <= completed) continue;
+          completed = publisherPosition;
+          compressed.push_back(group);
+        }
+      }
+    }
+    groups.swap(compressed);
+  }
+
+  std::map<std::pair<int, int>, std::vector<int>> groupsByOwnerPair;
+  for (size_t groupId = 0; groupId < groups.size(); ++groupId) {
+    const TokenGroup& group = groups[groupId];
+    groupsByOwnerPair[{group.producerOwner, group.consumerOwner}].push_back(
+        static_cast<int>(groupId));
   }
 
   int nextSlot = 0;
@@ -1021,7 +1055,8 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
   for (const MtTask& task : tasks.tasks_) localEdgeCount += task.localWaits.size();
   fprintf(stderr,
           "[cppEmitter-mt] workers=%d groups=%d mtasks=%zu edges=%zu tokens=%zu "
-          "local-edges=%zu transitive-edges-removed=%zu\n",
+          "token-groups-before-chain-compression=%zu local-edges=%zu "
+          "transitive-edges-removed=%zu\n",
           workerCount, groupCount, tasks.tasks_.size(), edgeCount, groups.size(),
-          localEdgeCount, transitiveEdgesRemoved);
+          uncompressedTokenGroups, localEdgeCount, transitiveEdgesRemoved);
 }

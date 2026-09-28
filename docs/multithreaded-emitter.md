@@ -597,6 +597,12 @@ planner 为每个“producer owner -> consumer owner -> consumer task”组合�
 
 生成模型中，`mtWaitSlots` 和 `mtStoreSlots` 是扁平只读数组，`MtDispatch` 只保存区间，避免每周期构造容器。
 
+当 `--mt-lookahead-window=0` 时，planner 还会沿每条 consumer worker chain 做支配压缩。
+如果较早的 consumer 已等待某个 producer worker 到位置 `P`，后续任务对同一 producer
+的需求位置不超过 `P`，则后续 wait 已被覆盖。planner 删除整个 `TokenGroup`，所以 consumer
+的 acquire 检查和 producer 的 release 发布会同时消失。启用 lookahead 时任务可能越过较早
+consumer 执行，因此不应用这项压缩。
+
 ### 5.2 奇偶代际
 
 `mtGeneration` 每周期递增，token 只保存 `generation & 1`：
