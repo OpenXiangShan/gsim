@@ -293,6 +293,20 @@ void appendMemoryCommit(MtStateUpdate& update, Node* port) {
   }
 }
 
+void appendSparseRegisterCommit(MtStateUpdate& update, Node* writer) {
+  Assert(writer->type == NODE_WRITER && writer->parent != nullptr &&
+             writer->parent->type == NODE_REG_SRC,
+         "invalid sparse register writer %s", writer->name.c_str());
+  update.body.push_back(
+      {static_cast<uint8_t>(SUPER_INFO_IF),
+       "if (" + mtMemoryWriteValidName(writer) + ") {"});
+  update.body.push_back(
+      {static_cast<uint8_t>(SUPER_INFO_STR),
+       writer->parent->name + "[" + mtMemoryWriteAddressName(writer) + "] = " +
+           mtMemoryWriteDataName(writer) + ";"});
+  update.body.push_back({static_cast<uint8_t>(SUPER_INFO_DEDENT), "}"});
+}
+
 template <typename Instruction>
 int countResetChunks(const std::vector<Instruction>& body, int chunkSize) {
   if (chunkSize <= 0) return 0;
@@ -332,15 +346,27 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
            reg->name.c_str());
     registers.push_back(reg);
   }
-  std::sort(registers.begin(), registers.end(), [](Node* lhs, Node* rhs) {
-    const size_t lhsCost = registerStorageBytes(lhs);
-    const size_t rhsCost = registerStorageBytes(rhs);
+  auto sparseRegister = [&](Node* reg) -> const MtSparseRegister* {
+    auto found = tasks.sparseRegisterBySource_.find(reg);
+    if (found == tasks.sparseRegisterBySource_.end()) return nullptr;
+    return &tasks.sparseRegisters_[found->second];
+  };
+  auto registerUpdateCost = [&](Node* reg) {
+    const MtSparseRegister* sparse = sparseRegister(reg);
+    if (sparse == nullptr) return registerStorageBytes(reg);
+    size_t result = 0;
+    for (Node* writer : sparse->writers) result += memoryWriteStorageBytes(writer);
+    return result;
+  };
+  std::sort(registers.begin(), registers.end(), [&](Node* lhs, Node* rhs) {
+    const size_t lhsCost = registerUpdateCost(lhs);
+    const size_t rhsCost = registerUpdateCost(rhs);
     if (lhsCost != rhsCost) return lhsCost > rhsCost;
     return lhs->id < rhs->id;
   });
 
   size_t totalRegisterBytes = 0;
-  for (Node* reg : registers) totalRegisterBytes += registerStorageBytes(reg);
+  for (Node* reg : registers) totalRegisterBytes += registerUpdateCost(reg);
   const size_t targetRegisterBytes = std::max<size_t>(
       1, (totalRegisterBytes + static_cast<size_t>(workerCount) - 1) /
              static_cast<size_t>(workerCount));
@@ -368,7 +394,7 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
   size_t baselineLocalRegisters = 0;
   size_t baselineLocalBytes = 0;
   for (size_t index = 0; index < registers.size(); ++index) {
-    const size_t cost = registerStorageBytes(registers[index]);
+    const size_t cost = registerUpdateCost(registers[index]);
     const int worker = static_cast<int>(
         std::min_element(baselineLoad.begin(), baselineLoad.end()) -
         baselineLoad.begin());
@@ -380,14 +406,19 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
   }
 
   std::vector<size_t> workerLoad(static_cast<size_t>(workerCount), 0);
+  std::vector<size_t> copiedRegisterLoad(static_cast<size_t>(workerCount), 0);
   std::map<Node*, int> ownerByRegister;
   size_t preferredRegisters = 0;
   size_t preferredBytes = 0;
   size_t localRegisters = 0;
   size_t localBytes = 0;
+  size_t copiedRegisterBytes = 0;
+  size_t sparseRegisterBytes = 0;
+  size_t sparseRegisterWrites = 0;
   for (size_t index = 0; index < registers.size(); ++index) {
     Node* reg = registers[index];
-    const size_t cost = registerStorageBytes(reg);
+    const MtSparseRegister* sparse = sparseRegister(reg);
+    const size_t cost = registerUpdateCost(reg);
     const int preferred = preferredOwner[index];
     if (preferred >= 0) {
       ++preferredRegisters;
@@ -397,7 +428,12 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
         std::min_element(workerLoad.begin(), workerLoad.end()) -
         workerLoad.begin());
     int worker = lightest;
-    if (preferred >= 0) {
+    if (sparse != nullptr && preferred >= 0) {
+      // The task writes this register's pending slots. Keeping the commit on
+      // the same worker avoids moving those cache lines between workers at
+      // every cycle boundary.
+      worker = preferred;
+    } else if (preferred >= 0) {
       const size_t preferredLoad = workerLoad[static_cast<size_t>(preferred)];
       if ((preferredLoad <= targetRegisterBytes &&
            cost <= targetRegisterBytes - preferredLoad) ||
@@ -412,8 +448,18 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
     }
     ownerByRegister[reg] = worker;
     MtStateUpdate& update = workers.stateUpdates_[static_cast<size_t>(worker)];
-    update.registerStorageBytes += cost;
-    update.registers.push_back(reg);
+    if (sparse != nullptr) {
+      update.sparseRegisterWriteBytes += cost;
+      update.sparseRegisterWriters.insert(update.sparseRegisterWriters.end(),
+                                          sparse->writers.begin(), sparse->writers.end());
+      sparseRegisterBytes += sparse->storageBytes;
+      sparseRegisterWrites += sparse->writers.size();
+    } else {
+      update.registerStorageBytes += cost;
+      update.registers.push_back(reg);
+      copiedRegisterLoad[static_cast<size_t>(worker)] += cost;
+      copiedRegisterBytes += cost;
+    }
     Node* dst = reg->getDst();
     if (dst->status == CONSTANT_NODE) {
       Assert(reg->dimension.empty() && dst->computeInfo != nullptr,
@@ -425,7 +471,15 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
     }
   }
 
-  const std::vector<size_t> registerLoad = workerLoad;
+  // These are prior-cycle writes. Apply them before synchronous reset so a
+  // reset asserted at the current edge has the same priority as resetting the
+  // full next-state array before the old memcpy-based commit.
+  for (MtStateUpdate& update : workers.stateUpdates_) {
+    for (Node* writer : update.sparseRegisterWriters) {
+      appendSparseRegisterCommit(update, writer);
+    }
+  }
+
   size_t memoryWriterCount = 0;
   size_t memoryWriteBytes = 0;
   std::vector<std::pair<Node*, std::vector<Node*>>> memoryWriters;
@@ -536,14 +590,22 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
     update.chunkCount = countResetChunks(update.body, chunkSize);
   }
 
-  const auto registerLimits = std::minmax_element(registerLoad.begin(), registerLoad.end());
+  const auto registerLimits =
+      std::minmax_element(copiedRegisterLoad.begin(), copiedRegisterLoad.end());
   const auto stateLimits = std::minmax_element(workerLoad.begin(), workerLoad.end());
-  size_t registerBytes = 0;
-  for (size_t bytes : registerLoad) registerBytes += bytes;
   fprintf(stderr,
           "[cppEmitter-mt] register-blocks registers=%zu bytes=%zu min-worker-bytes=%zu "
           "max-worker-bytes=%zu\n",
-          registers.size(), registerBytes, *registerLimits.first, *registerLimits.second);
+          registers.size() - tasks.sparseRegisters_.size(), copiedRegisterBytes,
+          *registerLimits.first, *registerLimits.second);
+  fprintf(stderr,
+          "[cppEmitter-mt] sparse-register-commits arrays=%zu avoided-copy-bytes=%zu "
+          "write-sites=%zu pending-bytes=%zu\n",
+          tasks.sparseRegisters_.size(), sparseRegisterBytes, sparseRegisterWrites,
+          std::accumulate(workers.stateUpdates_.begin(), workers.stateUpdates_.end(),
+                          size_t{0}, [](size_t total, const MtStateUpdate& update) {
+                            return total + update.sparseRegisterWriteBytes;
+                          }));
   fprintf(stderr,
           "[cppEmitter-mt] register-locality mapped-registers=%zu local-registers=%zu->%zu "
           "local-bytes=%zu->%zu/%zu target-worker-bytes=%zu\n",
@@ -933,7 +995,20 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
       Assert(member->type == NODE_REG_RESET, "invalid async reset member %s",
              member->name.c_str());
     }
-    std::vector<InstInfo> instructions = buildResetInstructions(super->member);
+    // A sparse register array has one real storage array. The reset graph
+    // contains both src and dst reset members, but both lower to that array.
+    std::vector<Node*> resetMembers;
+    resetMembers.reserve(super->member.size());
+    for (Node* member : super->member) {
+      Node* source = member->getResetSrc();
+      auto sparse = tasks.sparseRegisterBySource_.find(source);
+      if (sparse != tasks.sparseRegisterBySource_.end() &&
+          member->name == source->getDst()->name) {
+        continue;
+      }
+      resetMembers.push_back(member);
+    }
+    std::vector<InstInfo> instructions = buildResetInstructions(resetMembers);
     const auto range = resetBodyRange(instructions, super->resetNode);
     Assert(range.first == 1 && range.second + 1 == instructions.size(),
            "async reset %s does not have a single outer reset condition",

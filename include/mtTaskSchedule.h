@@ -30,8 +30,10 @@ struct MtStateUpdate {
   int chunkCount = 0;
   size_t registerStorageBytes = 0;
   size_t memoryWriteBytes = 0;
+  size_t sparseRegisterWriteBytes = 0;
   std::vector<Node*> registers;
   std::vector<Node*> memoryWriters;
+  std::vector<Node*> sparseRegisterWriters;
   std::vector<MtReset::Instruction> body;
 };
 

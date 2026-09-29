@@ -106,6 +106,10 @@ bool CppEmitterMt::isPackedRegister(Node* node) const {
   return packedRegisterNames_.find(node) != packedRegisterNames_.end();
 }
 
+bool CppEmitterMt::isSparseRegisterDestination(Node* node) const {
+  return sparseRegisterByDestination_.find(node) != sparseRegisterByDestination_.end();
+}
+
 std::string CppEmitterMt::packedRegisterName(Node* node) const {
   auto found = packedRegisterNames_.find(node);
   Assert(found != packedRegisterNames_.end(), "missing packed register name for %s",
@@ -132,6 +136,11 @@ void CppEmitterMt::buildRegisterStorageNames() {
       Assert(packedRegisterNamesByText_.emplace(dst->name, destinationName).second,
              "duplicate packed register destination name %s", dst->name.c_str());
     }
+  }
+  for (const MtSparseRegister& sparse : sparseRegisters_) {
+    Node* destination = sparse.source->getDst();
+    Assert(packedRegisterNamesByText_.emplace(destination->name, sparse.source->name).second,
+           "duplicate sparse register destination name %s", destination->name.c_str());
   }
 }
 
@@ -254,6 +263,13 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
       }
       fprintf(header, "{};\n");
     }
+    for (Node* writer : update.sparseRegisterWriters) {
+      fprintf(header, "alignas(64) uint64_t %s{};\n",
+              mtMemoryWriteAddressName(writer).c_str());
+      fprintf(header, "%s %s{};\n", widthUType(writer->width).c_str(),
+              mtMemoryWriteDataName(writer).c_str());
+      fprintf(header, "uint8_t %s{};\n", mtMemoryWriteValidName(writer).c_str());
+    }
   }
   for (int worker = 0; worker < workerCount_; ++worker) {
     fprintf(header, "struct MtWorkerStateW%d {\n", worker);
@@ -334,6 +350,10 @@ void CppEmitterMt::emitStateInitialization() {
     for (Node* writer : update.memoryWriters) {
       const std::string valid = mtMemoryWriteValidName(writer);
       emitText(1, false, "memset(&" + valid + ", 0, sizeof(" + valid + "));\n");
+    }
+    for (Node* writer : update.sparseRegisterWriters) {
+      const std::string valid = mtMemoryWriteValidName(writer);
+      emitText(1, false, valid + " = 0;\n");
     }
   }
 }
@@ -1241,6 +1261,7 @@ void graph::cppEmitterMt() {
     for (size_t index = begin; index < end; ++index) {
       Node* node = mtEmitter.emissionNodes()[index];
       if (node->type == NODE_EXT) continue;
+      if (mtEmitter.isSparseRegisterDestination(node)) continue;
       const std::string emittedName = mtEmitter.isPackedRegister(node)
                                           ? mtEmitter.packedRegisterName(node)
                                           : std::string();

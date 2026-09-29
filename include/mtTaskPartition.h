@@ -1,12 +1,14 @@
 #ifndef MT_TASK_PARTITION_H
 #define MT_TASK_PARTITION_H
 
+#include <cstddef>
 #include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 class graph;
+class ExpTree;
 class InstInfo;
 class Node;
 class StmtTree;
@@ -38,6 +40,15 @@ struct MtTask {
   uint32_t localWaitEnd = 0;
 };
 
+// A large register array whose next-state updates are represented as ordered
+// address/data/valid writes instead of a second full-size array.
+struct MtSparseRegister {
+  Node* source = nullptr;
+  std::vector<Node*> writers;
+  std::vector<ExpTree*> writeTrees;
+  std::size_t storageBytes = 0;
+};
+
 struct MtTaskPlan {
   std::vector<MtTask> tasks_;
   std::unordered_map<Node*, int> taskByNode_;
@@ -45,6 +56,9 @@ struct MtTaskPlan {
   std::vector<Node*> emissionNodes_;
   std::unordered_set<Node*> localNodes_;
   std::unordered_map<Node*, int> workerLocalOwners_;
+  std::vector<MtSparseRegister> sparseRegisters_;
+  std::unordered_map<Node*, std::size_t> sparseRegisterBySource_;
+  std::unordered_map<Node*, std::size_t> sparseRegisterByDestination_;
   int partitionGroupCount_ = 0;
 };
 

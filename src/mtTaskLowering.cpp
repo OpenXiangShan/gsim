@@ -3,6 +3,7 @@
 #include "common.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <map>
 #include <set>
 
@@ -38,6 +39,147 @@ ENode* negateMtWriteCondition(ENode* condition) {
   result->setWidth(1, false);
   result->addChild(condition);
   return result;
+}
+
+struct SparseWriteValue {
+  ENode* value = nullptr;
+  ENode* enable = nullptr;
+};
+
+void collectSparseWriteValues(ENode* root, ENode* condition,
+                              std::vector<SparseWriteValue>& writes) {
+  if (root == nullptr || root->opType == OP_INVALID) return;
+  if (root->opType == OP_WHEN || root->opType == OP_RESET) {
+    Assert(root->getChildNum() >= 2, "invalid conditional register-array write");
+    ENode* branchCondition = root->getChild(0);
+    collectSparseWriteValues(
+        root->getChild(1),
+        combineMtWriteCondition(condition == nullptr ? nullptr : condition->dup(),
+                                branchCondition->dup()),
+        writes);
+    if (root->getChildNum() >= 3) {
+      collectSparseWriteValues(
+          root->getChild(2),
+          combineMtWriteCondition(condition == nullptr ? nullptr : condition->dup(),
+                                  negateMtWriteCondition(branchCondition->dup())),
+          writes);
+    }
+    return;
+  }
+  writes.push_back(
+      {root->dup(), condition == nullptr ? allocIntEnode(1, "1") : condition});
+}
+
+size_t sparseRegisterStorageBytes(const Node* node) {
+  size_t bytes = static_cast<size_t>(widthBits(node->width)) / 8;
+  for (int dimension : node->dimension) {
+    bytes *= static_cast<size_t>(upperPower2(dimension));
+  }
+  return std::max<size_t>(1, bytes);
+}
+
+ENode* sparseWriteAddress(ENode* index) {
+  if (index->opType == OP_INDEX_INT) {
+    Assert(index->values.size() == 1, "constant array index has no value");
+    return allocIntEnode(std::max(1, index->width), std::to_string(index->values[0]));
+  }
+  Assert(index->opType == OP_INDEX && index->getChildNum() == 1,
+         "unsupported sparse register-array index operation %d", index->opType);
+  return index->getChild(0)->dup();
+}
+
+void selectSparseRegisters(graph& graph, MtTaskPlan& plan) {
+  plan.sparseRegisters_.clear();
+  plan.sparseRegisterBySource_.clear();
+  plan.sparseRegisterByDestination_.clear();
+  if (globalConfig.MtSparseRegisterMaxWrites == 0) return;
+
+  size_t selectedBytes = 0;
+  size_t selectedWrites = 0;
+  for (Node* source : graph.regsrc) {
+    if (source->status != VALID_NODE || source->type != NODE_REG_SRC ||
+        !source->regSplit || source->dimension.size() != 1 ||
+        source->regNext == nullptr || source->getDst()->status != VALID_NODE) {
+      if (globalConfig.LogLevel > 1 && source->isArray()) {
+        fprintf(stderr,
+                "[cppEmitter-mt] keep register array %s: status=%d type=%d split=%d "
+                "dimensions=%zu destination-status=%d\n",
+                source->name.c_str(), source->status, source->type, source->regSplit,
+                source->dimension.size(),
+                source->regNext == nullptr ? -1 : source->getDst()->status);
+      }
+      continue;
+    }
+    const size_t storageBytes = sparseRegisterStorageBytes(source);
+    if (storageBytes < static_cast<size_t>(globalConfig.MtSparseRegisterMinBytes)) continue;
+
+    Node* destination = source->getDst();
+    std::vector<std::pair<ENode*, SparseWriteValue>> writes;
+    bool eligible = !destination->assignTree.empty();
+    for (ExpTree* assignment : destination->assignTree) {
+      ENode* lvalue = assignment->getlval();
+      if (lvalue == nullptr || lvalue->getNode() != destination ||
+          lvalue->getChildNum() != source->dimension.size()) {
+        eligible = false;
+        break;
+      }
+      std::set<Node*> dependencies;
+      getENodeRelyNodes(assignment->getRoot(), dependencies);
+      if (dependencies.count(destination) != 0) {
+        eligible = false;
+        break;
+      }
+      ENode* index = lvalue->getChild(0);
+      if (index == nullptr ||
+          (index->opType != OP_INDEX_INT && index->opType != OP_INDEX)) {
+        eligible = false;
+        break;
+      }
+      std::vector<SparseWriteValue> assignmentWrites;
+      collectSparseWriteValues(assignment->getRoot(), nullptr, assignmentWrites);
+      for (SparseWriteValue& write : assignmentWrites) {
+        writes.emplace_back(index, write);
+      }
+      if (writes.size() > static_cast<size_t>(globalConfig.MtSparseRegisterMaxWrites)) {
+        eligible = false;
+        break;
+      }
+    }
+    if (!eligible || writes.empty()) continue;
+
+    MtSparseRegister sparse;
+    sparse.source = source;
+    sparse.storageBytes = storageBytes;
+    for (size_t ordinal = 0; ordinal < writes.size(); ++ordinal) {
+      Node* writer = source->dup(
+          NODE_WRITER, source->name + "$SPARSE_WRITE$" + std::to_string(ordinal));
+      writer->dimension.clear();
+      writer->parent = source;
+
+      ENode* write = new ENode(OP_WRITE_MEM);
+      write->memoryNode = source;
+      write->setWidth(source->width, source->sign);
+      write->addChild(sparseWriteAddress(writes[ordinal].first));
+      write->addChild(writes[ordinal].second.value);
+      write->addChild(writes[ordinal].second.enable);
+
+      sparse.writers.push_back(writer);
+      sparse.writeTrees.push_back(new ExpTree(write, new ENode(writer)));
+    }
+
+    const size_t index = plan.sparseRegisters_.size();
+    plan.sparseRegisterBySource_[source] = index;
+    plan.sparseRegisterByDestination_[destination] = index;
+    plan.sparseRegisters_.push_back(std::move(sparse));
+    selectedBytes += storageBytes;
+    selectedWrites += writes.size();
+  }
+  fprintf(stderr,
+          "[cppEmitter-mt] sparse-register-arrays arrays=%zu bytes=%zu write-sites=%zu "
+          "min-bytes=%d max-writes=%d\n",
+          plan.sparseRegisters_.size(), selectedBytes, selectedWrites,
+          globalConfig.MtSparseRegisterMinBytes,
+          globalConfig.MtSparseRegisterMaxWrites);
 }
 
 void collectMtMemoryWrites(ENode* root, ENode* condition,
@@ -237,12 +379,22 @@ void collectTaskLocalNodes(graph& graph, MtTaskPlan& plan) {
   }
 }
 
-void mergeNodeAssignments(StmtTree& tree, Node* node,
+void mergeNodeAssignments(StmtTree& tree, Node* node, const MtTaskPlan* plan,
                           std::vector<int>& predecessorPath,
                           std::vector<int>& nodePath) {
   // Every register with stored or constant next-state commits in the
   // cycle-start phase. A late async reset overwrites src before replay.
   if (isCycleStartRegisterUpdate(node)) return;
+  if (plan != nullptr) {
+    auto sparse = plan->sparseRegisterByDestination_.find(node);
+    if (sparse != plan->sparseRegisterByDestination_.end()) {
+      const MtSparseRegister& reg = plan->sparseRegisters_[sparse->second];
+      for (ExpTree* write : reg.writeTrees) {
+        tree.mergeExpTree(write, predecessorPath, nodePath, node);
+      }
+      return;
+    }
+  }
   for (ExpTree* assignment : node->assignTree) {
     tree.mergeExpTree(assignment, predecessorPath, nodePath, node);
     if (node->type != NODE_REG_SRC || node->reset != ASYRESET ||
@@ -279,7 +431,7 @@ void predecessorPath(Node* node, const std::set<Node*>& scope,
   }
 }
 
-void buildTaskTree(MtTask& task) {
+void buildTaskTree(MtTask& task, const MtTaskPlan& plan) {
   task.stmtTree = new StmtTree();
   task.stmtTree->root = new StmtNode(OP_STMT_SEQ);
   std::set<Node*> scope(task.members.begin(), task.members.end());
@@ -288,7 +440,7 @@ void buildTaskTree(MtTask& task) {
     std::vector<int> prevPath;
     std::vector<int> nodePath;
     predecessorPath(node, scope, allPaths, prevPath);
-    mergeNodeAssignments(*task.stmtTree, node, prevPath, nodePath);
+    mergeNodeAssignments(*task.stmtTree, node, &plan, prevPath, nodePath);
     allPaths[node] = std::move(nodePath);
   }
   task.insts = new std::vector<InstInfo>();
@@ -301,7 +453,7 @@ void buildResetTree(SuperNode* super) {
   for (Node* node : super->member) {
     std::vector<int> emptyPath;
     std::vector<int> nodePath;
-    mergeNodeAssignments(*super->stmtTree, node, emptyPath, nodePath);
+    mergeNodeAssignments(*super->stmtTree, node, nullptr, emptyPath, nodePath);
   }
   super->insts.clear();
   super->stmtTree->compute(super->insts);
@@ -331,6 +483,7 @@ void updateTaskRoots(const MtTaskPlan& plan) {
 
 void MtTaskLowerer::generateStmtTrees(graph& graph, MtTaskPlan& plan) {
   maxConcatNum = 0;
+  selectSparseRegisters(graph, plan);
   completeTaskLocalDependencies(graph, plan);
   makeMtMemoryWriteEnablesExplicit(plan);
   for (MtTask& task : plan.tasks_) orderTaskMembers(task);
@@ -350,7 +503,7 @@ void MtTaskLowerer::generateStmtTrees(graph& graph, MtTaskPlan& plan) {
       task.insts = new std::vector<InstInfo>(std::move(instructions));
       continue;
     }
-    buildTaskTree(task);
+    buildTaskTree(task, plan);
   }
 
   // Reset SuperNodes are invoked outside normal MTask dispatch and retain the

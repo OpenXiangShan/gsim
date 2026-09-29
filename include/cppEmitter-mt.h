@@ -39,6 +39,7 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
   bool isWorkerLocal(Node* node) const;
   int workerLocalOwner(Node* node) const;
   bool isPackedRegister(Node* node) const;
+  bool isSparseRegisterDestination(Node* node) const;
   std::string packedRegisterName(Node* node) const;
   const std::vector<Node*>& emissionNodes() const;
   static constexpr size_t kInitNodesPerPart = 256;

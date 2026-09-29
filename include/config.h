@@ -24,6 +24,8 @@ struct Config {
   std::string MtScheduler;
   int MtLookaheadWindow;
   bool MtLookaheadStats;
+  int MtSparseRegisterMinBytes;
+  int MtSparseRegisterMaxWrites;
   std::set<std::string> DumpStages;
   Config();
 };

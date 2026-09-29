@@ -688,7 +688,7 @@ dense:
 
 ### 寄存器和同步 Reset
 
-所有具有有效或常量 `reg-dst` 的寄存器（包括异步复位寄存器）都不再由普通 MTask 提交，也不再由主线程串行调用
+所有具有有效或常量 `reg-dst` 的普通寄存器（包括异步复位寄存器）都不再由普通 MTask 提交，也不再由主线程串行调用
 `resetAllMt()`。planner 使用 `widthBits(width) / 8` 和数组的实际 C++ 容量估计存储字节数，
 在 MTask 调度完成后再分配寄存器 owner。有效 `reg-dst` 所在 MTask 的 owner 是该寄存器的
 preferred owner；planner 按寄存器字节数从大到小处理，在 preferred owner 不超过平均目标
@@ -699,14 +699,32 @@ MTask 尽量写本 worker 随后提交的 `DstBlock`，减少跨核 dirty cache-
 
 生成日志中的 `register-locality` 会同时报告旧 size-only LPT 基线和新分配的本地寄存器数、
 本地字节数以及平均目标字节数；`register-blocks` 继续报告最终 min/max worker bytes。每个
-worker 分别生成字段完全同构且按 cache line 对齐的 `mtRegisterSrcWn` 和
+普通寄存器分别生成字段完全同构且按 cache line 对齐的 `mtRegisterSrcWn` 和
 `mtRegisterDstWn`；MTask 对寄存器的读写直接重定向到对应块字段。
 
-每周期先将触发的同步 reset value 写入 `DstBlock`，再用一次
+每周期先将触发的同步 reset value 写入普通寄存器的 `DstBlock`，再用一次
 `memcpy(&SrcBlock, &DstBlock, sizeof(SrcBlock))` 提交该 worker 的全部寄存器。因此未触发
 reset 时不再逐寄存器执行标量赋值，reset 分支同时更新 next-state shadow 的语义也自然得到
 保留。若 reset 信号本身是寄存器，则 `stepMt()` 在发布 generation 前保存 `$RESET`，避免
 并行更新时读取正在被其他 worker 改写的 reset 源。
+
+### 稀疏寄存器数组
+
+大容量、写点较少的一维寄存器数组可以在 MT lowering 阶段切换到稀疏提交表示。默认要求数组
+容量至少 256 字节且静态有序写点不超过 8 个，可分别通过
+`--mt-sparse-register-min-bytes=N` 和 `--mt-sparse-register-max-writes=N` 调整；将最大写点数
+设为 `0` 可关闭该优化。当前只接管完整单元素索引写，整数组、子数组和不支持的复杂索引会保留
+普通 `src/dst` 双缓冲路径。
+
+稀疏数组只保留一份当前值数组。每个写点拥有独立的 pending `address/data/valid` 槽，MTask
+阶段只更新这些槽；下一周期 state phase 按 FIRRTL `assignTree` 的原始顺序提交有效槽。这样同一
+地址的多次寄存器数组写入仍是确定的“最后连接获胜”，而不会错误地套用 memory 同址并发写的
+未定义语义。同步 reset 在上一周期 pending 写提交后覆盖当前数组；异步 reset 的 src/dst
+重复 reset 成员只保留一次，随后沿用原有周期末 replay。
+
+生成日志中的 `sparse-register-arrays` 报告命中数组、被省略的整块复制字节和写点数，
+`sparse-register-commits` 报告每周期 pending 写槽负载。关闭该功能后，输出应回到原来的
+`mtRegisterSrcWn`/`mtRegisterDstWn` 整块复制实现。
 
 ### 异步 Reset
 

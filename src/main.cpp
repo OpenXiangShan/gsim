@@ -81,6 +81,8 @@ Config::Config() {
   MtScheduler = "heft";
   MtLookaheadWindow = 16;
   MtLookaheadStats = false;
+  MtSparseRegisterMinBytes = 1024;
+  MtSparseRegisterMaxWrites = 8;
 }
 Config globalConfig;
 
@@ -164,6 +166,10 @@ static void printUsage(const char* ProgName) {
             << "      --mt-scheduler=heft|list     Worker assignment algorithm (default: heft).\n"
             << "      --mt-lookahead-window=[num]   Ready-task lookahead window when the chain head blocks (default: 16, 0 disables).\n"
             << "      --mt-lookahead-stats=off|on  Emit per-worker lookahead hit/miss counters (default: off).\n"
+            << "      --mt-sparse-register-min-bytes=[num]\n"
+            << "                                   Minimum register-array bytes for sparse writes (default: 256).\n"
+            << "      --mt-sparse-register-max-writes=[num]\n"
+            << "                                   Maximum ordered write sites for sparse arrays (default: 8; 0 disables).\n"
             ;
 }
 
@@ -201,6 +207,8 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_MT_SCHEDULER,
     OPT_MT_LOOKAHEAD_WINDOW,
     OPT_MT_LOOKAHEAD_STATS,
+    OPT_MT_SPARSE_REGISTER_MIN_BYTES,
+    OPT_MT_SPARSE_REGISTER_MAX_WRITES,
   };
 
   const struct option Table[] = {
@@ -229,6 +237,8 @@ static char* parseCommandLine(int argc, char** argv) {
       {"mt-scheduler", required_argument, nullptr, 0},
       {"mt-lookahead-window", required_argument, nullptr, 0},
       {"mt-lookahead-stats", required_argument, nullptr, 0},
+      {"mt-sparse-register-min-bytes", required_argument, nullptr, 0},
+      {"mt-sparse-register-max-writes", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -362,6 +372,20 @@ static char* parseCommandLine(int argc, char** argv) {
                     _exit(EXIT_FAILURE);
                   }
                   globalConfig.MtLookaheadStats = strcmp(optarg, "on") == 0;
+                  break;
+                case OPT_MT_SPARSE_REGISTER_MIN_BYTES:
+                  if (sscanf(optarg, "%d", &globalConfig.MtSparseRegisterMinBytes) != 1 ||
+                      globalConfig.MtSparseRegisterMinBytes < 1) {
+                    fprintf(stderr, "Error: --mt-sparse-register-min-bytes expects a positive number, got '%s'.\n", optarg);
+                    _exit(EXIT_FAILURE);
+                  }
+                  break;
+                case OPT_MT_SPARSE_REGISTER_MAX_WRITES:
+                  if (sscanf(optarg, "%d", &globalConfig.MtSparseRegisterMaxWrites) != 1 ||
+                      globalConfig.MtSparseRegisterMaxWrites < 0) {
+                    fprintf(stderr, "Error: --mt-sparse-register-max-writes expects a non-negative number, got '%s'.\n", optarg);
+                    _exit(EXIT_FAILURE);
+                  }
                   break;
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }
