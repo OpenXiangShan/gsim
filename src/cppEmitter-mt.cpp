@@ -86,6 +86,61 @@ void CppEmitterMt::prepare() {
   MtWorkerBuilder::build(graph_, static_cast<MtTaskPlan&>(*this), static_cast<MtWorkerPlan&>(*this),
                          workerCount_, resetChunk_);
   buildRegisterStorageNames();
+  writeTaskPhaseReport();
+}
+
+void CppEmitterMt::writeTaskPhaseReport() const {
+  const std::string phasesPath = globalConfig.OutputDir + "/mt-task-phases.csv";
+  const std::string membersPath = globalConfig.OutputDir + "/mt-state-task-members.csv";
+  FILE* phases = std::fopen(phasesPath.c_str(), "w");
+  FILE* members = std::fopen(membersPath.c_str(), "w");
+  Assert(phases != nullptr && members != nullptr, "cannot open MTask phase reports");
+  auto csv = [](const std::string& value) {
+    std::string result = "\"";
+    for (char c : value) {
+      if (c == '"') result += '"';
+      result += c;
+    }
+    return result + "\"";
+  };
+  fprintf(phases, "phase,task,worker,function,members,reg_src_members,instructions,cost,"
+                  "register_bytes,memory_pending_bytes,sparse_pending_bytes,barrier\n");
+  fprintf(members, "phase,task,worker,role,node_type,node_id,node\n");
+  for (const StateUpdate& task : stateTasks_) {
+    size_t registers = 0;
+    for (Node* node : task.members) {
+      registers += node->type == NODE_REG_SRC;
+      const char* type = node->type == NODE_REG_SRC ? "reg_src" :
+                         node->type == NODE_MEMORY ? "memory" : "sync_reset";
+      fprintf(members, "state,%d,%d,member,%s,%d,%s\n", task.owner, task.owner, type,
+              node->id, csv(node->name).c_str());
+    }
+    // References, not members: pending writes are produced in compute tasks
+    // in the previous cycle and committed by this state task.
+    auto writeProducer = [&](Node* node, const char* type) {
+      fprintf(members, "state,%d,%d,pending_write_producer,%s,%d,%s\n",
+              task.owner, task.owner, type, node->id, csv(node->name).c_str());
+    };
+    for (Node* writer : task.memoryWriters) writeProducer(writer, "memory_writer");
+    for (Node* writer : task.sparseRegisterWriters) writeProducer(writer, "sparse_writer");
+    fprintf(phases, "state,%d,%d,mtUpdateStateW%d,%zu,%zu,%zu,%d,%zu,%zu,%zu,state_publish\n",
+            task.owner, task.owner, task.owner, task.members.size(), registers,
+            task.insts->size(), task.cost, task.registerStorageBytes,
+            task.memoryWriteBytes, task.sparseRegisterWriteBytes);
+  }
+  for (size_t id = 0; id < tasks_.size(); ++id) {
+    const Task& task = tasks_[id];
+    size_t registers = 0;
+    for (Node* node : task.members) {
+      registers += node->type == NODE_REG_SRC;
+      Assert(!mtIsCycleStartRegisterUpdate(node) && stateTaskByNode_.count(node) == 0,
+             "node %s belongs to both state and compute phases", node->name.c_str());
+    }
+    fprintf(phases, "compute,%zu,%d,mtTask%zu,%zu,%zu,%zu,%d,0,0,0,state_acquire\n",
+            id, task.owner, id, task.members.size(), registers, task.insts->size(), task.cost);
+  }
+  Assert(std::fclose(phases) == 0, "cannot finish MTask phase report");
+  Assert(std::fclose(members) == 0, "cannot finish state MTask member report");
 }
 
 bool CppEmitterMt::isTaskLocal(Node* node) const {
@@ -120,9 +175,9 @@ std::string CppEmitterMt::packedRegisterName(Node* node) const {
 void CppEmitterMt::buildRegisterStorageNames() {
   packedRegisterNames_.clear();
   packedRegisterNamesByText_.clear();
-  for (const StateUpdate& update : stateUpdates_) {
-    const std::string source = "mtRegisterSrcW" + std::to_string(update.worker) + ".";
-    const std::string destination = "mtRegisterDstW" + std::to_string(update.worker) + ".";
+  for (const StateUpdate& update : stateTasks_) {
+    const std::string source = "mtRegisterSrcW" + std::to_string(update.owner) + ".";
+    const std::string destination = "mtRegisterDstW" + std::to_string(update.owner) + ".";
     for (Node* reg : update.registers) {
       Node* dst = reg->getDst();
       const std::string sourceName = source + reg->name;
@@ -206,6 +261,7 @@ void CppEmitterMt::emitHeaderPreamble(FILE* header) const {
 void CppEmitterMt::emitClassMembers(FILE* header) const {
   if (!enabled()) return;
   fprintf(header, "static constexpr int kMtWorkerCount = %d;\n", workerCount_);
+  fprintf(header, "static constexpr int kMtStateTaskCount = %zu;\n", stateTasks_.size());
   fprintf(header, "struct MtReadyToken { std::atomic<uint8_t> value{0}; };\n");
   fprintf(header, "struct alignas(64) MtDoneFlag { std::atomic<uint8_t> parity{0}; };\n");
   fprintf(header, "struct MtDispatch { void (S%s::*fn)(); uint32_t waitBegin, waitEnd, storeBegin, storeEnd, localWaitBegin, localWaitEnd; };\n",
@@ -225,8 +281,8 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
     fprintf(header, "struct alignas(64) MtLookaheadStats { uint64_t calls{}, scanned{}, found{}, fullMiss{}; };\n");
     fprintf(header, "MtLookaheadStats mtLookaheadStats[%d];\n", workerCount_);
   }
-  for (const StateUpdate& update : stateUpdates_) {
-    fprintf(header, "struct MtRegisterBlockW%d {\n", update.worker);
+  for (const StateUpdate& update : stateTasks_) {
+    fprintf(header, "struct MtRegisterBlockW%d {\n", update.owner);
     if (update.registers.empty()) {
       fprintf(header, "  uint8_t unused;\n");
     } else {
@@ -237,9 +293,9 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
     }
     fprintf(header, "};\n");
     fprintf(header, "alignas(64) MtRegisterBlockW%d mtRegisterSrcW%d{};\n",
-            update.worker, update.worker);
+            update.owner, update.owner);
     fprintf(header, "alignas(64) MtRegisterBlockW%d mtRegisterDstW%d{};\n",
-            update.worker, update.worker);
+            update.owner, update.owner);
     for (Node* reg : update.registers) {
       if (!reg->isReset()) continue;
       Assert(!reg->isArray() && reg->width <= BASIC_WIDTH,
@@ -296,10 +352,10 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
             "uint32_t head, uint8_t parity, int worker);\n");
   }
   fprintf(header, "void mtPinWorker(int worker);\nvoid stepMt();\n");
-  for (const StateUpdate& update : stateUpdates_) {
-    fprintf(header, "void mtUpdateStateW%d();\n", update.worker);
+  for (const StateUpdate& update : stateTasks_) {
+    fprintf(header, "void mtUpdateStateW%d();\n", update.owner);
     for (int chunk = 1; chunk <= update.chunkCount; ++chunk) {
-      fprintf(header, "void mtUpdateStateW%d_c%d();\n", update.worker, chunk);
+      fprintf(header, "void mtUpdateStateW%d_c%d();\n", update.owner, chunk);
     }
   }
   for (const Reset& reset : resets_) {
@@ -339,10 +395,10 @@ void CppEmitterMt::emitInitPartDeclarations(FILE* header) const {
 
 void CppEmitterMt::emitStateInitialization() {
   if (!enabled()) return;
-  for (const StateUpdate& update : stateUpdates_) {
+  for (const StateUpdate& update : stateTasks_) {
     if (!update.registers.empty()) {
-      const std::string source = "mtRegisterSrcW" + std::to_string(update.worker);
-      const std::string destination = "mtRegisterDstW" + std::to_string(update.worker);
+      const std::string source = "mtRegisterSrcW" + std::to_string(update.owner);
+      const std::string destination = "mtRegisterDstW" + std::to_string(update.owner);
       emitText(1, false, "memset(&" + source + ", 0, sizeof(" + source + "));\n");
       emitText(1, false,
                "memset(&" + destination + ", 0, sizeof(" + destination + "));\n");
@@ -416,7 +472,7 @@ void CppEmitterMt::emitAsyncResetFunction(const Reset& reset) {
 }
 
 void CppEmitterMt::emitStateUpdateFunction(const StateUpdate& update) {
-  emitResetBodyFunction("mtUpdateStateW" + std::to_string(update.worker), "",
+  emitResetBodyFunction("mtUpdateStateW" + std::to_string(update.owner), "",
                         update.body, update.chunkCount);
 }
 
@@ -483,7 +539,7 @@ void CppEmitterMt::emitDefinitions() {
   if (!enabled()) return;
   const std::string className = "S" + graph_.name;
 
-  for (const StateUpdate& update : stateUpdates_) {
+  for (const StateUpdate& update : stateTasks_) {
     emitStateUpdateFunction(update);
   }
 

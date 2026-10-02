@@ -47,7 +47,7 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
 
  private:
   using Task = MtTask;
-  using StateUpdate = MtStateUpdate;
+  using StateUpdate = MtStateTask;
   using Reset = MtReset;
 
   void emitText(int indent, bool canStartFile, const std::string& text);
@@ -58,6 +58,7 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
   void emitInstructions(const std::vector<InstInfo>& instructions, int indent);
   void emitTask(const Task& task, int indent);
   void buildRegisterStorageNames();
+  void writeTaskPhaseReport() const;
   std::string mapRegisterNames(const std::string& text) const;
 
   graph& graph_;

@@ -11,6 +11,13 @@
 #include <stack>
 #include <utility>
 
+bool mtIsCycleStartRegisterUpdate(const Node* node) {
+  return node->status == VALID_NODE && node->type == NODE_REG_SRC &&
+         node->regSplit && node->regNext != nullptr &&
+         (node->regNext->status == VALID_NODE ||
+          node->regNext->status == CONSTANT_NODE);
+}
+
 namespace {
 
 constexpr size_t kMaxNodesPerGroup = 7000;
@@ -96,7 +103,7 @@ class DirectMTaskCoarsener {
   explicit DirectMTaskCoarsener(graph& graph) : graph_(graph) {}
 
   void build(MtTaskPlan& plan, int targetTasks) {
-    initialize();
+    initialize(plan);
     topologicalOrder();
     // mergeWhenGroups();
     mergeOut1Groups();
@@ -122,14 +129,21 @@ class DirectMTaskCoarsener {
     return found == groupByNode_.end() ? -1 : found->second;
   }
 
-  void initialize() {
+  void initialize(MtTaskPlan& plan) {
+    plan.stateRegisters_.clear();
+    for (Node* reg : graph_.regsrc) {
+      if (mtIsCycleStartRegisterUpdate(reg)) plan.stateRegisters_.push_back(reg);
+    }
     groups_.reserve(graph_.sortedSuper.size());
     for (SuperNode* super : graph_.sortedSuper) {
       if (super->member.empty() && super->superType != SUPER_EXTMOD) {
         continue;
       }
       Group group;
-      group.members = super->member;
+      for (Node* node : super->member) {
+        if (!mtIsCycleStartRegisterUpdate(node)) group.members.push_back(node);
+      }
+      if (group.members.empty() && super->superType != SUPER_EXTMOD) continue;
       group.kind = taskKind(super);
       group.orderKey = reinterpret_cast<uintptr_t>(super);
       group.topologyKey = super->id;
@@ -141,6 +155,8 @@ class DirectMTaskCoarsener {
     rebuildEdges();
     fprintf(stderr, "[MtTaskPartitioner] initialize %zu MTask candidates from Node graph\n",
             groups_.size());
+    fprintf(stderr, "[MtTaskPartitioner] state-boundary registers=%zu excluded-from-compute\n",
+            plan.stateRegisters_.size());
   }
 
   void rebuildEdges() {
@@ -632,7 +648,9 @@ class DirectMTaskCoarsener {
   void formFinalTasks(MtTaskPlan& plan, int targetTasks) {
     plan.partitionGroupCount_ = static_cast<int>(order_.size());
     plan.partitionGroupByNode_.clear();
-    plan.emissionNodes_.clear();
+    // Storage / initialization / reset snapshots still need these nodes even
+    // though they no longer belong to any compute task or partition group.
+    plan.emissionNodes_ = plan.stateRegisters_;
     for (int groupId : order_) {
       for (Node* node : groups_[static_cast<size_t>(groupId)].members) {
         plan.partitionGroupByNode_[node] = groupId;
@@ -708,7 +726,11 @@ class DirectMTaskCoarsener {
       MtTask& task = plan.tasks_[taskId];
       task.successors.assign(taskSuccessors[taskId].begin(), taskSuccessors[taskId].end());
       task.predecessors.assign(taskPredecessors[taskId].begin(), taskPredecessors[taskId].end());
-      for (Node* node : task.members) plan.taskByNode_[node] = static_cast<int>(taskId);
+      for (Node* node : task.members) {
+        Assert(!mtIsCycleStartRegisterUpdate(node),
+               "state register %s leaked into compute partition", node->name.c_str());
+        plan.taskByNode_[node] = static_cast<int>(taskId);
+      }
     }
 
     fprintf(stderr, "[MtTaskPartitioner] coarsen MTask candidates %zu -> %zu\n",

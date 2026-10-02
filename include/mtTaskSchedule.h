@@ -25,8 +25,12 @@ struct MtReset {
   std::vector<Instruction> body;
 };
 
-struct MtStateUpdate {
-  int worker = -1;
+// One pinned MTask per worker, including workers with an empty state body.
+// Members own current-state storage / reset operations. The writer lists
+// reference compute-phase producers of prior-cycle pending writes; those
+// producers remain compute tasks and are NOT state-task members.
+struct MtStateTask : MtTask {
+  MtStateTask() { kind = MtTaskKind::StateUpdate; owner = -1; }
   int chunkCount = 0;
   size_t registerStorageBytes = 0;
   size_t memoryWriteBytes = 0;
@@ -43,7 +47,11 @@ struct MtWorkerPlan {
   std::vector<int> waitSlots_;
   std::vector<int> storeSlots_;
   std::vector<int> localWaitSlots_;
-  std::vector<MtStateUpdate> stateUpdates_;
+  // stateTasks_[w] -> all-worker state barrier -> workerTasks_[w].
+  // State and compute task IDs have separate namespaces; no state task is
+  // included in the token DAG, lookahead, or asynchronous-reset replay.
+  std::vector<MtStateTask> stateTasks_;
+  std::unordered_map<Node*, int> stateTaskByNode_;
   std::vector<MtReset> resets_;
 };
 

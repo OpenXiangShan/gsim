@@ -12,13 +12,6 @@ std::string computeExtMod(Node* ext, std::vector<InstInfo>& instructions);
 
 namespace {
 
-bool isCycleStartRegisterUpdate(const Node* node) {
-  return node->status == VALID_NODE && node->type == NODE_REG_SRC &&
-         node->regSplit && node->regNext != nullptr &&
-         (node->regNext->status == VALID_NODE ||
-          node->regNext->status == CONSTANT_NODE);
-}
-
 int taskForNode(const Node* node, const MtTaskPlan& plan) {
   if (node == nullptr) return -1;
   auto found = plan.taskByNode_.find(const_cast<Node*>(node));
@@ -349,7 +342,7 @@ void collectTaskLocalNodes(graph& graph, MtTaskPlan& plan) {
         }
       }
       task.globalNodeCount += crossesTask && hasModelStorage(node) &&
-                              !isCycleStartRegisterUpdate(node);
+                              !mtIsCycleStartRegisterUpdate(node);
 
       if (node->status != VALID_NODE || node->type != NODE_OTHERS ||
           node->isReset() || resetDependencies.count(node) != 0) {
@@ -384,7 +377,8 @@ void mergeNodeAssignments(StmtTree& tree, Node* node, const MtTaskPlan* plan,
                           std::vector<int>& nodePath) {
   // Every register with stored or constant next-state commits in the
   // cycle-start phase. A late async reset overwrites src before replay.
-  if (isCycleStartRegisterUpdate(node)) return;
+  Assert(!mtIsCycleStartRegisterUpdate(node),
+         "cycle-start register %s leaked into compute lowering", node->name.c_str());
   if (plan != nullptr) {
     auto sparse = plan->sparseRegisterByDestination_.find(node);
     if (sparse != plan->sparseRegisterByDestination_.end()) {

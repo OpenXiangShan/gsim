@@ -62,6 +62,13 @@ Node 依赖图 -> 直接 MTask 收缩 -> 静态 MTask -> 固定 worker chain
 
 ### 3.0 MTask lowering 的职责
 
+周期初状态提交现已作为独立的 `MtTaskKind::StateUpdate` 建模，每 worker
+一个状态 MTask。符合周期初提交条件的 `reg_src` 在普通候选任务初始化时就
+被排除，不再只是在 lowering 时跳过赋值。普通 `taskByNode_` 不包含这些
+状态源；它们通过单独的状态成员映射和全 worker state barrier 对接计算阶段。
+成员归属、memory pending write、reset 及生成的阶段报告详见
+[mt-state-tasks.md](mt-state-tasks.md)。
+
 MT 后端不再调用单线程的 `generateStmtTree()` 和 `instsGenerator()`。`CppEmitterMt::prepare()` 先建立 MTask DAG，再调用 `MtTaskLowerer::generateStmtTrees()`，最后建立 worker 计划。
 
 它的处理顺序如下：

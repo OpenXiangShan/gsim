@@ -16,7 +16,12 @@ class StmtTree;
 enum class MtTaskKind : uint8_t {
   Normal,
   ExtModule,
+  StateUpdate,
 };
+
+// The value is published by the cycle-start state barrier, not by an MTask
+// token. Keep this predicate shared by partitioning, lowering and scheduling.
+bool mtIsCycleStartRegisterUpdate(const Node* node);
 
 struct MtTask {
   std::vector<Node*> members;
@@ -50,8 +55,11 @@ struct MtSparseRegister {
 };
 
 struct MtTaskPlan {
+  // Only compute-phase tasks are partitioned and scheduled by HEFT/list.
   std::vector<MtTask> tasks_;
   std::unordered_map<Node*, int> taskByNode_;
+  // Removed before coarsening; assigned to per-worker state tasks later.
+  std::vector<Node*> stateRegisters_;
   std::unordered_map<Node*, int> partitionGroupByNode_;
   std::vector<Node*> emissionNodes_;
   std::unordered_set<Node*> localNodes_;

@@ -238,13 +238,6 @@ void appendInstructions(std::vector<MtReset::Instruction>& destination,
   }
 }
 
-bool isCycleStartRegisterUpdate(const Node* node) {
-  return node->status == VALID_NODE && node->type == NODE_REG_SRC &&
-         node->regSplit && node->regNext != nullptr &&
-         (node->regNext->status == VALID_NODE ||
-          node->regNext->status == CONSTANT_NODE);
-}
-
 size_t registerStorageBytes(const Node* node) {
   size_t bytes = static_cast<size_t>(widthBits(node->width)) / 8;
   for (int dimension : node->dimension) {
@@ -262,7 +255,7 @@ size_t memoryWriteStorageBytes(const Node* port) {
   return sizeof(uint64_t) + entries * (std::max<size_t>(1, dataBytes) + 1);
 }
 
-void appendMemoryCommit(MtStateUpdate& update, Node* port) {
+void appendMemoryCommit(MtStateTask& update, Node* port) {
   Assert(port->type == NODE_WRITER || port->type == NODE_READWRITER,
          "invalid staged memory writer %s", port->name.c_str());
   Assert(port->parent != nullptr && port->parent->type == NODE_MEMORY,
@@ -293,7 +286,7 @@ void appendMemoryCommit(MtStateUpdate& update, Node* port) {
   }
 }
 
-void appendSparseRegisterCommit(MtStateUpdate& update, Node* writer) {
+void appendSparseRegisterCommit(MtStateTask& update, Node* writer) {
   Assert(writer->type == NODE_WRITER && writer->parent != nullptr &&
              writer->parent->type == NODE_REG_SRC,
          "invalid sparse register writer %s", writer->name.c_str());
@@ -331,20 +324,24 @@ int countResetChunks(const std::vector<Instruction>& body, int chunkSize) {
 
 void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
                        MtWorkerPlan& workers, int workerCount, int chunkSize) {
-  workers.stateUpdates_.assign(static_cast<size_t>(workerCount), MtStateUpdate());
+  workers.stateTasks_.assign(static_cast<size_t>(workerCount), MtStateTask());
+  workers.stateTaskByNode_.clear();
   for (int worker = 0; worker < workerCount; ++worker) {
-    workers.stateUpdates_[static_cast<size_t>(worker)].worker = worker;
+    workers.stateTasks_[static_cast<size_t>(worker)].owner = worker;
   }
+  auto addStateMember = [&](MtStateTask& task, Node* node) {
+    Assert(tasks.taskByNode_.count(node) == 0,
+           "state node %s also belongs to a compute MTask", node->name.c_str());
+    Assert(workers.stateTaskByNode_.emplace(node, task.owner).second,
+           "duplicate state MTask member %s", node->name.c_str());
+    task.members.push_back(node);
+  };
 
-  std::vector<Node*> registers;
-  for (Node* reg : graph.regsrc) {
-    if (!isCycleStartRegisterUpdate(reg)) continue;
-    Assert(reg->regSplit &&
-               (reg->getDst()->status == VALID_NODE ||
-                reg->getDst()->status == CONSTANT_NODE),
+  std::vector<Node*> registers = tasks.stateRegisters_;
+  for (Node* reg : registers) {
+    Assert(mtIsCycleStartRegisterUpdate(reg),
            "packed MT register %s has neither valid nor constant destination storage",
            reg->name.c_str());
-    registers.push_back(reg);
   }
   auto sparseRegister = [&](Node* reg) -> const MtSparseRegister* {
     auto found = tasks.sparseRegisterBySource_.find(reg);
@@ -447,7 +444,8 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
       localBytes += cost;
     }
     ownerByRegister[reg] = worker;
-    MtStateUpdate& update = workers.stateUpdates_[static_cast<size_t>(worker)];
+    MtStateTask& update = workers.stateTasks_[static_cast<size_t>(worker)];
+    addStateMember(update, reg);
     if (sparse != nullptr) {
       update.sparseRegisterWriteBytes += cost;
       update.sparseRegisterWriters.insert(update.sparseRegisterWriters.end(),
@@ -474,7 +472,7 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
   // These are prior-cycle writes. Apply them before synchronous reset so a
   // reset asserted at the current edge has the same priority as resetting the
   // full next-state array before the old memcpy-based commit.
-  for (MtStateUpdate& update : workers.stateUpdates_) {
+  for (MtStateTask& update : workers.stateTasks_) {
     for (Node* writer : update.sparseRegisterWriters) {
       appendSparseRegisterCommit(update, writer);
     }
@@ -512,7 +510,10 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
         static_cast<int>(std::min_element(workerLoad.begin(), workerLoad.end()) -
                          workerLoad.begin());
     workerLoad[static_cast<size_t>(worker)] += cost;
-    MtStateUpdate& update = workers.stateUpdates_[static_cast<size_t>(worker)];
+    MtStateTask& update = workers.stateTasks_[static_cast<size_t>(worker)];
+    // Own the memory storage/commit here, not the compute-phase writer node
+    // which still evaluates address/data/enable into pending slots.
+    addStateMember(update, entry.first);
     update.memoryWriteBytes += cost;
     update.memoryWriters.insert(update.memoryWriters.end(), entry.second.begin(),
                                 entry.second.end());
@@ -556,7 +557,8 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
     for (int worker = 0; worker < workerCount; ++worker) {
       const std::vector<Node*>& resetDestinations =
           group.resetDestinationsByWorker[static_cast<size_t>(worker)];
-      MtStateUpdate& update = workers.stateUpdates_[static_cast<size_t>(worker)];
+      MtStateTask& update = workers.stateTasks_[static_cast<size_t>(worker)];
+      for (Node* reset : resetDestinations) addStateMember(update, reset);
       for (size_t begin = 0; begin < resetDestinations.size();) {
         const size_t end = std::min(resetDestinations.size(), begin + resetBatchSize);
         std::vector<Node*> resetMembers(resetDestinations.begin() + begin,
@@ -578,7 +580,7 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
   }
 
   for (int worker = 0; worker < workerCount; ++worker) {
-    MtStateUpdate& update = workers.stateUpdates_[static_cast<size_t>(worker)];
+    MtStateTask& update = workers.stateTasks_[static_cast<size_t>(worker)];
     if (!update.registers.empty()) {
       const std::string source = "mtRegisterSrcW" + std::to_string(worker);
       const std::string destination = "mtRegisterDstW" + std::to_string(worker);
@@ -588,7 +590,25 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
     }
     for (Node* writer : update.memoryWriters) appendMemoryCommit(update, writer);
     update.chunkCount = countResetChunks(update.body, chunkSize);
+    // The state-task body is lowered separately to preserve commit/reset
+    // ordering and packed memcpy. Expose the same instruction representation
+    // and cost as other MTasks without feeding it into HEFT or token reduction.
+    update.insts = new std::vector<InstInfo>();
+    for (const auto& instruction : update.body) {
+      update.insts->emplace_back(static_cast<SuperInfo>(instruction.type), nullptr,
+                                 instruction.text);
+    }
+    update.cost = loweredTaskCost(update);
+    Assert(update.kind == MtTaskKind::StateUpdate && update.owner == worker,
+           "invalid pinned state MTask");
   }
+  for (Node* reg : tasks.stateRegisters_) {
+    Assert(workers.stateTaskByNode_.count(reg) == 1 && tasks.taskByNode_.count(reg) == 0,
+           "register %s must belong to exactly one state MTask", reg->name.c_str());
+  }
+  fprintf(stderr, "[cppEmitter-mt] state-mtasks=%zu state-members=%zu registers=%zu "
+                  "compute-state-registers=0 barrier=all-workers\n",
+          workers.stateTasks_.size(), workers.stateTaskByNode_.size(), registers.size());
 
   const auto registerLimits =
       std::minmax_element(copiedRegisterLoad.begin(), copiedRegisterLoad.end());
@@ -602,8 +622,8 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
           "[cppEmitter-mt] sparse-register-commits arrays=%zu avoided-copy-bytes=%zu "
           "write-sites=%zu pending-bytes=%zu\n",
           tasks.sparseRegisters_.size(), sparseRegisterBytes, sparseRegisterWrites,
-          std::accumulate(workers.stateUpdates_.begin(), workers.stateUpdates_.end(),
-                          size_t{0}, [](size_t total, const MtStateUpdate& update) {
+          std::accumulate(workers.stateTasks_.begin(), workers.stateTasks_.end(),
+                          size_t{0}, [](size_t total, const MtStateTask& update) {
                             return total + update.sparseRegisterWriteBytes;
                           }));
   fprintf(stderr,
