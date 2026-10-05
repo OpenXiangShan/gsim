@@ -385,7 +385,11 @@ list 优化的是生成期估计的最早开始时间，不直接最小化最终
 
 ### 3.5 HEFT Worker 分配
 
-`--mt-scheduler=heft` 使用 HEFT 风格的静态调度。它与 list 共用已经 lowering 完成的 MTask、cost、依赖图和通信节点集合，不会重新构建 MTask。
+`--mt-scheduler=heft` 使用 HEFT 风格的静态调度。它与 list 共用已经 lowering 完成的 MTask、cost、依赖图和通信节点集合，不会重新构建 MTask。`--mt-scheduler=rheft` 在同一 lowered HEFT 流程中加入等待感知复制。
+
+复制感知 MT 调度通过 `--mt-scheduler=rheft` 启用。它直接扩展 HEFT 的 worker 选择：按 lowered rank 处理任务，在各 worker 的时间线中比较等待、复用与联合重算的最早完成时间；选中的副本成为独立 mTask，可以在消费者等待其他输入时提前计算。普通任务与复制块共同使用 InstInfo 成本，没有 lowering 前的 owner 预分配，也没有之后的第二轮调度。`--mt-scheduler=heft` 不复制，`list` 仍是普通 list。预算、边界与公式见 [mt-replication-scheduling.md](mt-replication-scheduling.md)。
+
+复制感知版本的完整实现文档包含[成本公式](mt-replication-scheduling.md#3-统一成本模型)、[候选比较和伪代码](mt-replication-scheduling.md#9-候选比较和完整伪代码)、[日志与 CSV 字段](mt-replication-scheduling.md#13-日志与报告字段)以及[生成、编译和运行命令](mt-replication-scheduling.md#14-参数与香山使用命令)。下文继续说明两种普通调度器的共有机制和 HEFT 基线。
 
 HEFT 的流程是：
 

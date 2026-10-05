@@ -257,6 +257,10 @@ void completeTaskLocalDependencies(graph& graph, MtTaskPlan& plan) {
   for (size_t taskId = 0; taskId < plan.tasks_.size(); ++taskId) {
     const MtTask& task = plan.tasks_[taskId];
     for (Node* node : task.members) {
+      // Replicated cones can read a stable source hosted in another task.
+      // Its value is already published before compute; no task token is needed.
+      if (node->type == NODE_INP || node->status == CONSTANT_NODE ||
+          mtIsCycleStartRegisterUpdate(node)) continue;
       for (Node* next : node->depNext) {
         const int nextTask = taskForNode(next, plan);
         if (nextTask < 0 || nextTask == static_cast<int>(taskId)) continue;

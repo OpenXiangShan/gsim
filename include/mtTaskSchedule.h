@@ -13,6 +13,9 @@ class graph;
 class Node;
 class SuperNode;
 
+// One cost definition for lowered originals and lowered replication blocks.
+int mtLoweredTaskCost(const MtTask& task);
+
 struct MtReset {
   struct Instruction {
     uint8_t type = 0;

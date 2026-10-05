@@ -7,10 +7,12 @@
 
 class CppEmitterMt;
 class MtTaskPartitioner;
+class MtWorkerBuilder;
 
 class graph {
   friend class CppEmitterMt;
   friend class MtTaskPartitioner;
+  friend class MtWorkerBuilder;
   FILE *srcFp;
   int srcFileIdx;
   int srcFileBytes;

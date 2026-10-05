@@ -59,7 +59,9 @@ double structuralExpressionCost(const ENode* root) {
   return work;
 }
 
-int nodeOperationCount(const Node* node) {
+}  // namespace
+
+int mtStructuralNodeCost(const Node* node) {
   double work = 0;
   for (const ExpTree* tree : node->assignTree) {
     work += structuralExpressionCost(tree->getRoot());
@@ -74,9 +76,11 @@ int nodeOperationCount(const Node* node) {
   return mtcost::bounded(work + globalConfig.MtPartitionNodeWeight);
 }
 
+namespace {
+
 int groupCost(const std::vector<Node*>& members) {
   double work = 0;
-  for (const Node* node : members) work += nodeOperationCount(node);
+  for (const Node* node : members) work += mtStructuralNodeCost(node);
   return mtcost::bounded(work);
 }
 

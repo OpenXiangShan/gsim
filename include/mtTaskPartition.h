@@ -22,6 +22,8 @@ enum class MtTaskKind : uint8_t {
 // The value is published by the cycle-start state barrier, not by an MTask
 // token. Keep this predicate shared by partitioning, lowering and scheduling.
 bool mtIsCycleStartRegisterUpdate(const Node* node);
+// Structural work units for partitioning; worker scheduling uses lowered code.
+int mtStructuralNodeCost(const Node* node);
 
 struct MtTask {
   std::vector<Node*> members;

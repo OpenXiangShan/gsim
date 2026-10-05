@@ -79,6 +79,8 @@ Config::Config() {
   MtScheduleGlobalWeight = 16;
   MtScheduleCommNodeWeight = 20;
   MtScheduler = "heft";
+  MtReplicationMaxOps = 3;
+  MtReplicationMinFanout = 2;
   MtLookaheadWindow = 16;
   MtLookaheadStats = false;
   MtSparseRegisterMinBytes = 1024;
@@ -163,7 +165,10 @@ static void printUsage(const char* ProgName) {
             << "                                   Weight for cross-MTask nodes in worker cost (default: 16).\n"
             << "      --mt-schedule-comm-node-weight=[num]\n"
             << "                                   Communication cost per cross-worker node (default: 20).\n"
-            << "      --mt-scheduler=heft|list     Worker assignment algorithm (default: heft).\n"
+            << "      --mt-scheduler=heft|list|rheft Worker assignment algorithm (default: heft).\n"
+            << "                                   rheft enables lowered replication-aware HEFT.\n"
+            << "      --mt-replication-max-ops=N  rheft cone operation budget (default: 3).\n"
+            << "      --mt-replication-min-fanout=N rheft root-node fanout threshold (default: 2).\n"
             << "      --mt-lookahead-window=[num]   Ready-task lookahead window when the chain head blocks (default: 16, 0 disables).\n"
             << "      --mt-lookahead-stats=off|on  Emit per-worker lookahead hit/miss counters (default: off).\n"
             << "      --mt-sparse-register-min-bytes=[num]\n"
@@ -205,6 +210,8 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_MT_SCHEDULE_GLOBAL_WEIGHT,
     OPT_MT_SCHEDULE_COMM_NODE_WEIGHT,
     OPT_MT_SCHEDULER,
+    OPT_MT_REPLICATION_MAX_OPS,
+    OPT_MT_REPLICATION_MIN_FANOUT,
     OPT_MT_LOOKAHEAD_WINDOW,
     OPT_MT_LOOKAHEAD_STATS,
     OPT_MT_SPARSE_REGISTER_MIN_BYTES,
@@ -235,6 +242,8 @@ static char* parseCommandLine(int argc, char** argv) {
       {"mt-schedule-global-weight", required_argument, nullptr, 0},
       {"mt-schedule-comm-node-weight", required_argument, nullptr, 0},
       {"mt-scheduler", required_argument, nullptr, 0},
+      {"mt-replication-max-ops", required_argument, nullptr, 0},
+      {"mt-replication-min-fanout", required_argument, nullptr, 0},
       {"mt-lookahead-window", required_argument, nullptr, 0},
       {"mt-lookahead-stats", required_argument, nullptr, 0},
       {"mt-sparse-register-min-bytes", required_argument, nullptr, 0},
@@ -345,8 +354,9 @@ static char* parseCommandLine(int argc, char** argv) {
                   }
                   break;
                 case OPT_MT_SCHEDULER:
-                  if (strcmp(optarg, "heft") != 0 && strcmp(optarg, "list") != 0) {
-                    fprintf(stderr, "Error: --mt-scheduler expects heft or list, got '%s'.\n", optarg);
+                  if (strcmp(optarg, "heft") != 0 && strcmp(optarg, "list") != 0 &&
+                      strcmp(optarg, "rheft") != 0) {
+                    fprintf(stderr, "Error: --mt-scheduler expects heft, list or rheft, got '%s'.\n", optarg);
                     printUsage(argv[0]);
                     std::cout.flush();
                     fflush(nullptr);
@@ -354,6 +364,21 @@ static char* parseCommandLine(int argc, char** argv) {
                   }
                   globalConfig.MtScheduler = optarg;
                   break;
+                case OPT_MT_REPLICATION_MAX_OPS:
+                case OPT_MT_REPLICATION_MIN_FANOUT: {
+                  char* end = nullptr;
+                  errno = 0;
+                  const long value = strtol(optarg, &end, 10);
+                  if (errno || end == optarg || *end || value < 1 || value > 1000000) {
+                    fprintf(stderr, "Error: MT replication parameter expects an integer in [1, 1000000].\n");
+                    _exit(EXIT_FAILURE);
+                  }
+                  if (option_index == OPT_MT_REPLICATION_MAX_OPS)
+                    globalConfig.MtReplicationMaxOps = value;
+                  else
+                    globalConfig.MtReplicationMinFanout = value;
+                  break;
+                }
                 case OPT_MT_LOOKAHEAD_WINDOW: {
                   int window = -1;
                   if (sscanf(optarg, "%d", &window) != 1 || window < 0) {
@@ -401,6 +426,11 @@ static char* parseCommandLine(int argc, char** argv) {
         std::cout.flush();
         fflush(nullptr);
         _exit(EXIT_SUCCESS);
+      case '?':
+        printUsage(argv[0]);
+        std::cout.flush();
+        fflush(nullptr);
+        _exit(EXIT_FAILURE);
       case 'h':
       default: {
         printUsage(argv[0]);

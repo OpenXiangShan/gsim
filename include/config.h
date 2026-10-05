@@ -22,6 +22,8 @@ struct Config {
   int MtScheduleGlobalWeight;
   int MtScheduleCommNodeWeight;
   std::string MtScheduler;
+  int MtReplicationMaxOps;
+  int MtReplicationMinFanout;
   int MtLookaheadWindow;
   bool MtLookaheadStats;
   int MtSparseRegisterMinBytes;

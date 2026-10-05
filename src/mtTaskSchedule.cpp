@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "mtCostModel.h"
+#include "mtReplicationSchedule.h"
 
 #include <algorithm>
 #include <climits>
@@ -9,13 +10,12 @@
 #include <cstdio>
 #include <map>
 #include <numeric>
+#include <queue>
 #include <set>
 #include <unordered_map>
 #include <utility>
 
-namespace {
-
-int loweredTaskCost(const MtTask& task) {
+int mtLoweredTaskCost(const MtTask& task) {
   mtcost::Accumulator features;
   if (task.insts != nullptr) {
     for (const InstInfo& instruction : *task.insts) {
@@ -31,6 +31,8 @@ int loweredTaskCost(const MtTask& task) {
   return mtcost::bounded(mtcost::taskOverhead + mtcost::score(features.all) +
       static_cast<double>(task.globalNodeCount) * globalConfig.MtScheduleGlobalWeight);
 }
+
+namespace {
 
 bool taskEmitsCode(const MtTask& task) {
   if (task.insts != nullptr && !task.insts->empty()) return true;
@@ -598,7 +600,7 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
       update.insts->emplace_back(static_cast<SuperInfo>(instruction.type), nullptr,
                                  instruction.text);
     }
-    update.cost = loweredTaskCost(update);
+    update.cost = mtLoweredTaskCost(update);
     Assert(update.kind == MtTaskKind::StateUpdate && update.owner == worker,
            "invalid pinned state MTask");
   }
@@ -637,14 +639,12 @@ void buildStateUpdates(graph& graph, const MtTaskPlan& tasks,
           memoryWriterCount, memoryWriteBytes, *stateLimits.first, *stateLimits.second);
 }
 
-struct ScheduledInterval {
-  int task = -1;
-  long long start = 0;
-  long long finish = 0;
-};
+using ScheduledInterval = MtScheduledInterval;
 
 struct WorkerSchedule {
   std::vector<int> owner;
+  std::vector<long long> start;
+  std::vector<long long> finish;
   std::vector<std::vector<int>> chains;
   long long makespan = 0;
 };
@@ -771,6 +771,8 @@ WorkerSchedule scheduleList(const MtTaskPlan& tasks, int workerCount,
   const int taskCount = static_cast<int>(tasks.tasks_.size());
   WorkerSchedule result;
   result.owner.assign(static_cast<size_t>(taskCount), -1);
+  result.start.assign(static_cast<size_t>(taskCount), 0);
+  result.finish.assign(static_cast<size_t>(taskCount), 0);
   result.chains.assign(static_cast<size_t>(workerCount), std::vector<int>());
 
   std::vector<int> remaining(static_cast<size_t>(taskCount), 0);
@@ -827,6 +829,8 @@ WorkerSchedule scheduleList(const MtTaskPlan& tasks, int workerCount,
     const long long finish = bestStart +
         candidateTaskCost(tasks, bestTask, bestWorker, result.owner, workerCount);
     result.owner[static_cast<size_t>(bestTask)] = bestWorker;
+    result.start[static_cast<size_t>(bestTask)] = bestStart;
+    result.finish[static_cast<size_t>(bestTask)] = finish;
     completion[static_cast<size_t>(bestTask)] = finish;
     workerAvailable[static_cast<size_t>(bestWorker)] = finish;
     result.chains[static_cast<size_t>(bestWorker)].push_back(bestTask);
@@ -841,11 +845,14 @@ WorkerSchedule scheduleList(const MtTaskPlan& tasks, int workerCount,
   return result;
 }
 
-WorkerSchedule scheduleHeft(const MtTaskPlan& tasks, int workerCount,
-                            const EdgeCommunicationNodes& communicationNodes) {
+WorkerSchedule scheduleHeft(MtTaskPlan& tasks, int workerCount,
+                            const EdgeCommunicationNodes& communicationNodes,
+                            MtHeftReplication* replication = nullptr) {
   const int taskCount = static_cast<int>(tasks.tasks_.size());
   WorkerSchedule result;
   result.owner.assign(static_cast<size_t>(taskCount), -1);
+  result.start.assign(static_cast<size_t>(taskCount), 0);
+  result.finish.assign(static_cast<size_t>(taskCount), 0);
   result.chains.assign(static_cast<size_t>(workerCount), std::vector<int>());
 
   // HEFT upward rank. Task IDs are already a forward topological order, so
@@ -880,12 +887,13 @@ WorkerSchedule scheduleHeft(const MtTaskPlan& tasks, int workerCount,
       static_cast<size_t>(workerCount));
 
   for (int taskId : order) {
-    const MtTask& task = tasks.tasks_[static_cast<size_t>(taskId)];
     int bestWorker = -1;
     long long bestStart = LLONG_MAX;
     long long bestFinish = LLONG_MAX;
+    MtHeftPlacement bestPlacement;
 
     for (int worker = 0; worker < workerCount; ++worker) {
+      const MtTask& task = tasks.tasks_[static_cast<size_t>(taskId)];
       const long long duration =
           candidateTaskCost(tasks, taskId, worker, result.owner, workerCount);
       long long readyAt = 0;
@@ -909,23 +917,56 @@ WorkerSchedule scheduleHeft(const MtTaskPlan& tasks, int workerCount,
         start = std::max(start, next->second.finish);
         ++next;
       }
-      const long long finish = start + duration;
+      MtHeftPlacement placement;
+      placement.task = taskId;
+      placement.worker = worker;
+      placement.start = start;
+      placement.finish = start + duration;
+      placement.waitFinish = placement.finish;
+      placement.waitStart = start;
+      placement.cost = task.cost;
+      placement.dependencies = task.predecessors;
+      if (replication) {
+        placement = replication->evaluate(std::move(placement), result.owner,
+                                            completion, timeline);
+      }
+      start = placement.start;
+      const long long finish = placement.finish;
       if (finish < bestFinish ||
           (finish == bestFinish &&
-           (start < bestStart || (start == bestStart && worker < bestWorker)))) {
+           (placement.extraWork < bestPlacement.extraWork ||
+            (placement.extraWork == bestPlacement.extraWork &&
+             (start < bestStart || (start == bestStart && worker < bestWorker)))))) {
         bestWorker = worker;
         bestStart = start;
         bestFinish = finish;
+        bestPlacement = std::move(placement);
       }
     }
 
     Assert(bestWorker >= 0, "HEFT scheduler failed to place task %d", taskId);
+    if (replication) {
+      const int replica = replication->commit(bestPlacement);
+      if (replica >= 0) {
+        Assert(replica == static_cast<int>(completion.size()), "invalid replica task ID");
+        completion.push_back(bestPlacement.copyFinish);
+        result.owner.push_back(bestWorker);
+        result.start.push_back(bestPlacement.copyStart);
+        result.finish.push_back(bestPlacement.copyFinish);
+        timelines[bestWorker].emplace(bestPlacement.copyStart,
+            ScheduledInterval{replica, bestPlacement.copyStart, bestPlacement.copyFinish});
+      }
+    }
     result.owner[static_cast<size_t>(taskId)] = bestWorker;
+    result.start[static_cast<size_t>(taskId)] = bestStart;
+    result.finish[static_cast<size_t>(taskId)] = bestFinish;
     completion[static_cast<size_t>(taskId)] = bestFinish;
     result.makespan = std::max(result.makespan, bestFinish);
     ScheduledInterval placed{taskId, bestStart, bestFinish};
     timelines[static_cast<size_t>(bestWorker)].emplace(placed.start, placed);
   }
+
+  if (replication) replication->finish();
 
   for (int worker = 0; worker < workerCount; ++worker) {
     for (const auto& entry : timelines[static_cast<size_t>(worker)]) {
@@ -935,6 +976,62 @@ WorkerSchedule scheduleHeft(const MtTaskPlan& tasks, int workerCount,
   return result;
 }
 
+// Preserve the jointly selected intervals; only IDs change. Both true data
+// edges and worker sequencing must be forward for token transitive reduction.
+std::vector<int> reorderHeftTasks(MtTaskPlan& tasks, WorkerSchedule& schedule) {
+  const size_t count = tasks.tasks_.size();
+  bool forward = true;
+  for (size_t i = 0; i < count; ++i) {
+    for (int p : tasks.tasks_[i].predecessors) forward &= p < static_cast<int>(i);
+  }
+  if (forward) {
+    std::vector<int> ids(count);
+    std::iota(ids.begin(), ids.end(), 0);
+    return ids;
+  }
+  std::vector<std::set<int>> edges(count);
+  std::vector<int> indegree(count);
+  for (size_t i = 0; i < count; ++i) {
+    edges[i].insert(tasks.tasks_[i].successors.begin(), tasks.tasks_[i].successors.end());
+  }
+  for (const auto& chain : schedule.chains) {
+    for (size_t i = 1; i < chain.size(); ++i) edges[chain[i-1]].insert(chain[i]);
+  }
+  for (const auto& next : edges) for (int target : next) ++indegree[target];
+  std::priority_queue<int, std::vector<int>, std::greater<int>> ready;
+  for (size_t i = 0; i < count; ++i) if (!indegree[i]) ready.push(i);
+  std::vector<int> order, ids(count, -1);
+  while (!ready.empty()) {
+    int id = ready.top(); ready.pop();
+    ids[id] = order.size();
+    order.push_back(id);
+    for (int target : edges[id]) if (!--indegree[target]) ready.push(target);
+  }
+  Assert(order.size() == count, "cycle in replication-aware HEFT schedule");
+  std::vector<MtTask> reordered;
+  WorkerSchedule remapped;
+  remapped.makespan = schedule.makespan;
+  for (int id : order) {
+    reordered.push_back(std::move(tasks.tasks_[id]));
+    remapped.owner.push_back(schedule.owner[id]);
+    remapped.start.push_back(schedule.start[id]);
+    remapped.finish.push_back(schedule.finish[id]);
+  }
+  tasks.tasks_.swap(reordered);
+  for (auto& task : tasks.tasks_) {
+    for (int& id : task.predecessors) id = ids[id];
+    for (int& id : task.successors) id = ids[id];
+    std::sort(task.predecessors.begin(), task.predecessors.end());
+    std::sort(task.successors.begin(), task.successors.end());
+  }
+  for (auto chain : schedule.chains) {
+    for (int& id : chain) id = ids[id];
+    remapped.chains.push_back(std::move(chain));
+  }
+  for (auto& entry : tasks.taskByNode_) entry.second = ids[entry.second];
+  schedule = std::move(remapped);
+  return ids;
+}
 
 }  // namespace
 
@@ -942,22 +1039,56 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
                             int workerCount, int resetChunk) {
   const int groupCount = tasks.partitionGroupCount_;
   compactEmptyTasks(tasks);
-  for (MtTask& task : tasks.tasks_) task.cost = loweredTaskCost(task);
-  const EdgeCommunicationNodes communicationNodes = buildEdgeCommunicationNodes(tasks);
+  for (MtTask& task : tasks.tasks_) task.cost = mtLoweredTaskCost(task);
+  EdgeCommunicationNodes communicationNodes = buildEdgeCommunicationNodes(tasks);
   size_t communicationEdges = 0;
   long long communicationUnits = 0;
   for (const auto& byProducer : communicationNodes) {
     communicationEdges += byProducer.size();
     for (const auto& entry : byProducer) communicationUnits += entry.second.size();
   }
-  WorkerSchedule schedule = globalConfig.MtScheduler == "list"
-                                ? scheduleList(tasks, workerCount, communicationNodes)
-                                : scheduleHeft(tasks, workerCount, communicationNodes);
+  const bool replicationAware = globalConfig.MtScheduler == "rheft" && workerCount > 1;
+  std::unique_ptr<MtHeftReplication> replication;
+  if (replicationAware) replication = std::make_unique<MtHeftReplication>(graph, tasks, workerCount);
+  WorkerSchedule schedule = replicationAware
+      ? scheduleHeft(tasks, workerCount, communicationNodes, replication.get())
+      : (globalConfig.MtScheduler == "list"
+          ? scheduleList(tasks, workerCount, communicationNodes)
+          : scheduleHeft(tasks, workerCount, communicationNodes));
+  if (replicationAware) {
+    // New replica tasks can precede old task IDs. Restore a forward DAG for
+    // transitive reduction, including the selected worker order.
+    const auto remapping = reorderHeftTasks(tasks, schedule);
+    replication->report(remapping, schedule.makespan);
+    communicationNodes = buildEdgeCommunicationNodes(tasks);
+    communicationEdges = 0;
+    communicationUnits = 0;
+    for (const auto& sources : communicationNodes) {
+      communicationEdges += sources.size();
+      for (const auto& source : sources) communicationUnits += source.second.size();
+    }
+  }
   for (size_t taskId = 0; taskId < tasks.tasks_.size(); ++taskId) {
     tasks.tasks_[taskId].owner = schedule.owner[taskId];
   }
   const size_t actualCrossWorkerNodes =
       actualCrossWorkerCommunicationNodes(tasks, communicationNodes);
+  if (replicationAware && !globalConfig.OutputDir.empty()) {
+    FILE* report = std::fopen((globalConfig.OutputDir + "/mt-replication-final.csv").c_str(), "w");
+    Assert(report != nullptr, "cannot write final joint schedule report");
+    fprintf(report, "task,worker,position,start,finish,cost\n");
+    for (int worker = 0; worker < workerCount; ++worker) {
+      const auto& chain = schedule.chains[worker];
+      for (size_t position = 0; position < chain.size(); ++position) {
+        const int id = chain[position];
+        fprintf(report, "%d,%d,%zu,%lld,%lld,%d\n", id, worker, position,
+                schedule.start[id], schedule.finish[id], tasks.tasks_[id].cost);
+      }
+    }
+    Assert(std::fclose(report) == 0, "cannot finish final joint schedule report");
+    fprintf(stderr, "[cppEmitter-mt] replication-aware-heft cost=lowered "
+                    "placement=joint-eft chains=heft-insertion\n");
+  }
   fprintf(stderr,
           "[cppEmitter-mt] scheduler=%s estimated-makespan=%lld "
           "potential-comm-edges=%zu potential-comm-nodes=%lld "
