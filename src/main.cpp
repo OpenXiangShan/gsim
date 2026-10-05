@@ -81,7 +81,7 @@ Config::Config() {
   MtScheduler = "heft";
   MtReplicationMaxOps = 3;
   MtReplicationMinFanout = 2;
-  MtLookaheadWindow = 16;
+  MtLookaheadWindow = 0;
   MtLookaheadStats = false;
   MtSparseRegisterMinBytes = 1024;
   MtSparseRegisterMaxWrites = 8;
@@ -169,7 +169,7 @@ static void printUsage(const char* ProgName) {
             << "                                   rheft enables lowered replication-aware HEFT.\n"
             << "      --mt-replication-max-ops=N  rheft cone operation budget (default: 3).\n"
             << "      --mt-replication-min-fanout=N rheft root-node fanout threshold (default: 2).\n"
-            << "      --mt-lookahead-window=[num]   Ready-task lookahead window when the chain head blocks (default: 16, 0 disables).\n"
+            << "      --mt-lookahead-window=[num]   Ready-task lookahead window when the chain head blocks (default: 0, 0 disables).\n"
             << "      --mt-lookahead-stats=off|on  Emit per-worker lookahead hit/miss counters (default: off).\n"
             << "      --mt-sparse-register-min-bytes=[num]\n"
             << "                                   Minimum register-array bytes for sparse writes (default: 256).\n"
