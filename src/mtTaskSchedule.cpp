@@ -28,8 +28,9 @@ int mtLoweredTaskCost(const MtTask& task) {
       }
     }
   }
-  return mtcost::bounded(mtcost::taskOverhead + mtcost::score(features.all) +
-      static_cast<double>(task.globalNodeCount) * globalConfig.MtScheduleGlobalWeight);
+  return mtcost::bounded(mtcost::taskOverhead + mtcost::loweredScore(features.all) +
+      mtcost::globalStorageCost(task.globalNodeCount,
+                               globalConfig.MtScheduleGlobalWeight));
 }
 
 namespace {

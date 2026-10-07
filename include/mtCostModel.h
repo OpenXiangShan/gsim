@@ -15,6 +15,8 @@ enum Feature { Assign, Simple, Multiply, Divide, Index, Call, Branch, Count };
 using Features = std::array<double, Count>;
 
 inline constexpr Features defaultWeights{1.0, 0.5, 4.0, 16.0, 0.5, 6.0, 8.0};
+inline constexpr double loweredBranchWeight = 2.0;
+inline constexpr int globalWriteFastCount = 64;
 
 inline bool identifier(char c) {
   return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '$';
@@ -92,19 +94,30 @@ inline int bounded(double value) {
   return std::max(1, static_cast<int>(std::ceil(value)));
 }
 
-// Relative work units, NOT ns.  The weights use all-path counts because that
-// ranked both instrumented task time and uninstrumented perf samples better
-// than a fixed 50/50 branch prior on the XiangShan calibration workload.  The
-// deliberately conservative multiply/divide ratios avoid fitting the handful
-// of such tasks as design-specific outliers.
+// Relative work units, NOT ns. Partitioning uses all-path structural counts;
+// lowering adjusts branch and storage terms from emitted-code measurements.
 inline double score(const Features& f) {
   double result = 0;
   for (size_t i = 0; i < Count; ++i) result += f[i]*defaultWeights[i];
   return result;
 }
+// Branch bodies are counted on every path, while dense C++ executes only the
+// selected path. Keep the structural partition score unchanged.
+inline double loweredScore(const Features& f) {
+  return score(f) -
+      (defaultWeights[Branch] - loweredBranchWeight) * f[Branch];
+}
+// Large groups of global result stores have a lower marginal cost than the
+// original per-node linear charge in the measured dense simulator.
+inline double globalStorageCost(int count, int weight) {
+  const double nodes = std::max(0, count);
+  const double head = std::min(nodes, static_cast<double>(globalWriteFastCount));
+  return std::max(0, weight) *
+      (2.0 * head + (nodes - head) / 16.0);
+}
 // Relative units fixed from the XiangShan trace/perf calibration. They are
 // static inputs to all later designs; generated simulators read no profile.
-inline constexpr int taskOverhead = 1400;
+inline constexpr int taskOverhead = 500;
 inline constexpr int remoteCheck = 192;
 inline constexpr int remotePublish = 32;
 inline constexpr int tokenLatency = 32;
