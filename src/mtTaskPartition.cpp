@@ -4,6 +4,8 @@
 #include "mtCostModel.h"
 
 #include <algorithm>
+#include <climits>
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <queue>
@@ -110,9 +112,18 @@ class DirectMTaskCoarsener {
     initialize(plan);
     topologicalOrder();
     // mergeWhenGroups();
-    mergeOut1Groups();
-    mergeIn1Groups();
-    mergeSiblingGroups();
+    if (globalConfig.MtPartition == "mffc") {
+      // Fanout-free cones first. Direct out/in/sibling contraction is not a
+      // preface. A second pass only folds single-predecessor groups and
+      // identical-fan-in siblings that still fit in one task budget.
+      mergeMffcGroups(targetTasks);
+      topologicalOrder();
+      mergeMffcBorderGroups(targetTasks);
+    } else {
+      mergeOut1Groups();
+      mergeIn1Groups();
+      mergeSiblingGroups();
+    }
     topologicalOrder();
     formFinalTasks(plan, targetTasks);
   }
@@ -508,6 +519,191 @@ class DirectMTaskCoarsener {
     convertSmallWhensToMux();
   }
 
+  // MFFC cone and border merges share final packing's task budget. This stays
+  // internal; it is not a user option. 1 keeps each cone within one targetCost.
+  static constexpr double kPartitionCostFactor = 1.0;
+
+  long long scaledPartitionLimit(long long targetCost) const {
+    const double scaled = std::ceil(static_cast<double>(targetCost) * kPartitionCostFactor);
+    if (!std::isfinite(scaled) || scaled >= static_cast<double>(LLONG_MAX)) return LLONG_MAX;
+    return std::max(1LL, static_cast<long long>(scaled));
+  }
+
+  // Disjoint maximum fanout-free cones on the initial Group DAG. A group joins
+  // a cone only when every dependency successor is already in that cone. The
+  // cone cost uses the same structural weights as direct packing, and cannot
+  // exceed the internal factor times targetCost. Direct out/in/sibling merges
+  // are not used.
+  void mergeMffcGroups(int targetTasks) {
+    Assert(targetTasks > 0, "invalid MT target task count");
+    std::vector<long long> cost(groups_.size(), 0);
+    long long totalCost = 0;
+    for (int id : order_) {
+      if (!alive(id)) continue;
+      cost[static_cast<size_t>(id)] = groupCost(groups_[static_cast<size_t>(id)].members);
+      totalCost += cost[static_cast<size_t>(id)];
+    }
+    const long long targetCost =
+        std::max(1LL, (totalCost + targetTasks - 1) / targetTasks);
+    const long long coneLimit = scaledPartitionLimit(targetCost);
+
+    std::vector<int> rootFor(groups_.size(), -1);
+    std::vector<int> inCone(groups_.size(), -1);
+    size_t multiCones = 0;
+    size_t largestCone = 1;
+    size_t largestNodes = 0;
+    for (size_t reverse = order_.size(); reverse > 0; --reverse) {
+      const int rootId = order_[reverse - 1];
+      if (!alive(rootId) || rootFor[static_cast<size_t>(rootId)] >= 0) continue;
+      Group& root = groups_[static_cast<size_t>(rootId)];
+      if (root.kind != MtTaskKind::Normal) {
+        rootFor[static_cast<size_t>(rootId)] = rootId;
+        largestNodes = std::max(largestNodes, root.members.size());
+        continue;
+      }
+
+      std::vector<int> cone{rootId};
+      std::queue<int> pending;
+      inCone[static_cast<size_t>(rootId)] = rootId;
+      long long coneCost = cost[static_cast<size_t>(rootId)];
+      size_t coneNodes = root.members.size();
+      for (int predecessor : root.depPrev) pending.push(predecessor);
+      while (!pending.empty()) {
+        const int candidate = pending.front();
+        pending.pop();
+        if (!alive(candidate) || inCone[static_cast<size_t>(candidate)] == rootId ||
+            rootFor[static_cast<size_t>(candidate)] >= 0 ||
+            groups_[static_cast<size_t>(candidate)].kind != MtTaskKind::Normal) {
+          continue;
+        }
+        const Group& group = groups_[static_cast<size_t>(candidate)];
+        bool fanoutFree = true;
+        for (int successor : group.depNext) {
+          if (inCone[static_cast<size_t>(successor)] != rootId) {
+            fanoutFree = false;
+            break;
+          }
+        }
+        if (!fanoutFree) continue;
+        const long long added = cost[static_cast<size_t>(candidate)];
+        if (coneNodes + group.members.size() > kMaxNodesPerGroup ||
+            coneCost > coneLimit || added > coneLimit - coneCost) {
+          continue;
+        }
+        inCone[static_cast<size_t>(candidate)] = rootId;
+        cone.push_back(candidate);
+        coneCost += added;
+        coneNodes += group.members.size();
+        for (int predecessor : group.depPrev) pending.push(predecessor);
+      }
+
+      if (cone.size() > 1) ++multiCones;
+      largestCone = std::max(largestCone, cone.size());
+      largestNodes = std::max(largestNodes, coneNodes);
+      for (int member : cone) rootFor[static_cast<size_t>(member)] = rootId;
+    }
+
+    size_t merged = 0;
+    for (int sourceId : order_) {
+      if (!alive(sourceId)) continue;
+      const int targetId = rootFor[static_cast<size_t>(sourceId)];
+      Assert(targetId >= 0, "MFFC left group %d unassigned", sourceId);
+      if (targetId == sourceId) continue;
+      Assert(rootFor[static_cast<size_t>(targetId)] == targetId,
+             "MFFC root must not be absorbed by another cone");
+      moveMembers(sourceId, targetId, false);
+      ++merged;
+    }
+    order_.erase(std::remove_if(order_.begin(), order_.end(),
+                                [&](int id) { return !alive(id); }),
+                 order_.end());
+    fprintf(stderr, "[MtTaskPartitioner] mffc merged %zu groups into %zu roots "
+                    "multi-cones=%zu largest-cone=%zu largest-nodes=%zu "
+                    "target-cost=%lld cone-limit=%lld\n",
+            merged, order_.size(), multiCones, largestCone, largestNodes,
+            targetCost, coneLimit);
+  }
+
+  long long taskCostLimit(int targetTasks) const {
+    long long totalCost = 0;
+    for (int id : order_) {
+      if (!alive(id)) continue;
+      totalCost += groupCost(groups_[static_cast<size_t>(id)].members);
+    }
+    const long long targetCost =
+        std::max(1LL, (totalCost + targetTasks - 1) / targetTasks);
+    return scaledPartitionLimit(targetCost);
+  }
+
+  // MFFC leaves broadcast and shared-fan-in nodes split. Fold those borders
+  // without exceeding one task budget, so a dependency chain does not pay the
+  // remote-check cost once per small task.
+  void mergeMffcBorderGroups(int targetTasks) {
+    const long long limit = taskCostLimit(targetTasks);
+    std::vector<long long> cost(groups_.size(), 0);
+    for (int id : order_) {
+      if (!alive(id)) continue;
+      cost[static_cast<size_t>(id)] = groupCost(groups_[static_cast<size_t>(id)].members);
+    }
+    auto fits = [&](int source, int target) {
+      const Group& src = groups_[static_cast<size_t>(source)];
+      const Group& dst = groups_[static_cast<size_t>(target)];
+      if (dst.members.size() + src.members.size() > kMaxNodesPerGroup) return false;
+      const long long added = cost[static_cast<size_t>(source)];
+      const long long base = cost[static_cast<size_t>(target)];
+      return base <= limit && added <= limit - base;
+    };
+
+    size_t inMerges = 0;
+    for (int id : order_) {
+      if (!alive(id)) continue;
+      Group& group = groups_[static_cast<size_t>(id)];
+      if (group.kind != MtTaskKind::Normal || group.prev.size() != 1) continue;
+      const int targetId = *group.prev.begin();
+      Group& target = groups_[static_cast<size_t>(targetId)];
+      if (!target.alive || target.kind != MtTaskKind::Normal || !fits(id, targetId)) continue;
+      bool canMerge = true;
+      for (int dependency : group.depPrev) {
+        if (groups_[static_cast<size_t>(dependency)].order > target.order) canMerge = false;
+      }
+      if (!canMerge) continue;
+      cost[static_cast<size_t>(targetId)] += cost[static_cast<size_t>(id)];
+      mergeInInto(id, targetId);
+      ++inMerges;
+    }
+    order_.erase(std::remove_if(order_.begin(), order_.end(),
+                                [&](int id) { return !alive(id); }),
+                 order_.end());
+
+    size_t siblingMerges = 0;
+    using Key = std::pair<std::vector<int>, std::vector<int>>;
+    std::map<Key, int> representative;
+    for (int id : order_) {
+      if (!alive(id)) continue;
+      Group& group = groups_[static_cast<size_t>(id)];
+      if (group.kind != MtTaskKind::Normal || group.prev.empty()) continue;
+      Key key{{group.prev.begin(), group.prev.end()}, {group.depPrev.begin(), group.depPrev.end()}};
+      auto found = representative.find(key);
+      if (found == representative.end()) {
+        representative.emplace(std::move(key), id);
+        continue;
+      }
+      const int targetId = found->second;
+      if (!alive(targetId) || !fits(id, targetId)) {
+        found->second = id;
+        continue;
+      }
+      cost[static_cast<size_t>(targetId)] += cost[static_cast<size_t>(id)];
+      moveMembers(id, targetId, false);
+      ++siblingMerges;
+    }
+    order_.erase(std::remove_if(order_.begin(), order_.end(),
+                                [&](int id) { return !alive(id); }),
+                 order_.end());
+    fprintf(stderr, "[MtTaskPartitioner] mffc-border in1=%zu sibling=%zu groups=%zu limit=%lld\n",
+            inMerges, siblingMerges, order_.size(), limit);
+  }
+
   void mergeOut1Groups() {
     for (auto position = order_.rbegin(); position != order_.rend(); ++position) {
       const int id = *position;
@@ -748,6 +944,8 @@ void MtTaskPartitioner::build(graph& graph, MtTaskPlan& plan, int targetTasks) {
   graph.orderAllNodes();
   graph.mergeResetAll();
   useDirectDependencies(graph);
+  fprintf(stderr, "[MtTaskPartitioner] partition=%s target-tasks=%d\n",
+          globalConfig.MtPartition.c_str(), targetTasks);
   DirectMTaskCoarsener(graph).build(plan, targetTasks);
 }
 

@@ -18,6 +18,7 @@ struct Config {
   int LogLevel;
   int NumThreads;
   int MtTargetTasks;
+  std::string MtPartition;
   int MtPartitionNodeWeight;
   int MtScheduleGlobalWeight;
   int MtScheduleCommNodeWeight;

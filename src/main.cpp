@@ -75,6 +75,7 @@ Config::Config() {
   LogLevel = 0;
   NumThreads = capThreads(10);
   MtTargetTasks = 2400;
+  MtPartition = "direct";
   MtPartitionNodeWeight = 0;
   MtScheduleGlobalWeight = 16;
   MtScheduleCommNodeWeight = 20;
@@ -159,6 +160,8 @@ static void printUsage(const char* ProgName) {
             << "      --mt-mode=off|on             Select the C++ emitter mode.\n"
             << "                                   off: single-thread active (default); on: multithread dense.\n"
             << "      --mt-target-tasks=[num]      Target number of MTasks used for MT partitioning (default: 2400).\n"
+            << "      --mt-partition=direct|mffc   MTask coarsening before cost packing (default: direct).\n"
+            << "                                   direct merges out/in/sibling groups; mffc merges fanout-free cones only.\n"
             << "      --mt-partition-node-weight=[num]\n"
             << "                                   Fixed per-node weight in MT partition cost (default: 0).\n"
             << "      --mt-schedule-global-weight=[num]\n"
@@ -206,6 +209,7 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_DUMP_CONST_STATUS,
     OPT_MT_MODE,
     OPT_MT_TARGET_TASKS,
+    OPT_MT_PARTITION,
     OPT_MT_PARTITION_NODE_WEIGHT,
     OPT_MT_SCHEDULE_GLOBAL_WEIGHT,
     OPT_MT_SCHEDULE_COMM_NODE_WEIGHT,
@@ -238,6 +242,7 @@ static char* parseCommandLine(int argc, char** argv) {
       {"dump-const-status", no_argument, nullptr, 0},
       {"mt-mode", required_argument, nullptr, 0},
       {"mt-target-tasks", required_argument, nullptr, 0},
+      {"mt-partition", required_argument, nullptr, 0},
       {"mt-partition-node-weight", required_argument, nullptr, 0},
       {"mt-schedule-global-weight", required_argument, nullptr, 0},
       {"mt-schedule-comm-node-weight", required_argument, nullptr, 0},
@@ -344,6 +349,13 @@ static char* parseCommandLine(int argc, char** argv) {
                   globalConfig.MtTargetTasks = targetTasks;
                   break;
                 }
+                case OPT_MT_PARTITION:
+                  if (strcmp(optarg, "direct") != 0 && strcmp(optarg, "mffc") != 0) {
+                    fprintf(stderr, "Error: --mt-partition expects direct or mffc, got '%s'.\n", optarg);
+                    _exit(EXIT_FAILURE);
+                  }
+                  globalConfig.MtPartition = optarg;
+                  break;
                 case OPT_MT_PARTITION_NODE_WEIGHT: sscanf(optarg, "%d", &globalConfig.MtPartitionNodeWeight); break;
                 case OPT_MT_SCHEDULE_GLOBAL_WEIGHT: sscanf(optarg, "%d", &globalConfig.MtScheduleGlobalWeight); break;
                 case OPT_MT_SCHEDULE_COMM_NODE_WEIGHT:
