@@ -74,17 +74,17 @@ MT 后端不再调用单线程的 `generateStmtTree()` 和 `instsGenerator()`。
 它的处理顺序如下：
 
 1. 将 MT 图中的 `depPrev/depNext` 归一化为 `prev/next`，再从直接数据边初始化候选 MTask。
-2. 在候选 MTask 上执行与旧 `graphPartitionMt` 等价的 when、单后继、单前驱和同前驱合并。
+2. `--mt-partition=direct` 做单后继、单前驱和同前驱局部合并。目标组超过 7000 个节点不再并入，同前驱目标组达到 30 个节点后不再并入。`--mt-partition=mffc` 不先做这三步，只在初始 Group DAG 上从后向前收集互不重叠的 fanout-free cone。一个 Group 只有在所有依赖后继都已在 cone 内时才会并入；cone 的加权结构成本不超过 `targetCost`，节点数也不超过 7000。cone 之后再做一次受同一预算限制的单前驱合并和同前驱合并，避免高扇入链被拆成许多小任务。reset/state 不进入 cone。extmodule 与普通 Group 一样参与 cone、边界合并和装箱；只含外部实例的箱子仍标成 ExtModule。
 3. 对收缩后的候选 MTask 做最终拓扑整理，再用 FIFO Kahn 算法得到规范依赖序。
 4. 直接从 Node 关系补充拓扑序上向前的 memory activation 边；寄存器提交由周期起始 state barrier 保证。
-5. 根据 `--mt-target-tasks` 和节点表达式树中的预估运算数，把候选组继续合并成最终 MTask；启用 critical-path contraction 时先形成更细的 seed MTask，再按关键路径收缩 DAG。
+5. 根据 `--mt-target-tasks` 和加权结构成本，把收缩后的候选组按依赖序装箱成最终 MTask。两种模式的装箱预算都是 `ceil(总成本 / targetTasks)`。已经形成的 Group 不可再拆，单个超限 Group 单独保留。
 6. 通过 `taskByNode` 将 Node 依赖映射成 MTask 的 `predecessors/successors`，检查所有边都是向前的。
 7. 按 task 内 `depPrev/depNext` 对成员 Node 做稳定拓扑排序。
 8. 复用单线程的 `StmtTree::mergeExpTree()` 和 `StmtTree::compute()`，为每个 MTask 生成一棵语句树和一条 `InstInfo` 流。
 9. 将所有直接使用者都在当前 MTask、且不被 reset helper 引用的普通标量中间节点标记为 task-local。
 10. 使用 lowering 后的指令数重新估计任务成本，再进行 worker 调度、状态提交分配和 token 规划。
 
-`StmtTree` 的 `prevPath` 约束覆盖同一 MTask 内的 Node 依赖。因此，无依赖节点可以提前并合并到相同条件分支中，有依赖节点则不能越过其前驱。extmodule 候选组保持为独立 MTask；异步 reset 不再形成特殊 MTask，其 reset 辅助树仅用于周期末慢路径。
+`StmtTree` 的 `prevPath` 约束覆盖同一 MTask 内的 Node 依赖。因此，无依赖节点可以提前并合并到相同条件分支中，有依赖节点则不能越过其前驱。extmodule 可以和普通节点落在同一个 MTask 里，调用按依赖顺序插在语句流中。只含外部实例的 MTask 仍跳过 replay 和复制；混有逻辑的 MTask 会重算逻辑，但外部调用受 `mtSkipExtCalls` 保护，不会执行第二次。异步 reset 不再形成特殊 MTask，其 reset 辅助树仅用于周期末慢路径。
 
 ### 3.1 输入数据
 
@@ -134,24 +134,28 @@ MT 路径在 lowering 前直接构建 `MtTaskPlan`。每个 MTask 已持有自�
 
 MTask 是多线程运行时的最小 dispatch 单位。`MtTaskPartitioner` 先把 Node 直接收缩到候选 MTask，再采用“拓扑序连续、按代价贪心”的方式形成最终 MTask。成员被合入同一棵 `StmtTree` 和同一个 `mtTaskN()` 函数，因此内部依赖不需要线程同步。
 
-MTask 成员确定后才调用 MT 专属的 `generateStmtTrees()`。划分阶段遍历每个 Node 的 `assignTree`，统计 RHS 和动态 lvalue index 中的运算节点；常量和普通信号引用不计为运算，没有显式运算的赋值至少计 1。worker scheduler 在 lowering 完成后再使用实际 `InstInfo` 数量和跨 MTask 全局节点数估计任务成本。同一 MTask 内使用的普通标量中间节点会成为 `mtTaskN()` 的局部变量；被其他 MTask、reset helper 或其他外部作用域使用的节点仍保留为模型成员。
+MTask 成员确定后才调用 MT 专属的 `generateStmtTrees()`。划分阶段遍历每个 Node 的 `assignTree`。`direct` 和 `mffc` 都使用同一套加权结构成本。worker scheduler 在 lowering 完成后再使用实际 `InstInfo` 特征和跨 MTask 全局节点数估计任务成本。同一 MTask 内使用的普通标量中间节点会成为 `mtTaskN()` 的局部变量；被其他 MTask、reset helper 或其他外部作用域使用的节点仍保留为模型成员。
 
 #### 代价估计
 
-MTask 划分发生在 lowering 之前，因此初始成本定义为：
+`direct` 和 `mffc` 使用同一份划分成本，也就是原本 direct 的加权结构成本。字宽因子 `L=max(1,ceil(width/64))`：信号引用 `0.25L`，赋值 `L`，普通运算 `0.5L`，乘法 `4L²`，除法/余数 `16L²`，内存读写和动态索引 `0.5L`，外部调用 `6`，`WHEN`/`RESET` `8`。常量、类型重解释和静态索引本身不计。每个 Node 再加 `--mt-partition-node-weight`（默认 0），向上取整且至少为 1。
 
 ```text
-nodeEstimatedOps = max(1, expressionOperationCount(node.assignTree)) + partition_weight
-groupCost = sum(nodeEstimatedOps)
-```
-
-`partition_weight` 默认是 0，可通过 `--mt-partition-node-weight` 覆盖；默认成本因此就是表达式计算量。`generateStmtTrees()` 完成后，worker scheduler 使用 lowering 产生的指令数和跨 task 节点数：
+nodeCost  = bounded(weightedExpressionCost + partition_weight)
+groupCost = sum(nodeCost)
+````generateStmtTrees()` 完成后，worker scheduler 使用 lowering 产生的指令数和跨 task 节点数：
 
 ```text
-scheduleCost = max(1, task.insts.size() + 12 * task.globalNodeCount)
+scheduleCost = bounded(500 + loweredWork(task.insts)
+             + globalWeight * (2 * min(globalNodeCount, 64)
+             + max(0, globalNodeCount - 64) / 16))
 ```
 
-`globalNodeCount` 统计存在跨 MTask 直接消费者或被 reset helper 引用的节点。它在 MTask 已形成后计算，只影响 worker 分配，不反向改变 MTask 边界，避免任务边界和全局节点判定形成循环依赖。默认权重 12 可通过 `--mt-schedule-global-weight` 覆盖；两种成本都只是启发式估计，不是运行时间测量结果。
+`loweredWork` 统计生成语句中的赋值、操作、调用和分支，具体权重见
+[lowered 成本校准](mt-lowered-cost-calibration.md)。`globalNodeCount` 统计存在跨
+MTask 直接消费者或被 reset helper 引用的节点。它在 MTask 已形成后计算，只影响
+worker 分配，不反向改变 MTask 边界。默认 `globalWeight=16` 可通过
+`--mt-schedule-global-weight` 覆盖；两种成本都是启发式估计，不是运行时间测量结果。
 
 planner 首先累加全部候选 MTask 组的成本，再根据期望 MTask 数计算目标成本：
 
@@ -228,7 +232,7 @@ void STop::mtTaskN() {
 | `globalNodeCount` | lowering 后统计的跨 MTask 或 reset helper 使用节点数 |
 | `predecessors/successors` | 收缩后的 MTask 图前驱和后继 |
 | `owner` | list scheduler 分配的固定 worker 编号 |
-| `cost` | lowering 后的 `insts.size() + global_weight * globalNodeCount` 调度成本 |
+| `cost` | lowering 后的词法工作量与分段全局存储成本之和，公式见上文 |
 | `waits/stores` | 跨 worker token 槽 |
 | `waitBegin/.../storeEnd` | 生成扁平静态数组时使用的区间 |
 
@@ -284,12 +288,16 @@ priority[task] = task.cost + max(priority[successor])
 每轮评估笛卡尔积 `readyTasks × workers`。MTask 的 lowering 成本为：
 
 ```text
-cost(T) = max(1,
-              instCount(T)
-              + globalNodeCount(T) × MtScheduleGlobalWeight)
+cost(T) = bounded(500 + loweredWork(T)
+          + MtScheduleGlobalWeight *
+            (2 * min(globalNodeCount(T), 64)
+            + max(0, globalNodeCount(T) - 64) / 16))
 ```
 
-`instCount` 是 `InstInfo` 数量，`globalNodeCount` 是跨 MTask 或被 reset helper 使用的模型节点数。这个 cost 是生成期估计，不是运行时采样得到的真实时间。
+`loweredWork` 对 `InstInfo` 中实际生成的语句按操作类型计分，而非仅统计条目数；
+`globalNodeCount` 是跨 MTask 或被 reset helper 使用的模型节点数。这个 cost 是生成期
+估计，不是运行时采样得到的真实时间。详细校准见
+[lowered 成本校准](mt-lowered-cost-calibration.md)。
 
 对于 ready 任务 `T` 和候选 worker `w`，先计算所有前驱的完成约束，再加入 worker 自身的可用时间：
 
@@ -386,6 +394,8 @@ list 优化的是生成期估计的最早开始时间，不直接最小化最终
 ### 3.5 HEFT Worker 分配
 
 `--mt-scheduler=heft` 使用 HEFT 风格的静态调度。它与 list 共用已经 lowering 完成的 MTask、cost、依赖图和通信节点集合，不会重新构建 MTask。`--mt-scheduler=rheft` 在同一 lowered HEFT 流程中加入等待感知复制。
+
+MTask 构建方式由 `--mt-partition=direct|mffc` 选择。`direct` 先做 out-degree=1、in-degree=1 和 sibling 局部合并。`mffc` 不先执行这些合并，只把 fanout-free cone 收成候选组，再用同一预算补一次单前驱和同前驱合并。两种模式随后用同一套加权结构成本装箱。之后都经过相同的 lowering、StateUpdate 构建和 HEFT/list/RHEFT 调度。lowering 后的指令成本只用于 worker 分配，不回头改变 MTask 边界。
 
 复制感知 MT 调度通过 `--mt-scheduler=rheft` 启用。它直接扩展 HEFT 的 worker 选择：按 lowered rank 处理任务，在各 worker 的时间线中比较等待、复用与联合重算的最早完成时间；选中的副本成为独立 mTask，可以在消费者等待其他输入时提前计算。普通任务与复制块共同使用 InstInfo 成本，没有 lowering 前的 owner 预分配，也没有之后的第二轮调度。`--mt-scheduler=heft` 不复制，`list` 仍是普通 list。预算、边界与公式见 [mt-replication-scheduling.md](mt-replication-scheduling.md)。
 
@@ -756,7 +766,7 @@ MTask 不再包含这类复制。若 next-state 被优化成常量，state phase
 4. 按全局拓扑 task ID 串行重算普通节点、输出和寄存器 `dst`；
 5. 提交 replay 产生的 printf/assert。
 
-extmodule task 不在 replay 中重复调用，保留首轮计算出的输出，以避免 DPI/external helper
+纯 extmodule task 不进入 replay。已经和普通逻辑合并的外部调用在 replay 中被跳过，保留首轮输出，以避免 DPI/external helper
 副作用执行两次。memory 真正状态只在周期开始提交；writer task 无条件计算 address/data，并将
 pending valid 直接赋值为完整写使能，因此 replay 不需要额外遍历并清除全部 memory writer。
 若复位触发，async reset body 会覆盖首次 state phase 提交的值，同时写入寄存器 `src` 和
@@ -805,6 +815,7 @@ task 内局部中间量使用 `T value{};` 值初始化。部分 external/memory
 | `--mt-mode=on` | `off` | 启用 MT 代码生成 |
 | `GSIM_THREADS` | `1` | 烘焙进生成模型的 worker 数 |
 | `--mt-target-tasks=N` | `2400` | 期望 MTask 数，软限制 |
+| `--mt-partition=direct|mffc` | `direct` | `direct` 做 out/in/sibling 局部合并；`mffc` 先做 fanout-free cone，再按预算补单前驱和同前驱合并 |
 | `--mt-partition-node-weight=N` | `0` | 划分成本中每个节点的固定权重 |
 | `--mt-schedule-global-weight=N` | `16` | worker 调度成本中每个跨 task 全局节点的权重 |
 | `--mt-schedule-comm-node-weight=N` | `20` | 跨 worker 通信节点的启发式权重 |

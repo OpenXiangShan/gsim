@@ -1,12 +1,267 @@
-# Lowering 后的复制感知 HEFT：完整实现说明
+# RHEFT：Lowering 后的复制感知 HEFT 完整实现说明
 
-本文以 2026-10-05 工作区源码为准，描述 `--mt-mode=on --mt-scheduler=rheft`
+本文以当前工作区源码为准，描述 `--mt-mode=on --mt-scheduler=rheft`
 的实际行为。它先生成原任务的 lowered 指令流，再在 HEFT 选择 worker 时联合评估
 等待、复用和重复计算。所有时间、rank 和 cost 均为相对工作单位，不是 ns、CPU 周期
 或实测时间。文档中的算法是已经落地的实现，不包含尚未实现的搜索方案。
 
+本文将当前实现正式抽象为 **RHEFT（Replication-aware HEFT，复制感知 HEFT）**：
+它不是在 HEFT 结束后追加一个复制优化阶段，而是把“等待原值”“复用已有副本”和“在
+当前 worker 上重算一整个可安全复制的前驱锥”作为同一个 HEFT worker-placement
+决策中的候选方案。每个原 mTask 仍然只提交一次，胜出的方案才会修改图并创建副本。
+
+## RHEFT 算法摘要
+
+给定 lowering 后的原任务 DAG `G=(V,E)`、`W` 个 worker 和每个 worker 的静态时间线，
+RHEFT 对每个原任务 `T` 做以下事情：
+
+1. 用 lowered 指令流成本计算 HEFT upward rank，并按 rank 从高到低处理任务。
+2. 对每个 worker `w` 先计算不复制的 Native 方案：跨 worker 前驱的结果就绪时间、
+   token/通信检查、worker 时间线中的最早空隙和 `T` 的完成时间。
+3. 如果 `w` 上已有某些输入的副本，评估 Reuse 方案；复用不再支付复制计算成本，
+   但副本的完成时间和边界 token 仍然必须满足。
+4. 在 Native 的预计开始位置之前选取若干时间边界（cut）。对每个 cut 找出会阻塞
+   `T` 的远程前驱，尝试把这些前驱尚未就绪的输入向上展开，构造一个**去重的前驱
+   复制锥**。复制锥可以包含多个节点和多个根，而不是只复制一个信号。
+5. 对每个合法锥，将锥作为一个新的连续复制 mTask `K` 插入 `w` 的时间线，再计算
+   `T` 的真实保留依赖和最早完成时间。只有候选的词典序键优于当前方案时才保留。
+   合法但暂时没有改善 EFT 的锥不会提交到时间线；如果它能作为后一个 blocker 的
+   联合前缀，则仍会暂存其根集合继续尝试。
+6. 在所有 worker 和三类方案中选择全局最早完成的 placement。提交时创建胜出的 `K`
+   （若有）、改写 `T` 的输入、重建依赖；未胜出的候选完全丢弃。
+7. 所有原任务处理完后，对最终 DAG 做拓扑重编号、传递约简、worker-local 收集和
+   token/local-wait 生成，最后生成固定 worker dispatch chain。
+
+RHEFT 的优化目标是当前静态模型中的最早完成时间（EFT），而不是复制节点数最少或
+跨 worker 边数最少。复制只是一种可能缩短 EFT 的手段；合法但没有改善完成时间的
+锥会被拒绝。算法是生成期的静态启发式：运行时不会根据 token 再搜索或动态决定
+是否复制，选中的复制 mTask 每个仿真周期都会执行。
+
+### RHEFT 的核心时间模型
+
+对候选 worker `w`，令 `E` 为任务保留的数据依赖和 ordering 依赖。按生产者 worker
+聚合跨 worker 输入，而不是对每条边重复加通信延迟：
+
+```text
+R(E,w) = max(
+    max(P∈E) completion[P],
+    max(v∈RemoteWorkers(E,w)) {
+        max(P∈E, owner[P]=v) completion[P]
+        + tokenLatency
+        + |Signals(v,E)| × CommNodeWeight
+    }
+)
+
+Checks(E,w) = |RemoteWorkers(E,w)| × remoteCheck
+```
+
+其中 `Signals(v,E)` 是来自 worker `v` 的不同跨任务 Node；同一 producer worker 的
+多个前驱共享一次 token latency。当前默认常量是 `tokenLatency=32`、
+`remoteCheck=192`、`remotePublish=32`，`CommNodeWeight` 由
+`--mt-schedule-comm-node-weight` 控制。原任务的 worker 占用为：
+
+```text
+Publish(T) = ceil(ExpectedRemoteGroups(outDegree(T), W) × remotePublish)
+D_T(w)     = C(T) + Checks(E_T,w) + Publish(T)
+S_T(w)     = Gap(timeline[w], R(E_T,w), D_T(w))
+F_T(w)     = S_T(w) + D_T(w)
+```
+
+`C(T)` 是 lowering 后的任务成本。`Gap` 从 ready 时刻起，在已有区间中寻找最早能
+完整容纳任务的空隙，不移动或抢占已提交任务。
+
+复制锥 `K` 使用同一成本口径，但不为它的输出预先收取远程 publish：
+
+```text
+D_K(w)     = C(K) + Checks(E_K,w)
+S_K(w)     = Gap(timeline[w], R(E_K,w), D_K(w))
+F_K(w)     = S_K(w) + D_K(w)
+F_T^K(w)   = placement of T in timeline[w] with
+             ready=max(R(E_T,w), F_K(w)) and temporary [S_K,F_K)
+```
+
+`E_K` 是复制锥边界，`E_T` 是去掉已复制节点后消费者仍保留的依赖。候选的主要
+比较目标是 `F_T^K(w)`，不是 `F_K(w)` 或 `D_K(w)`；复制只有在它让消费者更早完成
+时才有机会胜出。候选相同完成时间时，再使用额外复制工作量、开始时间和稳定的锥
+操作数/worker ID 作为 tie-breaker。
+
+### RHEFT 与其他调度器的区别
+
+| 调度器 | 任务顺序 | worker 选择 | 是否复制 | 主要目标 |
+| --- | --- | --- | --- | --- |
+| `list` | ready 队列和优先级 | 选择最早 start 的 worker | 否 | 尽早启动就绪任务 |
+| `heft` | upward rank 降序 | 选择最早 finish 的 worker，并允许时间线插空 | 否 | 静态 makespan |
+| `rheft` | 与 HEFT 相同 | 每个 worker 同时比较 Native、Reuse、Recompute | 是 | 复制感知的静态 makespan |
+
+RHEFT 继承 HEFT 的 rank 和空隙插入，不维护一个运行时 ready 队列，也不设置每个
+worker 的任务数上限；`--mt-target-tasks` 只影响前面的 mTask 划分粒度。RHEFT 也不
+先运行一次 HEFT、再把复制任务重新调度一遍，而是在同一轮 HEFT 放置时联合决定。
+
+### RHEFT 的四个不变量
+
+- **统一成本口径**：原任务和复制锥都先 lowering，再用 `mtLoweredTaskCost()` 估价。
+  不能用结构 Node 数直接与 lowered 指令成本比较。
+- **只复制纯数据锥**：复制不能绕过 memory、side effect 或额外 ordering 依赖；这些
+  依赖仍作为边界/排序依赖保留。
+- **候选评估不改图**：evaluate 阶段只使用临时 `Placement`，不创建 Node、不改表达式，
+  只有 commit 阶段提交一个胜出方案。
+- **复制必须改善 EFT**：同一个任务的 Native、Reuse 和 Recompute 用同一个 worker
+  时间线比较；若重算不能更早完成，保留 Native/Reuse。
+
+### RHEFT 核心伪代码
+
+下面的伪代码省略 C++ 容器细节，但保留当前实现的决策顺序。`owner[P]` 和
+`completion[P]` 只对已经按 rank 处理的前驱有效；因此复制锥的边界不能依赖尚未放置的
+任务。
+
+```text
+RHEFT(tasks, W):
+    # Phase 0: lowering 与统一成本
+    lower_every_original_task(tasks)
+    remove_empty_tasks_and_reconnect_edges(tasks)
+    for T in tasks:
+        cost[T] = lowered_cost(T)
+    commNodes = unique_cross_task_nodes(tasks)
+
+    # Phase 1: HEFT rank；该 rank 在复制搜索过程中不重算
+    for T in reverse_topological_order(tasks):
+        rank[T] = rank_cost(T, W)       # cost + expected remote check/publish
+        for U in successors[T]:
+            edgeComm = average_comm(commNodes[T,U])
+            rank[T] = max(rank[T], rank[U] + edgeComm)
+    order = sort(tasks, key=(-rank[T], T.id))
+
+    owner[T] = UNPLACED
+    completion[T] = 0
+    timeline[w] = empty_sorted_intervals()  # 每个区间 [start, finish)
+    replica[w] = {}                         # original Node -> copied Node
+
+    # Phase 2: 每个原任务只提交一次
+    for T in order:
+        bestGlobal = NONE
+        for w in 0 .. W-1:
+            native = place_native(T, w, owner, completion, timeline[w])
+            bestLocal = native
+
+            # 2a. 复用已经在 w 上完成的副本
+            reuse = direct_inputs_with_replica(T, replica[w])
+            if reuse != EMPTY:
+                candidate = place_with_redirects(T, w, reuse,
+                                                 owner, completion, timeline[w])
+                bestLocal = better(candidate, bestLocal)
+
+            # 2b. 在 native.start 之前的有限 cut 上搜索重算锥
+            cuts = timeline_finish_points_before(timeline[w], native.start)
+            cuts = keep_first_seven_and_last(cuts)  # 最多 8 个 cut
+            for cut in cuts:
+                local = replicas_finished_by(replica[w], cut, completion)
+                available(n) =
+                    stable(n) or local_has(local, n) or
+                    (producer(n) is placed and
+                     producer_is_not_task_local(n) and
+                     producer_ready_at(producer(n), w) <= cut)
+
+                blockers = []
+                for P in remote_data_predecessors(T, w):
+                    if ready_time(P, T, w, owner, completion) > cut:
+                        blockers.push(P)
+                sort(blockers, key=(-ready_time(P), P.id))
+
+                roots = []
+                for P in blockers:
+                    additions = unready_inputs(T, P, available)
+                    if any(root.fanout < minFanout for root in additions):
+                        reject("root-fanout")
+                        continue
+                    if roots != EMPTY:
+                        consider_cone(additions)       # 单独加入当前 blocker
+                    combined = roots + additions
+                    trial = consider_cone(combined)    # 联合前缀
+                    if trial is valid:
+                        roots = roots + additions  # 供后续 blocker 联合扩展
+
+        # consider_cone 内部：不修改全局图
+        function consider_cone(roots):
+            cone = DFS_backward_cone(roots,
+                      stop_at=available,
+                      whitelist=copyable_scalar_ops,
+                      maxOps=replicationMaxOps)
+            if cone invalid: reject(cone.reason); return NONE
+            if cone empty: return current_best
+            if duplicate_attempt(cone): return current_best
+
+            K = lower_cone(cone.nodes)
+            boundary = cone.boundaryInputs
+            copyReady = readiness(boundary, w, owner, completion)
+            copyDuration = lowered_cost(K) + remote_checks(boundary, w)
+            copyStart = earliest_gap(timeline[w], copyReady, copyDuration)
+            copyFinish = copyStart + copyDuration
+
+            redirects = reuse + cone.local_reuse
+            incoming = T.dependencies_after_redirect(redirects, cone.nodes)
+            taskReady = readiness(incoming, w, owner, completion)
+            taskDuration = cost[T] + remote_checks(incoming, w) + expected_publish(T)
+            taskStart = earliest_gap(timeline[w],
+                                     max(taskReady, copyFinish), taskDuration,
+                                     temporary_interval=[copyStart, copyFinish))
+            candidate = Placement(K, T, copyStart, copyFinish,
+                                 taskStart, taskStart + taskDuration,
+                                 redirects, incoming)
+            return better(candidate, bestLocal,
+                          key=(finish, extraWork, start, cone.operations))
+
+        bestGlobal = better(bestGlobal, bestLocal,
+                            key=(finish, extraWork, start, worker_id))
+
+        # Phase 3: 原子提交胜出 placement
+        if bestGlobal.has_cone:
+            K = create_replica_mtask(bestGlobal.cone, owner=bestGlobal.worker)
+            append(timeline[bestGlobal.worker], K.interval)
+            add replica mappings and K -> T dependency
+        redirect_inputs(T, bestGlobal.redirects)
+        replace_data_dependencies(T, bestGlobal.dependencies)
+        owner[T] = bestGlobal.worker
+        completion[T] = bestGlobal.finish
+        append(timeline[bestGlobal.worker], T.interval)
+
+    # Phase 4: final graph/backend construction
+    rebuild_successors_and_preserve_ordering_edges()
+    topologically_renumber_original_and_replica_tasks()
+    transitively_reduce_task_edges()
+    collect_worker_local_nodes()
+    build_state_update_tasks_and_state_barrier()
+    build_remote_tokens_and_local_waits()
+    emit_worker_dispatch_chains()
+```
+
+`better()` 的语义是先比较候选 `finish`，再比较 `extraWork`，再比较 `start`，最后
+比较 worker ID（同一 worker 的局部比较最后使用复制锥的 `operations` 作为稳定项）。
+因此，RHEFT 不会为了少复制几个 Node 而选择更晚完成的方案，也不会因为“某个候选的
+复制成本小”就跳过对 Native 的比较。
+
+### 生成期与运行期的边界
+
+RHEFT 只发生在生成仿真 C++ 的阶段。生成器中的 `start/finish` 是工作单位上的静态
+预测，用来比较候选，不会在生成的 C++ 中变成定时器或 sleep：
+
+| 阶段 | 生成器做什么 | 生成代码做什么 |
+| --- | --- | --- |
+| 状态更新 | 将寄存器源、memory pending/commit 和 reset 分到固定的 state mTask | 每周期执行各 worker 的 state mTask |
+| 状态同步 | 记录全 worker state barrier | 等所有 state mTask 完成，再进入计算阶段 |
+| 原 mTask | 在时间线中放置原任务 | 按所属 worker 的 dispatch chain 执行 |
+| 复制 mTask | 将胜出锥复制为同 worker 的独立任务，并把其依赖接到边界 | 每周期和普通 mTask 一样执行，不做运行时条件判断 |
+| 跨 worker 依赖 | 估算 token latency/check/publish，生成远程 token 边 | acquire 检查 token；未就绪时自旋，完成后 release 发布 |
+| worker 顺序 | 从最终时间线导出固定 chain，附加 local wait | 按 chain 顺序执行；`lookahead>0` 时仅由运行时前瞻逻辑扫描后继 |
+| 周期结束 | 不参与 HEFT 复制候选的 state/done 同步由后端生成 | W0 等其他 worker 完成后进入下一周期 |
+
+因此，RHEFT 优化的是“任务放在哪个 worker、是否提前复制哪些依赖”，而不是运行时
+根据一次 token 等待临时迁移任务。若实际执行时间、cache、CPU 抢占与生成期成本模型
+不一致，静态 `estimated-makespan` 可能与真实周期时间不同；这属于模型校准问题，而
+不是运行期会自动修正的行为。
+
 ## 阅读导航
 
+- [RHEFT 算法摘要](#rheft-算法摘要)
 - [1. 模式和整体流程](#1-模式和整体流程)
 - [2. 数据结构和依赖分类](#2-数据结构和依赖分类)
 - [3. 统一成本模型](#3-统一成本模型)
@@ -183,8 +438,10 @@ SuperNode 或空任务压缩前的编号。
 设 A/O/M/D/I/C/B 为赋值、简单运算、乘法、除余、索引、调用、分支的词法特征数：
 
 ```text
-Work(T) = A + 0.5×O + 4×M + 16×D + 0.5×I + 6×C + 8×B
-C(T) = bounded(1400 + Work(T) + G(T)×GlobalWeight)
+Work(T) = A + 0.5×O + 4×M + 16×D + 0.5×I + 6×C + 2×B
+Storage(G, GlobalWeight) = GlobalWeight ×
+                           (2×min(G,64) + max(0,G-64)/16)
+C(T) = bounded(500 + Work(T) + Storage(G(T),GlobalWeight))
 ```
 
 `bounded(x)` 对正常有限值向上取整，至少为 1，上限 `INT_MAX/4`。
@@ -194,24 +451,28 @@ C(T) = bounded(1400 + Work(T) + G(T)×GlobalWeight)
 - `ELSE` 和 `DEDENT` 不额外计费。
 - `ASSIGN_BEG/END` 属于 active 路径的赋值检查标记，dense 模式不计费。
 - 字符串、注释不当成运算；部分类型转换、`sizeof` 等不算调用。
-- 两个分支的生成代码都统计，不按 50% 分支概率折扣。
+- 两个分支的生成代码都统计；分支词法特征权重由 8 降到 2，不直接假设每层
+  分支的动态概率都为 50%。划分阶段的结构分支权重仍为 8。
 - 不按真实循环次数展开，也不使用结构模型中逐表达式按位宽乘 words 的规则。
 
 G(T) 是 lowering 时统计的跨任务或 reset 使用的存储节点代理，不等于实际跨 worker
-信号数。同 worker 内跨两个 mTask 的值也可能计入 G。
+信号数。同 worker 内跨两个 mTask 的值也可能计入 G。前 64 个节点每个收取
+`2×GlobalWeight`，后续节点每个只收取 `GlobalWeight/16`，避免大规模连续写入
+按同一边际价格线性放大。这个阈值是从当前香山任务耗时离线校准的启发式，
+不是 cache-line 大小或硬件周期数。
 
 ### 3.2 固定常量和可调权重
 
 | 项 | 当前值或默认值 | 用途 |
 | --- | ---: | --- |
-| `taskOverhead` | 1400 | 每个原任务或独立复制任务的固定成本 |
+| `taskOverhead` | 500 | 每个原任务或独立复制任务的固定成本 |
 | `remoteCheck` | 192 | 每个不同远程 producer worker 的检查成本 |
 | `remotePublish` | 32 | 每个预计远程发布组的成本 |
 | `tokenLatency` | 32 | 远程结果到达的固定延迟 |
-| `MtScheduleGlobalWeight` | 默认 16 | G(T) 的权重 |
+| `MtScheduleGlobalWeight` | 默认 16 | 分段 Storage(G) 的倍率，不再是每个节点的线性成本 |
 | `MtScheduleCommNodeWeight` | 默认 20 | 每个不同远程输入信号的通信权重 |
 
-前四项固定在 `include/mtCostModel.h`，后两项通过命令行调整。
+前四项及分支/存储分段规则固定在 `include/mtCostModel.h`，后两项通过命令行调整。
 
 ### 3.3 副本也先生成指令再估价
 
@@ -777,6 +1038,7 @@ pending writer 引用，不是全部计算节点成员表。
 | --mt-mode | off | 使用 MT 后端需设 on |
 | --mt-scheduler | heft | `heft`、`list` 或 `rheft`；rheft 启用复制感知 HEFT |
 | --mt-target-tasks | 2400 | 原计算任务划分目标 |
+| --mt-partition | direct | `direct` 使用局部 out/in/sibling 合并；`mffc` 先做 fanout-free cone，再按任务预算补单前驱和同前驱合并，不先做 direct 的无预算收缩 |
 | --mt-partition-node-weight | 0 | 结构划分的每节点附加权重 |
 | --mt-schedule-global-weight | 16 | lowered 全局节点成本权重 |
 | --mt-schedule-comm-node-weight | 20 | 远程去重输入信号权重 |
@@ -788,6 +1050,10 @@ pending writer 引用，不是全部计算节点成员表。
 复制预算和 fanout 接受 1..1,000,000。没有全设计复制总预算或复制任务数上限，
 每个选中消费者最多新增一个复制块。最终任务数可能超过 target-tasks，空任务压缩
 和新增复制都发生在划分之后。
+
+生成目录还会输出 `mt-partition-costs.csv`，记录每个最终 mTask 的输入 Group 数、
+划分成本、`targetCost`、实际合并上限和是否为不可拆分的超限输入 Group。`direct` 和 `mffc` 共用原本 direct 的加权结构成本，不使用
+lowering 后的指令成本。`mffc` 的 cone、补做的单前驱和同前驱合并上限等于 `targetCost = ceil(总成本 / targetTasks)`。direct 的单后继、单前驱和同前驱合并仍只用 7000/30 节点上限。最终装箱对两种模式都按 `targetCost` 合并候选组；单个已经超过预算的 Group 会单独保留。
 
 ### 14.2 生成
 
@@ -803,6 +1069,7 @@ GSIM_THREADS=32 build/gsim/gsim \
   --sep-mod=__DOT__ \
   --sep-aggr=__DOT__ \
   --mt-mode=on \
+  --mt-partition=direct \
   --mt-target-tasks=8000 \
   --mt-scheduler=rheft \
   --mt-schedule-global-weight=16 \
@@ -846,6 +1113,10 @@ GSIM_THREADS=32 GSIM_MT_EXECUTOR=dense GSIM_MT_CPU_AFFINITY=auto \
 香山模型，需要重新生成并编译 emu。
 
 ## 15. 验证与性能评估
+
+批量寻找复制参数可使用 [香山 RHEFT 参数扫描脚本](xiangshan-replication-tuning.md)：
+扫描 max-ops/min-fanout，自动生成普通 HEFT 基线，按实测 Host time spent 中位数排名，
+支持 dry-run、断点续跑和只复测已有模型。
 
 ### 15.1 回归
 
@@ -946,6 +1217,8 @@ O(NW)。提高预算或降低 fanout 可能同时增加搜索开销和代码规�
 | [mtReplicationSchedule.cpp](../src/mtReplicationSchedule.cpp) / commit、finish | 创建副本、改写引用、重建 DAG |
 | [test_mt_generation_cost.py](../test/test_mt_generation_cost.py) | 生成、报告和运行签名回归 |
 | [mt-replication-cone.cpp](../test/mt-replication-cone.cpp) | 锥安全性、独立块、复用、成本测试 |
+| [scan_xiangshan_replication.py](../scripts/scan_xiangshan_replication.py) | 香山 max-ops/min-fanout 扫描 |
+| [test_scan_xiangshan_replication.py](../test/test_scan_xiangshan_replication.py) | 扫描脚本的命令、计时和断点续跑测试 |
 
 背景文档：[普通 MT 后端与 HEFT/list](multithreaded-emitter.md)、
 [结构成本模型](mt-structural-cost-model.md)、[周期初状态任务](mt-state-tasks.md)。
