@@ -14,7 +14,7 @@ W0 的状态任务   W1 的状态任务   …   WN 的状态任务
                     ↓
 W0 普通任务链   W1 普通任务链   …   WN 普通任务链
                     ↓
-周期完成屏障 / 必要时的 async reset 与组合 replay
+周期完成屏障（异步 reset 已在状态屏障后、计算前覆盖寄存器，不再 replay）
 ```
 
 ## 成员与所有权
@@ -33,8 +33,8 @@ W0 普通任务链   W1 普通任务链   …   WN 普通任务链
 
 普通与状态任务使用独立编号空间：`compute:N` 与 `state:W`。状态任务不参加
 HEFT/list 的插入调度，也不进入普通 worker dispatch 表、token 压缩、lookahead
-或异步 reset 后的组合 replay。它们在任务模型中通过“先状态任务、全体屏障、
-后计算任务”的阶段关系同步，不展开成每对任务间的 token 边。
+或异步 reset replay。它们在任务模型中通过“先状态任务、全体屏障、
+异步 reset 覆盖、后计算任务”的阶段关系同步，不展开成每对任务间的 token 边。
 
 状态归属仍采用现有策略：在普通任务 owner 确定后，结合寄存器更新字节数和
 `reg_dst` 生产者的 owner 分配状态工作。寄存器的提交 owner 与其消费者
@@ -58,8 +58,9 @@ memory writer/readwriter 在普通任务中负责计算本周期的地址、数�
 不能整体移到周期初。状态任务持有其 pending-write producer 引用，并提交
 上一周期记录的值；引用不是成员。稀疏寄存器的合成 writer 也遵循同样规则。
 
-异步 reset 的少见修复路径仍在周期末执行：检查 reset、应用 reset、串行
-replay 普通组合任务。不能把这次 replay 误当作再执行一次状态任务。
+异步 reset 不在周期末 replay。状态屏障之后、计算之前，worker 0 先按
+已提交寄存器重算 reset 条件，再执行 `if (reset) reg = resetVal`（否则保持
+刚才提交的 `regNext`）。计算任务和 DPI 因此只运行一次，并且看到复位后的值。
 
 边界识别复用 `mtIsCycleStartRegisterUpdate()`：节点必须有效、类型为
 `NODE_REG_SRC`、已拆分 src/dst，并有有效或常量的 destination。没有满足

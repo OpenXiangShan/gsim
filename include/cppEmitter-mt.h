@@ -52,7 +52,8 @@ class CppEmitterMt : private MtTaskPlan, private MtWorkerPlan {
 
   void emitText(int indent, bool canStartFile, const std::string& text);
   void emitResetBodyFunction(const std::string& name, const std::string& condition,
-                             const std::vector<Reset::Instruction>& body, int chunkCount);
+                             const std::vector<Reset::Instruction>& body, int chunkCount,
+                             int chunkLimit = -1);
   void emitAsyncResetFunction(const Reset& reset);
   void emitStateUpdateFunction(const StateUpdate& update);
   void emitInstructions(const std::vector<InstInfo>& instructions, int indent);

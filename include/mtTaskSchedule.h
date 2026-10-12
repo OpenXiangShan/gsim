@@ -50,12 +50,14 @@ struct MtWorkerPlan {
   std::vector<int> waitSlots_;
   std::vector<int> storeSlots_;
   std::vector<int> localWaitSlots_;
-  // stateTasks_[w] -> all-worker state barrier -> workerTasks_[w].
+  // stateTasks_[w] -> all-worker state barrier -> async reset -> workerTasks_[w].
   // State and compute task IDs have separate namespaces; no state task is
-  // included in the token DAG, lookahead, or asynchronous-reset replay.
+  // included in the token DAG or lookahead. Asynchronous reset is applied
+  // once, after the state barrier and before compute, with no replay.
   std::vector<MtStateTask> stateTasks_;
   std::unordered_map<Node*, int> stateTaskByNode_;
   std::vector<MtReset> resets_;
+  std::vector<MtReset::Instruction> asyncResetConditions_;
 };
 
 class MtWorkerBuilder {

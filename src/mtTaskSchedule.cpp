@@ -161,6 +161,8 @@ void collectWorkerLocalNodes(MtTaskPlan& plan, const graph& graph) {
       }
     }
   }
+  resetDependencies.insert(plan.asyncResetConditionNodes_.begin(),
+                           plan.asyncResetConditionNodes_.end());
 
   std::unordered_map<Node*, int> ownerByNode;
   std::unordered_set<Node*> ambiguousNodes;
@@ -1134,8 +1136,9 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
 
   buildStateUpdates(graph, tasks, workers, workerCount, resetChunk);
 
-  // Async reset is checked after the speculative task pass. Its body is kept
-  // independent of worker ownership because the rare replay path is serial.
+  // Asynchronous reset is sampled after every worker has committed registers.
+  // Worker 0 refreshes the condition cone, then applies reset values before
+  // publishing the state barrier. Compute, including DPI, runs once.
   int resetId = 0;
   for (SuperNode* super : graph.allReset) {
     if (super->resetNode->status == CONSTANT_NODE) continue;
@@ -1172,6 +1175,13 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
     reset.chunkCount = countResetChunks(reset.body, resetChunk);
     workers.resets_.push_back(std::move(reset));
   }
+  if (!tasks.asyncResetConditionNodes_.empty()) {
+    appendInstructions(workers.asyncResetConditions_,
+                       buildResetInstructions(tasks.asyncResetConditionNodes_));
+  }
+  fprintf(stderr, "[cppEmitter-mt] async-reset groups=%zu condition-nodes=%zu "
+                  "apply=before-compute replay=off\n",
+          workers.resets_.size(), tasks.asyncResetConditionNodes_.size());
 
   struct TokenGroup {
     int producerOwner = -1;

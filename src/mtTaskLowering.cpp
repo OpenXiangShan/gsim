@@ -6,11 +6,93 @@
 #include <cstdio>
 #include <map>
 #include <set>
+#include <unordered_map>
 
 extern int maxConcatNum;
 std::string computeExtMod(Node* ext, std::vector<InstInfo>& instructions);
 
 namespace {
+
+bool needsAsyncResetRefresh(const Node* node) {
+  return node != nullptr && node->status == VALID_NODE &&
+         (node->type == NODE_OTHERS || node->type == NODE_OUT) &&
+         !node->assignTree.empty();
+}
+
+void assertAsyncResetConditionPure(const Node* node) {
+  std::vector<const ENode*> pending;
+  for (const ExpTree* tree : node->assignTree) {
+    if (tree == nullptr) continue;
+    pending.push_back(tree->getRoot());
+    pending.push_back(tree->getlval());
+  }
+  while (!pending.empty()) {
+    const ENode* expr = pending.back();
+    pending.pop_back();
+    if (expr == nullptr) continue;
+    switch (expr->opType) {
+      case OP_PRINTF: case OP_ASSERT: case OP_EXIT:
+      case OP_READ_MEM: case OP_WRITE_MEM: case OP_EXT_FUNC:
+        Assert(false, "async reset condition %s has a side effect", node->name.c_str());
+      default: break;
+    }
+    for (const ENode* child : expr->child) pending.push_back(child);
+  }
+}
+
+struct AsyncResetNodeOrder {
+  bool operator()(const Node* lhs, const Node* rhs) const {
+    return lhs->id != rhs->id ? lhs->id < rhs->id : lhs < rhs;
+  }
+};
+
+// Combinational cone of async reset conditions, leaves excluded, dependency order.
+void collectAsyncResetConditionNodes(graph& graph, std::vector<Node*>& ordered) {
+  ordered.clear();
+  std::unordered_map<Node*, std::vector<Node*>> predecessors;
+  std::vector<Node*> pending;
+  for (SuperNode* super : graph.allReset) {
+    if (super->superType == SUPER_ASYNC_RESET && needsAsyncResetRefresh(super->resetNode)) {
+      pending.push_back(super->resetNode);
+    }
+  }
+  while (!pending.empty()) {
+    Node* node = pending.back();
+    pending.pop_back();
+    if (!predecessors.emplace(node, std::vector<Node*>{}).second) continue;
+    assertAsyncResetConditionPure(node);
+    std::set<Node*> rely;
+    for (ExpTree* tree : node->assignTree) {
+      if (tree != nullptr) tree->getRelyNodes(rely);
+    }
+    for (Node* previous : rely) {
+      if (!needsAsyncResetRefresh(previous)) continue;
+      predecessors[node].push_back(previous);
+      pending.push_back(previous);
+    }
+  }
+
+  std::unordered_map<Node*, int> indegree;
+  std::unordered_map<Node*, std::vector<Node*>> successors;
+  std::set<Node*, AsyncResetNodeOrder> ready;
+  for (const auto& entry : predecessors) {
+    indegree.emplace(entry.first, static_cast<int>(entry.second.size()));
+    for (Node* previous : entry.second) successors[previous].push_back(entry.first);
+    if (entry.second.empty()) ready.insert(entry.first);
+  }
+  while (!ready.empty()) {
+    Node* node = *ready.begin();
+    ready.erase(ready.begin());
+    ordered.push_back(node);
+    for (Node* next : successors[node]) {
+      if (--indegree[next] == 0) ready.insert(next);
+    }
+  }
+  Assert(ordered.size() == predecessors.size(),
+         "async reset condition cone has a cycle (%zu/%zu)",
+         ordered.size(), predecessors.size());
+}
+
 
 int taskForNode(const Node* node, const MtTaskPlan& plan) {
   if (node == nullptr) return -1;
@@ -323,6 +405,8 @@ void collectTaskLocalNodes(graph& graph, MtTaskPlan& plan) {
       }
     }
   }
+  resetDependencies.insert(plan.asyncResetConditionNodes_.begin(),
+                           plan.asyncResetConditionNodes_.end());
 
   plan.localNodes_.clear();
   auto hasModelStorage = [](const Node* node) {
@@ -380,7 +464,7 @@ void mergeNodeAssignments(StmtTree& tree, Node* node, const MtTaskPlan* plan,
                           std::vector<int>& predecessorPath,
                           std::vector<int>& nodePath) {
   // Every register with stored or constant next-state commits in the
-  // cycle-start phase. A late async reset overwrites src before replay.
+  // cycle-start phase. Asynchronous reset overwrites src after that barrier.
   Assert(!mtIsCycleStartRegisterUpdate(node),
          "cycle-start register %s leaked into compute lowering", node->name.c_str());
   if (plan != nullptr) {
@@ -485,6 +569,7 @@ void MtTaskLowerer::generateStmtTrees(graph& graph, MtTaskPlan& plan) {
   completeTaskLocalDependencies(graph, plan);
   makeMtMemoryWriteEnablesExplicit(plan);
   for (MtTask& task : plan.tasks_) orderTaskMembers(task);
+  collectAsyncResetConditionNodes(graph, plan.asyncResetConditionNodes_);
   collectTaskLocalNodes(graph, plan);
 
   updateTaskRoots(plan);

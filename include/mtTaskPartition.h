@@ -69,6 +69,8 @@ struct MtTaskPlan {
   std::vector<MtSparseRegister> sparseRegisters_;
   std::unordered_map<Node*, std::size_t> sparseRegisterBySource_;
   std::unordered_map<Node*, std::size_t> sparseRegisterByDestination_;
+  // Combinational cone refreshed after the state barrier, before async reset.
+  std::vector<Node*> asyncResetConditionNodes_;
   int partitionGroupCount_ = 0;
 };
 

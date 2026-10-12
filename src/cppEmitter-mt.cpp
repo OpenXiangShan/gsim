@@ -364,9 +364,8 @@ void CppEmitterMt::emitClassMembers(FILE* header) const {
       fprintf(header, "void subResetMt%d_c%d();\n", reset.id, chunk);
     }
   }
-  fprintf(header, "bool mtAnyAsyncResetAsserted();\n");
+  fprintf(header, "void mtRefreshAsyncResetConditions();\n");
   fprintf(header, "void mtApplyAsyncResets();\n");
-  fprintf(header, "void mtReplayAfterAsyncReset();\n");
   for (size_t taskId = 0; taskId < tasks_.size(); ++taskId) fprintf(header, "void mtTask%zu();\n", taskId);
   fprintf(header, "~S%s();\n", graph_.name.c_str());
 }
@@ -416,7 +415,8 @@ void CppEmitterMt::emitStateInitialization() {
 
 void CppEmitterMt::emitResetBodyFunction(const std::string& name, const std::string& condition,
                                          const std::vector<Reset::Instruction>& body,
-                                         int chunkCount) {
+                                         int chunkCount, int chunkLimit) {
+  if (chunkLimit < 0) chunkLimit = resetChunk_;
   const std::string className = "S" + graph_.name;
   emitText(0, true, "void " + className + "::" + name + "() {\n");
   int indent = 1;
@@ -430,7 +430,7 @@ void CppEmitterMt::emitResetBodyFunction(const std::string& name, const std::str
     const SuperInfo type = static_cast<SuperInfo>(instruction.type);
     const bool statement = type == SUPER_INFO_IF || type == SUPER_INFO_ELSE ||
                            type == SUPER_INFO_STR;
-    if (resetChunk_ > 0 && statement && emitted >= resetChunk_ && nesting == 0) {
+    if (chunkLimit > 0 && statement && emitted >= chunkLimit && nesting == 0) {
       emitText(indent, false, name + "_c" + std::to_string(chunk + 1) + "();\n");
       if (chunk == 0 && !condition.empty()) emitText(--indent, false, "}\n");
       emitText(--indent, false, "}\n");
@@ -546,6 +546,8 @@ void CppEmitterMt::emitDefinitions() {
   for (const Reset& reset : resets_) {
     emitAsyncResetFunction(reset);
   }
+  // The condition cone is a few pure assignments; do not split it.
+  emitResetBodyFunction("mtRefreshAsyncResetConditions", "", asyncResetConditions_, 0, 0);
 
   std::vector<int> taskEmissionOrder;
   taskEmissionOrder.reserve(tasks_.size());
@@ -575,18 +577,6 @@ void CppEmitterMt::emitDefinitions() {
     emitText(0, false, "}\n");
   }
 
-  emitText(0, true, "bool " + className + "::mtAnyAsyncResetAsserted() {\n");
-  std::string anyReset = "false";
-  for (const Reset& reset : resets_) {
-    Node* resetNode = reset.super->resetNode;
-    const std::string condition = isPackedRegister(resetNode)
-                                      ? packedRegisterName(resetNode)
-                                      : resetNode->name;
-    anyReset += " || " + condition;
-  }
-  emitText(1, false, "return " + anyReset + ";\n");
-  emitText(0, false, "}\n");
-
   emitText(0, true, "void " + className + "::mtApplyAsyncResets() {\n");
   for (const Reset& reset : resets_) {
     Node* resetNode = reset.super->resetNode;
@@ -596,13 +586,6 @@ void CppEmitterMt::emitDefinitions() {
     emitText(1, false, "if (unlikely(" + condition + ")) {\n");
     emitText(2, false, "subResetMt" + std::to_string(reset.id) + "();\n");
     emitText(1, false, "}\n");
-  }
-  emitText(0, false, "}\n");
-
-  emitText(0, true, "void " + className + "::mtReplayAfterAsyncReset() {\n");
-  for (size_t taskId = 0; taskId < tasks_.size(); ++taskId) {
-    if (tasks_[taskId].kind == MtTaskKind::ExtModule) continue;
-    emitText(1, false, "mtTask" + std::to_string(taskId) + "();\n");
   }
   emitText(0, false, "}\n");
 
@@ -801,6 +784,8 @@ void CppEmitterMt::emitDefinitions() {
       "      while (mtStateDoneFlags[other - 1].parity.load(std::memory_order_acquire) != parity)\n"
       "        __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
       "    }\n"
+      "    mtRefreshAsyncResetConditions();\n"
+      "    mtApplyAsyncResets();\n"
       "    mtStateReady.parity.store(parity, std::memory_order_release);\n"
       "  } else {\n"
       "    mtStateDoneFlags[worker - 1].parity.store(parity, std::memory_order_release);\n"
@@ -878,13 +863,6 @@ void CppEmitterMt::emitDefinitions() {
       "  for (int worker = 1; worker < kMtWorkerCount; ++worker) {\n"
       "    while (mtDoneFlags[worker - 1].parity.load(std::memory_order_acquire) != parity)\n"
       "      __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
-      "  }\n"
-      "  if (mtAnyAsyncResetAsserted()) {\n"
-      "    for (int worker = 0; worker < kMtWorkerCount; ++worker)\n"
-      "      mtDeferredEventsByWorker[worker].clear();\n"
-      "    mtApplyAsyncResets();\n"
-      "    mtReplayAfterAsyncReset();\n"
-      "    mtDeferredEventsByWorker[0] = mtTakeDeferredEvents();\n"
       "  }\n"
       "  bool assertionFailed = false;\n"
       "  for (int worker = 0; worker < kMtWorkerCount; ++worker)\n"
