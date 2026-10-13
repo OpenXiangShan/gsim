@@ -8400,7 +8400,7 @@ void fstWriterEmitValueChangeVec64(void *ctx, fstHandle handle,
                 int br = bits & 63;
                 int i;
                 int w;
-                uint32_t v;
+                uint64_t v;
                 unsigned char* s;
                 if (FST_UNLIKELY(bits > xc->outval_alloc_siz))
                 {
@@ -8414,6 +8414,7 @@ void fstWriterEmitValueChangeVec64(void *ctx, fstHandle handle,
                         }
                 }
                 s = xc->outval_mem;
+                if (br)
                 {
                         w = bq;
                         v = val[w];
