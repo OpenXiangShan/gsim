@@ -25,3 +25,5 @@
   positive/negative operands, including constant divisors and narrowed results.
 - signed-constant-slice.fir: Checks node splitting of shifts, bit selections,
   and padding applied to negative signed constants.
+- signed-runtime-slice.fir: Checks that a full-width signed bit selection becomes
+  unsigned without host sign-extension bits when concatenated with other bits.

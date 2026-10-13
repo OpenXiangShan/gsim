@@ -1236,15 +1236,18 @@ void infoBits(valInfo* ret, ENode* enode, valInfo* childInfo) {
   int lo = enode->values[1];
   int w = hi - lo + 1;
 
+  // bits() returns UInt. Even a full logical-width slice needs a mask when
+  // signed native storage contains sign-extension bits above that width.
+
   if (isConstant) {
     if (enode->sign) TODO();
     u_bits(ret->consVal, childInfo->consVal, childInfo->width, hi, lo);
     ret->setConsStr();
   } else if (lo >= childInfo->width) {
     ret->setConstantByStr("0");
-  } else if (childInfo->width <= BASIC_WIDTH && lo == 0 && w == childInfo->width) {
-    ret->valStr = childInfo->width;
-    ret->opNum = childInfo->width;
+  } else if (!childInfo->sign && childInfo->width <= BASIC_WIDTH && lo == 0 && w == childInfo->width) {
+    ret->valStr = childInfo->valStr;
+    ret->opNum = childInfo->opNum;
   } else {
     std::string shift;
     if (lo == 0) {
@@ -1274,7 +1277,7 @@ valInfo* ENode::instsBits(Node* node, std::string lvalue, bool isRoot) {
     ret->setConsStr();
   } else if (lo >= Child(0, width) || lo >= ChildInfo(0, width)) {
     ret->setConstantByStr("0");
-  } else if (ChildInfo(0, width) <= BASIC_WIDTH && lo == 0 && w == ChildInfo(0, width)) {
+  } else if (!ChildInfo(0, sign) && ChildInfo(0, width) <= BASIC_WIDTH && lo == 0 && w == ChildInfo(0, width)) {
     ret->valStr = ChildInfo(0, valStr);
     ret->opNum = ChildInfo(0, opNum);
   } else {
@@ -1310,7 +1313,7 @@ valInfo* ENode::instsBitsNoShift(Node* node, std::string lvalue, bool isRoot) {
     ret->setConsStr();
   } else if (lo >= Child(0, width) || lo >= ChildInfo(0, width)) {
     ret->setConstantByStr("0");
-  } else if (ChildInfo(0, width) <= BASIC_WIDTH && lo == 0 && w == ChildInfo(0, width)) {
+  } else if (!ChildInfo(0, sign) && ChildInfo(0, width) <= BASIC_WIDTH && lo == 0 && w == ChildInfo(0, width)) {
     ret->valStr = ChildInfo(0, valStr);
     ret->opNum = ChildInfo(0, opNum);
   } else {
