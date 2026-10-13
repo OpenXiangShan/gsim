@@ -578,11 +578,43 @@ void CppEmitterMt::emitDefinitions() {
   }
 
   emitText(0, true, "void " + className + "::mtApplyAsyncResets() {\n");
+  auto emitBody = [&](const std::vector<Reset::Instruction>& body, int indent) {
+    for (const Reset::Instruction& instruction : body) {
+      const SuperInfo type = static_cast<SuperInfo>(instruction.type);
+      switch (type) {
+        case SUPER_INFO_IF:
+          emitText(indent++, false, mapRegisterNames(instruction.text) + "\n");
+          break;
+        case SUPER_INFO_ELSE:
+          emitText(indent - 1, false, mapRegisterNames(instruction.text) + "\n");
+          break;
+        case SUPER_INFO_DEDENT:
+          emitText(--indent, false, mapRegisterNames(instruction.text) + "\n");
+          break;
+        case SUPER_INFO_STR:
+          emitText(indent, false, mapRegisterNames(instruction.text) + "\n");
+          break;
+        case SUPER_INFO_ASSIGN_BEG:
+        case SUPER_INFO_ASSIGN_END:
+          break;
+      }
+    }
+    return indent;
+  };
   for (const Reset& reset : resets_) {
     Node* resetNode = reset.super->resetNode;
-    const std::string condition = isPackedRegister(resetNode)
-                                      ? packedRegisterName(resetNode)
-                                      : resetNode->name;
+    std::string condition = isPackedRegister(resetNode)
+                                ? packedRegisterName(resetNode)
+                                : resetNode->name;
+    if (!reset.conditionBody.empty()) {
+      const std::string previous = "mtAsyncResetPrev" + std::to_string(reset.id);
+      emitText(1, false, "const bool " + previous + " = " + condition + ";\n");
+      emitText(1, false, "{\n");
+      const int indent = emitBody(reset.conditionBody, 2);
+      Assert(indent == 2, "unbalanced async reset condition for %s", resetNode->name.c_str());
+      emitText(1, false, "}\n");
+      condition = previous + " || " + condition;
+    }
     emitText(1, false, "if (unlikely(" + condition + ")) {\n");
     emitText(2, false, "subResetMt" + std::to_string(reset.id) + "();\n");
     emitText(1, false, "}\n");
@@ -784,7 +816,6 @@ void CppEmitterMt::emitDefinitions() {
       "      while (mtStateDoneFlags[other - 1].parity.load(std::memory_order_acquire) != parity)\n"
       "        __asm__ __volatile__(\"pause\" ::: \"memory\");\n"
       "    }\n"
-      "    mtRefreshAsyncResetConditions();\n"
       "    mtApplyAsyncResets();\n"
       "    mtStateReady.parity.store(parity, std::memory_order_release);\n"
       "  } else {\n"

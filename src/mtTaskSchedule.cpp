@@ -13,6 +13,7 @@
 #include <queue>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 int mtLoweredTaskCost(const MtTask& task) {
@@ -1036,6 +1037,98 @@ std::vector<int> reorderHeftTasks(MtTaskPlan& tasks, WorkerSchedule& schedule) {
   return ids;
 }
 
+
+// A reset body can make another reset condition true in the same cycle
+// (reset -> pipe_reset -> raw_reset). Order bodies before the cones that read
+// their registers, and keep each cone so it can be refreshed after those writes.
+void orderAsyncResetCascade(const std::vector<Node*>& conditionNodes,
+                            std::vector<MtReset>& resets) {
+  const std::unordered_set<Node*> cone(conditionNodes.begin(), conditionNodes.end());
+  const size_t count = resets.size();
+  std::vector<std::vector<Node*>> groups(count);
+  std::vector<std::set<Node*>> reads(count);
+  std::vector<std::set<Node*>> writes(count);
+
+  for (size_t index = 0; index < count; ++index) {
+    std::set<Node*> seen;
+    std::vector<Node*> pending;
+    Node* resetNode = resets[index].super->resetNode;
+    if (cone.count(resetNode) != 0) pending.push_back(resetNode);
+    else reads[index].insert(resetNode);
+    while (!pending.empty()) {
+      Node* node = pending.back();
+      pending.pop_back();
+      if (!seen.insert(node).second) continue;
+      std::set<Node*> rely;
+      for (ExpTree* tree : node->assignTree) {
+        if (tree != nullptr) tree->getRelyNodes(rely);
+      }
+      for (Node* previous : rely) {
+        if (cone.count(previous) != 0) pending.push_back(previous);
+        else reads[index].insert(previous);
+      }
+    }
+    for (Node* node : conditionNodes) {
+      if (seen.count(node) != 0) groups[index].push_back(node);
+    }
+    for (Node* member : resets[index].super->member) {
+      Node* source = member->getResetSrc();
+      writes[index].insert(source);
+      if (source->type == NODE_REG_SRC && source->regNext != nullptr) {
+        writes[index].insert(source->getDst());
+      }
+    }
+  }
+
+  std::vector<std::vector<int>> successors(count);
+  std::vector<int> indegree(count, 0);
+  for (size_t writer = 0; writer < count; ++writer) {
+    for (size_t reader = 0; reader < count; ++reader) {
+      if (writer == reader) continue;
+      bool depends = false;
+      for (Node* node : reads[reader]) {
+        if (writes[writer].count(node) != 0) {
+          depends = true;
+          break;
+        }
+      }
+      if (!depends) continue;
+      successors[writer].push_back(static_cast<int>(reader));
+      ++indegree[reader];
+    }
+  }
+
+  std::vector<int> ready;
+  for (size_t index = 0; index < count; ++index) {
+    if (indegree[index] == 0) ready.push_back(static_cast<int>(index));
+  }
+  std::vector<int> order;
+  order.reserve(count);
+  while (!ready.empty()) {
+    std::sort(ready.begin(), ready.end());
+    const int index = ready.front();
+    ready.erase(ready.begin());
+    order.push_back(index);
+    for (int next : successors[static_cast<size_t>(index)]) {
+      if (--indegree[static_cast<size_t>(next)] == 0) ready.push_back(next);
+    }
+  }
+  Assert(order.size() == count,
+         "async reset cascade has a cycle (%zu/%zu)", order.size(), count);
+
+  std::vector<MtReset> ordered;
+  ordered.reserve(count);
+  for (int index : order) {
+    MtReset reset = std::move(resets[static_cast<size_t>(index)]);
+    if (!groups[static_cast<size_t>(index)].empty()) {
+      appendInstructions(reset.conditionBody,
+                         buildResetInstructions(groups[static_cast<size_t>(index)]));
+    }
+    ordered.push_back(std::move(reset));
+  }
+  resets.swap(ordered);
+}
+
 }  // namespace
 
 void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& workers,
@@ -1137,8 +1230,9 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
   buildStateUpdates(graph, tasks, workers, workerCount, resetChunk);
 
   // Asynchronous reset is sampled after every worker has committed registers.
-  // Worker 0 refreshes the condition cone, then applies reset values before
-  // publishing the state barrier. Compute, including DPI, runs once.
+  // Worker 0 applies bodies before compute. A body that writes a register used
+  // by another condition is ordered first; that condition is refreshed after
+  // the write and before its own body. Compute, including DPI, runs once.
   int resetId = 0;
   for (SuperNode* super : graph.allReset) {
     if (super->resetNode->status == CONSTANT_NODE) continue;
@@ -1179,8 +1273,9 @@ void MtWorkerBuilder::build(graph& graph, MtTaskPlan& tasks, MtWorkerPlan& worke
     appendInstructions(workers.asyncResetConditions_,
                        buildResetInstructions(tasks.asyncResetConditionNodes_));
   }
+  orderAsyncResetCascade(tasks.asyncResetConditionNodes_, workers.resets_);
   fprintf(stderr, "[cppEmitter-mt] async-reset groups=%zu condition-nodes=%zu "
-                  "apply=before-compute replay=off\n",
+                  "apply=before-compute cascade=on\n",
           workers.resets_.size(), tasks.asyncResetConditionNodes_.size());
 
   struct TokenGroup {

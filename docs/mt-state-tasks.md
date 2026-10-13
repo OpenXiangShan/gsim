@@ -14,7 +14,7 @@ W0 的状态任务   W1 的状态任务   …   WN 的状态任务
                     ↓
 W0 普通任务链   W1 普通任务链   …   WN 普通任务链
                     ↓
-周期完成屏障（异步 reset 已在状态屏障后、计算前覆盖寄存器，不再 replay）
+周期完成屏障（异步 reset 已在状态屏障后按依赖级联覆盖寄存器，不再 replay）
 ```
 
 ## 成员与所有权
@@ -58,9 +58,7 @@ memory writer/readwriter 在普通任务中负责计算本周期的地址、数�
 不能整体移到周期初。状态任务持有其 pending-write producer 引用，并提交
 上一周期记录的值；引用不是成员。稀疏寄存器的合成 writer 也遵循同样规则。
 
-异步 reset 不在周期末 replay。状态屏障之后、计算之前，worker 0 先按
-已提交寄存器重算 reset 条件，再执行 `if (reset) reg = resetVal`（否则保持
-刚才提交的 `regNext`）。计算任务和 DPI 因此只运行一次，并且看到复位后的值。
+异步 reset 不在周期末 replay。状态屏障之后、计算之前，worker 0 按依赖顺序执行复位：先写会改变下游条件的寄存器，再重算那条条件并执行因此变为真的复位体。计算任务和 DPI 因此只运行一次，并且看到同一拍内已经级联完成的复位值。
 
 边界识别复用 `mtIsCycleStartRegisterUpdate()`：节点必须有效、类型为
 `NODE_REG_SRC`、已拆分 src/dst，并有有效或常量的 destination。没有满足

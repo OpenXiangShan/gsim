@@ -761,7 +761,7 @@ MTask 不再包含这类复制。若 next-state 被优化成常量，state phase
 若没有信号为高，直接提交本周期 deferred printf/assert。若任一信号为高，则进入罕见慢路径：
 
 1. 丢弃所有 worker 首轮记录的 printf/assert；
-2. 执行所有当前为高的 async reset body，更新对应寄存器 `src` 和仍有存储的动态 `dst`；
+2. 按级联顺序处理每个 async reset：先保存刷新前的条件，再重算条件锥；旧值或新值为高时执行一次 reset body，更新对应寄存器 `src` 和仍有存储的动态 `dst`；
 3. replay 每个 memory writer task，以新的写使能直接覆盖该端口的 pending-write valid；
 4. 按全局拓扑 task ID 串行重算普通节点、输出和寄存器 `dst`；
 5. 提交 replay 产生的 printf/assert。

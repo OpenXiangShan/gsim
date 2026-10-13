@@ -26,6 +26,9 @@ struct MtReset {
   int id = -1;
   int chunkCount = 0;
   std::vector<Instruction> body;
+  // Combinational cone of this reset, refreshed after upstream bodies and
+  // before the condition is tested. Empty when the condition is a leaf.
+  std::vector<Instruction> conditionBody;
 };
 
 // One pinned MTask per worker, including workers with an empty state body.
@@ -52,8 +55,9 @@ struct MtWorkerPlan {
   std::vector<int> localWaitSlots_;
   // stateTasks_[w] -> all-worker state barrier -> async reset -> workerTasks_[w].
   // State and compute task IDs have separate namespaces; no state task is
-  // included in the token DAG or lookahead. Asynchronous reset is applied
-  // once, after the state barrier and before compute, with no replay.
+  // included in the token DAG or lookahead. Asynchronous resets run before
+  // compute, in cascade order: a body that writes a register is applied
+  // before any condition cone that reads it is refreshed and tested.
   std::vector<MtStateTask> stateTasks_;
   std::unordered_map<Node*, int> stateTaskByNode_;
   std::vector<MtReset> resets_;
