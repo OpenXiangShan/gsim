@@ -649,29 +649,6 @@ int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
           if (inst.node->isArray() || inst.node->type == NODE_WRITER) activateUncondNext(inst.node, inst.node->nextActiveId, false, flagName, indent);
           else activateNext(inst.node, inst.node->nextActiveId, oldName(inst.node), false, flagName, indent);
         }
-        if (globalConfig.TraceFst && fstWaveNodeSet.count(inst.node)) {
-          emitBodyLock(indent, "if (dumpWaveformFlag && fstCtx) {\n");
-          std::vector<int> dims = nodeArrayDims(inst.node);
-          if (dims.empty()) {
-            emitBodyLock(indent + 1, "updateFstSignal(fstHandle_%s, &%s, %d);\n", inst.node->name.c_str(), inst.node->name.c_str(), inst.node->width);
-          } else {
-            int curIndent = indent + 1;
-            for (size_t i = 0; i < dims.size(); i ++) {
-              emitBodyLock(curIndent ++, "for (int i%zu = 0; i%zu < %d; i%zu ++) {\n", i, i, dims[i], i);
-            }
-            std::string accessStr = inst.node->name;
-            emitBodyLock(curIndent, "size_t handle_idx = 0;\n");
-            for (size_t i = 0; i < dims.size(); i ++) {
-              accessStr += format("[i%zu]", i);
-              emitBodyLock(curIndent, "handle_idx = handle_idx * %d + i%zu;\n", dims[i], i);
-            }
-            emitBodyLock(curIndent, "updateFstSignal(fstHandle_%s[handle_idx], &%s, %d);\n", inst.node->name.c_str(), accessStr.c_str(), inst.node->width);
-            for (size_t i = 0; i < dims.size(); i ++) {
-              emitBodyLock(-- curIndent, "}\n");
-            }
-          }
-          emitBodyLock(indent, "}\n");
-        }
         if (skipActivate) break;
       }
       break;
@@ -913,6 +890,19 @@ void graph::genStep(int subStepIdxMax) {
   }
 
   emitFuncDecl(0, "void S%s::step() {\n", name.c_str());
+  emitBodyLock(1, "resetAll();\n");
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->isReset() && member->type == NODE_REG_SRC) {
+        emitBodyLock(1, "%s = %s;\n", RESET_NAME(member).c_str(), member->name.c_str());
+      }
+    }
+  }
+  for (int i = 0; i <= subStepIdxMax; i ++) {
+    emitBodyLock(1, "subStep%d();\n", i);
+  }
+
+  emitBodyLock(1, "cycles ++;\n");
   if (globalConfig.TraceFst) {
     emitBodyLock(1, "dumpWaveformFlag = waveformEnabled;\n");
     emitBodyLock(1, "if (dumpWaveformFlag && !fstDumpInitialized) {\n");
@@ -937,30 +927,15 @@ void graph::genStep(int subStepIdxMax) {
     emitBodyLock(2, "fstHandle_gsim_cycle = fstWriterCreateVar(fstCtx, FST_VT_VCD_WIRE, FST_VD_IMPLICIT, 64, \"gsim_cycle\", 0u);\n");
     emitBodyLock(2, "fstWriterSetUpscope(fstCtx);\n");
     emitBodyLock(2, "fstWriterSetUpscope(fstCtx);\n");
-    emitBodyLock(2, "uint64_t fst_rel_cycle = cycles - fstCycleBase;\n");
-    emitBodyLock(2, "fstWriterEmitTimeChange(fstCtx, fst_rel_cycle);\n");
-    emitBodyLock(2, "emitAllSignalValues();\n");
+
     emitBodyLock(2, "fstDumpInitialized = true;\n");
     emitBodyLock(1, "}\n");
   }
-  emitBodyLock(1, "resetAll();\n");
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      if (member->isReset() && member->type == NODE_REG_SRC) {
-        emitBodyLock(1, "%s = %s;\n", RESET_NAME(member).c_str(), member->name.c_str());
-      }
-    }
-  }
-  for (int i = 0; i <= subStepIdxMax; i ++) {
-    emitBodyLock(1, "subStep%d();\n", i);
-  }
-
-  emitBodyLock(1, "cycles ++;\n");
   if (globalConfig.TraceFst) {
     emitBodyLock(1, "if (dumpWaveformFlag && fstCtx) {\n");
     emitBodyLock(2, "uint64_t fst_rel_cycle = cycles - fstCycleBase;\n");
-    emitBodyLock(2, "updateFstSignal(fstHandle_gsim_cycle, &fst_rel_cycle, 64);\n");
     emitBodyLock(2, "fstWriterEmitTimeChange(fstCtx, fst_rel_cycle);\n");
+    emitBodyLock(2, "emitAllSignalValues();\n");
     emitBodyLock(1, "}\n");
   }
   emitBodyLock(0, "}\n");
@@ -1329,8 +1304,7 @@ void graph::cppEmitter() {
 
     emitFuncDecl(0, "void S%s::emitAllSignalValues() {\n", name.c_str());
     emitBodyLock(1, "if (!dumpWaveformFlag || !fstCtx) return;\n");
-    emitBodyLock(1, "uint64_t fst_rel_cycle = cycles - fstCycleBase;\n");
-    emitBodyLock(1, "updateFstSignal(fstHandle_gsim_cycle, &fst_rel_cycle, 64);\n");
+    emitBodyLock(1, "updateFstSignal(fstHandle_gsim_cycle, &cycles, 64);\n");
     for (size_t chunk = 0; chunk < fstWaveChunkCount(); chunk ++) {
       emitBodyLock(1, "emitSignalValuesChunk%zu();\n", chunk);
     }
