@@ -65,6 +65,8 @@ Config::Config() {
   DumpAssignTree = false;
   DumpConstStatus = false;
   MtMode = false;
+  RepCutMode = false;
+  RepCutThreads = 1;
   OutputDir = ".";
   SuperNodeMaxSize = 35;
   cppMaxSizeKB = -1;
@@ -157,8 +159,9 @@ static void printUsage(const char* ProgName) {
             << "      --dump-stages=a,b,c          Dump only the listed stages (e.g., Init,TopoSort,AliasAnalysis).\n"
             << "      --dump-assign-tree           Include assignTree structure in JSON dump (can be large).\n"
             << "      --dump-const-status          Dump per-node constant-analysis status before removing constants.\n"
-            << "      --mt-mode=off|on             Select the C++ emitter mode.\n"
+            << "      --mt-mode=off|on|repcut      Select the C++ emitter mode.\n"
             << "                                   off: single-thread active (default); on: multithread dense.\n"
+            << "                                   repcut: independent active subgraphs, one sync per cycle.\n"
             << "      --mt-target-tasks=[num]      Target number of MTasks used for MT partitioning (default: 2400).\n"
             << "      --mt-partition=direct|mffc   MTask coarsening before cost packing (default: direct).\n"
             << "                                   direct merges out/in/sibling groups; mffc merges fanout-free cones only.\n"
@@ -331,11 +334,13 @@ static char* parseCommandLine(int argc, char** argv) {
                   globalConfig.DumpConstStatus = true;
                   break;
                 case OPT_MT_MODE:
-                  if (strcmp(optarg, "off") != 0 && strcmp(optarg, "on") != 0) {
-                    fprintf(stderr, "Error: --mt-mode expects off or on, got '%s'.\n", optarg);
+                  if (strcmp(optarg, "off") != 0 && strcmp(optarg, "on") != 0 &&
+                      strcmp(optarg, "repcut") != 0) {
+                    fprintf(stderr, "Error: --mt-mode expects off, on, or repcut, got '%s'.\n", optarg);
                     _exit(EXIT_FAILURE);
                   }
                   globalConfig.MtMode = strcmp(optarg, "on") == 0;
+                  globalConfig.RepCutMode = strcmp(optarg, "repcut") == 0;
                   break;
                 case OPT_MT_TARGET_TASKS: {
                   int targetTasks = 0;
@@ -528,13 +533,15 @@ int main(int argc, char** argv) {
   if (globalConfig.MtMode) {
     FUNC_WRAPPER(g->cppEmitterMt(), "Final");
   } else {
-    FUNC_WRAPPER(g->graphPartition(), "graphPartition");
-
-    FUNC_WRAPPER(g->replicationOpt(), "Replication");
-
-    FUNC_TIMER(g->generateStmtTree());
-
-    FUNC_TIMER(g->instsGenerator());
+    if (globalConfig.RepCutMode) {
+      FUNC_WRAPPER(g->repCutSplit(), "RepCut");
+      FUNC_WRAPPER(g->repCutLower(), "RepCutLower");
+    } else {
+      FUNC_WRAPPER(g->graphPartition(), "graphPartition");
+      FUNC_WRAPPER(g->replicationOpt(), "Replication");
+      FUNC_TIMER(g->generateStmtTree());
+      FUNC_TIMER(g->instsGenerator());
+    }
     FUNC_WRAPPER(g->cppEmitter(), "Final");
   }
 

@@ -3,7 +3,8 @@
 #include <map>
 
 bool Node::isLocal() { // TODO: isArray is OK
-  return status == VALID_NODE && type == NODE_OTHERS && !anyNextActive() && !isArray() && !isReset();
+  return status == VALID_NODE && type == NODE_OTHERS && !anyNextActive() && !isArray() && !isReset() &&
+         !rcResetSource && (!globalConfig.RepCutMode || repCutBoundaryNext(this).empty());
 }
 
 int Node::counter = 1;

@@ -156,6 +156,12 @@ class Node {
 
 /* used in instsGenerator */
   bool nodeIsRoot = false;
+  /* RepCut: partition that evaluates this node. -1 means not owned yet.
+     Commit-only nodes (register sources) run after the parallel eval. */
+  int rcPart = -1;
+  bool rcCommitOnly = false;
+  // Reset-condition/value cones are refreshed by the serial state phase.
+  bool rcResetSource = false;
 
 /* used in cppEmitter */
   std::set<int> nextActiveId;

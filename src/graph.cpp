@@ -22,6 +22,7 @@ void graph::connectDep() {
       if (member->type == NODE_REG_SRC) member->updateDep();
     }
   }
+  if (repCutLocalGraph()) repCutPruneEdges(sortedSuper);
 }
 
 void graph::reconnectSuper() {

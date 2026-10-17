@@ -5,14 +5,17 @@
 #include "common.h"
 #include "util.h"
 
+#include <cctype>
 #include <cstddef>
 #include <cstdio>
 #include <map>
 #include <string>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 #define ACTIVE_WIDTH 8
-#define RESET_PER_FUNC 400
+static constexpr size_t kResetAssignmentsPerChunk = 1024;
 
 #define ENABLE_ACTIVATOR false
 
@@ -34,6 +37,68 @@ static int activeFlagNum = 0;
 static std::set<Node*> definedNode;
 static std::map<int, SuperNode*> cppId2Super;
 static std::set<int> alwaysActive;
+static std::set<int> rcAlways[64];
+static int rcFlagWords[64];
+static int rcCurPart = -1;
+static bool rcInWorker = false;
+static std::string gActiveFlags = "activeFlags";
+static int rcEmitPart = -1;
+static int rcChunks[64];
+static int rcCommitChunks[64];
+static bool rcDeferForeign = false;
+static bool rcHasCommitPend = false;
+static FILE* rcHeader = nullptr;
+static std::vector<SuperNode*> rcEvalSupers[64];
+static std::vector<SuperNode*> rcCommitSupers[64];
+static std::vector<SuperNode*> rcResetSupers;
+static std::unordered_map<Node*, std::vector<std::pair<int, int>>> rcForeign;
+static std::unordered_map<Node*, std::vector<Node*>> rcReaders;
+struct RcMemWakeGroup {
+  int part = 0;
+  std::set<int> ids;
+};
+
+struct RcMemFlushWake {
+  Node* memory = nullptr;
+  int writerPart = 0;
+  std::vector<RcMemWakeGroup> groups;
+};
+
+// Cross-partition readers are activated when the log is written into the array,
+// not when a writer merely runs. The map is filled once per emission.
+static std::vector<RcMemFlushWake> rcMemFlushWakes;
+static bool rcMemFlushReady = false;
+static int rcSuperPart(SuperNode* super);
+static void repCutActivate(Node* node);
+static void buildRcMemFlushWakes();
+
+static int rcThreads() {
+  const int threads = globalConfig.RepCutThreads;
+  return threads > 0 ? threads : 1;
+}
+
+struct RcFlags {
+  std::string savedFlags;
+  int savedPart;
+  RcFlags(std::string flags, int part)
+      : savedFlags(gActiveFlags), savedPart(rcCurPart) {
+    gActiveFlags = std::move(flags);
+    rcCurPart = part;
+  }
+  ~RcFlags() {
+    gActiveFlags = std::move(savedFlags);
+    rcCurPart = savedPart;
+  }
+  RcFlags(const RcFlags&) = delete;
+  RcFlags& operator=(const RcFlags&) = delete;
+};
+
+static bool rcTrackedReader(Node* writer, Node* port) {
+  if (port == nullptr || port == writer || port->status != VALID_NODE) return false;
+  if (writer->type == NODE_WRITER) return port->type == NODE_READER;
+  if (writer->type != NODE_READWRITER) return false;
+  return port->type == NODE_READER || port->type == NODE_READWRITER;
+}
 
 static std::map<Node*, std::pair<int, int>> super2ResetId;  // uint & async reset
 
@@ -42,6 +107,7 @@ bool nameExist(std::string str);
 static int resetFuncNum = 0;
 
 static bool isAlwaysActive(int cppId) {
+  if (globalConfig.RepCutMode && rcCurPart >= 0) return rcAlways[rcCurPart].count(cppId) != 0;
   return alwaysActive.find(cppId) != alwaysActive.end();
 }
 
@@ -111,14 +177,14 @@ ActiveType activeSet2bitMap(std::set<int>& activeId, std::map<uint64_t, ActiveTy
 }
 
 std::string updateActiveStr(int idx, uint64_t mask) {
-  if (mask <= MAX_U8) return format("activeFlags[%d] |= 0x%lx;", idx, mask);
-  if (mask <= MAX_U16) return format("*(uint16_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
-  if (mask <= MAX_U32) return format("*(uint32_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
-  return format("*(uint64_t*)&activeFlags[%d] |= 0x%lx;", idx, mask);
+  if (mask <= MAX_U8) return format("%s[%d] |= 0x%lx;", gActiveFlags.c_str(), idx, mask);
+  if (mask <= MAX_U16) return format("*(uint16_t*)&%s[%d] |= 0x%lx;", gActiveFlags.c_str(), idx, mask);
+  if (mask <= MAX_U32) return format("*(uint32_t*)&%s[%d] |= 0x%lx;", gActiveFlags.c_str(), idx, mask);
+  return format("*(uint64_t*)&%s[%d] |= 0x%lx;", gActiveFlags.c_str(), idx, mask);
 }
 
 std::string updateActiveStr(int idx, uint64_t mask, std::string& cond, int uniqueId) {
-  auto activeFlags = std::string("activeFlags[") + std::to_string(idx) + std::string("]");
+  auto activeFlags = gActiveFlags + "[" + std::to_string(idx) + "]";
 
   if (mask <= MAX_U8) {
     if (uniqueId >= 0) return format("%s |= %s%s;", activeFlags.c_str(), cond.c_str(), shiftBits(uniqueId, ShiftDir::Left).c_str());
@@ -163,6 +229,12 @@ FILE* graph::genHeaderStart() {
   includeLib(header, "cstring", true);
   includeLib(header, "map", true);
   includeLib(header, "cstdarg", true);
+  if (globalConfig.RepCutMode) {
+    includeLib(header, "pthread.h", true);
+    includeLib(header, "sched.h", true);
+    includeLib(header, "atomic", true);
+    includeLib(header, "cstddef", true);
+  }
   newLine(header);
 
   fprintf(header, "\n// User configuration\n");
@@ -210,20 +282,37 @@ FILE* graph::genHeaderStart() {
   return header;
 }
 
+void graph::emitActiveMask(std::set<int>& activeId, int indent) {
+  std::map<uint64_t, ActiveType> bitMapInfo;
+  activeSet2bitMap(activeId, bitMapInfo, -1);
+  for (auto& iter : bitMapInfo) {
+    emitBodyLock(indent, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+  }
+}
+
 void graph::genInterfaceInput(Node* input) {
   /* set by string */
   emitFuncDecl(0, "void S%s::set_%s(%s val) {\n", name.c_str(), input->name.c_str(), widthUType(input->width).c_str());
   emitBodyLock(1, "if (%s != val) { \n", input->name.c_str());
   emitBodyLock(2, "%s = val;\n", input->name.c_str());
   /* update nodes in the same superNode */
-  std::set<int> allNext;
-  for (Node* next : input->next) {
-    if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
-  }
-  std::map<uint64_t, ActiveType> bitMapInfo;
-  activeSet2bitMap(allNext, bitMapInfo, -1);
-  for (auto iter : bitMapInfo) {
-    emitBodyLock(2, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+  if (!globalConfig.RepCutMode) {
+    std::set<int> allNext;
+    for (Node* next : input->next) {
+      if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
+    }
+    emitActiveMask(allNext, 2);
+  } else {
+    std::map<int, std::set<int>> groups;
+    auto note = [&](Node* next) {
+      if (next->super->cppId >= 0) groups[rcSuperPart(next->super)].insert(next->super->cppId);
+    };
+    for (Node* next : input->next) note(next);
+    for (Node* next : repCutBoundaryNext(input)) note(next);
+    for (auto& group : groups) {
+      RcFlags guard("activeFlags" + std::to_string(group.first), group.first);
+      emitActiveMask(group.second, 2);
+    }
   }
   emitBodyLock(1, "}\n");
   emitBodyLock(0, "}\n");
@@ -336,10 +425,25 @@ void graph::genNodeDef(FILE* fp, Node* node) {
 #endif
   if (definedNode.find(node) != definedNode.end()) return;
   definedNode.insert(node);
-  fprintf(fp, "%s %s", widthUType(node->width).c_str(), node->name.c_str());
-  if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", upperPower2(node->depth));
-  for (int dim : node->dimension) fprintf(fp, "[%d]", upperPower2(dim));
-  fprintf(fp, "; // width = %d, lineno = %d\n", node->width, node->lineno);
+  auto emitDecl = [&](const std::string& declName) {
+    fprintf(fp, "%s %s", widthUType(node->width).c_str(), declName.c_str());
+    if (node->type == NODE_MEMORY) fprintf(fp, "[%d]", upperPower2(node->depth));
+    for (int dim : node->dimension) fprintf(fp, "[%d]", upperPower2(dim));
+    fprintf(fp, "; // width = %d, lineno = %d\n", node->width, node->lineno);
+  };
+  emitDecl(node->name);
+  if (node->type == NODE_MEMORY && repCutSnapshotMemory(node)) {
+    const std::string elem = widthUType(node->width);
+    fprintf(fp, "struct RcStore$%s { uint64_t elem; %s data; };\n", node->name.c_str(), elem.c_str());
+    for (int part : repCutSnapshotWriterParts(node)) {
+      fprintf(fp, "alignas(64) std::vector<RcStore$%s> rcLog$%s$%d;\n",
+              node->name.c_str(), node->name.c_str(), part);
+      fprintf(fp, "void rcWrite$%s$%d(uint64_t elem, %s data);\n",
+              node->name.c_str(), part, elem.c_str());
+      fprintf(fp, "%s rcRead$%s$%d(uint64_t elem);\n",
+              elem.c_str(), node->name.c_str(), part);
+    }
+  }
   int w = node->width;
   bool needInitMask = (node->type != NODE_MEMORY && node->type != NODE_WRITER) &&
     (((w < 64) && (w != 8 && w != 16 && w != 32 && w != 64)) || ((w > 64) && (w % 32 != 0)));
@@ -369,7 +473,63 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   }
 }
 
+struct RcActGroup {
+  std::string storage;
+  int part = 0;
+  int pendSrc = -1;
+  std::set<int> ids;
+};
+
+static void addRcGroup(std::vector<RcActGroup>& groups, std::string storage, int part, int pendSrc, const std::set<int>& ids) {
+  if (ids.empty()) return;
+  for (RcActGroup& group : groups) {
+    if (group.storage == storage) {
+      group.ids.insert(ids.begin(), ids.end());
+      return;
+    }
+  }
+  groups.push_back(RcActGroup{std::move(storage), part, pendSrc, ids});
+}
+
+// Commit workers write another partition's active bits into a private buffer.
+// The bits are ORed after every commit finishes; OR does not depend on order.
+// Each source records destinations in its own cache line. Consumers only read
+// that mask after the commit barrier, so commit does not bounce a shared flag.
+static void addRepCutGroups(Node* node, const std::set<int>& local, std::vector<RcActGroup>& groups) {
+  addRcGroup(groups, gActiveFlags, rcCurPart, -1, local);
+  auto foreign = rcForeign.find(node);
+  if (foreign == rcForeign.end()) return;
+  std::map<int, std::set<int>> byPart;
+  for (const auto& edge : foreign->second) byPart[edge.first].insert(edge.second);
+  for (auto& item : byPart) {
+    const int dest = item.first;
+    if (rcDeferForeign && dest != rcEmitPart) {
+      addRcGroup(groups, format("rcCommitPend%d_%d", rcEmitPart, dest), dest, rcEmitPart, item.second);
+    } else {
+      if (rcInWorker && dest != rcEmitPart) {
+        Assert(false, "RepCut worker %d node %s activates partition %d", rcEmitPart, node->name.c_str(), dest);
+      }
+      addRcGroup(groups, "activeFlags" + std::to_string(dest), dest, -1, item.second);
+    }
+  }
+}
+
 void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName, int indent) {
+  if (globalConfig.RepCutMode) {
+    std::vector<RcActGroup> groups;
+    addRepCutGroups(node, nextNodeId, groups);
+    if (groups.empty()) return;
+    emitBodyLock(indent++, "if (%s != %s) {\n", node->name.c_str(), oldName.c_str());
+    for (RcActGroup& group : groups) {
+      RcFlags guard(group.storage, group.part);
+      if (group.pendSrc >= 0) emitBodyLock(indent, "rcCommitDirty[%d].mask |= 1ull << %d;\n", group.pendSrc, group.part);
+      // IDs are local to each partition. Never use the source cppId/flagName
+      // for a destination partition's same-byte shortcut.
+      emitActiveMask(group.ids, indent);
+    }
+    emitBodyLock(--indent, "}\n");
+    return;
+  }
   std::string nodeName = node->name;
   auto condName = std::string("cond_") + nodeName;
   bool opt{false};
@@ -420,6 +580,16 @@ void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldN
 }
 
 void graph::activateUncondNext(Node* node, std::set<int>& activateId, bool inStep, std::string flagName, int indent) {
+  if (globalConfig.RepCutMode) {
+    std::vector<RcActGroup> groups;
+    addRepCutGroups(node, activateId, groups);
+    for (RcActGroup& group : groups) {
+      RcFlags guard(group.storage, group.part);
+      if (group.pendSrc >= 0) emitBodyLock(indent, "rcCommitDirty[%d].mask |= 1ull << %d;\n", group.pendSrc, group.part);
+      emitActiveMask(group.ids, indent);
+    }
+    return;
+  }
   std::map<uint64_t, ActiveType> bitMapInfo;
   auto curMask = activeSet2bitMap(activateId, bitMapInfo, node->super->cppId);
   if (ACTIVE_MASK(curMask) != 0) emitBodyLock(indent, "%s |= 0x%lx; // %s\n", flagName.c_str(), ACTIVE_MASK(curMask), ACTIVE_COMMENT(curMask).c_str());
@@ -540,7 +710,7 @@ int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
 void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { // current indent = 2
   if (super->superType == SUPER_EXTMOD) { // TODO: normalize
     auto emitExtAsyncReset = [&](Node* extOut) {
-      if (!extOut->isAsyncReset()) return;
+      if (globalConfig.RepCutMode || !extOut->isAsyncReset()) return;
       auto resetId = super2ResetId.find(extOut);
       Assert(resetId != super2ResetId.end() && resetId->second.second >= 0, "missing async reset id for %s", extOut->name.c_str());
       emitBodyLock(indent, "subReset%d();\n", resetId->second.second);
@@ -566,7 +736,7 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
       else activateNext(super->member[i], super->member[i]->nextActiveId, oldName(super->member[i]), false, flagName, indent);
     }
   } else {
-    if (super->superType == SUPER_ASYNC_RESET) {
+    if (!globalConfig.RepCutMode && super->superType == SUPER_ASYNC_RESET) {
       emitBodyLock(indent, "subReset%d();\n", super2ResetId[super->resetNode].second);
     }
     /* local nodes definition */
@@ -578,7 +748,7 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
     for (InstInfo inst : super->insts) {
       indent = translateInst(inst, indent, flagName);
     }
-    if (super->superType == SUPER_ASYNC_RESET) emitBodyLock(indent, "subReset%d();\n", super2ResetId[super->resetNode].second);
+    if (!globalConfig.RepCutMode && super->superType == SUPER_ASYNC_RESET) emitBodyLock(indent, "subReset%d();\n", super2ResetId[super->resetNode].second);
     emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
     emitBodyLock(indent ++, "if (cycles >= LOG_START && cycles <= LOG_END) {\n");
     for (Node* n : super->member) nodeDisplay(n, indent);
@@ -628,38 +798,101 @@ int graph::genActivate() {
     return nextSubStepIdx - 1; // return the maxinum subStepIdx currently used
 }
 
+// Outline only complete scalar assignments: declarations must keep their scope,
+// and array loops/control flow must remain intact. Reference captures preserve
+// any enclosing loop variables. Each lambda is called immediately and cannot
+// be inlined back into the giant reset function.
+static bool isScalarResetAssignment(const InstInfo& inst) {
+  if (inst.infoType != SUPER_INFO_STR) return false;
+  const std::string& text = inst.inst;
+  size_t pos = text.find_first_not_of(" \t");
+  if (pos == std::string::npos) return false;
+  const auto identifier = [](unsigned char c) {
+    return std::isalnum(c) || c == '_' || c == '$';
+  };
+  if (!identifier(text[pos]) || std::isdigit(static_cast<unsigned char>(text[pos]))) return false;
+  while (pos < text.size() && identifier(text[pos])) ++pos;
+  pos = text.find_first_not_of(" \t", pos);
+  if (pos == std::string::npos || text[pos] != '=' ||
+      (pos + 1 < text.size() && text[pos + 1] == '=')) return false;
+  return text.find('\n') == std::string::npos &&
+         text.find(';') == text.find_last_not_of(" \t\r");
+}
+
 void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
+  const int generatedResetId = resetFuncNum;
   emitBodyLock(indent ++, "void S%s::subReset%d(){ // %s reset\n", name.c_str(), resetFuncNum, isUIntReset ? "uint" : "async");
-  if (super2ResetId.find(super->resetNode) != super2ResetId.end()) {
+  if (super2ResetId.find(super->resetNode) == super2ResetId.end()) {
     super2ResetId[super->resetNode] = std::make_pair(-1, -1);
   }
   if (isUIntReset) super2ResetId[super->resetNode].first = resetFuncNum;
   else super2ResetId[super->resetNode].second = resetFuncNum;
   resetFuncNum ++;
   std::string resetName = super->resetNode->type == NODE_REG_SRC ? RESET_NAME(super->resetNode).c_str() : super->resetNode->name.c_str();
+  if (globalConfig.RepCutMode && !isUIntReset) resetName = "rcResetActive" + std::to_string(generatedResetId);
   emitBodyLock(indent ++, "if(unlikely(%s)) {\n", resetName.c_str());
+  std::map<int, std::set<int>> rcGroups;
   std::set<int> allNext;
   for (size_t i = 0; i < super->member.size(); i ++) {
     Node* node = super->member[i];
     if (node->type == NODE_REG_RESET) node = node->getResetSrc();
-    for (Node* next : node->next) {
-      if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
+    auto note = [&](Node* next) {
+      if (next->super == nullptr || next->super->cppId < 0) return;
+      if (globalConfig.RepCutMode) rcGroups[rcSuperPart(next->super)].insert(next->super->cppId);
+      else allNext.insert(next->super->cppId);
+    };
+    for (Node* next : node->next) note(next);
+    if (globalConfig.RepCutMode) {
+      for (Node* next : repCutBoundaryNext(node)) note(next);
+      // Reset writes both current state and the next-state shadow. Even a
+      // feed-forward next-state expression with unchanged inputs must run again.
+      if (node->type == NODE_REG_SRC && node->getDst()) note(node->getDst());
     }
   }
 
-  if (allNext.size() > 100) emitBodyLock(indent, "activateAll();\n");
+  size_t rcCount = 0;
+  for (const auto& group : rcGroups) rcCount += group.second.size();
+  if ((globalConfig.RepCutMode ? rcCount : allNext.size()) > 100) emitBodyLock(indent, "activateAll();\n");
+  else if (!globalConfig.RepCutMode) emitActiveMask(allNext, indent);
   else {
-    std::map<uint64_t, ActiveType> bitMapInfo;
-    activeSet2bitMap(allNext, bitMapInfo, -1);
-    for (auto iter : bitMapInfo) {
-      emitBodyLock(indent, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+    for (auto& group : rcGroups) {
+      RcFlags guard("activeFlags" + std::to_string(group.first), group.first);
+      emitActiveMask(group.second, indent);
     }
   }
   emitBodyLock(-- indent, "}\n");
-  for (InstInfo inst : super->insts) {
+  bool resetGuardEmitted = false;
+  for (size_t index = 0; index < super->insts.size();) {
+    size_t end = index;
+    while (end < super->insts.size() && isScalarResetAssignment(super->insts[end])) ++end;
+    if (end - index > kResetAssignmentsPerChunk) {
+      // Keep the original reset condition outside the chunks. Rechecking it in
+      // each helper could change behavior if an earlier assignment changes it.
+      for (; index < end;) {
+        const size_t chunkEnd = std::min(end, index + kResetAssignmentsPerChunk);
+        emitBodyLock(indent++, "[&]() __attribute__((noinline)) {\n");
+        for (; index < chunkEnd; ++index) {
+          emitBodyLock(indent, "%s\n", super->insts[index].inst.c_str());
+        }
+        emitBodyLock(--indent, "}();\n");
+      }
+      continue;
+    }
+    if (end > index) {
+      for (; index < end; ++index) {
+        emitBodyLock(indent, "%s\n", super->insts[index].inst.c_str());
+      }
+      continue;
+    }
+    const InstInfo& inst = super->insts[index++];
     switch (inst.infoType) {
       case SUPER_INFO_IF:
-        emitBodyLock(indent ++, "%s\n", inst.inst.c_str());
+        if (globalConfig.RepCutMode && !isUIntReset && !resetGuardEmitted) {
+          emitBodyLock(indent++, "if (%s) {\n", resetName.c_str());
+        } else {
+          emitBodyLock(indent++, "%s\n", inst.inst.c_str());
+        }
+        resetGuardEmitted = true;
         break;
       case SUPER_INFO_DEDENT:
         emitBodyLock(--indent, "%s\n", inst.inst.c_str());
@@ -775,7 +1008,604 @@ void graph::emitPrintf() {
   );
 }
 
+static int rcSuperPart(SuperNode* super) {
+  const int part = repCutPartOf(super);
+  return part >= 0 && part < rcThreads() ? part : 0;
+}
+
+static bool rcNeedsId(SuperNode* super) {
+  return !super->instsEmpty() || super->superType == SUPER_EXTMOD || super->superType == SUPER_ASYNC_RESET;
+}
+
+static void repCutActivate(Node* node) {
+  node->nextActiveId.clear();
+  node->nextNeedActivate.clear();
+  const int srcPart = rcSuperPart(node->super);
+  auto add = [&](SuperNode* dst) {
+    if (dst == nullptr || dst->cppId < 0) return;
+    const int part = rcSuperPart(dst);
+    if (part == srcPart) {
+      node->nextActiveId.insert(dst->cppId);
+      if (rcAlways[part].count(dst->cppId) == 0) node->nextNeedActivate.insert(dst->cppId);
+    } else if (rcAlways[part].count(dst->cppId) == 0) {
+      rcForeign[node].push_back({part, dst->cppId});
+      node->nextNeedActivate.insert(dst->cppId);
+    }
+  };
+  for (Node* nextNode : node->next) {
+    if (nextNode->super != node->super) add(nextNode->super);
+    else if (node->super->findIndex(node) >= node->super->findIndex(nextNode)) add(node->super);
+  }
+  for (Node* nextNode : repCutBoundaryNext(node)) add(nextNode->super);
+  if (node->type == NODE_REG_DST) add(node->getSrc()->super);
+  if ((node->type == NODE_WRITER || node->type == NODE_READWRITER) && node->parent != nullptr) {
+    auto readers = rcReaders.find(node->parent);
+    if (readers != rcReaders.end()) {
+      for (Node* port : readers->second) {
+        if (port == nullptr || port->status != VALID_NODE || port->super == nullptr || port->super->cppId < 0) continue;
+        if (port == node) {
+          if (node->type == NODE_READWRITER && node->parent->extraInfo != "new") add(node->super);
+          continue;
+        }
+        if (!rcTrackedReader(node, port)) continue;
+        const int part = rcSuperPart(port->super);
+        if (part == srcPart) add(port->super);
+        else {
+          // The array does not hold this write until the next flush. Wake the
+          // reader there, instead of publishing a flag at the end of this cycle.
+          Assert(repCutSnapshotMemory(node->parent),
+                 "RepCut memory reader %s crosses partitions without a snapshot",
+                 port->name.c_str());
+        }
+      }
+    }
+  }
+}
+
+static void assignRepCutIds(const std::vector<SuperNode*>& sortedSuper) {
+  const int threads = rcThreads();
+  superId = 0;
+  cppId2Super.clear();
+  alwaysActive.clear();
+  rcForeign.clear();
+  rcReaders.clear();
+  rcMemFlushWakes.clear();
+  rcMemFlushReady = false;
+  rcResetSupers.clear();
+  for (int part = 0; part < 64; ++part) {
+    rcEvalSupers[part].clear();
+    rcCommitSupers[part].clear();
+    rcAlways[part].clear();
+    rcChunks[part] = 0;
+    rcCommitChunks[part] = 0;
+    rcFlagWords[part] = 8;
+  }
+  for (SuperNode* super : sortedSuper) {
+    super->cppId = -1;
+    for (Node* member : super->member) {
+      if (member->parent == nullptr) continue;
+      if (member->type == NODE_READER || member->type == NODE_READWRITER) {
+        rcReaders[member->parent].push_back(member);
+      }
+    }
+  }
+
+  struct Item {
+    SuperNode* super;
+    int part;
+    bool commit;
+  };
+  std::vector<Item> items;
+  items.reserve(sortedSuper.size());
+  for (SuperNode* super : sortedSuper) {
+    if (!rcNeedsId(super)) continue;
+    items.push_back({super, rcSuperPart(super), repCutCommitOnly(super)});
+  }
+
+  std::vector<int> local(threads, 0);
+  for (const Item& item : items) {
+    const int id = local[item.part]++;
+    item.super->cppId = id;
+    if (item.super->superType == SUPER_EXTMOD) rcAlways[item.part].insert(id);
+    if (item.super->member.front()->rcResetSource) rcResetSupers.push_back(item.super);
+    else if (item.commit) rcCommitSupers[item.part].push_back(item.super);
+    else rcEvalSupers[item.part].push_back(item.super);
+    ++superId;
+  }
+  for (int part = 0; part < threads; ++part) {
+    const int words = (local[part] + ACTIVE_WIDTH - 1) / ACTIVE_WIDTH;
+    const int rounded = (int)ROUNDUP(words, 8);
+    rcFlagWords[part] = rounded < 8 ? 8 : rounded;
+  }
+}
+
+void graph::emitRepCutFns(const std::vector<SuperNode*>& supers, const std::string& prefix, int& chunks) {
+  chunks = 0;
+  if (supers.empty()) return;
+  auto beginChunk = [&](int chunk) {
+    if (rcHeader != nullptr) fprintf(rcHeader, "void %s_%d();\n", prefix.c_str(), chunk);
+    emitFuncDecl(0, "void S%s::%s_%d() {\n", name.c_str(), prefix.c_str(), chunk);
+  };
+  auto endChunk = [&]() {
+    emitBodyLock(0, "}\n");
+  };
+  beginChunk(0);
+  for (size_t index = 0; index < supers.size(); ++index) {
+    if (index > 0 && srcFileBytes > (globalConfig.cppMaxSizeKB * 1024)) {
+      endChunk();
+      beginChunk(++chunks);
+    }
+    SuperNode* super = supers[index];
+    const int part = rcSuperPart(super);
+    const std::string flags = "activeFlags" + std::to_string(part);
+    RcFlags guard(flags, part);
+    int word = 0;
+    int bit = 0;
+    std::tie(word, bit) = cppId2flagIdx(super->cppId);
+    const uint64_t mask = (uint64_t)1 << bit;
+    const std::string flagName = format("%s[%d]", flags.c_str(), word);
+    int indent = genNodeStepStart(super, mask, super->cppId, flagName, 1);
+    if (!isAlwaysActive(super->cppId)) {
+      uint64_t clearMask = 0;
+      std::tie(word, clearMask) = clearIdxMask(super->cppId);
+      emitBodyLock(indent, "%s &= 0x%lx;\n", flagName.c_str(), clearMask);
+    }
+    genSuperEval(super, flagName, indent);
+    genNodeStepEnd(super, indent);
+  }
+  endChunk();
+  chunks += 1;
+}
+
+void graph::genRepCutEval(int part) {
+  rcEmitPart = part;
+  rcInWorker = true;
+  emitRepCutFns(rcEvalSupers[part], format("evalPart%d", part), rcChunks[part]);
+  rcInWorker = false;
+  rcEmitPart = -1;
+}
+
+static void buildRcMemFlushWakes() {
+  if (rcMemFlushReady) return;
+  rcMemFlushReady = true;
+  rcMemFlushWakes.clear();
+  const int threads = rcThreads();
+  if (threads <= 1) return;
+  for (Node* memory : repCutSnapshotMemories()) {
+    auto readers = rcReaders.find(memory);
+    if (readers == rcReaders.end()) continue;
+    std::map<int, std::map<int, std::set<int>>> byWriter;
+    for (Node* writer : memory->member) {
+      if (writer == nullptr || writer->status != VALID_NODE) continue;
+      if (writer->type != NODE_WRITER && writer->type != NODE_READWRITER) continue;
+      const int src = writer->rcPart;
+      if (src < 0 || src >= threads) continue;
+      for (Node* port : readers->second) {
+        if (port == nullptr || port->super == nullptr || port->super->cppId < 0 || !rcTrackedReader(writer, port)) continue;
+        const int dst = rcSuperPart(port->super);
+        if (dst == src || dst < 0 || dst >= threads) continue;
+        if (rcAlways[dst].count(port->super->cppId) != 0) continue;
+        byWriter[src][dst].insert(port->super->cppId);
+      }
+    }
+    for (auto& writer : byWriter) {
+      if (writer.second.empty()) continue;
+      RcMemFlushWake wake;
+      wake.memory = memory;
+      wake.writerPart = writer.first;
+      wake.groups.reserve(writer.second.size());
+      for (auto& readersByPart : writer.second) {
+        wake.groups.push_back(RcMemWakeGroup{readersByPart.first, std::move(readersByPart.second)});
+      }
+      rcMemFlushWakes.push_back(std::move(wake));
+    }
+  }
+}
+
+void graph::genRepCutCommit() {
+  const int threads = rcThreads();
+  std::set<std::pair<int, int>> pendPairs;
+  buildRcMemFlushWakes();
+  if (threads > 1) {
+    for (int part = 0; part < threads; ++part) {
+      for (SuperNode* super : rcCommitSupers[part]) {
+        for (Node* member : super->member) {
+          auto found = rcForeign.find(member);
+          if (found == rcForeign.end()) continue;
+          for (const auto& edge : found->second) {
+            if (edge.first != part) pendPairs.emplace(part, edge.first);
+          }
+        }
+      }
+    }
+    for (const RcMemFlushWake& wake : rcMemFlushWakes) {
+      for (const RcMemWakeGroup& group : wake.groups) pendPairs.emplace(wake.writerPart, group.part);
+    }
+  }
+  rcHasCommitPend = !pendPairs.empty();
+  if (rcHasCommitPend && rcHeader != nullptr) {
+    fprintf(rcHeader, "struct alignas(64) RcCommitDirty { uint64_t mask; };\n");
+    fprintf(rcHeader, "RcCommitDirty rcCommitDirty[%d]{};\n", threads);
+    for (const auto& pend : pendPairs) {
+      const int src = pend.first;
+      const int dst = pend.second;
+      fprintf(rcHeader, "alignas(64) uint%d_t rcCommitPend%d_%d[%d]{};\n",
+              ACTIVE_WIDTH, src, dst, rcFlagWords[dst]);
+    }
+  }
+  for (int part = 0; part < threads; ++part) {
+    rcEmitPart = part;
+    rcInWorker = threads > 1;
+    rcDeferForeign = threads > 1;
+    emitRepCutFns(rcCommitSupers[part], format("commitPart%d", part), rcCommitChunks[part]);
+  }
+  rcDeferForeign = false;
+  rcInWorker = false;
+  rcEmitPart = -1;
+  if (threads == 1) {
+    if (rcHeader != nullptr) fprintf(rcHeader, "void commitCycle();\n");
+    emitFuncDecl(0, "void S%s::commitCycle() {\n", name.c_str());
+    for (int part = 0; part < threads; ++part) {
+      if (!repCutSnapshotMemories().empty()) emitBodyLock(1, "rcFlushMem(%d);\n", part);
+      for (int chunk = 0; chunk < rcCommitChunks[part]; ++chunk) {
+        emitBodyLock(1, "commitPart%d_%d();\n", part, chunk);
+      }
+    }
+    emitBodyLock(0, "}\n");
+  } else if (rcHeader != nullptr) {
+    fprintf(rcHeader, "void rcCommitPart(int part);\n");
+    emitFuncDecl(0, "void S%s::rcCommitPart(int part) {\n", name.c_str());
+    // Flush records reader activations in the same dirty mask as registers.
+    if (rcHasCommitPend) emitBodyLock(1, "rcCommitDirty[part].mask = 0;\n");
+    if (!repCutSnapshotMemories().empty()) emitBodyLock(1, "rcFlushMem(part);\n");
+    emitBodyLock(1, "switch (part) {\n");
+    for (int part = 0; part < threads; ++part) {
+      emitBodyLock(1, "case %d:\n", part);
+      for (int chunk = 0; chunk < rcCommitChunks[part]; ++chunk) {
+        emitBodyLock(2, "commitPart%d_%d();\n", part, chunk);
+      }
+      emitBodyLock(2, "break;\n");
+    }
+    emitBodyLock(1, "default: break;\n");
+    emitBodyLock(1, "}\n");
+    emitBodyLock(0, "}\n");
+  }
+  if (rcHasCommitPend) {
+    if (rcHeader != nullptr) fprintf(rcHeader, "void rcMergeCommitFlags(int part);\n");
+    emitFuncDecl(0, "void S%s::rcMergeCommitFlags(int part) {\n", name.c_str());
+    emitBodyLock(1, "switch (part) {\n");
+    for (int part = 0; part < threads; ++part) {
+      emitBodyLock(1, "case %d:\n", part);
+      for (const auto& pend : pendPairs) {
+        if (pend.second != part) continue;
+        const int src = pend.first;
+        const int dst = pend.second;
+        emitBodyLock(2, "if ((rcCommitDirty[%d].mask & (1ull << %d)) != 0) {\n", src, dst);
+        emitBodyLock(3, "for (int rcWord = 0; rcWord < %d; ++rcWord) activeFlags%d[rcWord] |= rcCommitPend%d_%d[rcWord];\n",
+                     rcFlagWords[dst], dst, src, dst);
+        emitBodyLock(3, "memset(rcCommitPend%d_%d, 0, sizeof(rcCommitPend%d_%d));\n", src, dst, src, dst);
+        emitBodyLock(2, "}\n");
+      }
+      emitBodyLock(2, "break;\n");
+    }
+    emitBodyLock(1, "default: break;\n");
+    emitBodyLock(1, "}\n");
+    emitBodyLock(0, "}\n");
+  }
+}
+
+void graph::genRepCutResetRefresh() {
+  fprintf(rcHeader, "void rcRefreshResetInputs();\n");
+  emitFuncDecl(0, "void S%s::rcRefreshResetInputs() {\n", name.c_str());
+  for (SuperNode* super : rcResetSupers) {
+    const int part = rcSuperPart(super);
+    RcFlags guard("activeFlags" + std::to_string(part), part);
+    genSuperEval(super, format("%s[%d]", gActiveFlags.c_str(), super->cppId / ACTIVE_WIDTH), 1);
+  }
+  emitBodyLock(0, "}\n");
+}
+
+void graph::genRepCutMemoryDefer() {
+  const std::vector<Node*>& memories = repCutSnapshotMemories();
+  if (memories.empty() || rcHeader == nullptr) return;
+  buildRcMemFlushWakes();
+  fprintf(rcHeader, "void rcFlushMem(int part);\n");
+  std::map<int, std::vector<Node*>> byPart;
+  for (Node* memory : memories) {
+    const std::string elem = widthUType(memory->width);
+    for (int part : repCutSnapshotWriterParts(memory)) {
+      byPart[part].push_back(memory);
+      const std::string log = "rcLog$" + memory->name + "$" + std::to_string(part);
+      emitFuncDecl(0,
+                   "void S%s::rcWrite$%s$%d(uint64_t elem, %s data) {\n"
+                   "  for (auto& entry : %s) {\n"
+                   "    if (entry.elem == elem) { entry.data = data; return; }\n"
+                   "  }\n"
+                   "  %s.push_back({elem, data});\n"
+                   "}\n"
+                   "%s S%s::rcRead$%s$%d(uint64_t elem) {\n"
+                   "  for (size_t i = %s.size(); i-- > 0;) {\n"
+                   "    if (%s[i].elem == elem) return %s[i].data;\n"
+                   "  }\n"
+                   "  return ((%s*)%s)[elem];\n"
+                   "}\n",
+                   name.c_str(), memory->name.c_str(), part, elem.c_str(), log.c_str(), log.c_str(),
+                   elem.c_str(), name.c_str(), memory->name.c_str(), part,
+                   log.c_str(), log.c_str(), log.c_str(), elem.c_str(), memory->name.c_str());
+    }
+  }
+  emitFuncDecl(0, "void S%s::rcFlushMem(int part) {\n", name.c_str());
+  emitBodyLock(1, "switch (part) {\n");
+  for (const auto& group : byPart) {
+    emitBodyLock(1, "case %d:\n", group.first);
+    for (Node* memory : group.second) {
+      const std::string elem = widthUType(memory->width);
+      const std::string log = "rcLog$" + memory->name + "$" + std::to_string(group.first);
+      RcMemFlushWake* wake = nullptr;
+      for (RcMemFlushWake& item : rcMemFlushWakes) {
+        if (item.memory == memory && item.writerPart == group.first) {
+          wake = &item;
+          break;
+        }
+      }
+      if (wake == nullptr) {
+        emitBodyLock(2, "for (const auto& entry : %s) ((%s*)%s)[entry.elem] = entry.data;\n",
+                     log.c_str(), elem.c_str(), memory->name.c_str());
+        emitBodyLock(2, "%s.clear();\n", log.c_str());
+        continue;
+      }
+      // A writer supernode can run while its when stores nothing. Only a
+      // non-empty log is a real array update, so only then wake readers.
+      emitBodyLock(2, "if (unlikely(!%s.empty())) {\n", log.c_str());
+      emitBodyLock(3, "for (const auto& entry : %s) ((%s*)%s)[entry.elem] = entry.data;\n",
+                   log.c_str(), elem.c_str(), memory->name.c_str());
+      emitBodyLock(3, "%s.clear();\n", log.c_str());
+      for (RcMemWakeGroup& readers : wake->groups) {
+        emitBodyLock(3, "rcCommitDirty[%d].mask |= 1ull << %d;\n", group.first, readers.part);
+        RcFlags guard(format("rcCommitPend%d_%d", group.first, readers.part), readers.part);
+        emitActiveMask(readers.ids, 3);
+      }
+      emitBodyLock(2, "}\n");
+    }
+    emitBodyLock(2, "break;\n");
+  }
+  emitBodyLock(1, "default: break;\n");
+  emitBodyLock(1, "}\n");
+  emitBodyLock(0, "}\n");
+}
+
+void graph::genRepCutStep() {
+  genRepCutResetRefresh();
+  genRepCutMemoryDefer();
+  const int threads = rcThreads();
+  if (threads > 1 && rcHeader != nullptr) {
+    fprintf(rcHeader,
+            "struct RcPack {\n"
+            "  S%s* self;\n"
+            "  int part;\n"
+            "  std::atomic<uint64_t>* epoch;\n"
+            "};\n"
+            "static void rcPinPart(int part);\n"
+            "static void* rcWorkerMain(void* arg);\n"
+            "void rcRunPart(int part);\n"
+            "void rcBarrier(int part, int phase);\n"
+            "void rcCycle(int part);\n"
+            "struct alignas(64) RcPhaseFlag { std::atomic<uint8_t> parity{0}; };\n"
+            "RcPhaseFlag rcArrive[2][%d]{};\n"
+            "RcPhaseFlag rcRelease[2]{};\n"
+            "struct alignas(64) RcEpoch { std::atomic<uint64_t> v; };\n"
+            "RcEpoch rcEpoch{};\n"
+            "struct alignas(64) RcJoin { std::atomic<uint64_t> v; };\n"
+            "RcJoin rcJoin[%d]{};\n"
+            "pthread_t rcThreads[%d]{};\nRcPack rcPacks[%d]{};\nbool rcStarted = false;\n"
+            "~S%s();\nS%s(const S%s&) = delete;\nS%s& operator=(const S%s&) = delete;\n",
+            name.c_str(), threads, threads, threads - 1, threads,
+            name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str());
+  }
+  if (threads > 1) {
+    emitFuncDecl(0, "void S%s::rcRunPart(int part) {\n", name.c_str());
+    emitBodyLock(1, "switch (part) {\n");
+    for (int part = 0; part < threads; ++part) {
+      emitBodyLock(1, "case %d:\n", part);
+      for (int chunk = 0; chunk < rcChunks[part]; ++chunk) emitBodyLock(2, "evalPart%d_%d();\n", part, chunk);
+      emitBodyLock(2, "break;\n");
+    }
+    emitBodyLock(1, "default: break;\n");
+    emitBodyLock(1, "}\n");
+    emitBodyLock(0, "}\n");
+    emitFuncDecl(0,
+                 "void S%s::rcBarrier(int part, int phase) {\n"
+                 "  const uint8_t parity = static_cast<uint8_t>(rcEpoch.v.load(std::memory_order_acquire) & 1);\n"
+                 "  if (part == 0) {\n"
+                 "    for (int i = 1; i < %d; ++i) {\n"
+                 "      while (rcArrive[phase][i].parity.load(std::memory_order_acquire) != parity) {\n"
+                 "        asm volatile(\"pause\" ::: \"memory\");\n"
+                 "      }\n"
+                 "    }\n"
+                 "    rcRelease[phase].parity.store(parity, std::memory_order_release);\n"
+                 "  } else {\n"
+                 "    rcArrive[phase][part].parity.store(parity, std::memory_order_release);\n"
+                 "    while (rcRelease[phase].parity.load(std::memory_order_acquire) != parity) {\n"
+                 "      asm volatile(\"pause\" ::: \"memory\");\n"
+                 "    }\n"
+                 "  }\n"
+                 "}\n",
+                 name.c_str(), threads);
+    bool rcHasAsync = false;
+    for (SuperNode* reset : allReset) {
+      if (reset->superType == SUPER_ASYNC_RESET && reset->resetNode->status != CONSTANT_NODE) rcHasAsync = true;
+    }
+    emitFuncDecl(0, "void S%s::rcCycle(int part) {\n", name.c_str());
+    emitBodyLock(1, "rcCommitPart(part);\n");
+    emitBodyLock(1, "rcBarrier(part, 0);\n");
+    if (rcHasAsync) {
+      emitBodyLock(1, "if (part == 0) {\n");
+      for (SuperNode* reset : allReset) {
+        if (reset->superType != SUPER_ASYNC_RESET || reset->resetNode->status == CONSTANT_NODE) continue;
+        const int id = super2ResetId.at(reset->resetNode).second;
+        emitBodyLock(2, "rcRefreshResetInputs();\n");
+        emitBodyLock(2, "rcResetActive%d = rcPrevAsync%d || %s;\n", id, id, reset->resetNode->name.c_str());
+        emitBodyLock(2, "subReset%d();\n", id);
+      }
+      emitBodyLock(1, "}\n");
+      emitBodyLock(1, "rcBarrier(part, 1);\n");
+    }
+    if (rcHasCommitPend) emitBodyLock(1, "rcMergeCommitFlags(part);\n");
+    emitBodyLock(1, "rcRunPart(part);\n");
+    emitBodyLock(0, "}\n");
+    emitFuncDecl(0, "void S%s::rcPinPart(int part) {\n", name.c_str());
+    emitBodyLock(0,
+                 "  const char* affinity = getenv(\"GSIM_MT_CPU_AFFINITY\");\n"
+                 "  if (affinity == nullptr || affinity[0] == '\\0') return;\n"
+                 "  cpu_set_t allowed;\n"
+                 "  CPU_ZERO(&allowed);\n"
+                 "  if (strcmp(affinity, \"auto\") == 0) {\n"
+                 "    if (sched_getaffinity(0, sizeof(allowed), &allowed) != 0) return;\n"
+                 "  } else {\n"
+                 "    const char* cursor = affinity;\n"
+                 "    while (*cursor != '\\0') {\n"
+                 "      while (*cursor == ' ' || *cursor == ',') ++cursor;\n"
+                 "      if (*cursor == '\\0') break;\n"
+                 "      char* end = nullptr;\n"
+                 "      const long start = strtol(cursor, &end, 10);\n"
+                 "      if (end == cursor) {\n"
+                 "        fprintf(stderr, \"[repcut] warning: bad GSIM_MT_CPU_AFFINITY '%%s'\\n\", affinity);\n"
+                 "        return;\n"
+                 "      }\n"
+                 "      long stop = start;\n"
+                 "      cursor = end;\n"
+                 "      if (*cursor == '-') {\n"
+                 "        ++cursor;\n"
+                 "        stop = strtol(cursor, &end, 10);\n"
+                 "        if (end == cursor || stop < start) {\n"
+                 "          fprintf(stderr, \"[repcut] warning: bad GSIM_MT_CPU_AFFINITY '%%s'\\n\", affinity);\n"
+                 "          return;\n"
+                 "        }\n"
+                 "        cursor = end;\n"
+                 "      }\n"
+                 "      if (start < 0 || stop >= CPU_SETSIZE) {\n"
+                 "        fprintf(stderr, \"[repcut] warning: CPU in GSIM_MT_CPU_AFFINITY is out of range\\n\");\n"
+                 "        return;\n"
+                 "      }\n"
+                 "      for (long cpu = start; cpu <= stop; ++cpu) CPU_SET(static_cast<int>(cpu), &allowed);\n"
+                 "    }\n"
+                 "  }\n"
+                 "  int selected = -1;\n"
+                 "  int index = 0;\n"
+                 "  for (int cpu = 0; cpu < CPU_SETSIZE; ++cpu) {\n"
+                 "    if (CPU_ISSET(cpu, &allowed) && index++ == part) { selected = cpu; break; }\n"
+                 "  }\n"
+                 "  if (selected < 0) {\n"
+                 "    fprintf(stderr, \"[repcut] warning: no CPU for part %%d\\n\", part);\n"
+                 "    return;\n"
+                 "  }\n"
+                 "  cpu_set_t target;\n"
+                 "  CPU_ZERO(&target);\n"
+                 "  CPU_SET(selected, &target);\n"
+                 "  if (sched_setaffinity(0, sizeof(target), &target) != 0)\n"
+                 "    fprintf(stderr, \"[repcut] warning: failed to pin part %%d to cpu %%d\\n\", part, selected);\n"
+                 "}\n");
+    emitFuncDecl(0,
+                 "void* S%s::rcWorkerMain(void* arg) {\n"
+                 "  RcPack* pack = static_cast<RcPack*>(arg);\n"
+                 "  S%s* self = pack->self;\n"
+                 "  const int part = pack->part;\n"
+                 "  rcPinPart(part);\n"
+                 "  std::atomic<uint64_t>* epoch = pack->epoch;\n"
+                 "  uint64_t seen = 0;\n"
+                 "  for (;;) {\n"
+                 "    const uint64_t cur = epoch->load(std::memory_order_acquire);\n"
+                 "    if (cur == seen) {\n"
+                 "      asm volatile(\"pause\" ::: \"memory\");\n"
+                 "      continue;\n"
+                 "    }\n"
+                 "    if (cur == ~uint64_t{0}) return nullptr;\n"
+                 "    seen = cur;\n"
+                 "    self->rcCycle(part);\n"
+                 "    self->rcJoin[part].v.store(seen, std::memory_order_release);\n"
+                 "  }\n"
+                 "}\n",
+                 name.c_str(), name.c_str());
+    emitFuncDecl(0, "S%s::~S%s() {\n", name.c_str(), name.c_str());
+    emitBodyLock(1, "if (!rcStarted) return;\n");
+    if (!repCutSnapshotMemories().empty()) {
+      emitBodyLock(1, "for (int part = 0; part < %d; ++part) rcFlushMem(part);\n", threads);
+    }
+    emitBodyLock(1, "rcEpoch.v.store(~uint64_t{0}, std::memory_order_release);\n");
+    emitBodyLock(1, "for (int part = 1; part < %d; ++part) pthread_join(rcThreads[part - 1], nullptr);\n", threads);
+    emitBodyLock(0, "}\n");
+  }
+  fprintf(rcHeader, "bool rcChecked = false;\n");
+  if (rcHeader != nullptr) fprintf(rcHeader, "void step();\n");
+  emitFuncDecl(0, "void S%s::step() {\n", name.c_str());
+  emitBodyLock(1,
+               "if (!rcChecked) {\n"
+               "    rcChecked = true;\n"
+               "    const char* rcEnv = getenv(\"GSIM_THREADS\");\n"
+               "    if (rcEnv != nullptr && rcEnv[0] != '\\0') {\n"
+               "      char* rcEnd = nullptr;\n"
+               "      long rcWant = strtol(rcEnv, &rcEnd, 10);\n"
+               "      gAssert(rcEnd != rcEnv && *rcEnd == '\\0' && rcWant == %d, \"GSIM_THREADS=%%s but RepCut model was built for %d\", rcEnv);\n"
+               "    }\n"
+               "  }\n",
+               threads, threads);
+  for (SuperNode* reset : allReset) {
+    if (reset->superType != SUPER_ASYNC_RESET || reset->resetNode->status == CONSTANT_NODE) continue;
+    const int id = super2ResetId.at(reset->resetNode).second;
+    emitBodyLock(1, "rcPrevAsync%d = %s;\n", id,
+                 reset->resetNode->rcResetSource ? reset->resetNode->name.c_str() : "false");
+  }
+  emitBodyLock(1, "rcRefreshResetInputs();\n");
+  emitBodyLock(1, "resetAll();\n");
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->isReset() && member->type == NODE_REG_SRC) {
+        emitBodyLock(1, "%s = %s;\n", RESET_NAME(member).c_str(), member->name.c_str());
+      }
+    }
+  }
+  if (threads == 1) {
+    emitBodyLock(1, "commitCycle();\n");
+    for (SuperNode* reset : allReset) {
+      if (reset->superType != SUPER_ASYNC_RESET || reset->resetNode->status == CONSTANT_NODE) continue;
+      const int id = super2ResetId.at(reset->resetNode).second;
+      emitBodyLock(1, "rcRefreshResetInputs();\n");
+      emitBodyLock(1, "rcResetActive%d = rcPrevAsync%d || %s;\n", id, id, reset->resetNode->name.c_str());
+      emitBodyLock(1, "subReset%d();\n", id);
+    }
+    for (int chunk = 0; chunk < rcChunks[0]; ++chunk) emitBodyLock(1, "evalPart0_%d();\n", chunk);
+  } else {
+    emitBodyLock(1,
+                 "if (!rcStarted) {\n"
+                 "    rcStarted = true;\n"
+                 "    for (int part = 1; part < %d; part ++) {\n"
+                 "      rcPacks[part].self = this;\n"
+                 "      rcPacks[part].part = part;\n"
+                 "      rcPacks[part].epoch = &rcEpoch.v;\n"
+                 "      gAssert(pthread_create(&rcThreads[part - 1], nullptr, rcWorkerMain, &rcPacks[part]) == 0, \"pthread_create failed\");\n"
+                 "    }\n"
+                 "    rcPinPart(0);\n"
+                 "  }\n"
+                 "  const uint64_t rcTurn = rcEpoch.v.fetch_add(1, std::memory_order_release) + 1;\n"
+                 "  rcCycle(0);\n"
+                 "  for (int part = 1; part < %d; ++part) {\n"
+                 "    while (rcJoin[part].v.load(std::memory_order_acquire) != rcTurn) {\n"
+                 "      asm volatile(\"pause\" ::: \"memory\");\n"
+                 "    }\n"
+                 "  }\n",
+                 threads, threads);
+  }
+  emitBodyLock(1, "cycles ++;\n");
+  emitBodyLock(0, "}\n");
+}
+
 void graph::cppEmitter() {
+  gActiveFlags = "activeFlags";
+  rcEmitPart = -1;
+  rcHeader = nullptr;
+  if (globalConfig.RepCutMode) {
+    assignRepCutIds(sortedSuper);
+  } else {
   for (SuperNode* super : sortedSuper) {
     if (!super->instsEmpty() || super->superType == SUPER_EXTMOD || super->superType == SUPER_ASYNC_RESET) {
       super->cppId = superId ++;
@@ -794,12 +1624,16 @@ void graph::cppEmitter() {
   activeFlagNum = (superId + ACTIVE_WIDTH - 1) / ACTIVE_WIDTH;
   // avoid buffer overflow when accessing the last elements as uint64_t
   activeFlagNum = ROUNDUP(activeFlagNum, 8);
+  }
 
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->status == VALID_NODE) {
-        member->updateActivate();
-        member->updateNeedActivate(alwaysActive);
+        if (globalConfig.RepCutMode) repCutActivate(member);
+        else {
+          member->updateActivate();
+          member->updateNeedActivate(alwaysActive);
+        }
       }
     }
   }
@@ -816,7 +1650,14 @@ void graph::cppEmitter() {
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
   fprintf(header, "uint64_t cycles;\n");
   fprintf(header, "uint64_t LOG_START, LOG_END;\n");
-  fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
+  if (globalConfig.RepCutMode) {
+    const int threads = rcThreads();
+    for (int part = 0; part < threads; ++part) {
+      fprintf(header, "alignas(64) uint%d_t activeFlags%d[%d];\n", ACTIVE_WIDTH, part, rcFlagWords[part]);
+    }
+  } else {
+    fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
+  }
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
 #if ENABLE_ACTIVATOR
@@ -836,6 +1677,9 @@ void graph::cppEmitter() {
 
   /* initialization */
   emitFuncDecl(0, "void S%s::init() {\n", name.c_str());
+  const std::string clearStateBytes = globalConfig.RepCutMode
+      ? "offsetof(S" + name + ", _var_end) - offsetof(S" + name + ", _var_start)"
+      : "&_var_end - &_var_start";
   emitBodyLock(1, "activateAll();\n");
 #ifdef PERF
   emitBodyLock(1, "for (int i = 0; i < %d; i ++) activeTimes[i] = 0;\n", superId);
@@ -876,11 +1720,11 @@ void graph::cppEmitter() {
   fprintf(header, "uint32_t _var_end;\n");
 
   emitBodyLock(0, "// initialize registers with reset value 0 to overwrite the rand() results\n" );
-  emitBodyLock(1, "memset(&_var_start, 0, &_var_end - &_var_start);\n");
+  emitBodyLock(1, "memset(&_var_start, 0, %s);\n", clearStateBytes.c_str());
 
   emitBodyLock(0, "#else\n" // RANDOMIZE_INIT
-               "  memset(&_var_start, 0, &_var_end - &_var_start);\n"
-               "#endif\n");
+               "  memset(&_var_start, 0, %s);\n"
+               "#endif\n", clearStateBytes.c_str());
 
   fprintf(header, "S%s();\n", name.c_str());
   fprintf(header, "void init();\n");
@@ -889,9 +1733,18 @@ void graph::cppEmitter() {
 
   /* activation all nodes for reset */
   fprintf(header, "void activateAll();\n");
-  emitFuncDecl(0, "void S%s::activateAll() {\n"
-               "  memset(activeFlags, 0xff, sizeof(activeFlags));\n"
-               "}\n", name.c_str());
+  if (globalConfig.RepCutMode) {
+    const int threads = rcThreads();
+    emitFuncDecl(0, "void S%s::activateAll() {\n", name.c_str());
+    for (int part = 0; part < threads; ++part) {
+      emitBodyLock(1, "memset(activeFlags%d, 0xff, sizeof(activeFlags%d));\n", part, part);
+    }
+    emitBodyLock(0, "}\n");
+  } else {
+    emitFuncDecl(0, "void S%s::activateAll() {\n"
+                 "  memset(activeFlags, 0xff, sizeof(activeFlags));\n"
+                 "}\n", name.c_str());
+  }
 
    /* input/output interface */
   for (Node* node : input) {
@@ -908,17 +1761,25 @@ void graph::cppEmitter() {
   genResetAll();
   for (int i = 0; i < resetFuncNum; i ++) {
     fprintf(header, "void subReset%d();\n", i);
+    if (globalConfig.RepCutMode) fprintf(header, "bool rcResetActive%d = false;\nbool rcPrevAsync%d = false;\n", i, i);
   }
 
   /* main evaluation loop (step) */
-  int subStepIdxMax = genActivate();
-  for (int i = 0; i <= subStepIdxMax; i ++) {
-    fprintf(header, "void subStep%d();\n", i);
+  if (globalConfig.RepCutMode) {
+    rcHeader = header;
+    const int threads = rcThreads();
+    for (int part = 0; part < threads; ++part) genRepCutEval(part);
+    genRepCutCommit();
+    genRepCutStep();
+    rcHeader = nullptr;
+  } else {
+    int subStepIdxMax = genActivate();
+    for (int i = 0; i <= subStepIdxMax; i ++) {
+      fprintf(header, "void subStep%d();\n", i);
+    }
+    fprintf(header, "void step();\n");
+    genStep(subStepIdxMax);
   }
-
-  /* step wrapper */
-  fprintf(header, "void step();\n");
-  genStep(subStepIdxMax);
 
   /* end of file */
   fprintf(header, "};\n"

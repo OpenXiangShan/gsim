@@ -34,6 +34,13 @@ class graph {
   void genInterfaceOutput(Node* output);
   void genInterfaceOutputMt(Node* output);
   void genStep(int subStepIdxMax);
+  void emitActiveMask(std::set<int>& activeId, int indent);
+  void emitRepCutFns(const std::vector<SuperNode*>& supers, const std::string& prefix, int& chunks);
+  void genRepCutEval(int part);
+  void genRepCutCommit();
+  void genRepCutStep();
+  void genRepCutResetRefresh();
+  void genRepCutMemoryDefer();
   void genHeaderEnd(FILE* fp);
   int genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string flagName, int indent);
   int genNodeStepEnd(SuperNode* node, int indent);
@@ -67,7 +74,7 @@ class graph {
   void orderAllNodes();
   void genDiffSig(FILE* fp, Node* node);
   void genDiffSigMt(FILE* fp, Node* node, const std::string& emittedName = "");
-  void graphCoarsen();
+  void graphCoarsen(bool withReset = true);
   void graphInitPartition();
   void graphRefine();
   void resort();
@@ -119,6 +126,10 @@ class graph {
   void exprOpt();
   void patternDetect();
   void graphPartition();
+  void partitionSorted(bool withReset);
+  void repCutLower();
+  void repCutSplit();
+  void finalizeRepCutParts();
   void MFFCPartition();
   void mergeEssentSmallSubling(size_t maxSize, double sim);
   void essentPartition();
@@ -128,5 +139,17 @@ class graph {
   void generateStmtTree();
   void connectDep();
 };
+
+int repCutPartOf(SuperNode* super);
+bool repCutCommitOnly(SuperNode* super);
+bool repCutMergeOk(SuperNode* a, SuperNode* b);
+bool repCutSnapshotMemory(Node* memory);
+int repCutMemoryLogPart(Node* access);
+const std::vector<int>& repCutSnapshotWriterParts(Node* memory);
+const std::vector<Node*>& repCutSnapshotMemories();
+void repCutNoteBoundary(Node* from, Node* to);
+const std::vector<Node*>& repCutBoundaryNext(Node* node);
+void repCutPruneEdges(const std::vector<SuperNode*>& supers);
+bool repCutLocalGraph();
 
 #endif

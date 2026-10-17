@@ -115,9 +115,20 @@ int memberConstant(valInfo* info) {
   return ret;
 }
 
-static std::string constantAssign(std::string lvalue, int dimIdx, Node* node, valInfo* rinfo) {
+static std::string rcElementOffset(Node* memory, const std::string& indexed) {
+  return format("(((uintptr_t)&(%s) - (uintptr_t)%s) / sizeof(%s))",
+                indexed.c_str(), memory->name.c_str(), widthUType(memory->width).c_str());
+}
+
+static std::string rcStageStore(Node* memory, int part, const std::string& indexed, const std::string& value) {
+  return format("rcWrite$%s$%d(%s, %s);", memory->name.c_str(), part,
+                rcElementOffset(memory, indexed).c_str(), value.c_str());
+}
+
+static std::string constantAssign(std::string lvalue, int dimIdx, Node* node, valInfo* rinfo,
+                                  Node* stageMemory = nullptr, int stagePart = 0) {
   std::string ret;
-  if(node->width <= BASIC_WIDTH && mpz_sgn(rinfo->consVal) == 0) {
+  if (stageMemory == nullptr && node->width <= BASIC_WIDTH && mpz_sgn(rinfo->consVal) == 0) {
     ret = format("memset(%s, 0, sizeof(%s));", lvalue.c_str(), lvalue.c_str());
   } else {
     std::string idxStr, bracket;
@@ -126,28 +137,32 @@ static std::string constantAssign(std::string lvalue, int dimIdx, Node* node, va
       idxStr += "[i" + std::to_string(i) + "]";
       bracket += "}\n";
     }
-    ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
+    if (stageMemory != nullptr) ret += rcStageStore(stageMemory, stagePart, lvalue + idxStr, rinfo->valStr) + "\n";
+    else ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
     ret += bracket;
   }
   return ret;
 }
 
-static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int dimIdx = -1) {
+static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int dimIdx = -1,
+                             Node* stageMemory = nullptr, int stagePart = 0) {
   std::string ret;
   int num = 1;
   if (dimIdx < 0) dimIdx = countArrayIndex(lvalue);
   for (size_t i = dimIdx; i < node->dimension.size(); i ++) num *= node->dimension[i];
   if (rinfo->status == VAL_CONSTANT) {
-    ret = constantAssign(lvalue, dimIdx, node, rinfo);
+    ret = constantAssign(lvalue, dimIdx, node, rinfo, stageMemory, stagePart);
   } else if (memberValid(rinfo, num)) {
     int consType = memberConstant(rinfo);
     if (consType == 0 || consType == 1) {
       for (int i = 0; i < num; i ++) {
         valInfo* assignInfo = rinfo->getMemberInfo(i);
-        ret += format("%s%s = %s;\n", lvalue.c_str(), idx2Str(node, i, dimIdx).c_str(), assignInfo->valStr.c_str());
+        const std::string indexed = lvalue + idx2Str(node, i, dimIdx);
+        if (stageMemory != nullptr) ret += rcStageStore(stageMemory, stagePart, indexed, assignInfo->valStr) + "\n";
+        else ret += format("%s = %s;\n", indexed.c_str(), assignInfo->valStr.c_str());
       }
     } else if (consType == 2) {
-      ret = constantAssign(lvalue, dimIdx, node, rinfo->memberInfo[0]);
+      ret = constantAssign(lvalue, dimIdx, node, rinfo->memberInfo[0], stageMemory, stagePart);
     } else Panic();
 
   } else if (node->dimension.size() - dimIdx == 1 && rinfo->isArrayRef()) {
@@ -158,8 +173,13 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int
        next state, and shares its type since a width change lowers to a mask or
        a cast that stops it being bare. The count comes from the dimension
        rather than sizeof, which keeps a prefix copy exact. */
-    ret = format("memcpy(%s, %s, %d * sizeof(%s[0]));",
-                 lvalue.c_str(), rinfo->arrayRef().c_str(), num, lvalue.c_str());
+    if (stageMemory != nullptr) {
+      ret = format("for (int __rc_i = 0; __rc_i < %d; ++__rc_i) { %s }\n", num,
+                   rcStageStore(stageMemory, stagePart, lvalue + "[__rc_i]", rinfo->arrayRef() + "[__rc_i]").c_str());
+    } else {
+      ret = format("memcpy(%s, %s, %d * sizeof(%s[0]));",
+                   lvalue.c_str(), rinfo->arrayRef().c_str(), num, lvalue.c_str());
+    }
   } else {
     std::string idxStr, bracket;
     for (size_t i = 0; i < node->dimension.size() - dimIdx; i ++) {
@@ -167,7 +187,8 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int
       idxStr += "[i" + std::to_string(i) + "]";
       bracket += "}";
     }
-    ret += format("%s%s = %s; ", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
+    if (stageMemory != nullptr) ret += rcStageStore(stageMemory, stagePart, lvalue + idxStr, rinfo->valStr) + " ";
+    else ret += format("%s%s = %s; ", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
     ret += bracket;
   }
   return ret;
@@ -1324,13 +1345,21 @@ valInfo* ENode::instsReadMem(Node* node, std::string lvalue, bool isRoot) {
   Assert(node->type == NODE_READER || node->type == NODE_READWRITER, "invalid type %d", node->type);
   Node* memory = memoryNode;
   const std::string address = ChildInfo(0, valStr);
-  const std::string memoryValue = memory->name + "[" + address + "]";
-  ret->valStr = memoryValue;
   std::string indexStr;
   for (size_t i = 0; i < memory->dimension.size(); i ++) {
     indexStr += "[i" + std::to_string(i) + "]";
   }
-  ret->valStr += indexStr;
+  const std::string indexed = memory->name + "[" + address + "]" + indexStr;
+  // Cross-partition reads use the array directly: this cycle's stores are
+  // still in the writer partitions' logs. A read in a writer partition
+  // forwards from that partition's log only.
+  const int logPart = repCutMemoryLogPart(node);
+  if (logPart >= 0) {
+    ret->valStr = format("rcRead$%s$%d(%s)", memory->name.c_str(), logPart,
+                         rcElementOffset(memory, indexed).c_str());
+  } else {
+    ret->valStr = indexed;
+  }
 
   // A readwrite port on a write-first memory used to update the memory array
   // before evaluating its read expression. MT memory writes are now staged, so
@@ -1393,6 +1422,23 @@ valInfo* ENode::instsWriteMem(Node* node, std::string lvalue, bool isRoot) {
       if (memory->width < width) value += " & " + bitMask(memory->width);
       ret->valStr += data + " = " + value + ";\n";
       ret->valStr += valid + " = " + enable + ";";
+    }
+    ret->opNum = -1;
+    ret->type = TYPE_STMT;
+    return ret;
+  }
+
+  if (repCutSnapshotMemory(memory)) {
+    const int logPart = repCutMemoryLogPart(node);
+    Assert(logPart >= 0, "RepCut snapshot writer %s has no memory log", node->name.c_str());
+    std::string value = ChildInfo(1, valStr);
+    if (!isSubArray(lvalue, node) && memory->width < width) value += " & " + bitMask(memory->width);
+    if (isSubArray(lvalue, node)) {
+      std::string arraylvalue = format("%s[%s]%s", memory->name.c_str(), ChildInfo(0, valStr).c_str(), indexStr.c_str());
+      ret->valStr = arrayCopy(arraylvalue, node, Child(1, computeInfo), countArrayIndex(arraylvalue) - 1, memory, logPart);
+    } else {
+      const std::string indexed = format("%s[%s]%s", memory->name.c_str(), ChildInfo(0, valStr).c_str(), indexStr.c_str());
+      ret->valStr = rcStageStore(memory, logPart, indexed, value);
     }
     ret->opNum = -1;
     ret->type = TYPE_STMT;
@@ -1824,6 +1870,7 @@ void ExpTree::clearInfo(){
 }
 
 void Node::updateIsRoot() {
+  if (globalConfig.RepCutMode && (rcResetSource || !repCutBoundaryNext(this).empty())) nodeIsRoot = true;
   if (anyExtEdge() || next.size() != 1 || isReset() || isExt()) nodeIsRoot = true;
   for (Node* prevNode : prev) {
     if (prevNode->type == NODE_REG_SRC && !prevNode->regSplit && prevNode->getDst()->super == super) {
@@ -1892,13 +1939,13 @@ std::string computeExtMod(SuperNode* super) {
 }
 
 void graph::instsGenerator() {
-  maxConcatNum = 0;
   std::set<Node*> s;
   std::set<Node*> s_array;
   for (SuperNode* super : sortedSuper) {
     for (Node* n : super->member) n->updateIsRoot();
   }
   for (SuperNode* super : sortedSuper) {
+    super->insts.clear();
     if (super->superType == SUPER_EXTMOD) {
       extDecl.push_back(computeExtMod(super));
     } else {
@@ -1906,6 +1953,7 @@ void graph::instsGenerator() {
     }
   }
   for (SuperNode* super : allReset) {
+    super->insts.clear();
     super->stmtTree->compute(super->insts);
   }
 

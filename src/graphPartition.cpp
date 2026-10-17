@@ -47,8 +47,8 @@ void graph::resort() {
 }
 
 // coarsen phase
-void graph::graphCoarsen() {
-  mergeResetAll();
+void graph::graphCoarsen(bool withReset) {
+  if (withReset) mergeResetAll();
 
   mergeWhenNodes();
   resort();
@@ -120,6 +120,26 @@ void graph::graphInitPartition() {
     if (sortedSuper[i]->superType != SUPER_VALID) {
       cut.insert(i);
       if (i + 1 < sortedSuper.size()) cut.insert(i + 1);
+    }
+  }
+  if (globalConfig.RepCutMode) {
+    int runPart = -3;
+    for (size_t i = 0; i < sortedSuper.size(); i ++) {
+      const int part = repCutPartOf(sortedSuper[i]);
+      if (part == -2) {
+        cut.insert(i);
+        if (i + 1 < sortedSuper.size()) cut.insert(i + 1);
+        runPart = -3;
+      } else if (runPart >= 0 && part >= 0 && part != runPart) {
+        cut.insert(i);
+        runPart = part;
+      } else if (part >= 0) {
+        runPart = part;
+      }
+      if (i + 1 < sortedSuper.size() && !repCutMergeOk(sortedSuper[i], sortedSuper[i + 1])) {
+        cut.insert(i + 1);
+        runPart = -3;
+      }
     }
   }
   // for (int i : cut) printf("cut %d\n", i);
@@ -364,23 +384,89 @@ void graph::graphRefine() {
   printf("refine %d times\n", refineNum);
 }
 
-void graph::graphPartition() {
+void graph::partitionSorted(bool withReset) {
   size_t totalSuper = sortedSuper.size();
   size_t phaseSuper = sortedSuper.size();
   orderAllNodes();
-
-/* coarsen phase */
-  graphCoarsen();
+  graphCoarsen(withReset);
   resort();
   printf("[graphCoarsen] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
-
-/* initial partition */
   phaseSuper = sortedSuper.size();
   graphInitPartition();
   orderAllNodes();
   printf("[InitPartition] remove %ld superNodes (%ld -> %ld)\n", phaseSuper - sortedSuper.size(), phaseSuper, sortedSuper.size());
-/* refine & uncoarsen phase */
-  // graphRefine();
-  phaseSuper = sortedSuper.size();
-  printf("[graphPartition] remove %ld superNodes (%ld -> %ld)\n", totalSuper - phaseSuper, totalSuper, phaseSuper);
+  printf("[graphPartition] remove %ld superNodes (%ld -> %ld)\n", totalSuper - sortedSuper.size(), totalSuper, sortedSuper.size());
+}
+
+static void stampRepCutPart(const std::vector<SuperNode*>& supers, int part) {
+  for (SuperNode* super : supers) {
+    for (Node* node : super->member) {
+      if (node->rcPart < 0) node->rcPart = part;
+    }
+  }
+}
+
+void graph::repCutLower() {
+  const int threads = globalConfig.RepCutThreads > 0 ? globalConfig.RepCutThreads : 1;
+  orderAllNodes();
+  repCutPruneEdges(sortedSuper);
+
+  std::vector<std::vector<SuperNode*>> parts(threads);
+  for (SuperNode* super : sortedSuper) {
+    int part = repCutPartOf(super);
+    Assert(part != -2, "RepCut super %d mixes partitions before lowering", super->id);
+    if (part < 0 || part >= threads) part = 0;
+    parts[part].push_back(super);
+  }
+
+  std::vector<SuperNode*> merged;
+  for (int part = 0; part < threads; ++part) {
+    if (parts[part].empty()) {
+      fprintf(stderr, "[repcut] lower part=%d supers=0\n", part);
+      continue;
+    }
+    sortedSuper = std::move(parts[part]);
+    const size_t before = sortedSuper.size();
+    auto seal = [&]() {
+      stampRepCutPart(sortedSuper, part);
+      repCutPruneEdges(sortedSuper);
+    };
+    stampRepCutPart(sortedSuper, part);
+    reconnectSuper();
+    partitionSorted(false);
+    seal();
+    replicationOpt();
+    seal();
+    generateStmtTree();
+    repCutPruneEdges(sortedSuper);
+    instsGenerator();
+    seal();
+    fprintf(stderr, "[repcut] lower part=%d supers=%zu -> %zu\n", part, before, sortedSuper.size());
+    merged.insert(merged.end(), sortedSuper.begin(), sortedSuper.end());
+  }
+  sortedSuper = std::move(merged);
+  finalizeRepCutParts();
+  std::vector<size_t> assigned(threads), evaluated(threads), replicas(threads);
+  for (SuperNode* super : sortedSuper) {
+    for (Node* node : super->member) {
+      if (node == nullptr) continue;
+      int part = node->rcPart;
+      if (part < 0 || part >= threads) part = 0;
+      assigned[part] += 1;
+      if (node->name.find("$RC$") != std::string::npos) replicas[part] += 1;
+      if (node->status == VALID_NODE && !node->rcCommitOnly && !node->rcResetSource) {
+        evaluated[part] += 1;
+      }
+    }
+  }
+  printf("[repcut] lowered %d independent partitions, supers=%zu\n", threads, sortedSuper.size());
+  for (int part = 0; part < threads; ++part) {
+    fprintf(stderr, "[repcut] thread=%d nodes=%zu eval=%zu replicas=%zu\n",
+            part, assigned[part], evaluated[part], replicas[part]);
+  }
+  fflush(stderr);
+}
+
+void graph::graphPartition() {
+  partitionSorted(true);
 }

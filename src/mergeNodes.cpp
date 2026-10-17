@@ -159,6 +159,7 @@ void graph::mergeWhenNodes() {
     std::vector<SuperNode*> allSuper = iter.second;
     SuperNode* mergeSuper = allSuper[0];
     for (size_t i = 1; i < allSuper.size(); i ++) {
+      if (!repCutMergeOk(mergeSuper, allSuper[i])) continue;
       for (Node* member : allSuper[i]->member) {
         mergeSuper->add_member(member);
         member->super = mergeSuper;
@@ -281,6 +282,7 @@ void graph::mergeOut1() {
     if (super->next.size() == 1) {
       SuperNode* nextSuper = *(super->next.begin());
       if (nextSuper->superType != SUPER_VALID) continue;
+      if (!repCutMergeOk(super, nextSuper)) continue;
       if (nextSuper->member.size() > MAX_NODES_PER_SUPER) continue;
       bool canMerge = true;
       for (SuperNode* depNext : super->depNext) {
@@ -332,6 +334,7 @@ void graph::mergeIn1() {
     if (super->prev.size() == 1) {
       SuperNode* prevSuper = *(super->prev.begin());
       if (prevSuper->superType != SUPER_VALID) continue;
+      if (!repCutMergeOk(super, prevSuper)) continue;
       if (prevSuper->member.size() > MAX_NODES_PER_SUPER) continue;
       bool canMerge = true;
       for (SuperNode* depPrev : super->depPrev) {
@@ -400,6 +403,7 @@ void graph::mergeSublings() {
       for (SuperNode* checkSuper : uniquePrev) {
         if (prevEq(checkSuper, super)) { // merge or replace
           find = true;
+          if (!repCutMergeOk(checkSuper, super)) break;
           if (checkSuper->member.size() < MAX_SUBLINGS) {
             for (Node* member : super->member) member->super = checkSuper;
             checkSuper->member.insert(checkSuper->member.end(), super->member.begin(), super->member.end());
