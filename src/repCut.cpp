@@ -44,6 +44,32 @@ int repCutThreadsFromEnv() {
   return static_cast<int>(value);
 }
 
+// State sources must stay with their register destinations.  The original
+// RepCut objective only prices the combinational sink cones, so this separate
+// weight lets the partitioner account for the commit work without moving a
+// reg-src to another worker.  It is deliberately an environment knob while
+// the static estimate is being calibrated against runtime traces.
+double repCutStateWeightScale() {
+  const char* text = std::getenv("GSIM_REPCUT_STATE_WEIGHT");
+  if (text == nullptr || text[0] == '\0') return 1.0;
+  char* end = nullptr;
+  const double value = std::strtod(text, &end);
+  if (end == text || *end != '\0' || value < 0 || value > 1000) {
+    fprintf(stderr, "[repcut] GSIM_REPCUT_STATE_WEIGHT must be in [0, 1000], got '%s'\n", text);
+    exit(1);
+  }
+  return value;
+}
+
+double repCutStateCost(const Node* reg) {
+  const int width = reg->width > 0 ? reg->width : 1;
+  const double words = std::max(1, (width + 63) / 64);
+  // The fixed term prices the active guard / old-value compare / assignment;
+  // the word term prices wider state writes.  Fanout and dynamic activity are
+  // workload-dependent and are intentionally left to profile-guided tuning.
+  return 16.0 + 4.0 * words;
+}
+
 int partOf(SuperNode* super) {
   int part = -1;
   for (Node* node : super->member) {
@@ -662,6 +688,29 @@ void graph::repCutSplit() {
     }
   }
 
+  // Charge each sink group for the state-update work that is forced to follow
+  // its register destinations.  A reg-dst is non-replicable, so its cone
+  // membership is normally one group; split the charge defensively if an
+  // earlier graph transform leaves more than one group in its cone.
+  std::vector<double> groupStateCost(groupCount, 0);
+  size_t stateCostUnassigned = 0;
+  for (Node* reg : regsrc) {
+    if (reg == nullptr || reg->status == DEAD_NODE) continue;
+    Node* dst = reg->getDst();
+    if (dst == nullptr) { ++stateCostUnassigned; continue; }
+    auto found = index.find(dst);
+    if (found == index.end()) { ++stateCostUnassigned; continue; }
+    std::vector<int> groups;
+    for (int cursor = coneHead[found->second]; cursor != 0; cursor = cons[cursor].tail) {
+      groups.push_back(cons[cursor].group);
+    }
+    std::sort(groups.begin(), groups.end());
+    groups.erase(std::unique(groups.begin(), groups.end()), groups.end());
+    if (groups.empty()) { ++stateCostUnassigned; continue; }
+    const double share = repCutStateCost(reg) / groups.size();
+    for (int group : groups) groupStateCost[group] += share;
+  }
+
   std::vector<double> vertexWeight(groupCount, 0);
   std::vector<std::vector<int>> hedges;
   std::vector<double> hedgeWeight;
@@ -684,6 +733,10 @@ void graph::repCutSplit() {
     hedges.push_back(std::move(pins));
     hedgeWeight.push_back(static_cast<double>(entry.second.eta));
   }
+  const double stateWeightScale = repCutStateWeightScale();
+  for (int group = 0; group < groupCount; ++group) {
+    vertexWeight[group] += stateWeightScale * groupStateCost[group];
+  }
   for (double& value : vertexWeight) if (value <= 0) value = 1;
 
   const std::string kahyparDir = globalConfig.OutputDir + "/repcut-kahypar";
@@ -704,8 +757,10 @@ void graph::repCutSplit() {
   }
   const double average = threads > 0 ? std::accumulate(blockWeight.begin(), blockWeight.end(), 0.0) / threads : 0;
   const double heaviest = blockWeight.empty() ? 0 : *std::max_element(blockWeight.begin(), blockWeight.end());
-  fprintf(stderr, "[repcut] intersection vertices=%d hyperedges=%zu solver=%s km1=%.0f balance=%.3f\n",
-          groupCount, hedges.size(), solver, km1, average > 0 ? (heaviest - average) / average : 0);
+  double totalGroupStateCost = std::accumulate(groupStateCost.begin(), groupStateCost.end(), 0.0);
+  fprintf(stderr, "[repcut] intersection vertices=%d hyperedges=%zu solver=%s km1=%.0f balance=%.3f state_weight=%.3f state_cost=%.0f unassigned_state=%zu\n",
+          groupCount, hedges.size(), solver, km1, average > 0 ? (heaviest - average) / average : 0,
+          stateWeightScale, totalGroupStateCost, stateCostUnassigned);
 
   std::vector<std::vector<Node*>> roots(threads);
   for (int group = 0; group < groupCount; ++group) {
@@ -798,12 +853,14 @@ void graph::repCutSplit() {
     snapshotOrder.push_back(mem);
   }
   std::vector<size_t> regdstCount(threads), regdstBits(threads);
+  std::vector<double> stateCost(threads, 0);
   for (Node* reg : regsrc) {
     reg->rcCommitOnly = true;
     Node* dst = reg->getDst();
     const int part = dst && dst->rcPart >= 0 ? dst->rcPart : 0;
     reg->rcPart = part;
     if (reg->status == DEAD_NODE || part < 0 || part >= threads) continue;
+    stateCost[part] += repCutStateCost(reg);
     ++regdstCount[part];
     const int bits = dst && dst->width > 0 ? dst->width : (reg->width > 0 ? reg->width : 0);
     regdstBits[part] += static_cast<size_t>(bits);
@@ -818,12 +875,13 @@ void graph::repCutSplit() {
   reconnectAll(); resort();
   FILE* report = std::fopen((globalConfig.OutputDir+"/repcut-partitions.csv").c_str(),"w");
   Assert(report,"cannot write RepCut partition report");
-  fprintf(report,"worker,sinks,original_nodes,replica_nodes,structural_cost,regdst_count,regdst_bits,shared_intermediates,exclusive_intermediates\n");
+  fprintf(report,"worker,sinks,original_nodes,replica_nodes,structural_cost,state_cost,combined_cost,regdst_count,regdst_bits,shared_intermediates,exclusive_intermediates\n");
   int nonempty = 0;
   for (int part = 0; part < threads; ++part) {
     nonempty += !roots[part].empty();
-    fprintf(report,"%d,%zu,%zu,%zu,%.0f,%zu,%zu,%zu,%zu\n",part,roots[part].size(),originalCount[part],replicaCount[part],work[part],regdstCount[part],regdstBits[part],sharedInter[part],exclusiveInter[part]);
-    fprintf(stderr,"[repcut] partition=%d sinks=%zu original=%zu replicas=%zu cost=%.0f regdst=%zu regdst_bits=%zu shared_intermediates=%zu exclusive_intermediates=%zu\n",part,roots[part].size(),originalCount[part],replicaCount[part],work[part],regdstCount[part],regdstBits[part],sharedInter[part],exclusiveInter[part]);
+    const double combined = work[part] + stateWeightScale * stateCost[part];
+    fprintf(report,"%d,%zu,%zu,%zu,%.0f,%.0f,%.0f,%zu,%zu,%zu,%zu\n",part,roots[part].size(),originalCount[part],replicaCount[part],work[part],stateCost[part],combined,regdstCount[part],regdstBits[part],sharedInter[part],exclusiveInter[part]);
+    fprintf(stderr,"[repcut] partition=%d sinks=%zu original=%zu replicas=%zu cost=%.0f state_cost=%.0f combined=%.0f regdst=%zu regdst_bits=%zu shared_intermediates=%zu exclusive_intermediates=%zu\n",part,roots[part].size(),originalCount[part],replicaCount[part],work[part],stateCost[part],combined,regdstCount[part],regdstBits[part],sharedInter[part],exclusiveInter[part]);
   }
   fclose(report);
   fprintf(stderr,"[repcut] threads=%d nonempty=%d sinks=%zu resource-groups=%zu replicated=%zu deferred-memories=%zu\n",
