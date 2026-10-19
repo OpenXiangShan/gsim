@@ -191,6 +191,16 @@ void Node::addUpdateTree() {
     whenNode->addChild(resetVal->getRoot());
     resetTree = new ExpTree(whenNode, this);
   }
+  if (reset == ASYRESET) {
+    // Keep normal writes from replacing the pending reset value.
+    for (ExpTree* tree : getDst()->assignTree) {
+      ENode* whenNode = new ENode(OP_WHEN);
+      whenNode->addChild(resetCond->getRoot()->dup());
+      whenNode->addChild(nullptr);
+      whenNode->addChild(tree->getRoot());
+      tree->setRoot(whenNode);
+    }
+  }
 }
 
 bool Node::anyExtEdge() {

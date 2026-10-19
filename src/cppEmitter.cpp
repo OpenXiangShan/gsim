@@ -228,6 +228,7 @@ void graph::genInterfaceInput(Node* input) {
   emitBodyLock(2, "%s = val;\n", input->name.c_str());
   /* update nodes in the same superNode */
   std::set<int> allNext;
+  if (input->isAsyncReset()) allNext.insert(input->super->cppId);
   for (Node* next : input->next) {
     if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
   }
