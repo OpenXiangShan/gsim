@@ -552,7 +552,6 @@ void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldN
     emitBodyLock(indent++, "if (%s != %s) {\n", node->name.c_str(), oldName.c_str());
     for (RcActGroup& group : groups) {
       RcFlags guard(group.storage, group.part);
-      if (group.pendSrc >= 0) emitBodyLock(indent, "rcCommitDirty[%d].mask |= 1ull << %d;\n", group.pendSrc, group.part);
       // IDs are local to each partition. Never use the source cppId/flagName
       // for a destination partition's same-byte shortcut.
       emitActiveMask(group.ids, indent);
@@ -622,7 +621,6 @@ void graph::activateUncondNext(Node* node, std::set<int>& activateId, bool inSte
     addRepCutGroups(node, activateId, groups);
     for (RcActGroup& group : groups) {
       RcFlags guard(group.storage, group.part);
-      if (group.pendSrc >= 0) emitBodyLock(indent, "rcCommitDirty[%d].mask |= 1ull << %d;\n", group.pendSrc, group.part);
       emitActiveMask(group.ids, indent);
     }
     if (regChange) {
@@ -1250,45 +1248,14 @@ static void buildRcMemFlushWakes() {
   }
 }
 
-static void buildRcRegChanges() {
-  rcRegChanges.clear();
-  rcRegChangeOf.clear();
-  rcHasRegChanges = false;
-  const int threads = rcThreads();
-  for (int part = 0; part < 64; ++part) rcRegChangeWords[part] = 0;
-  if (threads <= 1) return;
-  std::vector<int> count(threads, 0);
-  for (int part = 0; part < threads; ++part) {
-    for (SuperNode* super : rcCommitSupers[part]) {
-      for (Node* member : super->member) {
-        if (member == nullptr || member->type != NODE_REG_SRC) continue;
-        auto found = rcForeign.find(member);
-        if (found == rcForeign.end()) continue;
-        RcRegChange change;
-        change.owner = part;
-        for (const auto& edge : found->second) {
-          if (edge.first == part || edge.first < 0 || edge.first >= threads) continue;
-          change.destIds[edge.first].insert(edge.second);
-        }
-        if (change.destIds.empty()) continue;
-        change.index = count[part]++;
-        rcRegChangeOf.emplace(member, rcRegChanges.size());
-        rcRegChanges.push_back(std::move(change));
-      }
-    }
-  }
-  for (int part = 0; part < threads; ++part) {
-    if (count[part] == 0) continue;
-    rcRegChangeWords[part] = (count[part] + 63) / 64;
-    rcHasRegChanges = true;
-  }
-}
-
 void graph::genRepCutCommit() {
   const int threads = rcThreads();
   std::set<std::pair<int, int>> pendPairs;
+  // rcCommitPend is indexed by active-flag byte (ACTIVE_WIDTH ids per slot).
+  // Keep the exact slots touched by each source/destination pair so the merge
+  // phase does not scan or clear the whole destination bitmap.
+  std::map<std::pair<int, int>, std::set<int>> pendSlots;
   buildRcMemFlushWakes();
-  buildRcRegChanges();
   if (threads > 1) {
     for (int part = 0; part < threads; ++part) {
       for (SuperNode* super : rcCommitSupers[part]) {
@@ -1297,13 +1264,21 @@ void graph::genRepCutCommit() {
           auto found = rcForeign.find(member);
           if (found == rcForeign.end()) continue;
           for (const auto& edge : found->second) {
-            if (edge.first != part) pendPairs.emplace(part, edge.first);
+            if (edge.first != part) {
+              const std::pair<int, int> pair{part, edge.first};
+              pendPairs.insert(pair);
+              pendSlots[pair].insert(edge.second / ACTIVE_WIDTH);
+            }
           }
         }
       }
     }
     for (const RcMemFlushWake& wake : rcMemFlushWakes) {
-      for (const RcMemWakeGroup& group : wake.groups) pendPairs.emplace(wake.writerPart, group.part);
+      for (const RcMemWakeGroup& group : wake.groups) {
+        const std::pair<int, int> pair{wake.writerPart, group.part};
+        pendPairs.insert(pair);
+        for (int id : group.ids) pendSlots[pair].insert(id / ACTIVE_WIDTH);
+      }
     }
   }
   rcHasCommitPend = !pendPairs.empty();
@@ -1314,8 +1289,6 @@ void graph::genRepCutCommit() {
     }
   }
   if (rcHasCommitPend && rcHeader != nullptr) {
-    fprintf(rcHeader, "struct alignas(64) RcCommitDirty { uint64_t mask; };\n");
-    fprintf(rcHeader, "RcCommitDirty rcCommitDirty[%d]{};\n", threads);
     for (const auto& pend : pendPairs) {
       const int src = pend.first;
       const int dst = pend.second;
@@ -1345,8 +1318,7 @@ void graph::genRepCutCommit() {
   } else if (rcHeader != nullptr) {
     fprintf(rcHeader, "void rcCommitPart(int part);\n");
     emitFuncDecl(0, "void S%s::rcCommitPart(int part) {\n", name.c_str());
-    // Memory wakes still use the dirty mask. Register changes use rcRegChanged.
-    if (rcHasCommitPend) emitBodyLock(1, "rcCommitDirty[part].mask = 0;\n");
+    // Register and memory wakes both land in rcCommitPend. Merge consumes the touched slots.
     if (!repCutSnapshotMemories().empty()) emitBodyLock(1, "rcFlushMem(part);\n");
     emitBodyLock(1, "switch (part) {\n");
     for (int part = 0; part < threads; ++part) {
@@ -1373,11 +1345,16 @@ void graph::genRepCutCommit() {
         if (pend.second != part) continue;
         const int src = pend.first;
         const int dst = pend.second;
-        emitBodyLock(2, "if ((rcCommitDirty[%d].mask & (1ull << %d)) != 0) {\n", src, dst);
-        emitBodyLock(3, "for (int rcWord = 0; rcWord < %d; ++rcWord) activeFlags%d[rcWord] |= rcCommitPend%d_%d[rcWord];\n",
-                     rcFlagWords[dst], dst, src, dst);
-        emitBodyLock(3, "memset(rcCommitPend%d_%d, 0, sizeof(rcCommitPend%d_%d));\n", src, dst, src, dst);
-        emitBodyLock(2, "}\n");
+        auto slots = pendSlots.find(pend);
+        Assert(slots != pendSlots.end() && !slots->second.empty(),
+               "RepCut pending pair %d -> %d has no touched active slots", src, dst);
+        for (int slot : slots->second) {
+          Assert(slot >= 0 && slot < rcFlagWords[dst],
+                 "RepCut pending slot %d out of range for destination %d", slot, dst);
+          emitBodyLock(3, "activeFlags%d[%d] |= rcCommitPend%d_%d[%d];\n",
+                       dst, slot, src, dst, slot);
+          emitBodyLock(3, "rcCommitPend%d_%d[%d] = 0;\n", src, dst, slot);
+        }
       }
       emitBodyLock(2, "break;\n");
     }
@@ -1493,7 +1470,6 @@ void graph::genRepCutMemoryDefer() {
                    log.c_str(), elem.c_str(), memory->name.c_str());
       emitBodyLock(3, "%s.clear();\n", log.c_str());
       for (RcMemWakeGroup& readers : wake->groups) {
-        emitBodyLock(3, "rcCommitDirty[%d].mask |= 1ull << %d;\n", group.first, readers.part);
         RcFlags guard(format("rcCommitPend%d_%d", group.first, readers.part), readers.part);
         emitActiveMask(readers.ids, 3);
       }

@@ -361,16 +361,15 @@ worker 在 commit 或 partition-local evaluation 中不能直接改另一个 wor
 的 active flag。生成器为跨 partition 目标创建：
 
 ```cpp
-RcCommitDirty rcCommitDirty[threads];
 uint64_t rcCommitPend<source>_<dest>[...];
 ```
 
-源 worker 只写自己的 pending 位图和 dirty mask。commit barrier 之后，目标 worker
+源 worker 只写自己的 pending 位图。commit barrier 之后，目标 worker
 执行 `rcMergeCommitFlags(part)`：
 
-1. 检查每个 source 的 dirty mask；
-2. 将对应 pending words OR 到目标 `activeFlags`；
-3. 清空 pending buffer。
+1. 按生成期记录的 touched slot 读取 pending 位；
+2. 将对应 pending slot OR 到目标 `activeFlags`；
+3. 立即清空该 slot。
 
 这种协议把跨线程写入限制在 commit/state phase 产生，并避免 evaluation phase 中
 不同 worker 同时修改共享 active cache line。
@@ -399,11 +398,11 @@ commitPart<part>_<chunk>()
 ### 9.2 commitPart
 
 当前 emitter 使用一个统一的 `rcCommitPart(int part)` 入口。它先清零
-`rcCommitDirty[part].mask`，再调用 `rcFlushMem(part)`，最后通过 `switch(part)`
+再调用 `rcFlushMem(part)`，最后通过 `switch(part)`
 调用该 worker 的 `commitPart<part>_<chunk>()` 函数。
 
 真正的寄存器提交 body 和 chunks 仍按 worker 独立生成；统一入口只是负责公共的
-dirty-mask/memory 顺序和运行时路由。这个选择减少了 wrapper 和函数布局数量，但保留
+memory 顺序和运行时路由。这个选择减少了 wrapper 和函数布局数量，但保留
 了一次每周期的 dispatch。后续若再次研究 per-worker wrapper，必须同时测量代码体积、
 instruction cache 和 branch 行为，不能只看 switch 是否被移除。
 
@@ -414,7 +413,7 @@ instruction cache 和 branch 行为，不能只看 switch 是否被移除。
 - 写入当前寄存器值；
 - 比较新旧值；
 - 更新本地 activeFlags；
-- 写入远端 `rcCommitPend` 和 dirty mask。
+- 写入远端 `rcCommitPend`。
 
 因此提交负载同时取决于 state 数量、宽度、当前 active 稀疏性以及跨 partition fanout。
 
@@ -603,7 +602,7 @@ Tcycle ≈ max_part(Tmemory_flush + Tcommit)
 - 状态提交主要集中在少数拥有大量活跃寄存器的 worker；
 - active evaluation 的拖尾 worker 与提交拖尾 worker 不完全相同；
 - worker 0 的静态 structural cost 最大，不代表它的动态 active 求值最大；
-- active merge 可能因为远端 pending 位图容量和 dirty source 数量在少数 worker 上变重；
+- active merge 可能因为远端 pending 位图容量和 touched slot 数量在少数 worker 上变重；
 - barrier/join 等待时间包含其他 worker 的有效工作，不能直接当作纯同步开销。
 
 这解释了为什么仅平衡复制前组合节点成本不能保证运行时平衡。加入 state-aware weight
@@ -617,7 +616,7 @@ commit super 被检查次数
 commit super 实际执行次数
 寄存器值变化次数
 本地 active 写次数
-远端 dirty mask 写次数
+远端 pending slot 写次数
 每个 source->dest pending buffer 实际 OR word 数
 eval super 实际执行次数
 ```
@@ -1177,15 +1176,38 @@ if (activeFlags[flag_word] != 0) {
 占主体时，才进一步尝试 partition-local active list；动态 list 需要去重、顺序和跨
 partition pending 处理，复杂度更高。
 
-### 20.3 第三优先级：稀疏 active merge
+### 20.3 第三优先级：稀疏 active merge（已实现，待 XiangShan A/B）
 
-当前 `rcMergeCommitFlags` 在 dirty source 命中后，按目标 partition 的整个 flag word
-范围执行 OR 和清零。建议在生成期为每个 `(src, dst)` 建立静态 touched-word 列表，
-运行时只遍历这些 word；再用 profile 记录每周期真实触及的 word 数。
+这一项已经接入 `src/cppEmitter.cpp`。生成期从两类来源收集 `(src, dst)` 的目标
+active ID：
 
-该优化不改变 barrier 或 active 语义，因为 commit 完成后 pending buffer 才被 consumer
-读取。要同时观察：生成代码大小、pending word 数、merge 时间和 cache-line 访问；如果
-列表展开使 `.text` 显著膨胀，应改成紧凑的 word-index 数组。
+- 普通 foreign activation 的 `rcForeign` 目标 ID；
+- snapshot memory flush 的 reader wake ID。
+
+目标 ID 按 `id / ACTIVE_WIDTH` 转成唯一 pending slot。生成的
+`rcMergeCommitFlags(dst)` 现在只 OR 和清零这些 slot：
+
+```cpp
+activeFlags<dst>[slot0] |= rcCommitPend<src>_<dst>[slot0];
+rcCommitPend<src>_<dst>[slot0] = 0;
+activeFlags<dst>[slot1] |= rcCommitPend<src>_<dst>[slot1];
+rcCommitPend<src>_<dst>[slot1] = 0;
+```
+
+寄存器跨分区 change 使用已有的 `rcRegChanged`/`rcApplyRegChanges` 路径，不重复加入
+`rcCommitPend`。因此本改动只缩小普通 foreign activation 和 memory wake 的 merge
+访问范围，不改变寄存器 state barrier、memory flush 或 reset 顺序。
+
+小模型 `mt-memory-commit` 已生成并运行通过，5 项 RepCut active 回归也通过。当前
+尚未重新生成和运行完整 XiangShan，因此性能收益仍需单独测量。下一次 A/B 需要记录：
+
+- 每个 `(src,dst)` 的静态 touched slot 数；
+- 每周期实际 OR slot 数；
+- `merge_active` 阶段均值/P95/P99；
+- 生成 `.text` 大小和 instruction-cache 事件。
+
+如果稀疏 slot 展开使 `.text` 显著膨胀，应改为生成紧凑的 slot-index 数组，而不是恢复
+整个 pending bitmap 扫描。
 
 ### 20.4 第四优先级：验证 barrier 原语和 L3 映射
 
