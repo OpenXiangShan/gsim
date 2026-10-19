@@ -48,6 +48,18 @@ static int rcCommitChunks[64];
 static bool rcDeferForeign = false;
 static bool rcHasCommitPend = false;
 static FILE* rcHeader = nullptr;
+// One bit per committed register that has readers on another partition.
+// The owner sets it while comparing old and new; readers apply it after the
+// commit barrier. Local readers still update their own activeFlags directly.
+struct RcRegChange {
+  int owner = 0;
+  int index = 0;
+  std::map<int, std::set<int>> destIds;
+};
+static std::vector<RcRegChange> rcRegChanges;
+static std::unordered_map<Node*, size_t> rcRegChangeOf;
+static int rcRegChangeWords[64];
+static bool rcHasRegChanges = false;
 static std::vector<SuperNode*> rcEvalSupers[64];
 static std::vector<SuperNode*> rcCommitSupers[64];
 static std::vector<SuperNode*> rcResetSupers;
@@ -495,8 +507,24 @@ static void addRcGroup(std::vector<RcActGroup>& groups, std::string storage, int
 // The bits are ORed after every commit finishes; OR does not depend on order.
 // Each source records destinations in its own cache line. Consumers only read
 // that mask after the commit barrier, so commit does not bounce a shared flag.
+static bool rcUsesRegChange(Node* node) {
+  return rcRegChangeOf.find(node) != rcRegChangeOf.end();
+}
+
+static bool rcRegChangedAt(Node* node, int& owner, int& word, int& bit) {
+  auto found = rcRegChangeOf.find(node);
+  if (found == rcRegChangeOf.end()) return false;
+  const RcRegChange& change = rcRegChanges[found->second];
+  owner = change.owner;
+  word = change.index / 64;
+  bit = change.index % 64;
+  return true;
+}
+
 static void addRepCutGroups(Node* node, const std::set<int>& local, std::vector<RcActGroup>& groups) {
   addRcGroup(groups, gActiveFlags, rcCurPart, -1, local);
+  // Foreign register readers are woken from the change bit after the barrier.
+  if (rcUsesRegChange(node)) return;
   auto foreign = rcForeign.find(node);
   if (foreign == rcForeign.end()) return;
   std::map<int, std::set<int>> byPart;
@@ -514,11 +542,13 @@ static void addRepCutGroups(Node* node, const std::set<int>& local, std::vector<
   }
 }
 
+
 void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName, int indent) {
   if (globalConfig.RepCutMode) {
+    const bool regChange = rcUsesRegChange(node);
     std::vector<RcActGroup> groups;
     addRepCutGroups(node, nextNodeId, groups);
-    if (groups.empty()) return;
+    if (groups.empty() && !regChange) return;
     emitBodyLock(indent++, "if (%s != %s) {\n", node->name.c_str(), oldName.c_str());
     for (RcActGroup& group : groups) {
       RcFlags guard(group.storage, group.part);
@@ -526,6 +556,12 @@ void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldN
       // IDs are local to each partition. Never use the source cppId/flagName
       // for a destination partition's same-byte shortcut.
       emitActiveMask(group.ids, indent);
+    }
+    if (regChange) {
+      int owner = 0, word = 0, bit = 0;
+      if (rcRegChangedAt(node, owner, word, bit)) {
+        emitBodyLock(indent, "rcRegChanged%d[%d] |= 1ull << %d;\n", owner, word, bit);
+      }
     }
     emitBodyLock(--indent, "}\n");
     return;
@@ -581,12 +617,19 @@ void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldN
 
 void graph::activateUncondNext(Node* node, std::set<int>& activateId, bool inStep, std::string flagName, int indent) {
   if (globalConfig.RepCutMode) {
+    const bool regChange = rcUsesRegChange(node);
     std::vector<RcActGroup> groups;
     addRepCutGroups(node, activateId, groups);
     for (RcActGroup& group : groups) {
       RcFlags guard(group.storage, group.part);
       if (group.pendSrc >= 0) emitBodyLock(indent, "rcCommitDirty[%d].mask |= 1ull << %d;\n", group.pendSrc, group.part);
       emitActiveMask(group.ids, indent);
+    }
+    if (regChange) {
+      int owner = 0, word = 0, bit = 0;
+      if (rcRegChangedAt(node, owner, word, bit)) {
+        emitBodyLock(indent, "rcRegChanged%d[%d] |= 1ull << %d;\n", owner, word, bit);
+      }
     }
     return;
   }
@@ -1069,6 +1112,9 @@ static void assignRepCutIds(const std::vector<SuperNode*>& sortedSuper) {
   alwaysActive.clear();
   rcForeign.clear();
   rcReaders.clear();
+  rcRegChanges.clear();
+  rcRegChangeOf.clear();
+  rcHasRegChanges = false;
   rcMemFlushWakes.clear();
   rcMemFlushReady = false;
   rcResetSupers.clear();
@@ -1079,6 +1125,7 @@ static void assignRepCutIds(const std::vector<SuperNode*>& sortedSuper) {
     rcChunks[part] = 0;
     rcCommitChunks[part] = 0;
     rcFlagWords[part] = 8;
+    rcRegChangeWords[part] = 0;
   }
   for (SuperNode* super : sortedSuper) {
     super->cppId = -1;
@@ -1202,14 +1249,50 @@ static void buildRcMemFlushWakes() {
   }
 }
 
+static void buildRcRegChanges() {
+  rcRegChanges.clear();
+  rcRegChangeOf.clear();
+  rcHasRegChanges = false;
+  const int threads = rcThreads();
+  for (int part = 0; part < 64; ++part) rcRegChangeWords[part] = 0;
+  if (threads <= 1) return;
+  std::vector<int> count(threads, 0);
+  for (int part = 0; part < threads; ++part) {
+    for (SuperNode* super : rcCommitSupers[part]) {
+      for (Node* member : super->member) {
+        if (member == nullptr || member->type != NODE_REG_SRC) continue;
+        auto found = rcForeign.find(member);
+        if (found == rcForeign.end()) continue;
+        RcRegChange change;
+        change.owner = part;
+        for (const auto& edge : found->second) {
+          if (edge.first == part || edge.first < 0 || edge.first >= threads) continue;
+          change.destIds[edge.first].insert(edge.second);
+        }
+        if (change.destIds.empty()) continue;
+        change.index = count[part]++;
+        rcRegChangeOf.emplace(member, rcRegChanges.size());
+        rcRegChanges.push_back(std::move(change));
+      }
+    }
+  }
+  for (int part = 0; part < threads; ++part) {
+    if (count[part] == 0) continue;
+    rcRegChangeWords[part] = (count[part] + 63) / 64;
+    rcHasRegChanges = true;
+  }
+}
+
 void graph::genRepCutCommit() {
   const int threads = rcThreads();
   std::set<std::pair<int, int>> pendPairs;
   buildRcMemFlushWakes();
+  buildRcRegChanges();
   if (threads > 1) {
     for (int part = 0; part < threads; ++part) {
       for (SuperNode* super : rcCommitSupers[part]) {
         for (Node* member : super->member) {
+          if (rcUsesRegChange(member)) continue;
           auto found = rcForeign.find(member);
           if (found == rcForeign.end()) continue;
           for (const auto& edge : found->second) {
@@ -1223,6 +1306,12 @@ void graph::genRepCutCommit() {
     }
   }
   rcHasCommitPend = !pendPairs.empty();
+  if (rcHasRegChanges && rcHeader != nullptr) {
+    for (int part = 0; part < threads; ++part) {
+      if (rcRegChangeWords[part] == 0) continue;
+      fprintf(rcHeader, "alignas(64) uint64_t rcRegChanged%d[%d]{};\n", part, rcRegChangeWords[part]);
+    }
+  }
   if (rcHasCommitPend && rcHeader != nullptr) {
     fprintf(rcHeader, "struct alignas(64) RcCommitDirty { uint64_t mask; };\n");
     fprintf(rcHeader, "RcCommitDirty rcCommitDirty[%d]{};\n", threads);
@@ -1255,12 +1344,15 @@ void graph::genRepCutCommit() {
   } else if (rcHeader != nullptr) {
     fprintf(rcHeader, "void rcCommitPart(int part);\n");
     emitFuncDecl(0, "void S%s::rcCommitPart(int part) {\n", name.c_str());
-    // Flush records reader activations in the same dirty mask as registers.
+    // Memory wakes still use the dirty mask. Register changes use rcRegChanged.
     if (rcHasCommitPend) emitBodyLock(1, "rcCommitDirty[part].mask = 0;\n");
     if (!repCutSnapshotMemories().empty()) emitBodyLock(1, "rcFlushMem(part);\n");
     emitBodyLock(1, "switch (part) {\n");
     for (int part = 0; part < threads; ++part) {
       emitBodyLock(1, "case %d:\n", part);
+      if (rcRegChangeWords[part] > 0) {
+        emitBodyLock(2, "memset(rcRegChanged%d, 0, sizeof(rcRegChanged%d));\n", part, part);
+      }
       for (int chunk = 0; chunk < rcCommitChunks[part]; ++chunk) {
         emitBodyLock(2, "commitPart%d_%d();\n", part, chunk);
       }
@@ -1284,6 +1376,45 @@ void graph::genRepCutCommit() {
         emitBodyLock(3, "for (int rcWord = 0; rcWord < %d; ++rcWord) activeFlags%d[rcWord] |= rcCommitPend%d_%d[rcWord];\n",
                      rcFlagWords[dst], dst, src, dst);
         emitBodyLock(3, "memset(rcCommitPend%d_%d, 0, sizeof(rcCommitPend%d_%d));\n", src, dst, src, dst);
+        emitBodyLock(2, "}\n");
+      }
+      emitBodyLock(2, "break;\n");
+    }
+    emitBodyLock(1, "default: break;\n");
+    emitBodyLock(1, "}\n");
+    emitBodyLock(0, "}\n");
+  }
+  if (rcHasRegChanges) {
+    if (rcHeader != nullptr) fprintf(rcHeader, "void rcApplyRegChanges(int part);\n");
+    std::map<int, std::map<std::pair<int, int>, std::vector<std::pair<int, std::set<int>>>>> byDest;
+    for (const RcRegChange& change : rcRegChanges) {
+      const int word = change.index / 64;
+      for (const auto& dest : change.destIds) {
+        byDest[dest.first][{change.owner, word}].push_back({change.index % 64, dest.second});
+      }
+    }
+    emitFuncDecl(0, "void S%s::rcApplyRegChanges(int part) {\n", name.c_str());
+    emitBodyLock(1, "switch (part) {\n");
+    for (int part = 0; part < threads; ++part) {
+      auto found = byDest.find(part);
+      if (found == byDest.end()) continue;
+      emitBodyLock(1, "case %d:\n", part);
+      for (const auto& wordGroup : found->second) {
+        const int owner = wordGroup.first.first;
+        const int word = wordGroup.first.second;
+        uint64_t relevant = 0;
+        for (const auto& bitIds : wordGroup.second) relevant |= 1ull << bitIds.first;
+        emitBodyLock(2, "{\n");
+        emitBodyLock(3, "const uint64_t changed = rcRegChanged%d[%d] & 0x%lxull;\n", owner, word, relevant);
+        emitBodyLock(3, "if (unlikely(changed != 0)) {\n");
+        for (const auto& bitIds : wordGroup.second) {
+          emitBodyLock(4, "if (changed & (1ull << %d)) {\n", bitIds.first);
+          std::set<int> ids = bitIds.second;
+          RcFlags guard("activeFlags" + std::to_string(part), part);
+          emitActiveMask(ids, 5);
+          emitBodyLock(4, "}\n");
+        }
+        emitBodyLock(3, "}\n");
         emitBodyLock(2, "}\n");
       }
       emitBodyLock(2, "break;\n");
@@ -1451,6 +1582,7 @@ void graph::genRepCutStep() {
       emitBodyLock(1, "rcBarrier(part, 1);\n");
     }
     if (rcHasCommitPend) emitBodyLock(1, "rcMergeCommitFlags(part);\n");
+    if (rcHasRegChanges) emitBodyLock(1, "rcApplyRegChanges(part);\n");
     emitBodyLock(1, "rcRunPart(part);\n");
     emitBodyLock(0, "}\n");
     emitFuncDecl(0, "void S%s::rcPinPart(int part) {\n", name.c_str());
