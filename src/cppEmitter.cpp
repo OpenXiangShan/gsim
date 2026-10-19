@@ -76,8 +76,8 @@ struct RcMemFlushWake {
   std::vector<RcMemWakeGroup> groups;
 };
 
-// Cross-partition readers are activated when the log is written into the array,
-// not when a writer merely runs. The map is filled once per emission.
+// Snapshot readers are activated when the log is written into the array,
+// not when a writer merely runs. Local and remote readers share this list.
 static std::vector<RcMemFlushWake> rcMemFlushWakes;
 static bool rcMemFlushReady = false;
 static int rcSuperPart(SuperNode* super);
@@ -1092,10 +1092,11 @@ static void repCutActivate(Node* node) {
         }
         if (!rcTrackedReader(node, port)) continue;
         const int part = rcSuperPart(port->super);
+        // Same-partition readers used to be flagged beside rcWrite. The array
+        // does not change until flush, so they join the flush wake list instead.
+        if (part == srcPart && rcThreads() > 1 && repCutSnapshotMemory(node->parent)) continue;
         if (part == srcPart) add(port->super);
         else {
-          // The array does not hold this write until the next flush. Wake the
-          // reader there, instead of publishing a flag at the end of this cycle.
           Assert(repCutSnapshotMemory(node->parent),
                  "RepCut memory reader %s crosses partitions without a snapshot",
                  port->name.c_str());
@@ -1230,7 +1231,7 @@ static void buildRcMemFlushWakes() {
       for (Node* port : readers->second) {
         if (port == nullptr || port->super == nullptr || port->super->cppId < 0 || !rcTrackedReader(writer, port)) continue;
         const int dst = rcSuperPart(port->super);
-        if (dst == src || dst < 0 || dst >= threads) continue;
+        if (dst < 0 || dst >= threads) continue;
         if (rcAlways[dst].count(port->super->cppId) != 0) continue;
         byWriter[src][dst].insert(port->super->cppId);
       }
