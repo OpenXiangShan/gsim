@@ -1252,8 +1252,7 @@ void graph::genRepCutCommit() {
   const int threads = rcThreads();
   std::set<std::pair<int, int>> pendPairs;
   // rcCommitPend is indexed by active-flag byte (ACTIVE_WIDTH ids per slot).
-  // Keep the exact slots touched by each source/destination pair so the merge
-  // phase does not scan or clear the whole destination bitmap.
+  // Merge only dirty 8-byte windows: a zero pending word is left untouched.
   std::map<std::pair<int, int>, std::set<int>> pendSlots;
   buildRcMemFlushWakes();
   if (threads > 1) {
@@ -1336,7 +1335,22 @@ void graph::genRepCutCommit() {
     emitBodyLock(0, "}\n");
   }
   if (rcHasCommitPend) {
-    if (rcHeader != nullptr) fprintf(rcHeader, "void rcMergeCommitFlags(int part);\n");
+    Assert(ACTIVE_WIDTH == 8, "RepCut 8-byte flag merge requires byte active flags");
+    if (rcHeader != nullptr) {
+      fprintf(rcHeader,
+              "static inline __attribute__((always_inline)) void rcMergeWord(uint8_t* flags, uint8_t* pend) {\n"
+              "  uint64_t bits;\n"
+              "  memcpy(&bits, pend, sizeof(bits));\n"
+              "  if (unlikely(bits != 0)) {\n"
+              "    uint64_t cur;\n"
+              "    memcpy(&cur, flags, sizeof(cur));\n"
+              "    cur |= bits;\n"
+              "    memcpy(flags, &cur, sizeof(cur));\n"
+              "    memset(pend, 0, sizeof(bits));\n"
+              "  }\n"
+              "}\n"
+              "void rcMergeCommitFlags(int part);\n");
+    }
     emitFuncDecl(0, "void S%s::rcMergeCommitFlags(int part) {\n", name.c_str());
     emitBodyLock(1, "switch (part) {\n");
     for (int part = 0; part < threads; ++part) {
@@ -1348,12 +1362,18 @@ void graph::genRepCutCommit() {
         auto slots = pendSlots.find(pend);
         Assert(slots != pendSlots.end() && !slots->second.empty(),
                "RepCut pending pair %d -> %d has no touched active slots", src, dst);
+        std::set<int> words;
         for (int slot : slots->second) {
           Assert(slot >= 0 && slot < rcFlagWords[dst],
                  "RepCut pending slot %d out of range for destination %d", slot, dst);
-          emitBodyLock(3, "activeFlags%d[%d] |= rcCommitPend%d_%d[%d];\n",
-                       dst, slot, src, dst, slot);
-          emitBodyLock(3, "rcCommitPend%d_%d[%d] = 0;\n", src, dst, slot);
+          const int word = slot & ~7;
+          Assert(word + 8 <= rcFlagWords[dst],
+                 "RepCut pending word %d overruns destination %d", word, dst);
+          words.insert(word);
+        }
+        for (int word : words) {
+          emitBodyLock(3, "rcMergeWord(&activeFlags%d[%d], &rcCommitPend%d_%d[%d]);\n",
+                       dst, word, src, dst, word);
         }
       }
       emitBodyLock(2, "break;\n");
