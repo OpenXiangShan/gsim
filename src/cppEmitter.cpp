@@ -1231,7 +1231,11 @@ void graph::cppEmitter() {
   }
 
   fprintf(header, "S%s();\n", name.c_str());
-  if (globalConfig.TraceFst) fprintf(header, "~S%s();\n", name.c_str());
+  if (globalConfig.TraceFst) {
+    fprintf(header, "~S%s();\n", name.c_str());
+    fprintf(header, "S%s(const S%s&) = delete;\n", name.c_str(), name.c_str());
+    fprintf(header, "S%s& operator=(const S%s&) = delete;\n", name.c_str(), name.c_str());
+  }
   fprintf(header, "void init();\n");
   if (globalConfig.TraceFst) {
     fprintf(header, "void emitAllSignalValues();\n");
