@@ -478,7 +478,7 @@ diff-internal:
 	$(MAKE) MODE=2 compile
 	$(MAKE) MODE=2 difftest
 
-run: clean
+run:
 	mkdir -p $(dir $(LOG_FILE))
 	set -o pipefail && stdbuf -oL -eL $(TIME) $(MAKE) run-internal 2>&1 | tee $(LOG_FILE)
 
