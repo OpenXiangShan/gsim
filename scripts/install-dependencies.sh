@@ -23,7 +23,8 @@ apt install -y \
   g++ \
   libfl-dev \
   libgmp-dev \
-  libjemalloc-dev
+  libjemalloc-dev \
+  zlib1g-dev
 
 if [ "$ENABLE_STATIC" = true ]; then
   apt install -y libc6-dev
