@@ -7,14 +7,97 @@
 #include <tuple>
 #include <utility>
 
-bool nextVarConnect(Node* node);
 bool nameExist(std::string str);
-void changeName(std::string oldName, std::string newName);
+ExpTree* mergeWhenTree(ExpTree* tree1, ExpTree* tree2);
 
 static std::set<Node*> fullyVisited;
 static std::set<Node*> partialVisited;
 
 static std::map<Node*, std::vector<Node*>> splitArrayMap;
+/* Generated members are not inserted into allSignals, so keep a separate
+ * name set to prevent members from different arrays colliding with each
+ * other.  It is reset at the beginning of each graph split pass. */
+static std::set<std::string> splitGeneratedNames;
+
+static std::vector<int> allArrayDims(Node* node) {
+  std::vector<int> dims;
+  for (size_t i = 0; i < node->dimension.size(); ++i) {
+    dims.push_back(static_cast<int>(i));
+  }
+  return dims;
+}
+
+static bool isSplitDim(const std::vector<int>& splitDims, int dim) {
+  return std::find(splitDims.begin(), splitDims.end(), dim) != splitDims.end();
+}
+
+static size_t splitMemberCount(Node* node, const std::vector<int>& splitDims) {
+  size_t count = 1;
+  for (int dim : splitDims) {
+    Assert(dim >= 0 && dim < static_cast<int>(node->dimension.size()),
+           "invalid split dimension %d for %s", dim, node->name.c_str());
+    count *= static_cast<size_t>(node->dimension[dim]);
+  }
+  return count;
+}
+
+static std::vector<int> splitMemberCoords(Node* node, const std::vector<int>& splitDims,
+                                          size_t memberIndex) {
+  std::vector<int> coords(splitDims.size(), 0);
+  for (size_t i = splitDims.size(); i-- > 0;) {
+    const int dim = splitDims[i];
+    coords[i] = static_cast<int>(memberIndex % static_cast<size_t>(node->dimension[dim]));
+    memberIndex /= static_cast<size_t>(node->dimension[dim]);
+  }
+  return coords;
+}
+
+static size_t splitMemberIndex(Node* node, const std::vector<int>& splitDims,
+                               const std::vector<int>& coords) {
+  Assert(splitDims.size() == coords.size(), "split coordinate size mismatch");
+  size_t index = 0;
+  for (size_t i = 0; i < splitDims.size(); ++i) {
+    Assert(coords[i] >= 0 && coords[i] < node->dimension[splitDims[i]],
+           "split coordinate out of bounds for %s", node->name.c_str());
+    index = index * static_cast<size_t>(node->dimension[splitDims[i]]) +
+            static_cast<size_t>(coords[i]);
+  }
+  return index;
+}
+
+static std::string allocateSplitName(const std::string& baseName) {
+  std::string memberName = baseName;
+  if (nameExist(memberName) || splitGeneratedNames.find(memberName) != splitGeneratedNames.end()) {
+    unsigned suffix = 0;
+    do {
+      memberName = baseName + "_" + std::to_string(suffix++);
+    } while (nameExist(memberName) || splitGeneratedNames.find(memberName) != splitGeneratedNames.end());
+  }
+  splitGeneratedNames.insert(memberName);
+  return memberName;
+}
+
+static Node* splitArrayMemberNode(Node* node, const std::vector<int>& splitDims,
+                                  const std::vector<int>& coords) {
+  Assert(splitDims.size() == coords.size(), "split coordinate size mismatch");
+  std::string baseName = node->name;
+  for (int coord : coords) baseName += "_" + std::to_string(coord);
+  std::string memberName = allocateSplitName(baseName);
+
+  Node* member = new Node(node->type);
+  member->name = memberName;
+  member->clock = node->clock;
+  member->reset = node->reset;
+  member->setType(node->width, node->sign);
+  member->constructSuperNode();
+  member->lineno = node->lineno;
+  for (size_t dim = 0; dim < node->dimension.size(); ++dim) {
+    if (!isSplitDim(splitDims, static_cast<int>(dim))) {
+      member->dimension.push_back(node->dimension[dim]);
+    }
+  }
+  return member;
+}
 
 ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index, Node* node) {
   ENode* lvalue = tree->getlval()->dup();
@@ -47,7 +130,12 @@ ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index, Node* node) {
         top_enode->addChild(idxNode);
       }
     } else if (top_enode->opType == OP_GROUP) {
-      ENode* select = top_enode->getChild(groupIdx);
+      ENode* select = nullptr;
+      if (groupIdx >= 0 && groupIdx < static_cast<int>(top_enode->getChildNum())) {
+        select = top_enode->getChild(groupIdx);
+      } else {
+        select = new ENode(OP_INVALID);
+      }
       if (!parent) rvalue = select;
       else parent->setChild(top_idx, select);
       top_enode = select;
@@ -234,23 +322,100 @@ void distributeTree(Node* node, ExpTree* tree, std::vector<Node*>& arrayMember) 
   }
 }
 
-void splitAssignMent(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees) {
-  int range = 1;
-  for (int i = tree->getlval()->getChildNum(); i < (int)node->dimension.size(); i ++) range *= node->dimension[i];
-
-  for (int idx = 0; idx < range; idx ++) {
-    std::vector<int> subIdx(node->dimension.size() - tree->getlval()->getChildNum());
-    int tmp = idx;
-    for (size_t i = node->dimension.size() - 1; i >= tree->getlval()->getChildNum(); i --) {
-      subIdx[i - tree->getlval()->getChildNum()] = tmp % node->dimension[i];
-      tmp /= node->dimension[i];
-    }
-    ExpTree* dupTree = dupTreeWithIdx(tree, subIdx, node);
-    newTrees.push_back(dupTree);
+static ENode* buildSplitSlice(ENode* ref, Node* array, std::vector<Node*>& arrayMember,
+                                const std::vector<int>& splitDims) {
+  const size_t prefix = ref->getChildNum();
+  std::vector<int> omittedSizes;
+  for (size_t dim = prefix; dim < array->dimension.size(); ++dim) {
+    omittedSizes.push_back(array->dimension[dim]);
   }
+  size_t count = 1;
+  for (int size : omittedSizes) {
+    Assert(size > 0, "invalid omitted dimension of %s", array->name.c_str());
+    Assert(count <= SIZE_MAX / static_cast<size_t>(size), "split slice of %s is too large",
+           array->name.c_str());
+    count *= static_cast<size_t>(size);
+  }
+
+  auto leafAt = [&](size_t flat) {
+    std::vector<int> suffix(omittedSizes.size(), 0);
+    size_t value = flat;
+    for (size_t i = omittedSizes.size(); i-- > 0;) {
+      suffix[i] = static_cast<int>(value % static_cast<size_t>(omittedSizes[i]));
+      value /= static_cast<size_t>(omittedSizes[i]);
+    }
+    std::vector<int> splitCoords;
+    splitCoords.reserve(splitDims.size());
+    for (int dim : splitDims) {
+      if (dim < static_cast<int>(prefix)) {
+        ENode* index = ref->getChild(dim);
+        Assert(index && index->opType == OP_INDEX_INT && index->values.size() == 1,
+               "split index of %s is not constant", array->name.c_str());
+        splitCoords.push_back(index->values[0]);
+      } else {
+        splitCoords.push_back(suffix[static_cast<size_t>(dim) - prefix]);
+      }
+    }
+    Node* member = arrayMember[splitMemberIndex(array, splitDims, splitCoords)];
+    ENode* leaf = new ENode(member);
+    leaf->width = member->width;
+    leaf->sign = member->sign;
+    for (size_t dim = 0; dim < array->dimension.size(); ++dim) {
+      if (isSplitDim(splitDims, static_cast<int>(dim))) continue;
+      if (dim < prefix) leaf->addChild(ref->getChild(dim)->dup());
+      else {
+        ENode* index = new ENode(OP_INDEX_INT);
+        index->addVal(suffix[dim - prefix]);
+        leaf->addChild(index);
+      }
+    }
+    return leaf;
+  };
+
+  if (count == 1) return leafAt(0);
+  ENode* group = new ENode(OP_GROUP);
+  group->width = ref->width;
+  group->sign = array->sign;
+  for (size_t flat = 0; flat < count; ++flat) group->addChild(leafAt(flat));
+  return group;
 }
 
-void ExpTree::updateWithSplittedArray(Node* node, Node* array, std::vector<Node*>& arrayMember) {
+static bool constantSplitCoords(ENode* ref, Node* array, const std::vector<int>& splitDims,
+                                 std::vector<int>& coords) {
+  if (!ref || ref->nodePtr != array) return false;
+  Assert(ref->getChildNum() <= array->dimension.size(),
+         "too many indices for array %s", array->name.c_str());
+  coords.clear();
+  coords.reserve(splitDims.size());
+  for (int dim : splitDims) {
+    if (dim >= static_cast<int>(ref->getChildNum())) return false;
+    ENode* index = ref->getChild(dim);
+    if (!index || index->opType != OP_INDEX_INT || index->values.size() != 1) return false;
+    coords.push_back(index->values[0]);
+  }
+  return true;
+}
+
+static bool rewriteFixedSplitReference(ENode* enode, Node* array,
+                                       std::vector<Node*>& arrayMember,
+                                       const std::vector<int>& splitDims) {
+  std::vector<int> coords;
+  if (!constantSplitCoords(enode, array, splitDims, coords)) return false;
+  const size_t memberIndex = splitMemberIndex(array, splitDims, coords);
+  Assert(memberIndex < arrayMember.size(), "split member index out of bounds for %s",
+         array->name.c_str());
+  std::vector<ENode*> remaining;
+  remaining.reserve(enode->getChildNum());
+  for (size_t dim = 0; dim < enode->getChildNum(); ++dim) {
+    if (!isSplitDim(splitDims, static_cast<int>(dim))) remaining.push_back(enode->getChild(dim));
+  }
+  enode->nodePtr = arrayMember[memberIndex];
+  enode->child = std::move(remaining);
+  return true;
+}
+
+void ExpTree::updateWithSplittedArray(Node* node, Node* array, std::vector<Node*>& arrayMember,
+                                      const std::vector<int>& splitDims) {
   std::stack<std::tuple<ENode*, ENode*, int>> s;
   s.push(std::make_tuple(getRoot(), nullptr, 0));
   s.push(std::make_tuple(getlval(), nullptr, -2));
@@ -266,9 +431,31 @@ void ExpTree::updateWithSplittedArray(Node* node, Node* array, std::vector<Node*
       }
       continue;
     }
-    auto range = top_enode->getIdx(top_enode->nodePtr);
-    if (range.first < 0) {
-      if (array->dimension.size() > 1) TODO();
+    if (!splitDims.empty() && rewriteFixedSplitReference(top_enode, array, arrayMember, splitDims)) {
+      /* A partially split array keeps the non-split index expressions. */
+      for (size_t i = 0; i < top_enode->getChildNum(); ++i) {
+        if (top_enode->getChild(i)) s.push(std::make_tuple(top_enode->getChild(i), top_enode, i));
+      }
+      continue;
+    }
+
+    bool splitVariable = false;
+    bool splitOmitted = false;
+    for (int dim : splitDims) {
+      if (dim >= static_cast<int>(top_enode->getChildNum())) {
+        splitOmitted = true;
+        continue;
+      }
+      ENode* index = top_enode->getChild(dim);
+      if (!index || index->opType != OP_INDEX_INT || index->values.size() != 1) splitVariable = true;
+    }
+    if (splitVariable) {
+      /* Preserve the old dynamic-index lowering for a fully split 1-D array. */
+      if (splitDims.size() != array->dimension.size() || array->dimension.size() > 1) {
+        Assert(splitDims.size() != array->dimension.size(),
+               "dynamic index cannot be remapped after splitting %s", array->name.c_str());
+        TODO();
+      }
       ENode* enode = nullptr;
       for (int i = array->arrayEntryNum() - 1; i >= 0; i --) {
         Node* member = arrayMember[i];
@@ -290,27 +477,247 @@ void ExpTree::updateWithSplittedArray(Node* node, Node* array, std::vector<Node*
       }
       if (top_parent) top_parent->setChild(top_idx, enode);
       else setRoot(enode);
-    } else if (range.first == range.second) {
-      top_enode->nodePtr = arrayMember[range.first];
-      top_enode->child.clear();
-    } else {
-      if (top_idx < 0) continue; // lvalue
-      ENode* group = new ENode(OP_GROUP);
-      group->width = top_enode->width;
-      for (int i = range.first; i <= range.second; i ++) {
-        Node* member = arrayMember[i];
-        ENode* enode = new ENode(member);
-        enode->width = member->width;
-        enode->sign = member->sign;
-        group->addChild(enode);
-      }
-      if (top_parent) top_parent->setChild(top_idx, group);
-      else setRoot(group);
+      continue;
+    }
+    if (splitOmitted) {
+      /* Distribution must already have given every split dimension a literal
+       * index.  A remaining bulk reference is a value, so replace it with the
+       * flat slice in the original row-major order. */
+      Assert(top_idx >= 0, "lvalue of %s omits a split dimension", array->name.c_str());
+      ENode* slice = buildSplitSlice(top_enode, array, arrayMember, splitDims);
+      if (top_parent) top_parent->setChild(top_idx, slice);
+      else setRoot(slice);
+      s.push(std::make_tuple(slice, top_parent, top_idx));
+      continue;
+    }
+    Assert(0, "reference to %s was not remapped", array->name.c_str());
+  }
+}
+
+static bool fixedSplitMember(ENode* ref, Node* array, const std::vector<int>& splitDims,
+                             size_t& memberIndex) {
+  std::vector<int> coords;
+  if (!constantSplitCoords(ref, array, splitDims, coords)) return false;
+  memberIndex = splitMemberIndex(array, splitDims, coords);
+  return true;
+}
+
+static bool remainingShapeMatches(ENode* ref, const std::vector<int>& omittedSizes) {
+  if (!ref || !ref->nodePtr || !ref->nodePtr->isArray()) return false;
+  const size_t rank = ref->nodePtr->dimension.size();
+  if (ref->getChildNum() > rank || rank - ref->getChildNum() != omittedSizes.size()) return false;
+  for (size_t i = 0; i < omittedSizes.size(); ++i) {
+    if (ref->nodePtr->dimension[ref->getChildNum() + i] != omittedSizes[i]) return false;
+  }
+  return true;
+}
+
+static void rewriteSuffix(ExpTree* tree, ENode* enode, ENode* parent, int parentIdx,
+                          const std::vector<int>& omittedSizes, const std::vector<int>& suffix,
+                          size_t product, int flat, bool isLvalue) {
+  if (!enode) return;
+  if (enode->opType == OP_GROUP && product != 0 && enode->getChildNum() == product) {
+    ENode* selected = nullptr;
+    if (flat >= 0 && flat < static_cast<int>(enode->getChildNum())) selected = enode->getChild(flat);
+    else selected = new ENode(OP_INVALID);
+    if (parent) parent->setChild(parentIdx, selected);
+    else if (isLvalue) tree->setlval(selected);
+    else tree->setRoot(selected);
+    rewriteSuffix(tree, selected, parent, parentIdx, omittedSizes, suffix, product, flat, isLvalue);
+    return;
+  }
+  const size_t childCount = enode->getChildNum();
+  for (size_t i = 0; i < childCount; ++i) {
+    if (enode->getChild(i)) {
+      rewriteSuffix(tree, enode->getChild(i), enode, static_cast<int>(i),
+                    omittedSizes, suffix, product, flat, false);
+    }
+  }
+  if (remainingShapeMatches(enode, omittedSizes)) {
+    for (int coord : suffix) {
+      ENode* index = new ENode(OP_INDEX_INT);
+      index->addVal(coord);
+      enode->addChild(index);
     }
   }
 }
 
+static ExpTree* dupTreeWithSuffix(ExpTree* tree, const std::vector<int>& omittedSizes,
+                                  const std::vector<int>& suffix) {
+  ExpTree* copy = tree->dup();
+  size_t product = 1;
+  int flat = 0;
+  for (size_t i = 0; i < omittedSizes.size(); ++i) {
+    product *= static_cast<size_t>(omittedSizes[i]);
+    flat = flat * omittedSizes[i] + suffix[i];
+  }
+  rewriteSuffix(copy, copy->getlval(), nullptr, -1, omittedSizes, suffix, product, flat, true);
+  rewriteSuffix(copy, copy->getRoot(), nullptr, -1, omittedSizes, suffix, product, flat, false);
+  return copy;
+}
+
+static void placeMemberTree(Node* member, ExpTree* tree, Node* oldArray) {
+  if (member->assignTree.empty()) {
+    member->assignTree.push_back(tree);
+    return;
+  }
+  /* Variable indices do not identify one element, so keep those trees apart.
+   * Only identical constant ranges can share the existing when-merge. */
+  int begin, end, previousBegin, previousEnd;
+  std::tie(begin, end) = tree->getlval()->getIdx(oldArray);
+  std::tie(previousBegin, previousEnd) = member->assignTree.back()->getlval()->getIdx(oldArray);
+  if (begin >= 0 && begin == previousBegin && end == previousEnd) {
+    ExpTree* replaceTree = mergeWhenTree(member->assignTree.back(), tree);
+    if (replaceTree) {
+      member->assignTree.back() = replaceTree;
+      return;
+    }
+  }
+  member->assignTree.push_back(tree);
+}
+
+static ENode* buildArraySlice(Node* source, const std::vector<int>& splitDims,
+                              const std::vector<int>& coords) {
+  std::vector<int> keptDims;
+  size_t keptCount = 1;
+  for (size_t dim = 0; dim < source->dimension.size(); ++dim) {
+    if (!isSplitDim(splitDims, static_cast<int>(dim))) {
+      keptDims.push_back(static_cast<int>(dim));
+      keptCount *= static_cast<size_t>(source->dimension[dim]);
+    }
+  }
+  ENode* group = new ENode(OP_GROUP);
+  group->width = source->width;
+  group->sign = source->sign;
+  for (size_t flat = 0; flat < keptCount; ++flat) {
+    std::vector<int> fullCoords(source->dimension.size(), 0);
+    for (size_t i = 0; i < splitDims.size(); ++i) fullCoords[splitDims[i]] = coords[i];
+    size_t value = flat;
+    for (size_t i = keptDims.size(); i-- > 0;) {
+      const int dim = keptDims[i];
+      fullCoords[dim] = static_cast<int>(value % static_cast<size_t>(source->dimension[dim]));
+      value /= static_cast<size_t>(source->dimension[dim]);
+    }
+    ENode* leaf = new ENode(source);
+    leaf->width = source->width;
+    leaf->sign = source->sign;
+    for (int coord : fullCoords) {
+      ENode* index = new ENode(OP_INDEX_INT);
+      index->addVal(coord);
+      leaf->addChild(index);
+    }
+    group->addChild(leaf);
+  }
+  return group;
+}
+
+static bool isWholeRegisterUpdate(Node* node, ExpTree* tree) {
+  return node->type == NODE_REG_SRC && node->getDst() != nullptr &&
+         tree->getlval() && tree->getlval()->nodePtr == node &&
+         tree->getlval()->getChildNum() == 0 && tree->getRoot() &&
+         tree->getRoot()->nodePtr == node->getDst() &&
+         tree->getRoot()->getChildNum() == 0;
+}
+
+static ExpTree* duplicateRegisterUpdateForMember(Node* node, ExpTree* tree, Node* member,
+                                                  const std::vector<int>& splitDims,
+                                                  const std::vector<int>& coords) {
+  ExpTree* copy = tree->dup();
+  copy->getlval()->nodePtr = member;
+  copy->getlval()->child.clear();
+  /* A register source has exactly one update tree, even when kept dimensions
+   * remain.  Element trees would make constant analysis reject the register. */
+  copy->setRoot(buildArraySlice(node->getDst(), splitDims, coords));
+  return copy;
+}
+
+static void distributePartiallySplitTree(Node* node, ExpTree* tree,
+                                          std::vector<Node*>& arrayMember,
+                                          const std::vector<int>& splitDims) {
+  if (isWholeRegisterUpdate(node, tree)) {
+    for (size_t i = 0; i < arrayMember.size(); ++i) {
+      placeMemberTree(arrayMember[i], duplicateRegisterUpdateForMember(
+          node, tree, arrayMember[i], splitDims, splitMemberCoords(node, splitDims, i)), node);
+    }
+    return;
+  }
+  size_t memberIndex = 0;
+  if (fixedSplitMember(tree->getlval(), node, splitDims, memberIndex)) {
+    Assert(memberIndex < arrayMember.size(), "split member index out of bounds for %s",
+           node->name.c_str());
+    placeMemberTree(arrayMember[memberIndex], tree, node);
+    return;
+  }
+
+  ENode* lvalue = tree->getlval();
+  Assert(lvalue && lvalue->nodePtr == node,
+         "assignment to %s does not fix every split dimension", node->name.c_str());
+  const size_t prefix = lvalue->getChildNum();
+  Assert(prefix < node->dimension.size(),
+         "assignment to %s does not fix every split dimension", node->name.c_str());
+  std::vector<int> omittedSizes;
+  bool omitsSplit = false;
+  for (size_t dim = prefix; dim < node->dimension.size(); ++dim) {
+    omittedSizes.push_back(node->dimension[dim]);
+    if (isSplitDim(splitDims, static_cast<int>(dim))) omitsSplit = true;
+  }
+  Assert(omitsSplit, "assignment to %s does not fix every split dimension", node->name.c_str());
+
+  size_t count = 1;
+  for (int size : omittedSizes) {
+    Assert(size > 0 && count <= SIZE_MAX / static_cast<size_t>(size),
+           "assignment slice of %s is too large", node->name.c_str());
+    count *= static_cast<size_t>(size);
+  }
+  for (size_t flat = 0; flat < count; ++flat) {
+    std::vector<int> suffix(omittedSizes.size(), 0);
+    size_t value = flat;
+    for (size_t i = omittedSizes.size(); i-- > 0;) {
+      suffix[i] = static_cast<int>(value % static_cast<size_t>(omittedSizes[i]));
+      value /= static_cast<size_t>(omittedSizes[i]);
+    }
+    ExpTree* copy = dupTreeWithSuffix(tree, omittedSizes, suffix);
+    Assert(fixedSplitMember(copy->getlval(), node, splitDims, memberIndex),
+           "expanded assignment to %s does not fix every split dimension", node->name.c_str());
+    placeMemberTree(arrayMember[memberIndex], copy, node);
+  }
+}
+
+static ExpTree* duplicateResetForMember(ExpTree* resetTree, Node* oldNode, Node* member,
+                                        const std::vector<int>& splitDims,
+                                        const std::vector<int>& coords) {
+  ExpTree* copy = resetTree->dup();
+  Assert(copy->getlval() && copy->getlval()->nodePtr == oldNode,
+         "reset lvalue does not refer to %s", oldNode->name.c_str());
+  copy->getlval()->nodePtr = member;
+  copy->getlval()->child.clear();
+  if (copy->getRoot()->opType == OP_RESET && copy->getRoot()->getChildNum() >= 2) {
+    ENode* value = copy->getRoot()->getChild(1);
+    bool sameShape = value && value->nodePtr &&
+                     value->nodePtr->dimension.size() == oldNode->dimension.size();
+    if (sameShape) {
+      for (size_t dim = 0; dim < oldNode->dimension.size(); ++dim) {
+        if (value->nodePtr->dimension[dim] != oldNode->dimension[dim]) {
+          sameShape = false;
+          break;
+        }
+      }
+    }
+    if (value && value->nodePtr && value->nodePtr->isArray() &&
+        value->getChildNum() == 0 && sameShape) {
+      copy->getRoot()->setChild(1, buildArraySlice(value->nodePtr, splitDims, coords));
+    }
+  }
+  return copy;
+}
+
 void graph::splitArrayNode(Node* node) {
+  splitArrayNode(node, allArrayDims(node));
+}
+
+void graph::splitArrayNode(Node* node, const std::vector<int>& splitDims) {
+  Assert(!splitDims.empty(), "no dimensions selected for array %s", node->name.c_str());
+  Assert(node->isArray(), "%s is not array", node->name.c_str());
   node->status = DEAD_NODE;
   /* remove prev connection */
   for (Node* prev : node->depPrev) prev->eraseNext(node);
@@ -323,27 +730,30 @@ void graph::splitArrayNode(Node* node) {
     if (memberInSuper != node)
       memberInSuper->constructSuperConnect();
   }
-  /* create new node */
-  int entryNum = node->arrayEntryNum();
+  /* create one node for every combination of selected dimensions */
+  const size_t memberNum = splitMemberCount(node, splitDims);
   std::vector<Node*> arrayMember;
-  for (int i = 0; i < entryNum; i ++) {
-    arrayMember.push_back(node->arrayMemberNode(i));
+  arrayMember.reserve(memberNum);
+  for (size_t i = 0; i < memberNum; ++i) {
+    arrayMember.push_back(splitArrayMemberNode(node, splitDims,
+                                               splitMemberCoords(node, splitDims, i)));
   }
   splitArrayMap[node] = arrayMember;
   /* distribute arrayVal */
-  for (ExpTree* tree : node->assignTree) distributeTree(node, tree, arrayMember);
+  const bool fullySplit = splitDims.size() == node->dimension.size();
+  for (ExpTree* tree : node->assignTree) {
+    if (fullySplit) distributeTree(node, tree, arrayMember);
+    else distributePartiallySplitTree(node, tree, arrayMember, splitDims);
+  }
   if (node->resetTree) {
-    for (size_t idx = 0; idx < node->arrayEntryNum(); idx ++) {
-      /* compute index for all array operands in tree */
-      std::vector<int> subIdx(node->dimension.size());
-      int tmp = idx;
-      for (int i = node->dimension.size() - 1; i >= 0; i --) {
-        subIdx[i] = tmp % node->dimension[i];
-        tmp /= node->dimension[i];
-      }
-      if (node->resetTree) {
-        ExpTree* newTree = dupTreeWithIdx(node->resetTree, subIdx, node);
-        arrayMember[idx]->resetTree = newTree;
+    for (size_t idx = 0; idx < memberNum; ++idx) {
+      if (fullySplit) {
+        std::vector<int> subIdx = splitMemberCoords(node, splitDims, idx);
+        arrayMember[idx]->resetTree = dupTreeWithIdx(node->resetTree, subIdx, node);
+      } else {
+        arrayMember[idx]->resetTree = duplicateResetForMember(
+            node->resetTree, node, arrayMember[idx], splitDims,
+            splitMemberCoords(node, splitDims, idx));
       }
     }
   }
@@ -364,8 +774,12 @@ void graph::splitArrayNode(Node* node) {
     if (next != node) next->erasePrev(node);
   }
   for (Node* n : checkNodes) {
-    for (ExpTree* tree : n->assignTree) tree->updateWithSplittedArray(n, node, arrayMember);
-    if (n->resetTree) n->resetTree->updateWithSplittedArray(n, node, arrayMember);
+    for (ExpTree* tree : n->assignTree) {
+      tree->updateWithSplittedArray(n, node, arrayMember, splitDims);
+    }
+    if (n->resetTree) {
+      n->resetTree->updateWithSplittedArray(n, node, arrayMember, splitDims);
+    }
   }
 
   for (Node* n : checkNodes) {
@@ -386,6 +800,7 @@ void graph::splitArray() {
   std::map<Node*, int> times;
   std::stack<Node*> s;
   int num = 0;
+  splitGeneratedNames.clear();
 
   for (SuperNode* super : supersrc) {
     for (Node* node : super->member) {
@@ -451,42 +866,7 @@ void graph::splitArray() {
   );
 }
 
-Node* Node::arrayMemberNode(int idx) {
-  Assert(isArray(), "%s is not array", name.c_str());
-  std::vector<int>index(dimension);
-  int dividend = dimension.back();
-  int divisor = idx;
-
-  for (int i = (int)dimension.size() - 1; i >= 0; i --) {
-    dividend = dimension[i];
-    index[i] = divisor % dividend;
-    divisor = divisor / dividend;
-  }
-  std::string memberName = name;
-  size_t i;
-  for (i = 0; i < index.size(); i ++) {
-    memberName += "_" + std::to_string(index[i]);
-  }
-
-  if (nameExist(memberName)) {
-    std::string newName = memberName + "_0";
-    Assert(!nameExist(newName), "%s already exist", newName.c_str());
-    changeName(memberName, newName);
-  }
-
-  Node* member = new Node(type);
-  member->name = memberName;
-  member->clock = clock;
-  member->reset = reset;
-  member->setType(width, sign);
-  member->constructSuperNode();
-  member->lineno = lineno;
-  for ( ; i < dimension.size(); i ++) member->dimension.push_back(dimension[i]);
-
-  return member;
-}
-
-bool nextVarConnect(Node* node) {
+static bool nextVarConnect(Node* node) {
   for (Node* next : node->next) {
     std::stack<std::pair<ENode*, bool>> s;
     for (ExpTree* tree : next->assignTree) {
@@ -510,6 +890,7 @@ bool nextVarConnect(Node* node) {
   }
   return false;
 }
+
 static std::map<Node*, bool> arraySplitMap;
 
 void graph::checkNodeSplit(Node* node) {
@@ -541,7 +922,143 @@ void graph::checkNodeSplit(Node* node) {
   }
 }
 
-/* splitted separately assigned, no variable index acceesing arrays */
+struct DimAccess {
+  std::vector<bool> variable;
+  std::vector<bool> explicitConstant;
+};
+
+static void noteArrayAccess(ENode* enode, std::map<Node*, DimAccess>& accesses) {
+  if (!enode) return;
+  if (enode->nodePtr && enode->nodePtr->isArray()) {
+    Node* array = enode->nodePtr;
+    DimAccess& info = accesses[array];
+    if (info.variable.size() != array->dimension.size()) {
+      info.variable.assign(array->dimension.size(), false);
+      info.explicitConstant.assign(array->dimension.size(), false);
+    }
+    Assert(enode->getChildNum() <= array->dimension.size(),
+           "too many indices for array %s", array->name.c_str());
+    /* A missing suffix is a bulk slice, not a variable index.  Only an
+     * explicit non-literal index blocks that dimension. */
+    for (size_t dim = 0; dim < enode->getChildNum(); ++dim) {
+      ENode* index = enode->getChild(dim);
+      if (index && index->opType == OP_INDEX_INT && index->values.size() == 1) {
+        info.explicitConstant[dim] = true;
+      } else {
+        info.variable[dim] = true;
+      }
+    }
+  }
+  for (ENode* child : enode->child) {
+    if (child) noteArrayAccess(child, accesses);
+  }
+}
+
+static void absorbAccess(DimAccess& merged, Node* node, const std::map<Node*, DimAccess>& accesses) {
+  auto found = accesses.find(node);
+  if (found == accesses.end()) return;
+  for (size_t dim = 0; dim < merged.variable.size() && dim < found->second.variable.size(); ++dim) {
+    merged.variable[dim] = merged.variable[dim] || found->second.variable[dim];
+    merged.explicitConstant[dim] = merged.explicitConstant[dim] || found->second.explicitConstant[dim];
+  }
+}
+
+/* Dimensions that are indexed somewhere, and only ever with a literal.
+ * Bulk slices do not block the dimension; they are rewritten while splitting. */
+static std::vector<int> constantAxisDims(Node* node, const std::map<Node*, DimAccess>& accesses) {
+  DimAccess merged;
+  merged.variable.assign(node->dimension.size(), false);
+  merged.explicitConstant.assign(node->dimension.size(), false);
+  absorbAccess(merged, node, accesses);
+  if (node->type == NODE_REG_SRC && node->getDst()) absorbAccess(merged, node->getDst(), accesses);
+
+  std::vector<int> splitDims;
+  for (size_t dim = 0; dim < node->dimension.size(); ++dim) {
+    if (node->dimension[dim] > 1 && merged.explicitConstant[dim] && !merged.variable[dim]) {
+      splitDims.push_back(static_cast<int>(dim));
+    }
+  }
+  return splitDims;
+}
+
+static std::vector<Node*> liveSplitNodes() {
+  std::set<Node*> seen;
+  std::vector<Node*> nodes;
+  auto add = [&](Node* node) {
+    if (!node || node->status == DEAD_NODE || !seen.insert(node).second) return;
+    nodes.push_back(node);
+  };
+  for (Node* node : fullyVisited) add(node);
+  for (const auto& entry : splitArrayMap) {
+    for (Node* member : entry.second) add(member);
+  }
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    Node* node = nodes[i];
+    for (Node* next : node->next) add(next);
+    for (Node* next : node->depNext) add(next);
+    for (Node* prev : node->prev) add(prev);
+    if (node->type == NODE_REG_SRC || node->type == NODE_REG_DST) add(node->getBindReg());
+  }
+  return nodes;
+}
+
+void graph::splitConstantAxes() {
+  std::map<Node*, DimAccess> accesses;
+  std::vector<Node*> nodes = liveSplitNodes();
+  for (Node* owner : nodes) {
+    for (ExpTree* tree : owner->assignTree) {
+      if (tree->getRoot()) noteArrayAccess(tree->getRoot(), accesses);
+      if (tree->getlval()) noteArrayAccess(tree->getlval(), accesses);
+    }
+    if (owner->resetTree) {
+      if (owner->resetTree->getRoot()) noteArrayAccess(owner->resetTree->getRoot(), accesses);
+      if (owner->resetTree->getlval()) noteArrayAccess(owner->resetTree->getlval(), accesses);
+    }
+  }
+
+  std::vector<std::pair<Node*, std::vector<int>>> selected;
+  for (Node* node : nodes) {
+    if (splitArrayMap.find(node) != splitArrayMap.end()) continue;
+    if (!node->isArray() || node->status == DEAD_NODE) continue;
+    if ((node->type != NODE_OTHERS && node->type != NODE_REG_SRC) || node->arrayEntryNum() <= 1) continue;
+    std::vector<int> splitDims = constantAxisDims(node, accesses);
+    if (splitDims.empty()) continue;
+    selected.push_back(std::make_pair(node, splitDims));
+  }
+#ifdef ORDERED_TOPO_SORT
+  std::sort(selected.begin(), selected.end(), [](const auto& a, const auto& b) {
+    return a.first->id < b.first->id;
+  });
+#endif
+  for (const auto& item : selected) {
+    item.first->status = DEAD_NODE;
+    if (item.first->type == NODE_REG_SRC) item.first->getDst()->status = DEAD_NODE;
+  }
+  regsrc.erase(
+    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
+        regsrc.end()
+  );
+  int num = 0;
+  for (const auto& item : selected) {
+    Node* arrayNode = item.first;
+    splitArrayNode(arrayNode, item.second);
+    if (arrayNode->type == NODE_REG_SRC) {
+      splitArrayNode(arrayNode->getDst(), item.second);
+      Assert(splitArrayMap[arrayNode].size() == splitArrayMap[arrayNode->getDst()].size(),
+             "%p %s member not match", arrayNode, arrayNode->name.c_str());
+      for (size_t i = 0; i < splitArrayMap[arrayNode].size(); i ++) {
+        regsrc.push_back(splitArrayMap[arrayNode][i]);
+        splitArrayMap[arrayNode][i]->bindReg(splitArrayMap[arrayNode->getDst()][i]);
+        splitArrayMap[arrayNode][i]->updateDep();
+      }
+    }
+    num ++;
+  }
+  printf("[splitConstantAxis] split %d arrays\n", num);
+}
+
+/* Fully split arrays with no variable index, then split any remaining
+ * dimension that is only ever indexed by a literal. */
 void graph::splitOptionalArray() {
   int num = 0;
   for (Node* node : fullyVisited) {
@@ -576,4 +1093,5 @@ void graph::splitOptionalArray() {
     num ++;
   }
   printf("[splitOptionalArray] split %d arrays\n", num);
+  splitConstantAxes();
 }

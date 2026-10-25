@@ -68,8 +68,10 @@ class graph {
   void mergeIn1();
   void mergeSublings();
   void splitArrayNode(Node* node);
+  void splitArrayNode(Node* node, const std::vector<int>& splitDims);
   void checkNodeSplit(Node* node);
   void splitOptionalArray();
+  void splitConstantAxes();
   void constantMemory();
   void orderAllNodes();
   void genDiffSig(FILE* fp, Node* node);

@@ -290,7 +290,6 @@ class Node {
   void recomputeConstant();
   void passWidthToPrev();
   void splitArray();
-  Node* arrayMemberNode(int idx);
   ENode* isAlias();
   bool anyExtEdge();
   bool needActivate();

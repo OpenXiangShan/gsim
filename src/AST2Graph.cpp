@@ -1705,13 +1705,6 @@ bool nameExist(std::string str) {
   return allSignals.find(str) != allSignals.end();
 }
 
-void changeName(std::string oldName, std::string newName) {
-  Assert(allSignals.find(oldName) != allSignals.end(), "signal %s not found", oldName.c_str());
-  allSignals[oldName]->name = newName;
-  allSignals[newName] = allSignals[oldName];
-  allSignals.erase(oldName);
-}
-
 void writer2Reg(ExpTree* tree) {
   std::stack<std::tuple<ENode*, ENode*, int>>s;
   s.push(std::make_tuple(tree->getRoot(), nullptr, 0));
