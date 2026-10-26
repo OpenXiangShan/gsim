@@ -279,7 +279,14 @@ static void close_program() {
 }
 
 #ifdef GSIM
-void dut_cycle(int n) { while (n --) dut->step(); }
+void dut_cycle(int n) {
+  while (n --){
+    dut->step();
+#ifdef GSIM_TRACE_FST
+    dut->dump();
+#endif
+  }
+}
 void dut_reset() { dut->set_reset(1); dut_cycle(10); dut->set_reset(0); }
 #endif
 #ifdef VERILATOR
