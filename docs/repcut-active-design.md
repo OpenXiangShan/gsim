@@ -180,12 +180,23 @@ hyperedge 被切开 = 该纯组合 cluster 需要复制
 
 ### 5.2 顶点和超边权重
 
-普通 cluster 的权重使用 `mtStructuralNodeCost(node)` 累加。它是基于 FIRRTL 节点、
-表达式类型和位宽的结构成本，不是实测 CPU 时间。
+普通 cluster 的权重使用 `repCutActiveBodyCost(node)` 累加，不用 dense 划分的
+`mtStructuralNodeCost`。每个节点的静态代价是：
 
-如果一个 cluster 只连接一个 sink group，它的成本全部加入该顶点；如果连接多个
-sink group，成本按端点数均摊到各顶点，同时作为 hyperedge weight 保留。划分器目标
-是同时平衡顶点权并降低：
+```text
+words = max(1, ceil(width / 64))
+fan   = 会被这个节点置上 active 位的后继个数
+C     = words + fan + 0.5 × 普通运算 + 乘法数 × words + 2 × 除法数 × words
+```
+
+不计入未命中的 active guard，乘除也不再按字数平方计价。这是生成前就能从位宽、
+后继和运算种类得到的量，不读取 workload。
+
+只连一个 sink group 的 cluster 把整份 `C` 加到该顶点，再加
+`GSIM_REPCUT_STATE_WEIGHT × state_cost`。连多个 sink group 的 cluster 不再摊进
+顶点，整份 `C` 只作为 hyperedge 权重。KaHyPar 用顶点权降低 km1。切开会让每个
+留下该锥的分区都再付一份 `C`，所以随后把最重分区上的汇点组迁到当前最轻分区，
+直到 `(max - mean) / mean ≤ 0.03`。单个顶点已经超过这个上限就不再拆。目标是降低：
 
 ```text
 km1 = Σ (number_of_blocks(hyperedge) - 1) × hyperedge_weight
@@ -228,7 +239,7 @@ GSIM_REPCUT_STATE_WEIGHT=0    # 仅使用旧 structural weight
 
 | 字段 | 含义 |
 | --- | --- |
-| `structural_cost` | 该 worker 的组合节点和复制节点结构成本 |
+| `structural_cost` | 该 worker 原有节点和复制节点的 active-body 代价 |
 | `state_cost` | 跟随该 worker 的寄存器提交静态成本 |
 | `combined_cost` | `structural_cost + state_weight × state_cost` |
 | `regdst_count` | 该 worker 的寄存器数量 |

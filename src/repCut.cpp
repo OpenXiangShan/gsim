@@ -64,9 +64,8 @@ double repCutStateWeightScale() {
 double repCutStateCost(const Node* reg) {
   const int width = reg->width > 0 ? reg->width : 1;
   const double words = std::max(1, (width + 63) / 64);
-  // The fixed term prices the active guard / old-value compare / assignment;
-  // the word term prices wider state writes.  Fanout and dynamic activity are
-  // workload-dependent and are intentionally left to profile-guided tuning.
+  // Fixed term: compare and write the register. Word term: wider state.
+  // Combinational fanout is priced on the eval node, not here.
   return 16.0 + 4.0 * words;
 }
 
@@ -108,6 +107,51 @@ void walkAssign(Node* node, Fn&& fn) {
     walkEnode(tree->getRoot(), fn);
     walkEnode(tree->getlval(), fn);
   }
+}
+
+// Static active-body cost. Guard checks are not included: an untaken active
+// test does not show up in cycle time. Multiplication and division grow with
+// word count, not word count squared. Fanout counts successors whose active
+// bit this node can set, which is known before any workload runs.
+double repCutActiveBodyCost(Node* node) {
+  const int width = node->width > 0 ? node->width : 1;
+  const double words = std::max(1, (width + 63) / 64);
+  double simple = 0;
+  double muls = 0;
+  double divs = 0;
+  walkAssign(node, [&](ENode* enode) {
+    if (enode->nodePtr != nullptr) return;
+    switch (enode->opType) {
+      case OP_EMPTY: case OP_INT: case OP_INVALID:
+      case OP_ASUINT: case OP_ASSINT: case OP_ASCLOCK: case OP_ASASYNCRESET:
+      case OP_INDEX_INT:
+      case OP_WHEN: case OP_RESET:
+        break;
+      case OP_MUL:
+        muls += 1;
+        break;
+      case OP_DIV: case OP_REM:
+        divs += 1;
+        break;
+      default:
+        simple += 1;
+        break;
+    }
+  });
+  int fan = 0;
+  for (Node* succ : node->next) {
+    if (succ != nullptr && succ->status == VALID_NODE) ++fan;
+  }
+  if (node->type == NODE_REG_DST) {
+    Node* src = node->getSrc();
+    if (src != nullptr && src->status == VALID_NODE) ++fan;
+  }
+  if ((node->type == NODE_WRITER || node->type == NODE_READWRITER) && node->parent != nullptr) {
+    for (Node* port : node->parent->member) {
+      if (port != nullptr && port->type == NODE_READER && port->status == VALID_NODE) ++fan;
+    }
+  }
+  return std::max(1.0, words + static_cast<double>(fan) + 0.5 * simple + muls * words + 2.0 * divs * words);
 }
 
 void retargetTree(ExpTree* tree, int part,
@@ -671,7 +715,7 @@ void graph::repCutSplit() {
   }
 
   struct Cluster {
-    int64_t eta = 0;
+    double eta = 0;
     bool anchored = false;
     const char* name = "";
   };
@@ -681,7 +725,7 @@ void graph::repCutSplit() {
     const int head = coneHead[index.at(node)];
     if (head == 0) continue;
     Cluster& cluster = clusters[head];
-    cluster.eta += mtStructuralNodeCost(node);
+    cluster.eta += repCutActiveBodyCost(node);
     if (!replicable(node)) {
       cluster.anchored = true;
       cluster.name = node->name.c_str();
@@ -714,6 +758,7 @@ void graph::repCutSplit() {
   std::vector<double> vertexWeight(groupCount, 0);
   std::vector<std::vector<int>> hedges;
   std::vector<double> hedgeWeight;
+  std::vector<std::vector<int>> incident(groupCount);
   for (const auto& entry : clusters) {
     std::vector<int> pins;
     for (int cursor = entry.first; cursor != 0; cursor = cons[cursor].tail) {
@@ -723,17 +768,18 @@ void graph::repCutSplit() {
     pins.erase(std::unique(pins.begin(), pins.end()), pins.end());
     Assert(!entry.second.anchored || pins.size() <= 1,
            "RepCut resource group failed to keep %s together", entry.second.name);
-    if (pins.size() <= 1) {
-      if (pins.size() == 1) vertexWeight[pins[0]] += entry.second.eta;
+    if (pins.empty() || entry.second.eta <= 0) continue;
+    if (pins.size() == 1) {
+      vertexWeight[pins[0]] += entry.second.eta;
       continue;
     }
-    const double share = static_cast<double>(entry.second.eta) / pins.size();
-    for (int pin : pins) vertexWeight[pin] += share;
-    if (entry.second.eta <= 0) continue;
+    const int edge = static_cast<int>(hedges.size());
+    for (int pin : pins) incident[pin].push_back(edge);
     hedges.push_back(std::move(pins));
-    hedgeWeight.push_back(static_cast<double>(entry.second.eta));
+    hedgeWeight.push_back(entry.second.eta);
   }
   const double stateWeightScale = repCutStateWeightScale();
+  const double totalGroupStateCost = std::accumulate(groupStateCost.begin(), groupStateCost.end(), 0.0);
   for (int group = 0; group < groupCount; ++group) {
     vertexWeight[group] += stateWeightScale * groupStateCost[group];
   }
@@ -747,20 +793,87 @@ void graph::repCutSplit() {
   } else {
     assigned = partitionKm1(vertexWeight, hedges, hedgeWeight, threads);
   }
-  double km1 = 0;
-  std::vector<double> blockWeight(threads, 0);
-  for (int group = 0; group < groupCount; ++group) blockWeight[assigned[group]] += vertexWeight[group];
-  for (size_t edge = 0; edge < hedges.size(); ++edge) {
-    uint64_t blocks = 0;
-    for (int pin : hedges[edge]) blocks |= uint64_t{1} << assigned[pin];
-    km1 += (__builtin_popcountll(blocks) - 1) * hedgeWeight[edge];
+
+  // Vertex weight is exclusive cones plus state. A cut shared cone is paid in
+  // full by every block that keeps a pin; move groups until that cost is balanced.
+  auto realizedLoad = [&](const std::vector<int>& part) {
+    std::vector<double> load(threads, 0);
+    for (int group = 0; group < groupCount; ++group) load[part[group]] += vertexWeight[group];
+    for (size_t edge = 0; edge < hedges.size(); ++edge) {
+      uint64_t blocks = 0;
+      for (int pin : hedges[edge]) blocks |= uint64_t{1} << part[pin];
+      for (int block = 0; block < threads; ++block) {
+        if (blocks & (uint64_t{1} << block)) load[block] += hedgeWeight[edge];
+      }
+    }
+    return load;
+  };
+  auto peakIfMoved = [&](const std::vector<double>& load, int group, int heavy, int to) {
+    double nextHeavy = load[heavy] - vertexWeight[group];
+    double nextTo = load[to] + vertexWeight[group];
+    for (int edge : incident[group]) {
+      uint64_t before = 0;
+      uint64_t after = 0;
+      for (int pin : hedges[edge]) {
+        before |= uint64_t{1} << assigned[pin];
+        after |= uint64_t{1} << (pin == group ? to : assigned[pin]);
+      }
+      if ((before & (uint64_t{1} << heavy)) && !(after & (uint64_t{1} << heavy))) nextHeavy -= hedgeWeight[edge];
+      if (!(before & (uint64_t{1} << to)) && (after & (uint64_t{1} << to))) nextTo += hedgeWeight[edge];
+    }
+    double nextMax = std::max(nextHeavy, nextTo);
+    for (int block = 0; block < threads; ++block) {
+      if (block != heavy && block != to) nextMax = std::max(nextMax, load[block]);
+    }
+    return nextMax;
+  };
+  std::vector<double> realized = realizedLoad(assigned);
+  int moves = 0;
+  for (; moves < 4096; ++moves) {
+    const double total = std::accumulate(realized.begin(), realized.end(), 0.0);
+    const double mean = threads > 0 ? total / threads : 0;
+    if (threads <= 1 || mean <= 0) break;
+    int heavy = 0;
+    for (int block = 1; block < threads; ++block) {
+      if (realized[block] > realized[heavy]) heavy = block;
+    }
+    if ((realized[heavy] - mean) / mean <= 0.03) break;
+    int light = heavy == 0 ? 1 : 0;
+    for (int block = 0; block < threads; ++block) {
+      if (block != heavy && realized[block] < realized[light]) light = block;
+    }
+    int best = -1;
+    double bestMax = realized[heavy];
+    for (int group = 0; group < groupCount; ++group) {
+      if (assigned[group] != heavy) continue;
+      const double nextMax = peakIfMoved(realized, group, heavy, light);
+      if (nextMax + 1e-6 < bestMax) {
+        bestMax = nextMax;
+        best = group;
+      }
+    }
+    if (best < 0) break;
+    assigned[best] = light;
+    realized = realizedLoad(assigned);
   }
-  const double average = threads > 0 ? std::accumulate(blockWeight.begin(), blockWeight.end(), 0.0) / threads : 0;
-  const double heaviest = blockWeight.empty() ? 0 : *std::max_element(blockWeight.begin(), blockWeight.end());
-  double totalGroupStateCost = std::accumulate(groupStateCost.begin(), groupStateCost.end(), 0.0);
-  fprintf(stderr, "[repcut] intersection vertices=%d hyperedges=%zu solver=%s km1=%.0f balance=%.3f state_weight=%.3f state_cost=%.0f unassigned_state=%zu\n",
-          groupCount, hedges.size(), solver, km1, average > 0 ? (heaviest - average) / average : 0,
-          stateWeightScale, totalGroupStateCost, stateCostUnassigned);
+  {
+    const double total = std::accumulate(realized.begin(), realized.end(), 0.0);
+    const double mean = threads > 0 ? total / threads : 0;
+    const double heaviest = realized.empty() ? 0 : *std::max_element(realized.begin(), realized.end());
+    int unsplittable = 0;
+    for (int group = 0; group < groupCount; ++group) {
+      if (mean > 0 && vertexWeight[group] > mean * 1.03) ++unsplittable;
+    }
+    double km1 = 0;
+    for (size_t edge = 0; edge < hedges.size(); ++edge) {
+      uint64_t blocks = 0;
+      for (int pin : hedges[edge]) blocks |= uint64_t{1} << assigned[pin];
+      km1 += (__builtin_popcountll(blocks) - 1) * hedgeWeight[edge];
+    }
+    fprintf(stderr, "[repcut] intersection vertices=%d hyperedges=%zu solver=%s km1=%.0f balance=%.3f moves=%d unsplittable=%d state_weight=%.3f state_cost=%.0f unassigned_state=%zu\n",
+            groupCount, hedges.size(), solver, km1, mean > 0 ? (heaviest - mean) / mean : 0, moves,
+            unsplittable, stateWeightScale, totalGroupStateCost, stateCostUnassigned);
+  }
 
   std::vector<std::vector<Node*>> roots(threads);
   for (int group = 0; group < groupCount; ++group) {
@@ -807,7 +920,7 @@ void graph::repCutSplit() {
     Assert(replicable(n) || __builtin_popcountll(parts)==1,
            "RepCut resource group failed to keep %s together",n->name.c_str());
     const int canonical = __builtin_ctzll(parts);
-    n->rcPart = canonical; ++originalCount[canonical]; work[canonical] += mtStructuralNodeCost(n);
+    n->rcPart = canonical; ++originalCount[canonical]; work[canonical] += repCutActiveBodyCost(n);
     if (__builtin_popcountll(parts) == 1) continue;
     version[n][canonical] = n;
     for (int part = canonical+1; part < threads; ++part) if (parts&(uint64_t{1}<<part)) {
@@ -816,7 +929,7 @@ void graph::repCutSplit() {
       copy->usedBit = n->usedBit;
       for (ExpTree* tree : n->assignTree) copy->assignTree.push_back(tree->dup());
       copy->constructSuperNode(); sortedSuper.push_back(copy->super); allNodes.push_back(copy);
-      version[n][part] = copy; ++replicated; ++replicaCount[part]; work[part] += mtStructuralNodeCost(n);
+      version[n][part] = copy; ++replicated; ++replicaCount[part]; work[part] += repCutActiveBodyCost(n);
     }
   }
   for (Node* mem : memory) {
