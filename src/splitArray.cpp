@@ -619,15 +619,23 @@ static bool isWholeRegisterUpdate(Node* node, ExpTree* tree) {
          tree->getRoot()->getChildNum() == 0;
 }
 
-static ExpTree* duplicateRegisterUpdateForMember(Node* node, ExpTree* tree, Node* member,
-                                                  const std::vector<int>& splitDims,
-                                                  const std::vector<int>& coords) {
+static ENode* wholeRegisterReference(Node* reg) {
+  ENode* ref = new ENode(reg);
+  ref->width = reg->width;
+  ref->sign = reg->sign;
+  return ref;
+}
+
+static ExpTree* duplicateRegisterUpdateForMember(Node* node, ExpTree* tree, Node* member) {
   ExpTree* copy = tree->dup();
   copy->getlval()->nodePtr = member;
   copy->getlval()->child.clear();
-  /* A register source has exactly one update tree, even when kept dimensions
-   * remain.  Element trees would make constant analysis reject the register. */
-  copy->setRoot(buildArraySlice(node->getDst(), splitDims, coords));
+  /* A bare $NEXT member stays one whole-array update. Element references would
+   * make async-reset mirroring assign $NEXT to itself. */
+  Node* dstMember = member->getDst();
+  Assert(dstMember && dstMember != node->getDst(),
+         "partial split of register %s has no next-state member", node->name.c_str());
+  copy->setRoot(wholeRegisterReference(dstMember));
   return copy;
 }
 
@@ -635,9 +643,8 @@ static void distributePartiallySplitTree(Node* node, ExpTree* tree,
                                           std::vector<Node*>& arrayMember,
                                           const std::vector<int>& splitDims) {
   if (isWholeRegisterUpdate(node, tree)) {
-    for (size_t i = 0; i < arrayMember.size(); ++i) {
-      placeMemberTree(arrayMember[i], duplicateRegisterUpdateForMember(
-          node, tree, arrayMember[i], splitDims, splitMemberCoords(node, splitDims, i)), node);
+    for (Node* member : arrayMember) {
+      placeMemberTree(member, duplicateRegisterUpdateForMember(node, tree, member), node);
     }
     return;
   }
@@ -715,9 +722,7 @@ void graph::splitArrayNode(Node* node) {
   splitArrayNode(node, allArrayDims(node));
 }
 
-void graph::splitArrayNode(Node* node, const std::vector<int>& splitDims) {
-  Assert(!splitDims.empty(), "no dimensions selected for array %s", node->name.c_str());
-  Assert(node->isArray(), "%s is not array", node->name.c_str());
+static void detachSplitNode(Node* node) {
   node->status = DEAD_NODE;
   /* remove prev connection */
   for (Node* prev : node->depPrev) prev->eraseNext(node);
@@ -730,7 +735,9 @@ void graph::splitArrayNode(Node* node, const std::vector<int>& splitDims) {
     if (memberInSuper != node)
       memberInSuper->constructSuperConnect();
   }
-  /* create one node for every combination of selected dimensions */
+}
+
+static std::vector<Node*> createSplitMembers(Node* node, const std::vector<int>& splitDims) {
   const size_t memberNum = splitMemberCount(node, splitDims);
   std::vector<Node*> arrayMember;
   arrayMember.reserve(memberNum);
@@ -739,14 +746,18 @@ void graph::splitArrayNode(Node* node, const std::vector<int>& splitDims) {
                                                splitMemberCoords(node, splitDims, i)));
   }
   splitArrayMap[node] = arrayMember;
-  /* distribute arrayVal */
+  return arrayMember;
+}
+
+static void distributeSplitMembers(graph* graph, Node* node, std::vector<Node*>& arrayMember,
+                                   const std::vector<int>& splitDims) {
   const bool fullySplit = splitDims.size() == node->dimension.size();
   for (ExpTree* tree : node->assignTree) {
     if (fullySplit) distributeTree(node, tree, arrayMember);
     else distributePartiallySplitTree(node, tree, arrayMember, splitDims);
   }
   if (node->resetTree) {
-    for (size_t idx = 0; idx < memberNum; ++idx) {
+    for (size_t idx = 0; idx < arrayMember.size(); ++idx) {
       if (fullySplit) {
         std::vector<int> subIdx = splitMemberCoords(node, splitDims, idx);
         arrayMember[idx]->resetTree = dupTreeWithIdx(node->resetTree, subIdx, node);
@@ -759,16 +770,11 @@ void graph::splitArrayNode(Node* node, const std::vector<int>& splitDims) {
   }
 
   std::set<Node*> checkNodes;
-  /* construct connections */
   if ((node->type == NODE_REG_SRC || node->type == NODE_REG_DST) && splitArrayMap.find(node->getBindReg()) != splitArrayMap.end()) {
     Node* regBind = node->getBindReg();
-    for (Node* member : splitArrayMap[regBind]) {
-      checkNodes.insert(member);
-    }
+    for (Node* member : splitArrayMap[regBind]) checkNodes.insert(member);
   }
-  for (Node* member : arrayMember) {
-    checkNodes.insert(member);
-  }
+  for (Node* member : arrayMember) checkNodes.insert(member);
   for (Node* next : node->depNext) {
     checkNodes.insert(next);
     if (next != node) next->erasePrev(node);
@@ -777,23 +783,75 @@ void graph::splitArrayNode(Node* node, const std::vector<int>& splitDims) {
     for (ExpTree* tree : n->assignTree) {
       tree->updateWithSplittedArray(n, node, arrayMember, splitDims);
     }
-    if (n->resetTree) {
-      n->resetTree->updateWithSplittedArray(n, node, arrayMember, splitDims);
-    }
+    if (n->resetTree) n->resetTree->updateWithSplittedArray(n, node, arrayMember, splitDims);
   }
-
   for (Node* n : checkNodes) {
     n->updateConnect();
-    if (n->type == NODE_REG_SRC) {
-      n->updateDep();
-    }
+    if (n->type == NODE_REG_SRC) n->updateDep();
   }
-  /* clear node connection */
   node->clear_relation();
   for (Node* member : arrayMember) member->constructSuperConnect();
   for (Node* member : arrayMember) {
-    if (member->super->prev.size() == 0) supersrc.push_back(member->super);
+    if (member->super->prev.size() == 0) graph->supersrc.push_back(member->super);
   }
+}
+
+/* Split the other side of a register with the same dimensions. A full split
+ * still needs that side's assignments to use constant indices. */
+static Node* splittableRegisterPartner(Node* node, const std::vector<int>& splitDims) {
+  if (node->type != NODE_REG_SRC && node->type != NODE_REG_DST) return nullptr;
+  Node* other = node->getBindReg();
+  if (!other || other == node || !other->isArray() || other->dimension != node->dimension) return nullptr;
+  if (splitArrayMap.find(other) != splitArrayMap.end()) return nullptr;
+  if (splitDims.size() == node->dimension.size()) {
+    for (ExpTree* tree : other->assignTree) {
+      int begin, end;
+      std::tie(begin, end) = tree->getlval()->getIdx(other);
+      if (begin < 0) return nullptr;
+    }
+  }
+  return other;
+}
+
+static void finishSplitRegister(graph* g, Node* arrayNode) {
+  if (arrayNode->type != NODE_REG_SRC) return;
+  Node* dst = arrayNode->getDst();
+  Assert(dst && splitArrayMap.find(dst) != splitArrayMap.end() &&
+         splitArrayMap[arrayNode].size() == splitArrayMap[dst].size(),
+         "%s next state was not split with it", arrayNode->name.c_str());
+  for (size_t i = 0; i < splitArrayMap[arrayNode].size(); i++) {
+    Node* member = splitArrayMap[arrayNode][i];
+    g->regsrc.push_back(member);
+    member->bindReg(splitArrayMap[dst][i]);
+    member->updateDep();
+  }
+}
+
+void graph::splitArrayNode(Node* node, const std::vector<int>& splitDims) {
+  if (splitArrayMap.find(node) != splitArrayMap.end()) return;
+  Assert(!splitDims.empty(), "no dimensions selected for array %s", node->name.c_str());
+  Assert(node->isArray(), "%s is not array", node->name.c_str());
+
+  Node* partner = splittableRegisterPartner(node, splitDims);
+  if (!partner) {
+    std::vector<Node*> members = createSplitMembers(node, splitDims);
+    detachSplitNode(node);
+    distributeSplitMembers(this, node, members, splitDims);
+    return;
+  }
+
+  Node* src = node->type == NODE_REG_SRC ? node : partner;
+  Node* dst = node->type == NODE_REG_DST ? node : partner;
+  std::vector<Node*> srcMembers = createSplitMembers(src, splitDims);
+  std::vector<Node*> dstMembers = createSplitMembers(dst, splitDims);
+  Assert(srcMembers.size() == dstMembers.size(),
+         "%s and %s split into different member counts", src->name.c_str(), dst->name.c_str());
+  for (size_t i = 0; i < srcMembers.size(); ++i) srcMembers[i]->bindReg(dstMembers[i]);
+  /* Detach $NEXT only after the update points at its new member. */
+  detachSplitNode(src);
+  distributeSplitMembers(this, src, srcMembers, splitDims);
+  detachSplitNode(dst);
+  distributeSplitMembers(this, dst, dstMembers, splitDims);
 }
 
 void graph::splitArray() {
@@ -832,28 +890,46 @@ void graph::splitArray() {
     }
 
     while (s.size() == 0 && partialVisited.size() != 0) {
-      /* split arrays in partialVisited until s.size() != 0 */
       Node* node = getSplitArray(this);
       Assert(splitArrayMap.find(node) == splitArrayMap.end(), "%s is already splitted", node->name.c_str());
+      Node* partner = (node->type == NODE_REG_SRC || node->type == NODE_REG_DST) ? node->getBindReg() : nullptr;
+      if (partner == node || (partner && splitArrayMap.find(partner) != splitArrayMap.end())) partner = nullptr;
       num ++;
       splitArrayNode(node);
-      /* add into s and visitedSet */
-      for (Node* member : splitArrayMap[node]) {
-        times[member] = 0;
-        for (Node* prev : member->prev) {
-          if (fullyVisited.find(prev) != fullyVisited.end()) {
-            times[member] ++;
+      auto admit = [&](Node* origin) {
+        for (Node* member : splitArrayMap[origin]) {
+          int seen = 0;
+          for (Node* prev : member->prev) {
+            if (fullyVisited.find(prev) != fullyVisited.end()) seen ++;
           }
+          times[member] = seen;
+          if (seen == (int)member->prev.size()) {
+            s.push(member);
+            fullyVisited.insert(member);
+          } else partialVisited.insert(member);
         }
-        if (times[member] == (int)member->prev.size()) {
-          s.push(member);
-          fullyVisited.insert(member);
-        } else {
-          partialVisited.insert(member);
+        partialVisited.erase(origin);
+      };
+      bool paired = partner && splitArrayMap.find(partner) != splitArrayMap.end();
+      if (paired) num ++;
+      if (paired && node->type == NODE_REG_DST) admit(partner);
+      admit(node);
+      if (paired && node->type != NODE_REG_DST) admit(partner);
+      if (!paired) continue;
+      std::vector<Node*> ready;
+      for (Node* waiting : partialVisited) {
+        int seen = 0;
+        for (Node* prev : waiting->prev) {
+          if (fullyVisited.find(prev) != fullyVisited.end()) seen ++;
         }
+        times[waiting] = seen;
+        if (seen == (int)waiting->prev.size()) ready.push_back(waiting);
       }
-      /* erase array */
-      partialVisited.erase(node);
+      for (Node* waiting : ready) {
+        partialVisited.erase(waiting);
+        fullyVisited.insert(waiting);
+        s.push(waiting);
+      }
     }
   }
   Assert(partialVisited.size() == 0, "partial is not empty!");
@@ -1042,16 +1118,7 @@ void graph::splitConstantAxes() {
   for (const auto& item : selected) {
     Node* arrayNode = item.first;
     splitArrayNode(arrayNode, item.second);
-    if (arrayNode->type == NODE_REG_SRC) {
-      splitArrayNode(arrayNode->getDst(), item.second);
-      Assert(splitArrayMap[arrayNode].size() == splitArrayMap[arrayNode->getDst()].size(),
-             "%p %s member not match", arrayNode, arrayNode->name.c_str());
-      for (size_t i = 0; i < splitArrayMap[arrayNode].size(); i ++) {
-        regsrc.push_back(splitArrayMap[arrayNode][i]);
-        splitArrayMap[arrayNode][i]->bindReg(splitArrayMap[arrayNode->getDst()][i]);
-        splitArrayMap[arrayNode][i]->updateDep();
-      }
-    }
+    finishSplitRegister(this, arrayNode);
     num ++;
   }
   printf("[splitConstantAxis] split %d arrays\n", num);
@@ -1081,15 +1148,7 @@ void graph::splitOptionalArray() {
     Node* arrayNode = iter.first;
 #endif
     splitArrayNode(arrayNode);
-    if (arrayNode->type == NODE_REG_SRC) {
-      splitArrayNode(arrayNode->getDst());
-      Assert(splitArrayMap[arrayNode].size() == splitArrayMap[arrayNode->getDst()].size(), "%p %s member not match", arrayNode, arrayNode->name.c_str());
-      for (size_t i = 0; i < splitArrayMap[arrayNode].size(); i ++) {
-        regsrc.push_back(splitArrayMap[arrayNode][i]);
-        splitArrayMap[arrayNode][i]->bindReg(splitArrayMap[arrayNode->getDst()][i]);
-        splitArrayMap[arrayNode][i]->updateDep();
-      }
-    }
+    finishSplitRegister(this, arrayNode);
     num ++;
   }
   printf("[splitOptionalArray] split %d arrays\n", num);
