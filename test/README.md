@@ -27,3 +27,10 @@
   and padding applied to negative signed constants.
 - signed-runtime-slice.fir: Checks that a full-width signed bit selection becomes
   unsigned without host sign-extension bits when concatenated with other bits.
+- rdwr-feedback.fir: Checks synchronous read/write feedback with defined
+  initialization, read latency, enables, constant-address write activation,
+  old read-under-write policy, depth-one lowering, and supported gated clocks.
+- rdwr-masked-feedback.fir: Checks per-element write masks and feedback on a
+  two-lane synchronous read/write port without modifying unmasked lanes.
+- rdwr-pipeline.fir: Checks s0 reads followed by s1 increment/writeback with
+  no extra data register; a new read replaces the pending writeback.
