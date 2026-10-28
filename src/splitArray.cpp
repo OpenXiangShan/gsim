@@ -202,6 +202,53 @@ void distributeTree(Node* node, ExpTree* tree, std::vector<Node*>& arrayMember) 
   Assert(arrayMember.size() == node->arrayEntryNum(), "arrayMember size %ld != arrayEntryNum %ld", arrayMember.size(), node->arrayEntryNum());
   int begin, end;
   std::tie(begin, end) = tree->getlval()->getIdx(node);
+  if (begin < 0) {
+    ENode* lvalue = tree->getlval();
+    int prefixes = 1;
+    for (size_t i = 0; i < lvalue->getChildNum(); i ++) prefixes *= node->dimension[i];
+    // Expand dynamic writes before splitting; each element keeps its write guard.
+    for (int prefix = 0; prefix < prefixes; prefix ++) {
+      std::vector<int> indices(lvalue->getChildNum());
+      int remainder = prefix;
+      for (int i = (int)indices.size() - 1; i >= 0; i --) {
+        indices[i] = remainder % node->dimension[i];
+        remainder /= node->dimension[i];
+      }
+      ENode* guard = nullptr;
+      bool matches = true;
+      ENode* fixedLvalue = lvalue->dup();
+      for (size_t i = 0; i < indices.size(); i ++) {
+        ENode* index = lvalue->getChild(i);
+        if (index->opType == OP_INDEX_INT) {
+          if (index->values[0] != indices[i]) matches = false;
+          continue;
+        }
+        Assert(index->opType == OP_INDEX, "Invalid dynamic index for %s", node->name.c_str());
+        ENode* constant = new ENode(OP_INT);
+        constant->strVal = std::to_string(indices[i]);
+        constant->width = std::max(1, upperLog2(node->dimension[i]));
+        ENode* equals = new ENode(OP_EQ);
+        equals->addChild(index->getChild(0)->dup());
+        equals->addChild(constant);
+        if (guard) {
+          ENode* both = new ENode(OP_AND);
+          both->addChild(guard);
+          both->addChild(equals);
+          guard = both;
+        } else guard = equals;
+        ENode* fixedIndex = new ENode(OP_INDEX_INT);
+        fixedIndex->addVal(indices[i]);
+        fixedLvalue->setChild(i, fixedIndex);
+      }
+      if (!matches) continue;
+      ENode* conditional = new ENode(OP_WHEN);
+      conditional->addChild(guard);
+      conditional->addChild(tree->getRoot()->dup());
+      conditional->addChild(nullptr);
+      distributeTree(node, new ExpTree(conditional, fixedLvalue), arrayMember);
+    }
+    return;
+  }
   Assert(begin >= 0 && end >= begin, "Invalid index for array %s: %d-%d", node->name.c_str(), begin, end);
   if (begin == end) {
     int idx = begin;

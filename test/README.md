@@ -12,6 +12,11 @@
   the operand width for both unsigned and signed values.
 - dynamic-vector-index.fir: Checks in-bounds reads plus deterministic,
   memory-safe out-of-bounds reads and writes through dynamic vector indices.
+- split-dynamic-array.fir: Checks dynamic-index writes to a split
+  multi-dimensional array, including partial-row writes, mixed constant and
+  dynamic indices, out-of-range indices, conditional writes and write priority.
+- split-dynamic-index.fir: Checks dynamic-index writes to a split
+  one-dimensional array, including in-range and out-of-range indices.
 - input-narrowing.fir: Checks input normalization after used-width optimization,
   including comparisons and signed extension from narrowed ports.
 - cat-eq-constant.fir: Checks constant slicing in the
