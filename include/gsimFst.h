@@ -3,6 +3,7 @@
  * Sourced from zyj-gsim/include/libfst with minor tweaks:
  *  - inlined fastlz/lz4 and fstapi sources
  *  - defaults to HAVE_LIBPTHREAD + FST_WRITER_PARALLEL enabled
+ *  - removes duplicate value changes and keeps the last update per time entry
  *  - lz4 visibility forced to static for header-only use
  * System deps: zlib (libz) and pthreads, plus standard C runtime.
  */
@@ -14,6 +15,10 @@
 #endif
 #ifndef FST_WRITER_PARALLEL
 #define FST_WRITER_PARALLEL 1
+#endif
+/* Avoid buffering unchanged values. Updates within one time entry keep the last value. */
+#ifndef FST_REMOVE_DUPLICATE_VC
+#define FST_REMOVE_DUPLICATE_VC 1
 #endif
 /* force lz4 public symbols to have internal linkage in header-only mode */
 #ifndef LZ4LIB_VISIBILITY
