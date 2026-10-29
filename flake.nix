@@ -30,6 +30,7 @@
               pkgs.flex
               pkgs.gmp
               pkgs.jemalloc
+              pkgs.zlib
             ];
 
             makeFlags = [
