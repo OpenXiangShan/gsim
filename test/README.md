@@ -27,3 +27,10 @@
   and padding applied to negative signed constants.
 - signed-runtime-slice.fir: Checks that a full-width signed bit selection becomes
   unsigned without host sign-extension bits when concatenated with other bits.
+- top-vecio.fir: Checks indexed setters/getters on top-level vector ports,
+  including reactivation after an idle step and independent element updates.
+- top-vecio-aggregate.fir: Checks multidimensional and Bundle vector ports,
+  non-power-of-two dimensions, signed and wide values, input normalization,
+  constant outputs, singleton dimensions, and names shared with parameters.
+  Both vector harnesses also check memory-safe out-of-bounds access when
+  compiled with NDEBUG.

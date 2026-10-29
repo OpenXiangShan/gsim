@@ -256,6 +256,7 @@ FILE* graph::genHeaderStart() {
   includeLib(header, "assert.h", true);
   includeLib(header, "stdlib.h", true);
   includeLib(header, "cstdint", true);
+  includeLib(header, "cstddef", true);
   includeLib(header, "ctime", true);
   includeLib(header, "iomanip", true);
   includeLib(header, "cstring", true);
@@ -315,9 +316,42 @@ FILE* graph::genHeaderStart() {
   return header;
 }
 
+// Vector ports retain their storage shape. Access one element at a time;
+// scalar ports have no index parameters and keep their existing interface.
+static std::string interfaceIndices(Node* node) {
+  std::string params;
+  for (size_t i = 0; i < node->dimension.size(); i ++) {
+    if (i != 0) params += ", ";
+    params += format("std::size_t i%zu", i);
+  }
+  return params;
+}
+
+static std::string interfaceElement(Node* node) {
+  std::string element = "this->" + node->name;
+  for (size_t i = 0; i < node->dimension.size(); i ++) element += format("[i%zu]", i);
+  return element;
+}
+
+static std::string interfaceBounds(Node* node, bool isInput) {
+  std::string checks;
+  for (size_t i = 0; i < node->dimension.size(); i ++) {
+    checks += format("  if (i%zu >= %d) {\n", i, node->dimension[i]);
+    checks += format("    gAssert(false, \"index i%zu out of bounds for %s\");\n", i, node->name.c_str());
+    // Also keep invalid indices memory-safe in builds with NDEBUG.
+    checks += isInput ? "    return;\n" : "    return 0;\n";
+    checks += "  }\n";
+  }
+  return checks;
+}
+
 void graph::genInterfaceInput(Node* input) {
-  /* set by string */
-  emitFuncDecl(0, "void S%s::set_%s(%s val) {\n", name.c_str(), input->name.c_str(), widthUType(input->width).c_str());
+  std::string params = interfaceIndices(input);
+  if (!params.empty()) params += ", ";
+  params += widthUType(input->width) + " val";
+  const std::string element = interfaceElement(input);
+  emitFuncDecl(0, "void S%s::set_%s(%s) {\n", name.c_str(), input->name.c_str(), params.c_str());
+  if (!input->dimension.empty()) emitBodyLock(0, "%s", interfaceBounds(input, true).c_str());
   // usedBits can narrow a port below its C++ storage width.
   if (input->width == 0) {
     emitBodyLock(1, "val = 0;\n");
@@ -329,8 +363,8 @@ void graph::genInterfaceInput(Node* input) {
       emitBodyLock(1, "val &= %s;\n", bitMask(input->width).c_str());
     }
   }
-  emitBodyLock(1, "if (%s != val) { \n", input->name.c_str());
-  emitBodyLock(2, "%s = val;\n", input->name.c_str());
+  emitBodyLock(1, "if (%s != val) { \n", element.c_str());
+  emitBodyLock(2, "%s = val;\n", element.c_str());
   /* update nodes in the same superNode */
   std::set<int> allNext;
   for (Node* next : input->next) {
@@ -346,11 +380,12 @@ void graph::genInterfaceInput(Node* input) {
 }
 
 void graph::genInterfaceOutput(Node* output) {
-  emitFuncDecl(0, "%s S%s::get_%s() {\n"
-               "  return %s;\n"
-               "}\n",
-               widthUType(output->width).c_str(), name.c_str(),
-               output->name.c_str(), output->status == CONSTANT_NODE ? output->computeInfo->valStr.c_str() : output->name.c_str());
+  emitFuncDecl(0, "%s S%s::get_%s(%s) {\n", widthUType(output->width).c_str(),
+               name.c_str(), output->name.c_str(), interfaceIndices(output).c_str());
+  if (!output->dimension.empty()) emitBodyLock(0, "%s", interfaceBounds(output, false).c_str());
+  emitBodyLock(1, "return %s;\n", output->status == CONSTANT_NODE ?
+               output->computeInfo->valStr.c_str() : interfaceElement(output).c_str());
+  emitBodyLock(0, "}\n");
 }
 
 void graph::genHeaderEnd(FILE* fp) {
@@ -1345,11 +1380,14 @@ void graph::cppEmitter() {
 
    /* input/output interface */
   for (Node* node : input) {
-    fprintf(header, "void set_%s(%s val);\n", node->name.c_str(), widthUType(node->width).c_str());
+    std::string params = interfaceIndices(node);
+    if (!params.empty()) params += ", ";
+    params += widthUType(node->width) + " val";
+    fprintf(header, "void set_%s(%s);\n", node->name.c_str(), params.c_str());
     genInterfaceInput(node);
   }
   for (Node* node : output) {
-    fprintf(header, "%s get_%s();\n", widthUType(node->width).c_str(), node->name.c_str());
+    fprintf(header, "%s get_%s(%s);\n", widthUType(node->width).c_str(), node->name.c_str(), interfaceIndices(node).c_str());
     genInterfaceOutput(node);
   }
 
