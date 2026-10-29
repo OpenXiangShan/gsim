@@ -111,3 +111,15 @@ jobs:
         run: |
           sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
           make -j `nproc` bolt dutName=ysyx3
+
+  nix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Check if nix builds
+        run: |
+          nix build .#gsim
+          nix build .#gsim-static
