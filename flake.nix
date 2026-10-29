@@ -38,6 +38,8 @@
               "SHELL=${llvm.stdenv.shell}"
               # nix builder does not have access to .git, so 'git describe' will fail, we need pass this explicitly
               "GSIM_VERSION=${version}"
+              # override GSIM_INCLUDE_DIR to real output path
+              "GSIM_INCLUDE_DIR=${builtins.placeholder "out"}/include"
               # override default build target to avoid running tests
               "build-gsim"
             ];
@@ -45,6 +47,7 @@
             installPhase = ''
               runHook preInstall
               install -Dm755 build/gsim/gsim $out/bin/gsim
+              install -Dm644 include/gsimFst.h $out/include/gsimFst.h
               runHook postInstall
             '';
 
