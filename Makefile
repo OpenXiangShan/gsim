@@ -157,8 +157,9 @@ CXXFLAGS += -ggdb -O3 -MMD $(addprefix -I,$(GSIM_INC_DIR)) -Wall -Werror --std=c
 GSIM_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo UNKNOWN)
 GSIM_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo UNKNOWN)
 GSIM_CXX_VERSION ?= $(shell $(CXX) --version 2>/dev/null | head -n 1 || echo UNKNOWN)
+GSIM_INCLUDE_DIR ?= $(abspath include)
 CXXFLAGS += '-DGSIM_VERSION="$(GSIM_VERSION)"' '-DGSIM_BUILD_DATE="$(GSIM_BUILD_DATE)"' '-DGSIM_CXX_VERSION="$(GSIM_CXX_VERSION)"'
-CXXFLAGS += '-DGSIM_INCLUDE_DIR="$(abspath include)"'
+CXXFLAGS += '-DGSIM_INCLUDE_DIR="$(GSIM_INCLUDE_DIR)"'
 
 ifeq ($(DWARF4),1)
 	CXXFLAGS += -gdwarf-4
