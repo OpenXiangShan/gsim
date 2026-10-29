@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <string>
 #include <utility>
@@ -44,6 +45,8 @@ static std::set<int> alwaysActive;
 static std::map<Node*, std::pair<int, int>> super2ResetId;  // uint & async reset
 static std::vector<Node*> fstWaveNodes;
 static std::set<Node*> fstWaveNodeSet;
+// Word offsets in the model's contiguous packed cache; word 0 is gsim_cycle.
+static std::vector<size_t> fstOldValueOffsets;
 
 static size_t fstWaveChunkCount() {
   return (fstWaveNodes.size() + FST_NODES_PER_FUNC - 1) / FST_NODES_PER_FUNC;
@@ -930,6 +933,7 @@ void graph::genDump(){
   emitBodyLock(2, "fstWriterSetUpscope(fstCtx);\n");
   emitBodyLock(2, "fstWriterSetUpscope(fstCtx);\n");
 
+  emitBodyLock(2, "fstOldValues.resize(%zu);\n", fstOldValueOffsets.back());
   emitBodyLock(2, "fstDumpInitialized = true;\n");
   emitBodyLock(1, "}\n");
   emitBodyLock(1, "if (dumpWaveformFlag && fstCtx) {\n");
@@ -1026,6 +1030,7 @@ void graph::cppEmitter() {
 
   fstWaveNodes.clear();
   fstWaveNodeSet.clear();
+  fstOldValueOffsets.clear();
   if (globalConfig.TraceFst) {
     const size_t fstWaveLimit = globalConfig.FstMaxArrayElems;
     auto collectWaveNode = [&](Node* n) {
@@ -1066,6 +1071,18 @@ void graph::cppEmitter() {
     std::sort(fstWaveNodes.begin(), fstWaveNodes.end(), [](Node* a, Node* b) {
       return a->name < b->name;
     });
+    fstOldValueOffsets.push_back(1);
+    for (Node* node : fstWaveNodes) {
+      size_t words = (static_cast<size_t>(node->width) + 63) / 64;
+      for (int dim : nodeArrayDims(node)) {
+        Assert(dim >= 0 && (dim == 0 || words <= std::numeric_limits<size_t>::max() / dim),
+               "FST cache size overflow for %s", node->name.c_str());
+        words *= dim;
+      }
+      Assert(words <= std::numeric_limits<size_t>::max() - fstOldValueOffsets.back(),
+             "FST cache size overflow for %s", node->name.c_str());
+      fstOldValueOffsets.push_back(fstOldValueOffsets.back() + words);
+    }
   }
 
   activeFlagNum = (superId + ACTIVE_WIDTH - 1) / ACTIVE_WIDTH;
@@ -1110,6 +1127,8 @@ void graph::cppEmitter() {
     fprintf(header, "std::string fstPath;\n");
     fprintf(header, "bool dumpWaveformFlag;\n");
     fprintf(header, "bool fstDumpInitialized;\n");
+    fprintf(header, "std::vector<uint64_t> fstOldValues;\n");
+    fprintf(header, "bool fstOldValuesValid;\n");
   }
 #ifdef PERF
   fprintf(header, "size_t activeTimes[%d];\n", superId);
@@ -1144,6 +1163,8 @@ void graph::cppEmitter() {
     emitBodyLock(0, "}\n");
 
     emitFuncDecl(0, "void S%s::resetFstHandles() {\n", name.c_str());
+    emitBodyLock(1, "std::vector<uint64_t>().swap(fstOldValues);\n");
+    emitBodyLock(1, "fstOldValuesValid = false;\n");
     emitBodyLock(1, "fstHandle_gsim_cycle = 0;\n");
     for (size_t chunk = 0; chunk < fstWaveChunkCount(); chunk ++) {
       emitBodyLock(1, "resetFstHandlesChunk%zu();\n", chunk);
@@ -1282,35 +1303,43 @@ void graph::cppEmitter() {
     emitBodyLock(0, "}\n");
 
     fprintf(header, "template<typename T>\n");
-    fprintf(header, "inline void updateFstSignal(fstHandle handle, T* value_ptr, uint32_t width) {\n"
-                  "  if (!dumpWaveformFlag || !fstCtx || handle == 0) return;\n"
-                  "  if (width <= 32) {\n"
-                  "    uint32_t val = 0;\n"
-                  "    std::memcpy(&val, value_ptr, sizeof(T) < sizeof(val) ? sizeof(T) : sizeof(val));\n"
-                  "    if (width < 32) {\n"
-                  "      if (width == 0) val = 0;\n"
-                  "      else val &= ((uint32_t(1) << width) - 1);\n"
-                  "    }\n"
-                  "    fstWriterEmitValueChange32(this->fstCtx, handle, width, val);\n"
-                  "  } else if (width <= 64) {\n"
+    fprintf(header, "inline void updateFstSignal(fstHandle handle, T* value_ptr, uint32_t width, size_t oldOffset) {\n"
+                  "  if (!dumpWaveformFlag || !fstCtx || handle == 0 || width == 0) return;\n"
+                  "  uint64_t* oldp = fstOldValues.data() + oldOffset;\n"
+                  "  if (width <= 64) {\n"
                   "    uint64_t val = 0;\n"
                   "    std::memcpy(&val, value_ptr, sizeof(T) < sizeof(val) ? sizeof(T) : sizeof(val));\n"
-                  "    if (width < 64) {\n"
-                  "      if (width == 0) val = 0;\n"
-                  "      else val &= ((uint64_t(1) << width) - 1);\n"
+                  "    if (width < 64) val &= ((uint64_t(1) << width) - 1);\n"
+                  "    if (fstOldValuesValid && *oldp == val) return;\n"
+                  "    *oldp = val;\n"
+                  "    if (width <= 32) {\n"
+                  "      fstWriterEmitValueChange32(fstCtx, handle, width, uint32_t(val));\n"
+                  "    } else {\n"
+                  "      fstWriterEmitValueChange64(fstCtx, handle, width, val);\n"
                   "    }\n"
-                  "    fstWriterEmitValueChange64(this->fstCtx, handle, width, val);\n"
                   "  } else {\n"
-                  "    fstWriterEmitValueChangeVec64(this->fstCtx, handle, width, (const uint64_t*)value_ptr);\n"
+                  "    const size_t lastWord = (size_t(width) - 1) / 64;\n"
+                  "    const size_t fullBytes = lastWord * sizeof(uint64_t);\n"
+                  "    uint64_t tail = 0;\n"
+                  "    const size_t tailBytes = sizeof(T) - fullBytes;\n"
+                  "    std::memcpy(&tail, reinterpret_cast<const char*>(value_ptr) + fullBytes,\n"
+                  "                tailBytes < sizeof(tail) ? tailBytes : sizeof(tail));\n"
+                  "    if (width %% 64) tail &= ((uint64_t(1) << (width %% 64)) - 1);\n"
+                  "    if (fstOldValuesValid && oldp[lastWord] == tail &&\n"
+                  "        std::memcmp(oldp, value_ptr, fullBytes) == 0) return;\n"
+                  "    std::memcpy(oldp, value_ptr, fullBytes);\n"
+                  "    oldp[lastWord] = tail;\n"
+                  "    fstWriterEmitValueChangeVec64(fstCtx, handle, width, oldp);\n"
                   "  }\n"
                     "}\n");
 
     emitFuncDecl(0, "void S%s::emitAllSignalValues() {\n", name.c_str());
     emitBodyLock(1, "if (!dumpWaveformFlag || !fstCtx) return;\n");
-    emitBodyLock(1, "updateFstSignal(fstHandle_gsim_cycle, &cycles, 64);\n");
+    emitBodyLock(1, "updateFstSignal(fstHandle_gsim_cycle, &cycles, 64, 0);\n");
     for (size_t chunk = 0; chunk < fstWaveChunkCount(); chunk ++) {
       emitBodyLock(1, "emitSignalValuesChunk%zu();\n", chunk);
     }
+    emitBodyLock(1, "fstOldValuesValid = true;\n");
     emitBodyLock(0, "}\n");
 
     for (size_t chunk = 0; chunk < fstWaveChunkCount(); chunk ++) {
@@ -1321,7 +1350,8 @@ void graph::cppEmitter() {
         Node* node = fstWaveNodes[nodeIdx];
         std::vector<int> dims = nodeArrayDims(node);
         if (dims.empty()) {
-          emitBodyLock(1, "updateFstSignal(fstHandle_%s, &%s, %d);\n", node->name.c_str(), node->name.c_str(), node->width);
+          emitBodyLock(1, "updateFstSignal(fstHandle_%s, &%s, %d, %zu);\n", node->name.c_str(), node->name.c_str(), node->width,
+                       fstOldValueOffsets[nodeIdx]);
         } else {
           int indent = 1;
           for (size_t i = 0; i < dims.size(); i ++) {
@@ -1333,7 +1363,9 @@ void graph::cppEmitter() {
             accessStr += format("[i%zu]", i);
             emitBodyLock(indent, "handle_idx = handle_idx * %d + i%zu;\n", dims[i], i);
           }
-          emitBodyLock(indent, "updateFstSignal(fstHandle_%s[handle_idx], &%s, %d);\n", node->name.c_str(), accessStr.c_str(), node->width);
+          emitBodyLock(indent, "updateFstSignal(fstHandle_%s[handle_idx], &%s, %d, %zu + handle_idx * %zu);\n",
+                       node->name.c_str(), accessStr.c_str(), node->width, fstOldValueOffsets[nodeIdx],
+                       (static_cast<size_t>(node->width) + 63) / 64);
           for (size_t i = 0; i < dims.size(); i ++) {
             emitBodyLock(-- indent, "}\n");
           }
