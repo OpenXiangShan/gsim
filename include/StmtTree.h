@@ -33,10 +33,17 @@ public:
 class StmtTree {
 public:
   StmtNode* root;
+  bool hasWhen = false;
+  bool hasSinkCandidate = false;
+  std::vector<StmtNode*> sinkDebugStmts;
+  std::vector<InstInfo> sinkDebugInsts;
   void mergeExpTree(ExpTree* tree, std::vector<int>& prevPath, std::vector<int>& nodePath, Node* belong);
   void display();
   void addSeq(ExpTree* tree, Node* belong);
   void mergeStmtTree(StmtTree* tree);
+  // Sink pure, output-only local computations into their common conditional
+  // region before lowering to InstInfo.
+  int sinkLocalComputations(const std::set<Node*>& blockedNodes = {});
   void compute(std::vector<InstInfo>& insts);
 };
 

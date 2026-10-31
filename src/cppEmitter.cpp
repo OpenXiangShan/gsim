@@ -789,6 +789,13 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
     for (InstInfo inst : super->insts) {
       indent = translateInst(inst, indent, flagName);
     }
+    if (!super->stmtTree->sinkDebugInsts.empty()) {
+      emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
+      for (const InstInfo& inst : super->stmtTree->sinkDebugInsts) {
+        if (inst.infoType == SUPER_INFO_STR) emitBodyLock(indent, "%s\n", inst.inst.c_str());
+      }
+      emitBodyLock(indent, "#endif\n");
+    }
     if (!globalConfig.RepCutMode && super->superType == SUPER_ASYNC_RESET) emitBodyLock(indent, "subReset%d();\n", super2ResetId[super->resetNode].second);
     emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
     emitBodyLock(indent ++, "if (cycles >= LOG_START && cycles <= LOG_END) {\n");

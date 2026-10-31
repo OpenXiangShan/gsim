@@ -9,6 +9,7 @@
 #include <stack>
 #include <tuple>
 #include <utility>
+#include <functional>
 
 #include "common.h"
 #include "graph.h"
@@ -1852,6 +1853,46 @@ void StmtNode::compute(std::vector<InstInfo>& insts, std::set<InstInfo> assign_i
 }
 
 void StmtTree::compute(std::vector<InstInfo>& insts) {
+  sinkDebugInsts.clear();
+  if (sinkDebugStmts.empty()) {
+    root->compute(insts);
+    return;
+  }
+  std::map<Node*, StmtNode*> debugByNode;
+  std::vector<StmtNode*> debugWithoutNode;
+  for (StmtNode* debugStmt : sinkDebugStmts) {
+    if (debugStmt == nullptr || debugStmt->tree == nullptr ||
+        debugStmt->tree->getlval() == nullptr ||
+        debugStmt->tree->getlval()->getNode() == nullptr) {
+      if (debugStmt != nullptr) debugWithoutNode.push_back(debugStmt);
+      continue;
+    }
+    debugByNode[debugStmt->tree->getlval()->getNode()] = debugStmt;
+  }
+  std::set<Node*> visiting;
+  std::set<Node*> visited;
+  std::vector<StmtNode*> orderedDebug;
+  // A moved value may depend on another moved value. Keep the debug-only
+  // copies in dependency order; normal evaluation may skip both branches.
+  std::function<void(Node*)> visitDebug = [&](Node* node) {
+    if (node == nullptr || visited.count(node) != 0) return;
+    if (!visiting.insert(node).second) return;
+    std::set<Node*> dependencies;
+    StmtNode* debugStmt = debugByNode.at(node);
+    getENodeRelyNodes(debugStmt->tree->getRoot(), dependencies);
+    getENodeRelyNodes(debugStmt->tree->getlval(), dependencies);
+    for (Node* dependency : dependencies) {
+      if (debugByNode.count(dependency) != 0) visitDebug(dependency);
+    }
+    visiting.erase(node);
+    visited.insert(node);
+    orderedDebug.push_back(debugStmt);
+  };
+  for (const auto& entry : debugByNode) visitDebug(entry.first);
+  orderedDebug.insert(orderedDebug.end(), debugWithoutNode.begin(), debugWithoutNode.end());
+  for (StmtNode* debugStmt : orderedDebug) {
+    debugStmt->compute(sinkDebugInsts);
+  }
   root->compute(insts);
 }
 

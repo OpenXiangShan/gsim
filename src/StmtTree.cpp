@@ -32,6 +32,15 @@ bool checkCondEq(StmtNode* stmtNode, ENode* enode) {
   return false;
 }
 
+static bool containsSinkCandidate(ENode* root) {
+  if (root == nullptr) return false;
+  if (root->opType != OP_WHEN && root->opType != OP_RESET) return true;
+  for (size_t index = 1; index < root->child.size(); ++index) {
+    if (containsSinkCandidate(root->child[index])) return true;
+  }
+  return false;
+}
+
 void addDepthPath(std::vector<int>& path, int depth, int nodeIdx) {
   if (path.size() <= depth) path.push_back(nodeIdx);
   else if(nodeIdx > path[depth]){
@@ -105,6 +114,11 @@ void StmtNode::generateWhenTree(ENode* lvalue, ENode* root, std::vector<int>& su
  * @param belong The node that this expression tree belongs to
  */
 void StmtTree::mergeExpTree(ExpTree* tree, std::vector<int>& prevPath, std::vector<int>& nodePath, Node* belong) {
+  hasSinkCandidate |= containsSinkCandidate(tree->getRoot());
+  if (tree->getRoot() != nullptr &&
+      (tree->getRoot()->opType == OP_WHEN || tree->getRoot()->opType == OP_RESET)) {
+    hasWhen = true;
+  }
   std::vector<int> path;
   maxPath(path, prevPath, nodePath);
   std::stack<std::tuple<StmtNode*, ENode*, int, bool>> s;
@@ -227,6 +241,311 @@ void StmtTree::mergeStmtTree(StmtTree* tree) {
   }
 }
 
+namespace {
+
+struct SinkControl {
+  StmtNode* when = nullptr;
+  int branch = 0; // 1 = then, 2 = else
+};
+
+struct SinkUse {
+  std::vector<SinkControl> controls;
+  bool outputUse = false;
+  StmtNode* seq = nullptr;
+  size_t index = 0;
+};
+
+struct SinkDef {
+  StmtNode* stmt = nullptr;
+  StmtNode* seq = nullptr;
+  size_t index = 0;
+  size_t order = 0;
+  std::vector<SinkControl> controls;
+};
+
+struct SinkMove {
+  StmtNode* stmt = nullptr;
+  StmtNode* seq = nullptr;
+  StmtNode* target = nullptr;
+  size_t index = 0;
+  size_t order = 0;
+  size_t targetIndex = 0;
+};
+
+struct SinkTreeInfo {
+  std::map<Node*, SinkDef> defs;
+  std::map<Node*, std::vector<SinkUse>> uses;
+  std::map<StmtNode*, std::pair<StmtNode*, size_t>> whenParents;
+  std::map<StmtNode*, std::pair<StmtNode*, size_t>> seqParents;
+  std::set<Node*> duplicateDefs;
+  size_t nextOrder = 0;
+};
+
+bool sameControl(const SinkControl& left, const SinkControl& right) {
+  return left.when == right.when && left.branch == right.branch;
+}
+
+bool controlPrefix(const std::vector<SinkControl>& prefix,
+                   const std::vector<SinkControl>& path) {
+  if (prefix.size() > path.size()) return false;
+  for (size_t i = 0; i < prefix.size(); ++i) {
+    if (!sameControl(prefix[i], path[i])) return false;
+  }
+  return true;
+}
+
+size_t commonControlDepth(const std::vector<SinkUse>& uses) {
+  if (uses.empty()) return 0;
+  size_t depth = uses.front().controls.size();
+  for (const SinkUse& use : uses) depth = std::min(depth, use.controls.size());
+  for (size_t index = 0; index < depth; ++index) {
+    for (const SinkUse& use : uses) {
+      if (!sameControl(uses.front().controls[index], use.controls[index])) return index;
+    }
+  }
+  return depth;
+}
+
+bool pureSinkTree(ENode* node) {
+  if (node == nullptr) return true;
+  switch (node->opType) {
+    case OP_READ_MEM:
+    case OP_WRITE_MEM:
+    case OP_EXT_FUNC:
+    case OP_PRINTF:
+    case OP_ASSERT:
+    case OP_EXIT:
+    case OP_RESET:
+      return false;
+    default:
+      break;
+  }
+  for (ENode* child : node->child) if (!pureSinkTree(child)) return false;
+  return true;
+}
+
+void collectRefs(ENode* root, std::set<Node*>& refs) {
+  if (root != nullptr) getENodeRelyNodes(root, refs);
+}
+
+void collectSinkTree(StmtNode* stmt, StmtNode* containingSeq, size_t index,
+                     const std::vector<SinkControl>& controls, SinkTreeInfo& info) {
+  if (stmt == nullptr) return;
+  if (stmt->type == OP_STMT_SEQ) {
+    info.seqParents[stmt] = {containingSeq, index};
+    for (size_t child = 0; child < stmt->child.size(); ++child) {
+      collectSinkTree(stmt->child[child], stmt, child, controls, info);
+    }
+    return;
+  }
+  if (stmt->type == OP_STMT_WHEN) {
+    Assert(stmt->child.size() == 3, "invalid statement when shape");
+    std::set<Node*> conditionRefs;
+    if (stmt->child[0] != nullptr && stmt->child[0]->isENode)
+      collectRefs(stmt->child[0]->enode, conditionRefs);
+    for (Node* ref : conditionRefs)
+      info.uses[ref].push_back({controls, false, containingSeq, index});
+    info.whenParents[stmt] = {containingSeq, index};
+    for (int branch = 1; branch <= 2; ++branch) {
+      std::vector<SinkControl> branchControls = controls;
+      branchControls.push_back({stmt, branch});
+      collectSinkTree(stmt->child[branch], stmt, branch, branchControls, info);
+    }
+    return;
+  }
+  if (stmt->type != OP_STMT_NODE || stmt->isENode || stmt->tree == nullptr) return;
+
+  Node* defined = stmt->tree->getlval() == nullptr ? nullptr : stmt->tree->getlval()->getNode();
+  if (defined != nullptr) {
+    auto [iter, inserted] = info.defs.emplace(
+        defined, SinkDef{stmt, containingSeq, index, info.nextOrder++, controls});
+    if (!inserted) info.duplicateDefs.insert(defined);
+  } else {
+    ++info.nextOrder;
+  }
+  std::set<Node*> refs;
+  collectRefs(stmt->tree->getRoot(), refs);
+  collectRefs(stmt->tree->getlval(), refs);
+  if (defined != nullptr) refs.erase(defined);
+  const OPType op = stmt->tree->getRoot()->opType;
+  const bool outputUse = op == OP_PRINTF || op == OP_ASSERT || op == OP_EXIT;
+  for (Node* ref : refs)
+    info.uses[ref].push_back({controls, outputUse, containingSeq, index});
+}
+
+StmtNode* sinkTarget(StmtNode* root, const std::vector<SinkControl>& controls) {
+  StmtNode* current = root;
+  for (const SinkControl& control : controls) {
+    if (current == nullptr || current->type != OP_STMT_SEQ) return nullptr;
+    StmtNode* found = nullptr;
+    for (StmtNode* child : current->child) {
+      if (child == control.when) {
+        found = child;
+        break;
+      }
+    }
+    if (found == nullptr || found->child.size() != 3) return nullptr;
+    current = found->child[control.branch];
+  }
+  return current != nullptr && current->type == OP_STMT_SEQ ? current : nullptr;
+}
+
+bool dependencyAvailable(Node* node, const std::vector<SinkControl>& target,
+                         const SinkTreeInfo& info) {
+  std::set<Node*> dependencies(node->prev.begin(), node->prev.end());
+  dependencies.insert(node->depPrev.begin(), node->depPrev.end());
+  for (Node* dependency : dependencies) {
+    if (dependency == nullptr || dependency->super != node->super) continue;
+    auto found = info.defs.find(dependency);
+    if (found == info.defs.end()) continue; // input/state source
+    // Only move nodes whose dependencies are outside the target region.
+    // This avoids changing sibling ordering during the batch rewrite.
+    if (found->second.controls.size() >= target.size() ||
+        !controlPrefix(found->second.controls, target)) return false;
+  }
+  return true;
+}
+
+bool definitionBeforeWhen(const SinkDef& def, StmtNode* when,
+                          const SinkTreeInfo& info) {
+  auto parent = info.whenParents.find(when);
+  if (parent == info.whenParents.end()) return false;
+  // mergeExpTree may wrap a definition in extra SEQ nodes. They are
+  // transparent for ordering, but a WHEN boundary must never be crossed.
+  StmtNode* sequence = def.seq;
+  size_t index = def.index;
+  while (sequence != parent->second.first) {
+    auto sequenceParent = info.seqParents.find(sequence);
+    if (sequenceParent == info.seqParents.end() ||
+        sequenceParent->second.first == nullptr ||
+        sequenceParent->second.first->type != OP_STMT_SEQ) {
+      return false;
+    }
+    index = sequenceParent->second.second;
+    sequence = sequenceParent->second.first;
+  }
+  return index < parent->second.second;
+}
+
+size_t useIndexInTarget(const SinkUse& use, StmtNode* target,
+                        size_t targetDepth, const SinkTreeInfo& info) {
+  if (use.controls.size() > targetDepth) {
+    const StmtNode* when = use.controls[targetDepth].when;
+    for (size_t index = 0; index < target->child.size(); ++index) {
+      if (target->child[index] == when) return index;
+    }
+    return target->child.size();
+  }
+
+  StmtNode* seq = use.seq;
+  size_t index = use.index;
+  while (seq != target) {
+    auto parent = info.seqParents.find(seq);
+    if (parent == info.seqParents.end() || parent->second.first == nullptr) {
+      return target->child.size();
+    }
+    index = parent->second.second;
+    seq = parent->second.first;
+  }
+  return index;
+}
+
+int collectSinkMoves(StmtTree* tree, SinkTreeInfo& info,
+                     const std::set<Node*>& blockedNodes,
+                     std::vector<SinkMove>& moves) {
+  for (auto& entry : info.defs) {
+    Node* node = entry.first;
+    SinkDef& def = entry.second;
+    if (blockedNodes.count(node) != 0) continue;
+    if (info.duplicateDefs.count(node) != 0 || node->type != NODE_OTHERS ||
+        !node->isLocal() || node->isArray() || node->assignTree.size() != 1 ||
+        !pureSinkTree(node->assignTree.front()->getRoot())) continue;
+    if (node->super == nullptr) continue;
+    for (Node* successor : node->next) {
+      if (successor != nullptr && successor->super != node->super) {
+        def.stmt = nullptr;
+        break;
+      }
+    }
+    if (def.stmt == nullptr) continue;
+    auto uses = info.uses.find(node);
+    if (uses == info.uses.end() || uses->second.empty()) continue;
+    if (!std::all_of(uses->second.begin(), uses->second.end(),
+                     [](const SinkUse& use) { return use.outputUse; })) continue;
+    const size_t commonDepth = commonControlDepth(uses->second);
+    if (commonDepth <= def.controls.size()) continue;
+    std::vector<SinkControl> targetControls(
+        uses->second.front().controls.begin(),
+        uses->second.front().controls.begin() + static_cast<std::ptrdiff_t>(commonDepth));
+    if (!controlPrefix(def.controls, targetControls) ||
+        !dependencyAvailable(node, targetControls, info)) continue;
+    if (!definitionBeforeWhen(def, targetControls[def.controls.size()].when, info)) continue;
+    StmtNode* target = sinkTarget(tree->root, targetControls);
+    if (target == nullptr || target == def.seq) continue;
+    size_t targetIndex = target->child.size();
+    for (const SinkUse& use : uses->second) {
+      targetIndex = std::min(targetIndex,
+                             useIndexInTarget(use, target, targetControls.size(), info));
+    }
+    moves.push_back({def.stmt, def.seq, target, def.index, def.order, targetIndex});
+  }
+  return static_cast<int>(moves.size());
+}
+
+} // namespace
+
+int StmtTree::sinkLocalComputations(const std::set<Node*>& blockedNodes) {
+  if (!hasWhen || !hasSinkCandidate) return 0;
+  SinkTreeInfo info;
+  collectSinkTree(root, nullptr, 0, {}, info);
+  std::vector<SinkMove> moves;
+  const int moved = collectSinkMoves(this, info, blockedNodes, moves);
+  if (moved == 0) return 0;
+
+  // Remove from each source sequence backwards so the collected indices stay
+  // valid while multiple definitions are moved from the same sequence.
+  std::vector<SinkMove*> removalOrder;
+  removalOrder.reserve(moves.size());
+  for (SinkMove& move : moves) removalOrder.push_back(&move);
+  std::sort(removalOrder.begin(), removalOrder.end(), [](const SinkMove* left,
+                                                         const SinkMove* right) {
+    if (left->seq != right->seq) return left->seq < right->seq;
+    return left->index > right->index;
+  });
+  for (SinkMove* move : removalOrder) {
+    Assert(move->index < move->seq->child.size(), "invalid sink definition index");
+    Assert(move->stmt->tree != nullptr && move->stmt->tree->getlval() != nullptr,
+           "sink definition has no expression tree");
+    move->seq->child.erase(move->seq->child.begin() + static_cast<std::ptrdiff_t>(move->index));
+  }
+
+  // Insert in original statement order. This preserves the ordering of pure
+  // definitions that share the same target region.
+  std::sort(moves.begin(), moves.end(), [](const SinkMove& left, const SinkMove& right) {
+    return left.order < right.order;
+  });
+  std::map<StmtNode*, size_t> inserted;
+  for (SinkMove& move : moves) {
+    size_t removedBefore = 0;
+    for (const SinkMove& other : moves) {
+      if (other.seq == move.target && other.index < move.targetIndex) ++removedBefore;
+    }
+    const size_t base = move.targetIndex >= removedBefore
+        ? move.targetIndex - removedBefore : 0;
+    const size_t offset = base + inserted[move.target]++;
+    move.target->child.insert(move.target->child.begin() +
+                                  static_cast<std::ptrdiff_t>(offset),
+                              move.stmt);
+    // Local values are displayed after normal evaluation under ENABLE_LOG.
+    // Preserve that diagnostic value at the old location without paying for
+    // the duplicate computation in production builds.
+    sinkDebugStmts.push_back(new StmtNode(
+        new ExpTree(move.stmt->tree->getRoot()->dup(), move.stmt->tree->getlval()->dup()),
+        move.stmt->belong));
+  }
+  return moved;
+}
+
 /**
  * @brief for all the depPrev of a node, calculates the longest(max) path
  *
@@ -256,75 +575,6 @@ void prevOrderPath(Node* node, std::vector<int>& prevPath, std::map<Node*, std::
       else break;
     }
   }
-}
-
-void getCommonPath(std::vector<int>& path1, ExpTree* referTree, std::vector<int>& path2, ExpTree* newTree) {
-  int commonNum = 1;
-  ENode* referRoot = referTree->getRoot();
-  ENode* newRoot = newTree->getRoot();
-  for (; commonNum < MIN(path1.size(), path2.size()) && referRoot->opType == OP_WHEN && newRoot->opType == OP_WHEN; commonNum ++) {
-    if (path1[commonNum] != path2[commonNum]) break;
-    if (!checkCondENodeSame(referRoot->getChild(0), newRoot->getChild(0))) break;
-    referRoot = referRoot->getChild(path1[commonNum]);
-    newRoot = newRoot->getChild(path2[commonNum]);
-  }
-  path1.resize(commonNum);
-}
-
-void getRelyPath(std::vector<int>&path, Node* node, ExpTree* tree) { // get the [path] in [tree] that refers [node]
-  enum status {NOT_VISITED, EXPANDED, VISITED};
-  std::map<ENode*, status> enodeStatus;
-  std::set<Node*> lvalueNodes;
-  getENodeRelyNodes(tree->getlval(), lvalueNodes);
-  bool inLvalue = lvalueNodes.find(node) != lvalueNodes.end(); // the path leads to assignment
-  std::stack<std::pair<ENode*, int>> s;
-  std::vector<int> currentPath;
-  bool isFirst = true;
-  s.push(std::make_pair(tree->getRoot(), 0));
-  while (!s.empty()) {
-    ENode* top;
-    int idx;
-    std::tie(top, idx) = s.top();
-    if (enodeStatus.find(top) == enodeStatus.end()) { // not visited
-      currentPath.push_back(idx);
-      /* compute common path of all referrence */
-      if (top->getNode() == node || (inLvalue && (top->getNode() || top->opType == OP_INT))) {
-        if (isFirst) {
-          path = currentPath;
-          isFirst = false;
-        } else {
-          getCommonPath(path, tree, currentPath, tree);
-        }
-        enodeStatus[top] = VISITED;
-        s.pop();
-        currentPath.pop_back();
-        continue;
-      }
-      /* expand top */
-      enodeStatus[top] = EXPANDED;
-      for (int i = 0; i < top->getChildNum(); i ++) {
-        Assert(enodeStatus.find(top->getChild(i)) == enodeStatus.end(), "already visited %p in %s\n", top->getChild(i), node->name.c_str());
-        if (top->getChild(i)) s.push(std::make_pair(top->getChild(i), i));
-      }
-    } else if (enodeStatus[top] == EXPANDED) {
-      enodeStatus[top] = VISITED;
-      s.pop();
-      currentPath.pop_back();
-    } else {
-      Panic();
-    }
-  }
-}
-
-bool isLastWhenCond(std::vector<int>&path, ExpTree* referTree) {
-  if (path.back() != 0) return false;
-  bool isLastWhenCond = false;
-  ENode* checkENode = referTree->getRoot();
-  for (size_t i = 1; i + 1 < path.size(); i ++) {
-    checkENode = checkENode->getChild(path[i]);
-  }
-  if (checkENode->opType == OP_WHEN) isLastWhenCond = true;
-  return isLastWhenCond;
 }
 
 void SuperNode::reorderMember() {
@@ -363,6 +613,8 @@ void SuperNode::reorderMember() {
 void graph::generateStmtTree() {
   orderAllNodes();
   std::map<Node*, std::vector<int>> allPath; // order in seq
+  size_t sinkTreeCount = 0;
+  size_t sinkMovedCount = 0;
   /* add when path for nodes with len(next in same SN) == 1 */
   for (int superIdx = sortedSuper.size() - 1; superIdx >= 0; superIdx --) {
     SuperNode* super = sortedSuper[superIdx];
@@ -392,6 +644,24 @@ void graph::generateStmtTree() {
     super->reorderMember();
   }
 
+  // Placement is decided with partition-wide visibility. A value consumed by
+  // another SuperNode must remain at its SuperNode boundary; otherwise the
+  // consumer can observe a value that is only computed inside a conditional
+  // branch of the producer.
+  std::set<Node*> blockedSinkNodes;
+  if (globalConfig.RepCutMode) {
+    for (SuperNode* super : sortedSuper) {
+      for (Node* node : super->member) {
+        for (Node* next : node->next) {
+          if (next != nullptr && next->super != super) blockedSinkNodes.insert(node);
+        }
+        for (Node* next : node->depNext) {
+          if (next != nullptr && next->super != super) blockedSinkNodes.insert(node);
+        }
+      }
+    }
+  }
+
   for (SuperNode* super : sortedSuper) {
     super->stmtTree = new StmtTree();
     super->stmtTree->root = new StmtNode(OP_STMT_SEQ);
@@ -415,6 +685,14 @@ void graph::generateStmtTree() {
       }
       allPath[node] = nodePath;
     }
+    if (globalConfig.RepCutMode) {
+      const int moved = super->stmtTree->sinkLocalComputations(blockedSinkNodes);
+      ++sinkTreeCount;
+      sinkMovedCount += moved;
+    }
+  }
+  if (globalConfig.RepCutMode) {
+    fprintf(stderr, "[StmtTree] sink trees=%zu moved=%zu\n", sinkTreeCount, sinkMovedCount);
   }
   for (SuperNode* super : allReset) {
     super->stmtTree = new StmtTree();
