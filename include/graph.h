@@ -21,7 +21,8 @@ class graph {
   bool __emitSrcMt(int indent, bool canNewFile, bool alreadyEndFunc, const char *nextFuncDef, const char *fmt, ...);
   void emitPrintf();
   void emitPrintfMt();
-  void activateNext(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName, int indent);
+  void activateNext(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName, int indent,
+                    std::string newName = "");
   void activateUncondNext(Node* node, std::set<int>& activateId, bool inStep, std::string flagName, int indent);
 
   FILE* genHeaderStart();

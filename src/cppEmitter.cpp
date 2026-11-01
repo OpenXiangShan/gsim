@@ -543,13 +543,14 @@ static void addRepCutGroups(Node* node, const std::set<int>& local, std::vector<
 }
 
 
-void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName, int indent) {
+void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName, int indent,
+                         std::string newName) {
   if (globalConfig.RepCutMode) {
     const bool regChange = rcUsesRegChange(node);
     std::vector<RcActGroup> groups;
     addRepCutGroups(node, nextNodeId, groups);
     if (groups.empty() && !regChange) return;
-    emitBodyLock(indent++, "if (%s != %s) {\n", node->name.c_str(), oldName.c_str());
+    emitBodyLock(indent++, "if (%s != %s) {\n", (newName.empty() ? node->name : newName).c_str(), oldName.c_str());
     for (RcActGroup& group : groups) {
       RcFlags guard(group.storage, group.part);
       // IDs are local to each partition. Never use the source cppId/flagName
@@ -810,12 +811,6 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
                    name.c_str(), last.c_str(), name.c_str(), first.c_str(), count - 1);
       emitBodyLock(indent, "static_assert(offsetof(S%s, %s) - offsetof(S%s, %s) == %zu * sizeof(uint64_t));\n",
                    name.c_str(), lastNext.c_str(), name.c_str(), firstNext.c_str(), count - 1);
-      emitBodyLock(indent, "uint64_t rcBulkOld[%zu];\n", count);
-      emitBodyLock(indent, "memcpy(rcBulkOld, (const char*)this + offsetof(S%s, %s), sizeof(rcBulkOld));\n",
-                   name.c_str(), first.c_str());
-      emitBodyLock(indent, "memcpy((char*)this + offsetof(S%s, %s), (const char*)this + offsetof(S%s, %s), sizeof(rcBulkOld));\n",
-                   name.c_str(), first.c_str(), name.c_str(), firstNext.c_str());
-
       std::set<int> destinations = bulk.front()->nextActiveId;
       bool sameDestination = !destinations.empty();
       for (Node* node : bulk) {
@@ -823,15 +818,18 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
             !rcForeign[node].empty()) sameDestination = false;
       }
       if (sameDestination) {
-        emitBodyLock(indent++, "if (memcmp(rcBulkOld, (const char*)this + offsetof(S%s, %s), sizeof(rcBulkOld)) != 0) {\n",
-                     name.c_str(), first.c_str());
+        emitBodyLock(indent++, "if (memcmp((const char*)this + offsetof(S%s, %s), (const char*)this + offsetof(S%s, %s), %zu * sizeof(uint64_t)) != 0) {\n",
+                     name.c_str(), first.c_str(), name.c_str(), firstNext.c_str(), count);
         emitActiveMask(destinations, indent);
         emitBodyLock(--indent, "}\n");
       } else {
         for (size_t i = 0; i < count; ++i) {
-          activateNext(bulk[i], bulk[i]->nextActiveId, format("rcBulkOld[%zu]", i), false, flagName, indent);
+          activateNext(bulk[i], bulk[i]->nextActiveId, bulk[i]->name, false, flagName, indent,
+                       bulk[i]->getDst()->name);
         }
       }
+      emitBodyLock(indent, "memcpy((char*)this + offsetof(S%s, %s), (const char*)this + offsetof(S%s, %s), %zu * sizeof(uint64_t));\n",
+                   name.c_str(), first.c_str(), name.c_str(), firstNext.c_str(), count);
     }
     if (!globalConfig.RepCutMode && super->superType == SUPER_ASYNC_RESET) emitBodyLock(indent, "subReset%d();\n", super2ResetId[super->resetNode].second);
     emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
