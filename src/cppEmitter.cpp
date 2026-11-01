@@ -43,6 +43,7 @@ static int rcCurPart = -1;
 static bool rcInWorker = false;
 static std::string gActiveFlags = "activeFlags";
 static int rcEmitPart = -1;
+static bool rcEmitEval = false;
 static int rcChunks[64];
 static int rcCommitChunks[64];
 static bool rcDeferForeign = false;
@@ -652,7 +653,9 @@ void graph::activateUncondNext(Node* node, std::set<int>& activateId, bool inSte
 int graph::genNodeStepStart(SuperNode* node, uint64_t mask, int idx, std::string flagName, int indent) {
   nodeNum ++;
   if (!isAlwaysActive(node->cppId)) {
-    emitBodyLock(indent ++, "if(unlikely(%s & 0x%lx)) { // id=%d\n", flagName.c_str(), mask, idx);
+    emitBodyLock(indent ++, rcEmitEval ? "if(%s & 0x%lx) { // id=%d\n"
+                                      : "if(unlikely(%s & 0x%lx)) { // id=%d\n",
+                 flagName.c_str(), mask, idx);
   }
   int id;
   uint64_t newMask;
@@ -1284,7 +1287,9 @@ void graph::emitRepCutFns(const std::vector<SuperNode*>& supers, const std::stri
 void graph::genRepCutEval(int part) {
   rcEmitPart = part;
   rcInWorker = true;
+  rcEmitEval = true;
   emitRepCutFns(rcEvalSupers[part], format("evalPart%d", part), rcChunks[part]);
+  rcEmitEval = false;
   rcInWorker = false;
   rcEmitPart = -1;
 }
@@ -1809,6 +1814,7 @@ void graph::genRepCutStep() {
 void graph::cppEmitter() {
   gActiveFlags = "activeFlags";
   rcEmitPart = -1;
+  rcEmitEval = false;
   rcHeader = nullptr;
   if (globalConfig.RepCutMode) {
     assignRepCutIds(sortedSuper);
