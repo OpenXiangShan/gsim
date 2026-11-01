@@ -748,6 +748,8 @@ int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
   return indent;
 }
 
+static std::vector<Node*> rcBulkCommitNodes(SuperNode* super);
+
 void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { // current indent = 2
   if (super->superType == SUPER_EXTMOD) { // TODO: normalize
     auto emitExtAsyncReset = [&](Node* extOut) {
@@ -786,15 +788,50 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
         emitBodyLock(indent, "%s %s;\n", widthUType(n->width).c_str(), n->name.c_str());
       }
     }
-    for (InstInfo inst : super->insts) {
-      indent = translateInst(inst, indent, flagName);
-    }
-    if (!super->stmtTree->sinkDebugInsts.empty()) {
-      emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
-      for (const InstInfo& inst : super->stmtTree->sinkDebugInsts) {
-        if (inst.infoType == SUPER_INFO_STR) emitBodyLock(indent, "%s\n", inst.inst.c_str());
+    const std::vector<Node*> bulk = rcBulkCommitNodes(super);
+    if (bulk.empty()) {
+      for (InstInfo inst : super->insts) {
+        indent = translateInst(inst, indent, flagName);
       }
-      emitBodyLock(indent, "#endif\n");
+      if (!super->stmtTree->sinkDebugInsts.empty()) {
+        emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
+        for (const InstInfo& inst : super->stmtTree->sinkDebugInsts) {
+          if (inst.infoType == SUPER_INFO_STR) emitBodyLock(indent, "%s\n", inst.inst.c_str());
+        }
+        emitBodyLock(indent, "#endif\n");
+      }
+    } else {
+      const size_t count = bulk.size();
+      const std::string& first = bulk.front()->name;
+      const std::string& last = bulk.back()->name;
+      const std::string& firstNext = bulk.front()->getDst()->name;
+      const std::string& lastNext = bulk.back()->getDst()->name;
+      emitBodyLock(indent, "static_assert(offsetof(S%s, %s) - offsetof(S%s, %s) == %zu * sizeof(uint64_t));\n",
+                   name.c_str(), last.c_str(), name.c_str(), first.c_str(), count - 1);
+      emitBodyLock(indent, "static_assert(offsetof(S%s, %s) - offsetof(S%s, %s) == %zu * sizeof(uint64_t));\n",
+                   name.c_str(), lastNext.c_str(), name.c_str(), firstNext.c_str(), count - 1);
+      emitBodyLock(indent, "uint64_t rcBulkOld[%zu];\n", count);
+      emitBodyLock(indent, "memcpy(rcBulkOld, (const char*)this + offsetof(S%s, %s), sizeof(rcBulkOld));\n",
+                   name.c_str(), first.c_str());
+      emitBodyLock(indent, "memcpy((char*)this + offsetof(S%s, %s), (const char*)this + offsetof(S%s, %s), sizeof(rcBulkOld));\n",
+                   name.c_str(), first.c_str(), name.c_str(), firstNext.c_str());
+
+      std::set<int> destinations = bulk.front()->nextActiveId;
+      bool sameDestination = !destinations.empty();
+      for (Node* node : bulk) {
+        if (node->nextActiveId != destinations || rcUsesRegChange(node) ||
+            !rcForeign[node].empty()) sameDestination = false;
+      }
+      if (sameDestination) {
+        emitBodyLock(indent++, "if (memcmp(rcBulkOld, (const char*)this + offsetof(S%s, %s), sizeof(rcBulkOld)) != 0) {\n",
+                     name.c_str(), first.c_str());
+        emitActiveMask(destinations, indent);
+        emitBodyLock(--indent, "}\n");
+      } else {
+        for (size_t i = 0; i < count; ++i) {
+          activateNext(bulk[i], bulk[i]->nextActiveId, format("rcBulkOld[%zu]", i), false, flagName, indent);
+        }
+      }
     }
     if (!globalConfig.RepCutMode && super->superType == SUPER_ASYNC_RESET) emitBodyLock(indent, "subReset%d();\n", super2ResetId[super->resetNode].second);
     emitBodyLock(indent, "#ifdef ENABLE_LOG\n");
@@ -1063,6 +1100,42 @@ static int rcSuperPart(SuperNode* super) {
 
 static bool rcNeedsId(SuperNode* super) {
   return !super->instsEmpty() || super->superType == SUPER_EXTMOD || super->superType == SUPER_ASYNC_RESET;
+}
+
+// Only a complete run of plain scalar register copies can be laid out and
+// copied together without changing the commit node's control flow.
+static std::vector<Node*> rcBulkCommitNodes(SuperNode* super) {
+#if defined(GSIM_DIFF) || defined(VERILATOR_DIFF)
+  return {};
+#endif
+  if (!globalConfig.RepCutMode || !repCutCommitOnly(super) ||
+      super->superType != SUPER_VALID || super->insts.size() % 3 != 0 ||
+      super->insts.size() < 24 || super->insts.size() > 3072 ||
+      !super->stmtTree->sinkDebugInsts.empty()) return {};
+  const size_t count = super->insts.size() / 3;
+  std::vector<Node*> nodes;
+  nodes.reserve(count);
+  std::set<Node*> seen;
+  for (size_t i = 0; i < count; ++i) {
+    const InstInfo& begin = super->insts[i];
+    if (begin.infoType != SUPER_INFO_ASSIGN_BEG || begin.node == nullptr) return {};
+    Node* node = begin.node;
+    if (node->type != NODE_REG_SRC || node->status != VALID_NODE ||
+        node->width != 64 || node->isArray() || node->isReset() ||
+        node->super != super || !node->needActivate() || !seen.insert(node).second)
+      return {};
+    Node* next = node->getDst();
+    if (next == nullptr || next->type != NODE_REG_DST || !next->regSplit ||
+        next->status != VALID_NODE || next->width != 64 ||
+        next->isArray() || next->isReset()) return {};
+    const InstInfo& copy = super->insts[count + i];
+    const InstInfo& end = super->insts[2 * count + i];
+    if (copy.infoType != SUPER_INFO_STR ||
+        copy.inst != node->name + " = " + next->name + ";" ||
+        end.infoType != SUPER_INFO_ASSIGN_END || end.node != node) return {};
+    nodes.push_back(node);
+  }
+  return nodes;
 }
 
 static void repCutActivate(Node* node) {
@@ -1842,6 +1915,21 @@ void graph::cppEmitter() {
 
   // header: node definition; src: node evaluation
   fprintf(header, "uint32_t _var_start;\n");
+  if (globalConfig.RepCutMode) {
+    for (SuperNode* super : sortedSuper) {
+      const std::vector<Node*> bulk = rcBulkCommitNodes(super);
+      if (bulk.empty()) continue;
+      for (Node* node : bulk) {
+        Assert(definedNode.insert(node).second, "bulk register declared twice: %s", node->name.c_str());
+        fprintf(header, "uint64_t %s;\n", node->name.c_str());
+      }
+      for (Node* node : bulk) {
+        Node* next = node->getDst();
+        Assert(definedNode.insert(next).second, "bulk next-state declared twice: %s", next->name.c_str());
+        fprintf(header, "uint64_t %s;\n", next->name.c_str());
+      }
+    }
+  }
   for (SuperNode* super : sortedSuper) {
     // std::string insts;
     if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
