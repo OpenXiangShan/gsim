@@ -701,6 +701,33 @@ static Node* allocAddrNode(graph* g, Node* port) {
   return addr_src;
 }
 
+// A synchronous read result must not depend on the same port's write data.
+// Keep the original node as the public read value and move write side effects
+// to a separate port before dependencies (and array members) are constructed.
+static void splitSyncReadWriter(graph* g, Node* reader) {
+  std::string writerName = reader->name + SEP_AGGR + "WRITE";
+  while (allSignals.count(writerName) || allAggr.count(writerName)) writerName += "_";
+  Node* writer = reader->dup(NODE_WRITER, writerName);
+  writer->clock = reader->clock;
+  writer->memTree = reader->memTree->dup();
+  writer->memTree->getlval()->nodePtr = writer;
+  writer->memTree->getRoot()->opType = OP_WRITE_MEM;
+  writer->assignTree.swap(reader->assignTree);
+  for (ExpTree* tree : writer->assignTree) {
+    ENode* lvalue = tree->getlval()->dup();
+    Assert(lvalue->getNode() == reader, "invalid readwriter lvalue in %s", reader->name.c_str());
+    lvalue->nodePtr = writer;
+    tree->setlval(lvalue);
+  }
+  reader->parent->add_member(writer);
+  addSignal(writer->name, writer);
+
+  Node* addrReg = allocAddrNode(g, reader);
+  reader->memTree->getRoot()->setChild(0, new ENode(addrReg));
+  reader->assignTree.push_back(reader->memTree);
+  reader->type = NODE_READER;
+}
+
 static Node* visitChirrtlPort(graph* g, PNode* port, int width, int depth, bool sign, std::string suffix, Node* node, ENode* addr_enode, Node* clock_node) {
   assert(port->type == P_READ || port->type == P_WRITE || port->type == P_INFER || port->type == P_READWRITER);
   // Add prefix port name
@@ -1581,6 +1608,12 @@ graph* AST2Graph(PNode* root) {
       node->valTree = nullptr;
     }
     if (node->type == NODE_READWRITER) {
+      // "new" relies on write-before-read ordering in the original node.
+      // Leave that policy and asynchronous ports on their existing path.
+      if (node->parent->rlatency == 1 && node->parent->extraInfo != "new") {
+        splitSyncReadWriter(g, node);
+        continue;
+      }
 #if RW_COND_READ
       ExpTree* newTree;
       if (node->parent->rlatency == 1) {
