@@ -3,6 +3,9 @@
 - Any `*.fir` file in this directory is auto-discovered by `make fir-tests` and by the GitHub CI `fir-regression` job.
 - A same-name `*.cpp` file is compiled with the generated model and run under
   AddressSanitizer and UndefinedBehaviorSanitizer.
+- async-reset.fir: Checks held asynchronous reset priority over enabled writes,
+  reassertion with writes disabled, and state after release for zero and nonzero
+  reset values.
 - array-narrowing.fir: Checks element-width truncation on two-dimensional
   register row connects, plus unsigned and signed whole-array narrowing and
   extension across native C++ storage widths.
