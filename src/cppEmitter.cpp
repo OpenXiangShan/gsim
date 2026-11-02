@@ -551,6 +551,25 @@ void graph::activateNext(Node* node, std::set<int>& nextNodeId, std::string oldN
     std::vector<RcActGroup> groups;
     addRepCutGroups(node, nextNodeId, groups);
     if (groups.empty() && !regChange) return;
+    std::string changedName = "cond_" + node->name;
+    bool branchless = !inStep && !regChange && groups.size() == 1 && groups[0].pendSrc < 0;
+    std::map<uint64_t, ActiveType> conditionalMasks;
+    if (branchless) {
+      activeSet2bitMap(groups[0].ids, conditionalMasks, -1);
+      branchless = !conditionalMasks.empty() && conditionalMasks.size() < 4;
+    }
+    if (branchless) {
+      emitBodyLock(indent, "bool %s = %s != %s;\n", changedName.c_str(),
+                   (newName.empty() ? node->name : newName).c_str(), oldName.c_str());
+      RcFlags guard(groups[0].storage, groups[0].part);
+      for (const auto& mask : conditionalMasks) {
+        emitBodyLock(indent, "%s // %s\n",
+                     updateActiveStr(static_cast<int>(mask.first), ACTIVE_MASK(mask.second),
+                                     changedName, ACTIVE_UNIQUE(mask.second)).c_str(),
+                     ACTIVE_COMMENT(mask.second).c_str());
+      }
+      return;
+    }
     emitBodyLock(indent++, "if (%s != %s) {\n", (newName.empty() ? node->name : newName).c_str(), oldName.c_str());
     for (RcActGroup& group : groups) {
       RcFlags guard(group.storage, group.part);
