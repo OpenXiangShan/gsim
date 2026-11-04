@@ -1,6 +1,8 @@
 #include "common.h"
 #include <stack>
 
+static bool nodeIdBefore(const Node* a, const Node* b) { return a->id < b->id; }
+
 bool checkENodeEq(ENode* enode1, ENode* enode2);
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
 
@@ -506,10 +508,15 @@ int StmtTree::sinkLocalComputations(const std::set<Node*>& blockedNodes) {
   // valid while multiple definitions are moved from the same sequence.
   std::vector<SinkMove*> removalOrder;
   removalOrder.reserve(moves.size());
-  for (SinkMove& move : moves) removalOrder.push_back(&move);
-  std::sort(removalOrder.begin(), removalOrder.end(), [](const SinkMove* left,
-                                                         const SinkMove* right) {
-    if (left->seq != right->seq) return left->seq < right->seq;
+  std::map<StmtNode*, size_t> sequenceOrder;
+  for (SinkMove& move : moves) {
+    removalOrder.push_back(&move);
+    auto [it, inserted] = sequenceOrder.emplace(move.seq, move.order);
+    if (!inserted) it->second = std::min(it->second, move.order);
+  }
+  std::sort(removalOrder.begin(), removalOrder.end(), [&](const SinkMove* left,
+                                                          const SinkMove* right) {
+    if (left->seq != right->seq) return sequenceOrder.at(left->seq) < sequenceOrder.at(right->seq);
     return left->index > right->index;
   });
   for (SinkMove* move : removalOrder) {
@@ -587,16 +594,20 @@ void SuperNode::reorderMember() {
     }
   }
   std::stack<Node*> s;
-  for (auto iter : nodePrev) {
-    if (iter.second == 0) {
-      newMember.push_back(iter.first);
-      s.push(iter.first);
+  std::vector<Node*> orderedMembers(member);
+  std::sort(orderedMembers.begin(), orderedMembers.end(), nodeIdBefore);
+  for (Node* node : orderedMembers) {
+    if (nodePrev[node] == 0) {
+      newMember.push_back(node);
+      s.push(node);
     }
   }
   while (!s.empty()) {
     Node* node = s.top();
     s.pop();
-    for (Node* next : node->depNext) {
+    std::vector<Node*> orderedNext(node->depNext.begin(), node->depNext.end());
+    std::sort(orderedNext.begin(), orderedNext.end(), nodeIdBefore);
+    for (Node* next : orderedNext) {
       if (next->super == this) {
         nodePrev[next] --;
         if (nodePrev[next] == 0) {

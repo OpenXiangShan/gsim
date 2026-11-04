@@ -167,8 +167,11 @@ void graph::graphInitPartition() {
 #define REFINE_DST(gain) std::get<1>(gain)
 #define REFINE_GAIN(gain) std::get<2>(gain)
 struct gainLess { // ascending order
-  bool operator()(REFINE_TYPE n1, REFINE_TYPE n2) {
-    return REFINE_GAIN(n1) < REFINE_GAIN(n2);
+  bool operator()(const REFINE_TYPE& n1, const REFINE_TYPE& n2) const {
+    if (REFINE_GAIN(n1) != REFINE_GAIN(n2)) return REFINE_GAIN(n1) < REFINE_GAIN(n2);
+    if (REFINE_NODE(n1)->id != REFINE_NODE(n2)->id)
+      return REFINE_NODE(n1)->id > REFINE_NODE(n2)->id;
+    return REFINE_DST(n1)->order > REFINE_DST(n2)->order;
   }
 };
 static std::priority_queue<REFINE_TYPE, std::vector<REFINE_TYPE>, gainLess> gainQueue;
@@ -253,7 +256,8 @@ SuperNode* checkIncoming(Node* node) {
       isInComing = false;
       break;
     } else {
-      if (prev->super->order > maxOrder) {
+      if (prev->super->order > maxOrder ||
+          (prev->super->order == maxOrder && (maxNode == nullptr || prev->id < maxNode->id))) {
         maxOrder = prev->super->order;
         maxNode = prev;
       }
@@ -266,13 +270,14 @@ SuperNode* checkIncoming(Node* node) {
 SuperNode* checkOutcoming(Node* node) {
   bool isOutComing = true;
   Node* minNode = nullptr;
-  int minOrder = -1;
+  int minOrder = INT_MAX;
   for (Node* next : node->next) {
     if (next->super->order == node->super->order) {
       isOutComing = false;
       break;
     } else {
-      if (next->super->order < minOrder) {
+      if (next->super->order < minOrder ||
+          (next->super->order == minOrder && (minNode == nullptr || next->id < minNode->id))) {
         minOrder = next->super->order;
         minNode = next;
       }

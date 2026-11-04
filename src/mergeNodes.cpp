@@ -8,6 +8,20 @@
 #define MAX_NODES_PER_SUPER 7000
 #define MAX_SUBLINGS 30
 
+struct SuperIdLess {
+  bool operator()(const SuperNode* a, const SuperNode* b) const { return a->id < b->id; }
+};
+
+struct NodeIdLess {
+  bool operator()(const Node* a, const Node* b) const { return a->id < b->id; }
+};
+
+static std::vector<SuperNode*> orderedSupers(const std::set<SuperNode*>& nodes) {
+  std::vector<SuperNode*> result(nodes.begin(), nodes.end());
+  std::sort(result.begin(), result.end(), SuperIdLess{});
+  return result;
+}
+
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
 
 bool anyPath(SuperNode* src, SuperNode* dst) {
@@ -82,7 +96,7 @@ void graph::mergeWhenNodes() {
   std::map<SuperNode*, std::set<SuperNode*>> allCond;
   std::map<SuperNode*, SuperNode*> node2Cond;
   std::map<SuperNode*, int>times;
-  std::map<SuperNode*, std::vector<SuperNode*>> whenMap;
+  std::map<SuperNode*, std::vector<SuperNode*>, SuperIdLess> whenMap;
   /* generator all cond nodes */
   for (SuperNode* super : sortedSuper) {
     times[super] = 0;
@@ -126,7 +140,7 @@ void graph::mergeWhenNodes() {
   while (!s.empty()) {
     SuperNode* top = s.front();
     s.pop();
-    for (SuperNode* next : top->depNext) {
+    for (SuperNode* next : orderedSupers(top->depNext)) {
       times[next] ++;
       if (times[next] + 1 == next->depPrev.size()) {
         if (node2Cond.find(next) != node2Cond.end()) {
@@ -140,12 +154,12 @@ void graph::mergeWhenNodes() {
     }
     while (s.empty() && (!cond.empty() || condWait.size() > 0)) {
       if (cond.empty()) {
-        cond2Queue(*condWait.begin());
+        cond2Queue(*std::min_element(condWait.begin(), condWait.end(), SuperIdLess{}));
       }
       SuperNode* mergeCond = cond.front();
       cond.pop();
       std::vector<SuperNode*> mergeSuper;
-      for (SuperNode* next : mergeCond->depNext) {
+      for (SuperNode* next : orderedSupers(mergeCond->depNext)) {
         times[next] ++;
         if (times[next] == next->depPrev.size()) {
           if (allCond[mergeCond].find(next) != allCond[mergeCond].end()) mergeSuper.push_back(next);
@@ -214,7 +228,7 @@ void graph::when2mux() {
 }
 
 void graph::mergeResetAll() {
-  std::map<Node*, std::pair<SuperNode*, SuperNode*>> resetSuper; // node as uint / async reset
+  std::map<Node*, std::pair<SuperNode*, SuperNode*>, NodeIdLess> resetSuper; // node as uint / async reset
   for (Node* reg : regsrc) {
     if (reg->reset != UINTRESET && reg->reset != ASYRESET) continue;
     std::set<Node*> prev;
@@ -377,7 +391,7 @@ void graph::mergeIn1() {
 uint64_t prevHash(SuperNode* super) {
   uint64_t ret = super->prev.size()*7;
   for (SuperNode* prev : super->prev) {
-    ret += (uint64_t)prev;
+    ret += static_cast<uint64_t>(prev->id);
   }
   return ret;
 }
@@ -397,10 +411,10 @@ void graph::mergeSublings() {
   }
 
   for (auto iter : prevSuper) {
-    std::set<SuperNode*> uniquePrev;
+    std::vector<SuperNode*> uniquePrev;
     for (SuperNode* super : iter.second) {
       bool find = false;
-      for (SuperNode* checkSuper : uniquePrev) {
+      for (SuperNode*& checkSuper : uniquePrev) {
         if (prevEq(checkSuper, super)) { // merge or replace
           find = true;
           if (!repCutMergeOk(checkSuper, super)) break;
@@ -409,13 +423,12 @@ void graph::mergeSublings() {
             checkSuper->member.insert(checkSuper->member.end(), super->member.begin(), super->member.end());
             super->member.clear();
           } else {
-            uniquePrev.erase(checkSuper);
-            uniquePrev.insert(super);
+            checkSuper = super;
           }
           break;
         }
       }
-      if (!find) uniquePrev.insert(super);
+      if (!find) uniquePrev.push_back(super);
     }
   }
   removeEmptySuper();

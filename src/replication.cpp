@@ -5,6 +5,12 @@
 
 /* non-negative if node is replicated and -1 if node is not */
 static std::map<Node*, int> opNum;
+struct SuperOrderLess {
+  bool operator()(const SuperNode* a, const SuperNode* b) const {
+    if (a->order != b->order) return a->order < b->order;
+    return a->id < b->id;
+  }
+};
 void getENodeRelyNodes(ENode* enode, std::set<Node*>& allNodes);
 
 void ExpTree::replace(Node* oldNode, Node* newNode) {
@@ -92,12 +98,16 @@ void graph::replicationOpt() {
   /* remove replication nodes and update connections */
   for (int i = repNodes.size() - 1; i >= 0; i --) {
     Node* node = repNodes[i];
-    std::map<SuperNode*, std::vector<Node*>> nextSuper;
+    std::map<SuperNode*, std::vector<Node*>, SuperOrderLess> nextSuper;
     bool remainNode = false;
     for (Node* next : node->next) {
       if (nextSuper.find(next->super) == nextSuper.end()) nextSuper[next->super] = std::vector<Node*>();
       nextSuper[next->super].push_back(next);
       if (next->super == node->super) remainNode = true;
+    }
+    for (auto& target : nextSuper) {
+      std::sort(target.second.begin(), target.second.end(),
+                [](const Node* a, const Node* b) { return a->id < b->id; });
     }
     if (!remainNode) node->status = REPLICATION_NODE;
     int repIdx = 1;

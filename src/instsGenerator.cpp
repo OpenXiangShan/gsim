@@ -1858,7 +1858,8 @@ void StmtTree::compute(std::vector<InstInfo>& insts) {
     root->compute(insts);
     return;
   }
-  std::map<Node*, StmtNode*> debugByNode;
+  auto nodeIdLess = [](const Node* left, const Node* right) { return left->id < right->id; };
+  std::map<Node*, StmtNode*, decltype(nodeIdLess)> debugByNode(nodeIdLess);
   std::vector<StmtNode*> debugWithoutNode;
   for (StmtNode* debugStmt : sinkDebugStmts) {
     if (debugStmt == nullptr || debugStmt->tree == nullptr ||
@@ -1881,7 +1882,9 @@ void StmtTree::compute(std::vector<InstInfo>& insts) {
     StmtNode* debugStmt = debugByNode.at(node);
     getENodeRelyNodes(debugStmt->tree->getRoot(), dependencies);
     getENodeRelyNodes(debugStmt->tree->getlval(), dependencies);
-    for (Node* dependency : dependencies) {
+    std::vector<Node*> orderedDependencies(dependencies.begin(), dependencies.end());
+    std::sort(orderedDependencies.begin(), orderedDependencies.end(), nodeIdLess);
+    for (Node* dependency : orderedDependencies) {
       if (debugByNode.count(dependency) != 0) visitDebug(dependency);
     }
     visiting.erase(node);

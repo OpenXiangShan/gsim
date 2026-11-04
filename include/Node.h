@@ -341,7 +341,7 @@ class InstInfo{
 public:
   SuperInfo infoType = SUPER_INFO_STR;
   std::string inst;
-  Node* node;
+  Node* node = nullptr;
   InstInfo(SuperInfo _type, Node* _node) {
     infoType = _type;
     node = _node;
@@ -358,7 +358,8 @@ public:
   bool operator<(const InstInfo& other) const {
     if (infoType != other.infoType) return infoType < other.infoType;
     if (inst != other.inst) return inst < other.inst;
-    return node < other.node;
+    if (node == nullptr || other.node == nullptr) return node == nullptr && other.node != nullptr;
+    return node->id < other.node->id;
   }
 };
 class SuperNode {

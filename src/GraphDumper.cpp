@@ -183,6 +183,7 @@ class GraphJsonDumper {
         if (!firstNode) os << ",\n";
         firstNode = false;
         os << "    {\"name\": \"" << jsonEscape(node->name) << "\", "
+           << "\"id\": " << node->id << ", "
            << "\"type\": \"" << nodeTypeToStr(node->type) << "\", "
            << "\"super\": " << super->id;
         if (globalConfig.DumpAssignTree) {
@@ -199,6 +200,22 @@ class GraphJsonDumper {
       if (!firstEdge) os << ",\n";
       firstEdge = false;
       os << "    [\"" << e.first << "\", \"" << e.second << "\"]";
+    }
+    os << "\n  ],\n  \"instructions\": [\n";
+    bool firstSuper = true;
+    for (const SuperNode* super : supers) {
+      if (!firstSuper) os << ",\n";
+      firstSuper = false;
+      os << "    {\"super\": " << super->id << ", \"insts\": [";
+      bool firstInst = true;
+      for (const InstInfo& inst : super->insts) {
+        if (!firstInst) os << ", ";
+        firstInst = false;
+        os << "[" << static_cast<int>(inst.infoType) << ", "
+           << (inst.node ? inst.node->id : -1) << ", \""
+           << jsonEscape(inst.inst) << "\"]";
+      }
+      os << "]}";
     }
     os << "\n  ]\n}\n";
   }

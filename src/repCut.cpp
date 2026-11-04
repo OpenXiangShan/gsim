@@ -759,6 +759,14 @@ void graph::repCutSplit() {
   std::vector<std::vector<int>> hedges;
   std::vector<double> hedgeWeight;
   std::vector<std::vector<int>> incident(groupCount);
+  struct OrderedCluster {
+    std::vector<int> pins;
+    double weight;
+    bool anchored;
+    const char* name;
+  };
+  std::vector<OrderedCluster> orderedClusters;
+  orderedClusters.reserve(clusters.size());
   for (const auto& entry : clusters) {
     std::vector<int> pins;
     for (int cursor = entry.first; cursor != 0; cursor = cons[cursor].tail) {
@@ -766,17 +774,26 @@ void graph::repCutSplit() {
     }
     std::sort(pins.begin(), pins.end());
     pins.erase(std::unique(pins.begin(), pins.end()), pins.end());
-    Assert(!entry.second.anchored || pins.size() <= 1,
-           "RepCut resource group failed to keep %s together", entry.second.name);
-    if (pins.empty() || entry.second.eta <= 0) continue;
-    if (pins.size() == 1) {
-      vertexWeight[pins[0]] += entry.second.eta;
+    orderedClusters.push_back({std::move(pins), entry.second.eta,
+                               entry.second.anchored, entry.second.name});
+  }
+  std::sort(orderedClusters.begin(), orderedClusters.end(),
+            [](const OrderedCluster& a, const OrderedCluster& b) {
+              if (a.pins != b.pins) return a.pins < b.pins;
+              return a.weight < b.weight;
+            });
+  for (OrderedCluster& cluster : orderedClusters) {
+    Assert(!cluster.anchored || cluster.pins.size() <= 1,
+           "RepCut resource group failed to keep %s together", cluster.name);
+    if (cluster.pins.empty() || cluster.weight <= 0) continue;
+    if (cluster.pins.size() == 1) {
+      vertexWeight[cluster.pins[0]] += cluster.weight;
       continue;
     }
     const int edge = static_cast<int>(hedges.size());
-    for (int pin : pins) incident[pin].push_back(edge);
-    hedges.push_back(std::move(pins));
-    hedgeWeight.push_back(entry.second.eta);
+    for (int pin : cluster.pins) incident[pin].push_back(edge);
+    hedges.push_back(std::move(cluster.pins));
+    hedgeWeight.push_back(cluster.weight);
   }
   const double stateWeightScale = repCutStateWeightScale();
   const double totalGroupStateCost = std::accumulate(groupStateCost.begin(), groupStateCost.end(), 0.0);
@@ -981,9 +998,14 @@ void graph::repCutSplit() {
   for (Node* n : nodes) {
     for (ExpTree* tree : n->assignTree) retargetTree(tree,n->rcPart,version);
   }
-  for (const auto& entry : version) for (const auto& v : entry.second) {
-    if (v.second == entry.first) continue;
-    for (ExpTree* tree : v.second->assignTree) retargetTree(tree,v.first,version);
+  for (Node* n : nodes) {
+    auto copies = version.find(n);
+    if (copies == version.end()) continue;
+    for (int part = 0; part < threads; ++part) {
+      auto copy = copies->second.find(part);
+      if (copy == copies->second.end() || copy->second == n) continue;
+      for (ExpTree* tree : copy->second->assignTree) retargetTree(tree, part, version);
+    }
   }
   reconnectAll(); resort();
   FILE* report = std::fopen((globalConfig.OutputDir+"/repcut-partitions.csv").c_str(),"w");
