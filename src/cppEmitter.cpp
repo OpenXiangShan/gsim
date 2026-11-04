@@ -1938,28 +1938,49 @@ void graph::cppEmitter() {
 
   // header: node definition; src: node evaluation
   fprintf(header, "uint32_t _var_start;\n");
+  auto isStateNode = [](Node* node) {
+    return node != nullptr && (node->type == NODE_REG_SRC || node->type == NODE_REG_DST);
+  };
   if (globalConfig.RepCutMode) {
-    for (SuperNode* super : sortedSuper) {
-      const std::vector<Node*> bulk = rcBulkCommitNodes(super);
-      if (bulk.empty()) continue;
-      for (Node* node : bulk) {
-        Assert(definedNode.insert(node).second, "bulk register declared twice: %s", node->name.c_str());
-        fprintf(header, "uint64_t %s;\n", node->name.c_str());
-      }
-      for (Node* node : bulk) {
-        Node* next = node->getDst();
-        Assert(definedNode.insert(next).second, "bulk next-state declared twice: %s", next->name.c_str());
-        fprintf(header, "uint64_t %s;\n", next->name.c_str());
+    const int threads = rcThreads();
+    for (int part = 0; part < threads; ++part) {
+      for (SuperNode* super : sortedSuper) {
+        if (rcSuperPart(super) != part) continue;
+        const std::vector<Node*> bulk = rcBulkCommitNodes(super);
+        if (bulk.empty()) continue;
+        for (Node* node : bulk) {
+          Assert(definedNode.insert(node).second, "bulk register declared twice: %s", node->name.c_str());
+          fprintf(header, "uint64_t %s;\n", node->name.c_str());
+        }
+        for (Node* node : bulk) {
+          Node* next = node->getDst();
+          Assert(definedNode.insert(next).second, "bulk next-state declared twice: %s", next->name.c_str());
+          fprintf(header, "uint64_t %s;\n", next->name.c_str());
+        }
       }
     }
   }
-  for (SuperNode* super : sortedSuper) {
-    // std::string insts;
-    if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET) {
-      for (Node* n : super->member) genNodeDef(header, n);
+  if (globalConfig.RepCutMode) {
+    const int threads = rcThreads();
+    for (int part = 0; part < threads; ++part) {
+      for (SuperNode* super : sortedSuper) {
+        if (rcSuperPart(super) != part) continue;
+        if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET)
+          for (Node* n : super->member) if (isStateNode(n)) genNodeDef(header, n);
+      }
     }
-    if (super->superType == SUPER_EXTMOD) {
-      for (size_t i = 1; i < super->member.size(); i ++) genNodeDef(header, super->member[i]);
+    for (SuperNode* super : sortedSuper) {
+      if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET)
+        for (Node* n : super->member) if (!isStateNode(n)) genNodeDef(header, n);
+      if (super->superType == SUPER_EXTMOD)
+        for (size_t i = 1; i < super->member.size(); i ++) genNodeDef(header, super->member[i]);
+    }
+  } else {
+    for (SuperNode* super : sortedSuper) {
+      if (super->superType == SUPER_VALID || super->superType == SUPER_ASYNC_RESET)
+        for (Node* n : super->member) genNodeDef(header, n);
+      if (super->superType == SUPER_EXTMOD)
+        for (size_t i = 1; i < super->member.size(); i ++) genNodeDef(header, super->member[i]);
     }
   }
   /* memory definition */
