@@ -1028,6 +1028,16 @@ void graph::cppEmitter() {
     }
   }
 
+  // Finalize activation before choosing fields for the FST inventory.
+  for (SuperNode* super : sortedSuper) {
+    for (Node* member : super->member) {
+      if (member->status == VALID_NODE) {
+        member->updateActivate();
+        member->updateNeedActivate(alwaysActive);
+      }
+    }
+  }
+
   fstWaveNodes.clear();
   fstWaveNodeSet.clear();
   fstOldValueOffsets.clear();
@@ -1088,15 +1098,6 @@ void graph::cppEmitter() {
   activeFlagNum = (superId + ACTIVE_WIDTH - 1) / ACTIVE_WIDTH;
   // avoid buffer overflow when accessing the last elements as uint64_t
   activeFlagNum = ROUNDUP(activeFlagNum, 8);
-
-  for (SuperNode* super : sortedSuper) {
-    for (Node* member : super->member) {
-      if (member->status == VALID_NODE) {
-        member->updateActivate();
-        member->updateNeedActivate(alwaysActive);
-      }
-    }
-  }
 
   srcFp = NULL;
   srcFileIdx = 0;
