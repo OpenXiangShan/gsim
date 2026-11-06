@@ -10,6 +10,7 @@ struct Config {
   bool DumpConstStatus;
   std::string OutputDir;
   std::string StopAfterStage;
+  std::string SplitArrayMapPath;
   int SuperNodeMaxSize;
   uint32_t cppMaxSizeKB;
   std::string sep_module;

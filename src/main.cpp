@@ -128,6 +128,7 @@ static void printUsage(const char* ProgName) {
             << "      --stop-after-stage=[name]    Stop after the named stage boundary.\n"
             << "      --dump-assign-tree           Include assignTree structure in JSON dump (can be large).\n"
             << "      --dump-const-status          Dump per-node constant-analysis status before removing constants.\n"
+            << "      --dump-split-array-map=PATH Dump original array Nodes to their split members.\n"
             ;
 }
 
@@ -158,6 +159,7 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_STOP_AFTER_STAGE,
     OPT_DUMP_ASSIGN_TREE,
     OPT_DUMP_CONST_STATUS,
+    OPT_DUMP_SPLIT_ARRAY_MAP,
   };
 
   const struct option Table[] = {
@@ -179,6 +181,7 @@ static char* parseCommandLine(int argc, char** argv) {
       {"stop-after-stage", required_argument, nullptr, 0},
       {"dump-assign-tree", no_argument, nullptr, 0},
       {"dump-const-status", no_argument, nullptr, 0},
+      {"dump-split-array-map", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -245,6 +248,9 @@ static char* parseCommandLine(int argc, char** argv) {
                   break;
                 case OPT_DUMP_CONST_STATUS:
                   globalConfig.DumpConstStatus = true;
+                  break;
+                case OPT_DUMP_SPLIT_ARRAY_MAP:
+                  globalConfig.SplitArrayMapPath = optarg;
                   break;
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }

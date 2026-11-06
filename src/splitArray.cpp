@@ -1,5 +1,8 @@
 #include "common.h"
+#include <algorithm>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <queue>
 #include <stack>
 #include <set>
@@ -15,6 +18,73 @@ static std::set<Node*> fullyVisited;
 static std::set<Node*> partialVisited;
 
 static std::map<Node*, std::vector<Node*>> splitArrayMap;
+
+static std::string splitArrayMapEscape(const std::string& text) {
+  std::string out;
+  for (unsigned char ch : text) {
+    switch (ch) {
+      case '\\': out += "\\\\"; break;
+      case '"': out += "\\\""; break;
+      case '\b': out += "\\b"; break;
+      case '\f': out += "\\f"; break;
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
+      default:
+        if (ch >= 0x20) out += static_cast<char>(ch);
+    }
+  }
+  return out;
+}
+
+static void dumpSplitArrayMap(graph* g) {
+  if (globalConfig.SplitArrayMapPath.empty()) return;
+  using Row = std::tuple<std::string, size_t, const Node*, const Node*>;
+  std::vector<Row> rows;
+  for (const auto& entry : splitArrayMap) {
+    for (size_t index = 0; index < entry.second.size(); ++index) {
+      rows.emplace_back(entry.first->name, index, entry.first, entry.second[index]);
+    }
+  }
+  std::sort(rows.begin(), rows.end(), [](const Row& lhs, const Row& rhs) {
+    if (std::get<0>(lhs) != std::get<0>(rhs)) return std::get<0>(lhs) < std::get<0>(rhs);
+    return std::get<1>(lhs) < std::get<1>(rhs);
+  });
+  const std::filesystem::path path(globalConfig.SplitArrayMapPath);
+  if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path());
+  std::ofstream out(path);
+  if (!out.is_open()) {
+    fprintf(stderr, "Cannot open split array map: %s\n", path.c_str());
+    exit(1);
+  }
+  auto dumpDimension = [&out](const Node* node) {
+    out << "[";
+    for (size_t index = 0; index < node->dimension.size(); ++index) {
+      if (index != 0) out << ", ";
+      out << node->dimension[index];
+    }
+    out << "]";
+  };
+  out << "{\n  \"formatVersion\": 1,\n  \"parents\": " << splitArrayMap.size()
+      << ",\n  \"members\": " << rows.size() << ",\n  \"entries\": [\n";
+  for (size_t index = 0; index < rows.size(); ++index) {
+    const Node* parent = std::get<2>(rows[index]);
+    const Node* member = std::get<3>(rows[index]);
+    out << "    {\"parentId\": " << parent->id
+        << ", \"parentName\": \"" << splitArrayMapEscape(parent->name)
+        << "\", \"parentWidth\": " << parent->width << ", \"parentDimension\": ";
+    dumpDimension(parent);
+    out << ", \"memberIndex\": " << std::get<1>(rows[index])
+        << ", \"memberId\": " << member->id
+        << ", \"memberName\": \"" << splitArrayMapEscape(member->name)
+        << "\", \"memberWidth\": " << member->width << ", \"memberDimension\": ";
+    dumpDimension(member);
+    out << "}";
+    if (index + 1 != rows.size()) out << ",";
+    out << "\n";
+  }
+  out << "  ]\n}\n";
+}
 
 ExpTree* dupTreeWithIdx(ExpTree* tree, std::vector<int>& index, Node* node) {
   ENode* lvalue = tree->getlval()->dup();
@@ -449,6 +519,7 @@ void graph::splitArray() {
     std::remove_if(supersrc.begin(), supersrc.end(), [](const SuperNode* n) {return n->member[0]->status == DEAD_NODE; }),
     supersrc.end()
   );
+  dumpSplitArrayMap(this);
 }
 
 Node* Node::arrayMemberNode(int idx) {
