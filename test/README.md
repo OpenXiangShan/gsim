@@ -3,6 +3,8 @@
 - Any `*.fir` file in this directory is auto-discovered by `make fir-tests` and by the GitHub CI `fir-regression` job.
 - A same-name `*.cpp` file is compiled with the generated model and run under
   AddressSanitizer and UndefinedBehaviorSanitizer.
+- An optional same-name `*.flags` file supplies additional GSIM generator flags
+  for that case; changing it invalidates the test result.
 - array-narrowing.fir: Checks element-width truncation on two-dimensional
   register row connects, plus unsigned and signed whole-array narrowing and
   extension across native C++ storage widths.
@@ -27,3 +29,11 @@
   and padding applied to negative signed constants.
 - signed-runtime-slice.fir: Checks that a full-width signed bit selection becomes
   unsigned without host sign-extension bits when concatenated with other bits.
+
+- fst-activation-fields.fir: Checks that shared intermediate signals spanning
+  supernodes appear in the FST after activation determines their model storage.
+  Its companion flags enable FST and limit supernodes to one node. The runtime
+  checks the generated model, then reads the actual FST and verifies one 64-bit
+  declaration per signal (`shared`, `cross`) and their values over four samples.
+  Before the fix, the model computes correctly but both FST signals are missing.
+  Run it with `make run-fir-test FIR_TEST=fst-activation-fields`.

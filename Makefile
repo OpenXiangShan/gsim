@@ -234,6 +234,7 @@ FIR_TEST ?=
 FIR_TEST_CXXFLAGS ?= --std=c++20 -O1 -fsanitize=address,undefined -fno-sanitize-recover=all
 FIR_TEST_LDFLAGS ?= -pthread -lz
 FIR_TEST_TIMEOUT_PREFIX = $(if $(strip $(FIR_TEST_TIMEOUT)),timeout $(FIR_TEST_TIMEOUT),)
+FIR_TEST_CASE_FLAGS = $(if $(wildcard $(FIR_TEST_INPUT_DIR)/$*.flags),$(shell cat $(FIR_TEST_INPUT_DIR)/$*.flags))
 FIR_TEST_TARGETS = $(addprefix $(FIR_TEST_OUTPUT_DIR)/,$(addsuffix /.done,$(FIR_TEST_CASES)))
 
 $(GEN_CPP_DIR)/$(NAME)0.cpp: $(GSIM_BIN) $(FIRRTL_FILE)
@@ -247,16 +248,16 @@ compile: $(GEN_CPP_DIR)/$(NAME)0.cpp
 .PHONY: compile
 
 .SECONDEXPANSION:
-$(FIR_TEST_OUTPUT_DIR)/%/.done: $(FIR_TEST_INPUT_DIR)/%.fir $(GSIM_BIN) $$(wildcard $$(FIR_TEST_INPUT_DIR)/$$*.cpp)
+$(FIR_TEST_OUTPUT_DIR)/%/.done: $(FIR_TEST_INPUT_DIR)/%.fir $(GSIM_BIN) $$(wildcard $$(FIR_TEST_INPUT_DIR)/$$*.cpp $$(FIR_TEST_INPUT_DIR)/$$*.flags)
 	@mkdir -p $(@D)
 	set -o pipefail && $(TIME) $(FIR_TEST_TIMEOUT_PREFIX) $(GSIM_BIN) --dir $(@D) \
-		$(GSIM_FLAGS_EXTRA) $< | tee $(@D)/gsim.log
+		$(GSIM_FLAGS_EXTRA) $(FIR_TEST_CASE_FLAGS) $< | tee $(@D)/gsim.log
 	@if [[ -f "$(FIR_TEST_INPUT_DIR)/$*.cpp" ]]; then \
 		set -e; \
 		echo "+ CXX/RUN $*"; \
 		$(CXX) $(FIR_TEST_CXXFLAGS) -I$(@D) $(@D)/*.cpp \
 			$(FIR_TEST_INPUT_DIR)/$*.cpp $(FIR_TEST_LDFLAGS) -o $(@D)/runtime-test; \
-		$(FIR_TEST_TIMEOUT_PREFIX) $(@D)/runtime-test; \
+		cd "$(@D)" && $(FIR_TEST_TIMEOUT_PREFIX) ./runtime-test; \
 	fi
 	@touch $@
 
