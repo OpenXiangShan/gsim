@@ -277,12 +277,14 @@ FILE* graph::genHeaderStart() {
     newLine(header);
   }
 
+  fprintf(header, "\n#define GSIM_HAS_ASSERT_HANDLER 1\n");
   fprintf(header, "\n#define gAssert(cond, ...) do {"
                      "if (!(cond)) {"
                        "fprintf(stderr, \"\\33[1;31m\");"
                        "fprintf(stderr, __VA_ARGS__);"
                        "fprintf(stderr, \"\\33[0m\\n\");"
-                       "assert(cond);"
+                       "if (gsim_assert) gsim_assert(__FILE__, __LINE__);"
+                       "else { assert(cond); }"
                      "}"
                    "} while (0)\n");
   fprintf(header, "#define gdiv(a, b) ((b) == 0 ? 0 : (a) / (b))\n");
@@ -1110,6 +1112,9 @@ void graph::cppEmitter() {
   /* class start*/
   fprintf(header, "class S%s {\npublic:\n", name.c_str());
   if (globalConfig.TraceFst) fprintf(header, "static constexpr bool kTraceFstCompiled = true;\n");
+  fprintf(header, "using assertFunc = void (*)(const char*, long long);\n");
+  fprintf(header, "assertFunc gsim_assert = nullptr;\n");
+  fprintf(header, "void register_assert(assertFunc fn) { gsim_assert = fn; }\n");
   fprintf(header, "uint64_t cycles;\n");
   fprintf(header, "uint64_t LOG_START, LOG_END;\n");
   fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
