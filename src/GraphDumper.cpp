@@ -320,8 +320,19 @@ class GraphJsonDumper {
     for (const Node* node : nodes) {
       if (!firstNode) os << ",\n";
       firstNode = false;
-      os << "    {\"name\": \"" << jsonEscape(node->name) << "\", "
+      os << "    {\"id\": " << node->id << ", "
+         << "\"name\": \"" << jsonEscape(node->name) << "\", "
          << "\"type\": \"" << nodeTypeToStr(node->type) << "\", "
+         << "\"status\": \"" << nodeStatusToStr(node->status) << "\", "
+         << "\"width\": " << node->width << ", "
+         << "\"sign\": " << node->sign << ", "
+         << "\"dimension\": [";
+      for (size_t i = 0; i < node->dimension.size(); ++i) {
+        if (i) os << ", ";
+        os << node->dimension[i];
+      }
+      os << "], "
+         << "\"lineno\": " << node->lineno << ", "
          << "\"super\": " << (node->super ? node->super->id : -1);
       if (globalConfig.DumpAssignTree) {
         os << ", \"assignTrees\": ";
