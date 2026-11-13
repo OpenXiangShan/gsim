@@ -1,4 +1,5 @@
 #include "common.h"
+#include "NodeEvolution.h"
 #include <algorithm>
 #include <cstdio>
 #include <filesystem>
@@ -7,17 +8,90 @@
 #include <stack>
 #include <set>
 #include <map>
+#include <memory>
 #include <tuple>
 #include <utility>
 
 bool nextVarConnect(Node* node);
 bool nameExist(std::string str);
-void changeName(std::string oldName, std::string newName);
+Node* changeName(std::string oldName, std::string newName);
 
 static std::set<Node*> fullyVisited;
 static std::set<Node*> partialVisited;
 
 static std::map<Node*, std::vector<Node*>> splitArrayMap;
+static std::map<Node*, bool> arraySplitMap;
+static NodeEvolutionTrace* splitTrace = nullptr;
+static std::map<Node*, const char*> arrayKeepReasons;
+
+// Bundle memory ports share address expressions, and bundle registers share
+// reset conditions. An in-place rewrite must trace every physical owner.
+class ArrayRewriteOwners {
+ public:
+  ArrayRewriteOwners(const std::set<Node*>& nodes, Node* array) {
+    for (Node* node : nodes) {
+      const auto collect = [&](ExpTree* tree) {
+        if (!tree) return;
+        trees[tree].push_back(node);
+        std::vector<std::pair<ENode*, ENode*>> pending{{tree->getRoot(), nullptr},
+                                                    {tree->getlval(), nullptr}};
+        while (!pending.empty()) {
+          auto [expression, parent] = pending.back();
+          pending.pop_back();
+          if (!expression) continue;
+          if (expression->nodePtr == array) {
+            expressions[expression].push_back(node);
+            if (parent) expressions[parent].push_back(node);
+          }
+          for (ENode* child : expression->child) pending.emplace_back(child, expression);
+        }
+      };
+      for (ExpTree* tree : node->assignTree) collect(tree);
+      collect(node->resetTree);
+    }
+  }
+
+  void rewritten(ExpTree* tree, ENode* expression) {
+    if (expression) {
+      const auto found = expressions.find(expression);
+      if (found != expressions.end()) changed.insert(found->second.begin(), found->second.end());
+    } else {
+      const auto found = trees.find(tree);
+      if (found != trees.end()) changed.insert(found->second.begin(), found->second.end());
+    }
+  }
+
+  std::set<Node*> changed;
+  std::set<Node*> direct;
+
+ private:
+  std::map<ENode*, std::vector<Node*>> expressions;
+  std::map<ExpTree*, std::vector<Node*>> trees;
+};
+
+static ArrayRewriteOwners* splitRewriteOwners = nullptr;
+
+static std::vector<Node*> traceInventory(graph* g) {
+  std::vector<Node*> nodes;
+  const auto append = [&](Node* node) {
+    if (node->status != DEAD_NODE) nodes.push_back(node);
+  };
+  for (Node* node : g->allNodes) append(node);
+  for (Node* node : g->memory) append(node);
+  for (const auto& entry : splitArrayMap)
+    for (Node* member : entry.second) append(member);
+  std::sort(nodes.begin(), nodes.end(), [](const Node* a, const Node* b) { return a->id < b->id; });
+  nodes.erase(std::unique(nodes.begin(), nodes.end()), nodes.end());
+  return nodes;
+}
+
+static void rememberKeep(Node* node, const char* reason) {
+  if (splitTrace) arrayKeepReasons[node] = reason;
+}
+
+const std::map<Node*, std::vector<Node*>>& graph::splitArraySources() const {
+  return splitArrayMap;
+}
 
 static std::string splitArrayMapEscape(const std::string& text) {
   std::string out;
@@ -157,19 +231,28 @@ bool point2self(Node* node) {
   return false;
 }
 
-Node* getSplitArray(graph* g) {
+Node* getSplitArray(graph* g, const char*& reason) {
   /* array points to itself */
   for (Node* node : partialVisited) {
-    if (node->isArray() && node->next.find(node) != node->next.end()) return node; // point to self directly
+    if (node->isArray() && node->next.find(node) != node->next.end()) {
+      reason = "direct_array_self_dependency";
+      return node;
+    }
   }
 
   for (Node* node : partialVisited) {
-    if (node->isArray() && point2self(node)) return node;
+    if (node->isArray() && point2self(node)) {
+      reason = "array_dependency_cycle";
+      return node;
+    }
   }
 
   for (Node* node : g->halfConstantArray) {
     if (fullyVisited.find(node) != fullyVisited.end() || splitArrayMap.find(node) != splitArrayMap.end()) continue;
-    if (point2self(node)) return node;
+    if (point2self(node)) {
+      reason = "half_constant_array_dependency_cycle";
+      return node;
+    }
   }
   for (Node* node : partialVisited) {
     int time = 0;
@@ -320,7 +403,8 @@ void splitAssignMent(Node* node, ExpTree* tree, std::vector<ExpTree*>& newTrees)
   }
 }
 
-void ExpTree::updateWithSplittedArray(Node* node, Node* array, std::vector<Node*>& arrayMember) {
+bool ExpTree::updateWithSplittedArray(Node* node, Node* array, std::vector<Node*>& arrayMember) {
+  bool changed = false;
   std::stack<std::tuple<ENode*, ENode*, int>> s;
   s.push(std::make_tuple(getRoot(), nullptr, 0));
   s.push(std::make_tuple(getlval(), nullptr, -2));
@@ -338,6 +422,7 @@ void ExpTree::updateWithSplittedArray(Node* node, Node* array, std::vector<Node*
     }
     auto range = top_enode->getIdx(top_enode->nodePtr);
     if (range.first < 0) {
+      changed = true;
       if (array->dimension.size() > 1) TODO();
       ENode* enode = nullptr;
       for (int i = array->arrayEntryNum() - 1; i >= 0; i --) {
@@ -358,13 +443,17 @@ void ExpTree::updateWithSplittedArray(Node* node, Node* array, std::vector<Node*
           enode = new ENode(member);
         }
       }
+      if (splitRewriteOwners) splitRewriteOwners->rewritten(this, top_parent);
       if (top_parent) top_parent->setChild(top_idx, enode);
       else setRoot(enode);
     } else if (range.first == range.second) {
+      changed = true;
+      if (splitRewriteOwners) splitRewriteOwners->rewritten(this, top_enode);
       top_enode->nodePtr = arrayMember[range.first];
       top_enode->child.clear();
     } else {
       if (top_idx < 0) continue; // lvalue
+      changed = true;
       ENode* group = new ENode(OP_GROUP);
       group->width = top_enode->width;
       for (int i = range.first; i <= range.second; i ++) {
@@ -374,13 +463,15 @@ void ExpTree::updateWithSplittedArray(Node* node, Node* array, std::vector<Node*
         enode->sign = member->sign;
         group->addChild(enode);
       }
+      if (splitRewriteOwners) splitRewriteOwners->rewritten(this, top_parent);
       if (top_parent) top_parent->setChild(top_idx, group);
       else setRoot(group);
     }
   }
+  return changed;
 }
 
-void graph::splitArrayNode(Node* node) {
+void graph::splitArrayNode(Node* node, const char* reason) {
   node->status = DEAD_NODE;
   /* remove prev connection */
   for (Node* prev : node->depPrev) prev->eraseNext(node);
@@ -400,6 +491,16 @@ void graph::splitArrayNode(Node* node) {
     arrayMember.push_back(node->arrayMemberNode(i));
   }
   splitArrayMap[node] = arrayMember;
+  if (splitTrace) {
+    std::ostringstream geometry;
+    geometry << "{\"partition\":true,\"memberCount\":" << entryNum << ",\"physicalShape\":[";
+    for (size_t i = 0; i < node->dimension.size(); ++i) {
+      if (i) geometry << ',';
+      geometry << node->dimension[i];
+    }
+    geometry << "]}";
+    splitTrace->event("split", reason, {node}, arrayMember, geometry.str());
+  }
   /* distribute arrayVal */
   for (ExpTree* tree : node->assignTree) distributeTree(node, tree, arrayMember);
   if (node->resetTree) {
@@ -433,9 +534,29 @@ void graph::splitArrayNode(Node* node) {
     checkNodes.insert(next);
     if (next != node) next->erasePrev(node);
   }
+  std::unique_ptr<ArrayRewriteOwners> rewriteOwners;
+  if (splitTrace) {
+    rewriteOwners = std::make_unique<ArrayRewriteOwners>(checkNodes, node);
+    splitRewriteOwners = rewriteOwners.get();
+  }
   for (Node* n : checkNodes) {
-    for (ExpTree* tree : n->assignTree) tree->updateWithSplittedArray(n, node, arrayMember);
-    if (n->resetTree) n->resetTree->updateWithSplittedArray(n, node, arrayMember);
+    bool rewritten = false;
+    for (ExpTree* tree : n->assignTree)
+      rewritten |= tree->updateWithSplittedArray(n, node, arrayMember);
+    if (n->resetTree) rewritten |= n->resetTree->updateWithSplittedArray(n, node, arrayMember);
+    if (rewriteOwners && rewritten) {
+      rewriteOwners->direct.insert(n);
+      rewriteOwners->changed.insert(n);
+    }
+  }
+  splitRewriteOwners = nullptr;
+  if (rewriteOwners) {
+    for (Node* n : rewriteOwners->changed) {
+      if (n == node) continue;
+      splitTrace->event("rewrite", rewriteOwners->direct.count(n) ?
+          "split_array_reference_rewrite" : "split_array_shared_expression_rewrite", {n}, {n},
+          "{\"arrayParent\":{\"kind\":\"gsim-node\",\"id\":" + std::to_string(node->id) + ",\"generation\":0}}");
+    }
   }
 
   for (Node* n : checkNodes) {
@@ -453,6 +574,18 @@ void graph::splitArrayNode(Node* node) {
 }
 
 void graph::splitArray() {
+  fullyVisited.clear();
+  partialVisited.clear();
+  splitArrayMap.clear();
+  arraySplitMap.clear();
+  arrayKeepReasons.clear();
+  std::unique_ptr<NodeEvolutionTrace> trace;
+  if (!globalConfig.NodeEvolutionTracePath.empty()) {
+    trace = std::make_unique<NodeEvolutionTrace>(globalConfig.NodeEvolutionTracePath, name, "splitArray",
+                                               globalConfig.NodeEvolutionInputSha256);
+    splitTrace = trace.get();
+    trace->inventory("before", traceInventory(this));
+  }
   std::map<Node*, int> times;
   std::stack<Node*> s;
   int num = 0;
@@ -488,10 +621,11 @@ void graph::splitArray() {
 
     while (s.size() == 0 && partialVisited.size() != 0) {
       /* split arrays in partialVisited until s.size() != 0 */
-      Node* node = getSplitArray(this);
+      const char* reason = nullptr;
+      Node* node = getSplitArray(this, reason);
       Assert(splitArrayMap.find(node) == splitArrayMap.end(), "%s is already splitted", node->name.c_str());
       num ++;
-      splitArrayNode(node);
+      splitArrayNode(node, reason);
       /* add into s and visitedSet */
       for (Node* member : splitArrayMap[node]) {
         times[member] = 0;
@@ -520,6 +654,19 @@ void graph::splitArray() {
     supersrc.end()
   );
   dumpSplitArrayMap(this);
+  if (trace) {
+    const auto nodes = traceInventory(this);
+    for (Node* node : nodes) {
+      if (!node->isArray()) continue;
+      const auto reason = arrayKeepReasons.find(node);
+      trace->event("retain", reason != arrayKeepReasons.end() ? reason->second :
+          node->type == NODE_MEMORY ? "memory_storage_not_split" : "array_not_selected_for_optional_split",
+          {node}, {node});
+    }
+    trace->inventory("after", nodes);
+    trace->finish();
+    splitTrace = nullptr;
+  }
 }
 
 Node* Node::arrayMemberNode(int idx) {
@@ -542,7 +689,9 @@ Node* Node::arrayMemberNode(int idx) {
   if (nameExist(memberName)) {
     std::string newName = memberName + "_0";
     Assert(!nameExist(newName), "%s already exist", newName.c_str());
-    changeName(memberName, newName);
+    Node* renamed = changeName(memberName, newName);
+    if (splitTrace) splitTrace->event("rewrite", "split_member_name_collision_rename", {renamed}, {renamed},
+        "{\"arrayParent\":{\"kind\":\"gsim-node\",\"id\":" + std::to_string(id) + ",\"generation\":0}}");
   }
 
   Node* member = new Node(type);
@@ -552,6 +701,22 @@ Node* Node::arrayMemberNode(int idx) {
   member->setType(width, sign);
   member->constructSuperNode();
   member->lineno = lineno;
+  member->sourceKind = sourceKind;
+  member->sourceLine = sourceLine;
+  member->sourceOwnerId = sourceOwnerId;
+  member->sourceEffectKind = sourceEffectKind;
+  member->sourceOriginRole = sourceOriginRole;
+  member->sourceMemoryDepth = sourceMemoryDepth;
+  member->semanticPath = semanticPath;
+  member->semanticScopeDepth = semanticScopeDepth;
+  member->semanticShape = semanticShape;
+  member->semanticShapeFieldDepths = semanticShapeFieldDepths;
+  member->semanticIndices = semanticIndices;
+  member->semanticAxes = semanticAxes;
+  Assert(semanticAxes.size() == index.size(), "source axes mismatch for %s", name.c_str());
+  for (size_t axis = 0; axis < index.size(); ++axis)
+    member->semanticIndices[semanticAxes[axis]] = index[axis];
+  member->semanticAxes.clear();
   for ( ; i < dimension.size(); i ++) member->dimension.push_back(dimension[i]);
 
   return member;
@@ -581,13 +746,12 @@ bool nextVarConnect(Node* node) {
   }
   return false;
 }
-static std::map<Node*, bool> arraySplitMap;
-
 void graph::checkNodeSplit(Node* node) {
   if (arraySplitMap.find(node) != arraySplitMap.end()) return;
   if (!node->isArray()) return;
   if ((node->type != NODE_OTHERS && node->type != NODE_REG_SRC) || node->arrayEntryNum() <= 1) {
     arraySplitMap[node] = false;
+    rememberKeep(node, node->arrayEntryNum() <= 1 ? "single_array_member" : "unsupported_array_node_kind");
     return;
   }
   for (Node* prev : node->prev) checkNodeSplit(prev);
@@ -597,10 +761,14 @@ void graph::checkNodeSplit(Node* node) {
   }
   Node* treeNode = node->type == NODE_REG_SRC ? node->getDst() : node;
   bool anyVarIdx = false;
+  const char* keepReason = nullptr;
   int beg, end;
   for (ExpTree* tree : treeNode->assignTree) {
     std::tie(beg, end) = tree->getlval()->getIdx(treeNode);
-    if (beg < 0 || (beg != end && !prevSplitted)) anyVarIdx = true;
+    if (beg < 0 || (beg != end && !prevSplitted)) {
+      anyVarIdx = true;
+      if (!keepReason) keepReason = beg < 0 ? "dynamic_write_index" : "unsplit_aggregate_input";
+    }
   }
 
   if (!anyVarIdx && !nextVarConnect(node)) {
@@ -609,6 +777,7 @@ void graph::checkNodeSplit(Node* node) {
     arraySplitMap[node] = true;
   } else {
     arraySplitMap[node] = false;
+    rememberKeep(node, anyVarIdx ? keepReason : "dynamic_consumer_index");
   }
 }
 
@@ -634,14 +803,19 @@ void graph::splitOptionalArray() {
     if (!iter.second) continue;
     Node* arrayNode = iter.first;
 #endif
-    splitArrayNode(arrayNode);
+    splitArrayNode(arrayNode, "static_indexed_array_access");
     if (arrayNode->type == NODE_REG_SRC) {
-      splitArrayNode(arrayNode->getDst());
+      splitArrayNode(arrayNode->getDst(), "paired_register_array_split");
       Assert(splitArrayMap[arrayNode].size() == splitArrayMap[arrayNode->getDst()].size(), "%p %s member not match", arrayNode, arrayNode->name.c_str());
       for (size_t i = 0; i < splitArrayMap[arrayNode].size(); i ++) {
         regsrc.push_back(splitArrayMap[arrayNode][i]);
         splitArrayMap[arrayNode][i]->bindReg(splitArrayMap[arrayNode->getDst()][i]);
         splitArrayMap[arrayNode][i]->updateDep();
+        if (splitTrace) {
+          const std::vector<Node*> pair = {splitArrayMap[arrayNode][i], splitArrayMap[arrayNode->getDst()][i]};
+          splitTrace->event("rewrite", "register_member_pair_bound", pair, pair,
+              "{\"memberIndex\":" + std::to_string(i) + "}");
+        }
       }
     }
     num ++;

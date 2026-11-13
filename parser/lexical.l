@@ -141,9 +141,9 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>attach                  { return token::Attach; }
 <normal>when                    { return token::When; }
 <normal>else                    { return token::Else; }
-<normal>stop                    { return token::Stop; }
-<normal>printf                  { return token::Printf; }
-<normal>assert                  { return token::Assert; }
+<normal>stop                    { yylval->intVal = lineno(); return token::Stop; }
+<normal>printf                  { yylval->intVal = lineno(); return token::Printf; }
+<normal>assert                  { yylval->intVal = lineno(); return token::Assert; }
 <normal>skip                    { return token::Skip; }
 <normal>input                   { return token::Input; }
 <normal>output                  { return token::Output; }
@@ -152,7 +152,7 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>defname                 { return token::Defname; }
 <normal>parameter               { return token::Parameter; }
 <normal>intmodule               { return token::Intmodule; }
-<normal>intrinsic               { return token::Intrinsic; }
+<normal>intrinsic               { yylval->intVal = lineno(); return token::Intrinsic; }
 <normal>layerblock              { return token::Layerblock; }
 <normal>FIRRTL                  { return token::Firrtl; }
 <normal>version                 { return token::Version; }

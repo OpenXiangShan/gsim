@@ -38,6 +38,9 @@ Config::Config() {
   DumpGraphJson = false;
   DumpGraphStats = false;
   DumpAssignTree = false;
+  DumpExpressions = false;
+  ExpressionClosure = "combinational";
+  ExpressionMaxNodes = 2000000;
   DumpConstStatus = false;
   OutputDir = ".";
   StopAfterStage.clear();
@@ -129,6 +132,12 @@ static void printUsage(const char* ProgName) {
             << "      --dump-assign-tree           Include assignTree structure in JSON dump (can be large).\n"
             << "      --dump-const-status          Dump per-node constant-analysis status before removing constants.\n"
             << "      --dump-split-array-map=PATH Dump original array Nodes to their split members.\n"
+            << "      --trace-node-evolution=PATH Trace native splitArray decisions and source geometry as JSONL.\n"
+            << "      --trace-input-sha256=SHA256 Caller-verified FIRRTL identity for evolution trace.\n"
+            << "      --dump-expressions=KINDS     Write faithful expression JSONL sidecars for source kinds.\n"
+            << "      --dump-expression-ids=PATH  Add newline-separated physical seed IDs.\n"
+            << "      --dump-expression-closure=MODE  none, combinational (default), source-cuts, or transitive.\n"
+            << "      --dump-expression-max-nodes=N   Sidecar node cap (default: 2000000).\n"
             ;
 }
 
@@ -160,6 +169,12 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_DUMP_ASSIGN_TREE,
     OPT_DUMP_CONST_STATUS,
     OPT_DUMP_SPLIT_ARRAY_MAP,
+    OPT_TRACE_NODE_EVOLUTION,
+    OPT_TRACE_INPUT_SHA256,
+    OPT_DUMP_EXPRESSIONS,
+    OPT_DUMP_EXPRESSION_IDS,
+    OPT_DUMP_EXPRESSION_CLOSURE,
+    OPT_DUMP_EXPRESSION_MAX_NODES,
   };
 
   const struct option Table[] = {
@@ -182,6 +197,12 @@ static char* parseCommandLine(int argc, char** argv) {
       {"dump-assign-tree", no_argument, nullptr, 0},
       {"dump-const-status", no_argument, nullptr, 0},
       {"dump-split-array-map", required_argument, nullptr, 0},
+      {"trace-node-evolution", required_argument, nullptr, 0},
+      {"trace-input-sha256", required_argument, nullptr, 0},
+      {"dump-expressions", required_argument, nullptr, 0},
+      {"dump-expression-ids", required_argument, nullptr, 0},
+      {"dump-expression-closure", required_argument, nullptr, 0},
+      {"dump-expression-max-nodes", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -252,6 +273,50 @@ static char* parseCommandLine(int argc, char** argv) {
                 case OPT_DUMP_SPLIT_ARRAY_MAP:
                   globalConfig.SplitArrayMapPath = optarg;
                   break;
+                case OPT_TRACE_NODE_EVOLUTION:
+                  if (optarg[0] == '\0') {
+                    fprintf(stderr, "Error: node evolution trace path must not be empty\n");
+                    exit(EXIT_FAILURE);
+                  }
+                  globalConfig.NodeEvolutionTracePath = optarg;
+                  break;
+                case OPT_TRACE_INPUT_SHA256: {
+                  const std::string digest(optarg);
+                  if (digest.size() != 64 || digest.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos) {
+                    fprintf(stderr, "Error: trace input SHA256 must have 64 hexadecimal characters\n");
+                    exit(EXIT_FAILURE);
+                  }
+                  globalConfig.NodeEvolutionInputSha256 = digest;
+                  break;
+                }
+                case OPT_DUMP_EXPRESSIONS:
+                  globalConfig.EnableDumpGraph = globalConfig.DumpExpressions = true;
+                  globalConfig.ExpressionKinds = parseStageList(optarg);
+                  for (const auto& kind : globalConfig.ExpressionKinds) {
+                    Assert(kind == "when-condition" || kind == "memory-read-address",
+                           "unsupported expression source kind %s", kind.c_str());
+                  }
+                  break;
+                case OPT_DUMP_EXPRESSION_IDS:
+                  globalConfig.EnableDumpGraph = globalConfig.DumpExpressions = true;
+                  globalConfig.ExpressionIdPath = optarg;
+                  break;
+                case OPT_DUMP_EXPRESSION_CLOSURE:
+                  globalConfig.ExpressionClosure = optarg;
+                  Assert(globalConfig.ExpressionClosure == "none" ||
+                         globalConfig.ExpressionClosure == "combinational" ||
+                         globalConfig.ExpressionClosure == "source-cuts" ||
+                         globalConfig.ExpressionClosure == "transitive",
+                         "unsupported expression closure %s", optarg);
+                  break;
+                case OPT_DUMP_EXPRESSION_MAX_NODES: {
+                  char* end = nullptr;
+                  const unsigned long long limit = strtoull(optarg, &end, 10);
+                  Assert(end && *end == '\0' && limit > 0 && optarg[0] != '-',
+                         "invalid expression node limit %s", optarg);
+                  globalConfig.ExpressionMaxNodes = limit;
+                  break;
+                }
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }
               break;

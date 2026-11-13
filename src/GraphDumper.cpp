@@ -114,6 +114,40 @@ static std::string jsonEscape(const std::string& in) {
   return out;
 }
 
+static void dumpSemantic(std::ostream& out, const Node* node) {
+  const char* role = node->sourceKind == Node::SourceKind::WhenCondition ? "predicate" :
+      node->sourceKind == Node::SourceKind::MemoryReadAddress ? "memory-read-address" :
+      node->type == NODE_SPECIAL ? "effect" :
+      node->type == NODE_MEMORY ? "memory-storage" :
+      node->type == NODE_REG_SRC ? "register-current" :
+      node->type == NODE_REG_DST ? "register-next" : "value";
+  out << ",\"semantic\":{\"path\":[";
+  for (size_t i = 0; i < node->semanticPath.size(); ++i) {
+    if (i) out << ',';
+    out << '\"' << jsonEscape(node->semanticPath[i]) << '\"';
+  }
+  out << "],\"scopeDepth\":" << node->semanticScopeDepth << ",\"role\":\"" << role << '\"';
+  if (!node->sourceEffectKind.empty())
+    out << ",\"statementKind\":\"" << jsonEscape(node->sourceEffectKind) << '\"';
+  if (!node->sourceOriginRole.empty())
+    out << ",\"originRole\":\"" << jsonEscape(node->sourceOriginRole) << '\"';
+  if (node->sourceMemoryDepth >= 0) out << ",\"storageDepth\":" << node->sourceMemoryDepth;
+  if (node->sourceKind == Node::SourceKind::MemoryReadAddress)
+    out << ",\"endpoint\":\"" << (node->type == NODE_REG_DST ? "next" : "current") << '\"';
+  const auto integers = [&](const char* key, const std::vector<int>& values) {
+    out << ",\"" << key << "\":[";
+    for (size_t i = 0; i < values.size(); ++i) {
+      if (i) out << ',';
+      out << values[i];
+    }
+    out << ']';
+  };
+  integers("shape", node->semanticShape);
+  integers("shapeFieldDepths", node->semanticShapeFieldDepths);
+  integers("indices", node->semanticIndices);
+  out << ",\"line\":" << (node->sourceLine >= 0 ? node->sourceLine : node->lineno) << '}';
+}
+
 static std::string nodeTypeToStr(NodeType t) {
   switch (t) {
     case NODE_INVALID: return "NODE_INVALID";
@@ -315,31 +349,92 @@ class GraphJsonDumper {
   void dump(const graph* g) {
     const std::vector<const Node*> nodes = collectGraphNodes(g);
     std::set<std::pair<std::string, std::string>> edges;
-    os << "{\n  \"nodes\": [\n";
+    os << "{\n  \"semanticLineageVersion\": 1,\n  \"nodes\": [\n";
     bool firstNode = true;
     for (const Node* node : nodes) {
       if (!firstNode) os << ",\n";
       firstNode = false;
-      os << "    {\"id\": " << node->id << ", "
-         << "\"name\": \"" << jsonEscape(node->name) << "\", "
-         << "\"type\": \"" << nodeTypeToStr(node->type) << "\", "
-         << "\"status\": \"" << nodeStatusToStr(node->status) << "\", "
-         << "\"width\": " << node->width << ", "
-         << "\"sign\": " << node->sign << ", "
-         << "\"dimension\": [";
-      for (size_t i = 0; i < node->dimension.size(); ++i) {
-        if (i) os << ", ";
-        os << node->dimension[i];
-      }
-      os << "], "
-         << "\"lineno\": " << node->lineno << ", "
-         << "\"super\": " << (node->super ? node->super->id : -1);
-      if (globalConfig.DumpAssignTree) {
-        os << ", \"assignTrees\": ";
-        dumpAssignTrees(node);
-      }
-      os << "}";
+      dumpNode(node);
       for (const Node* next : node->next) edges.insert({node->name, next->name});
+    }
+    os << "\n  ],\n  \"memoryInventoryComplete\": true,\n  \"memories\": [\n";
+    bool firstMemory = true;
+    for (const Node* memory : g->memory) {
+      if (!firstMemory) os << ",\n";
+      firstMemory = false;
+      dumpNode(memory);
+    }
+    os << "\n  ],\n  \"sourceAggregateInventoryComplete\": "
+       << (g->sourceAggregateInventoryComplete ? "true" : "false")
+       << ",\n  \"sourceAggregates\": [\n";
+    bool firstAggregate = true;
+    for (const auto& aggregate : g->sourceAggregates) {
+      if (!firstAggregate) os << ",\n";
+      firstAggregate = false;
+      os << "    {\"id\": " << aggregate.id << ", \"name\": \"" << jsonEscape(aggregate.name)
+         << "\", \"memberIds\": [";
+      for (size_t i = 0; i < aggregate.memberIds.size(); ++i) {
+        if (i) os << ", ";
+        os << aggregate.memberIds[i];
+      }
+      os << "], \"originalMemberIds\": [";
+      for (size_t i = 0; i < aggregate.originalMemberIds.size(); ++i) {
+        if (i) os << ", ";
+        os << aggregate.originalMemberIds[i];
+      }
+      os << "], \"memberFlips\": [";
+      for (size_t i = 0; i < aggregate.memberFlips.size(); ++i) {
+        if (i) os << ", ";
+        os << (aggregate.memberFlips[i] ? "true" : "false");
+      }
+      os << "], \"nestedAggregateIds\": [";
+      for (size_t i = 0; i < aggregate.nestedAggregateIds.size(); ++i) {
+        if (i) os << ", ";
+        os << aggregate.nestedAggregateIds[i];
+      }
+      os << "], \"semanticPath\": [";
+      for (size_t i = 0; i < aggregate.semanticPath.size(); ++i) {
+        if (i) os << ',';
+        os << '\"' << jsonEscape(aggregate.semanticPath[i]) << '\"';
+      }
+      os << "], \"semanticScopeDepth\": " << aggregate.semanticScopeDepth << '}';
+    }
+    os << "\n  ],\n  \"sourceReplacementInventoryComplete\": "
+       << (g->sourceReplacementInventoryComplete ? "true" : "false")
+       << ",\n  \"sourceReplacements\": [\n";
+    bool firstReplacement = true;
+    for (const auto& replacement : g->sourceReplacements) {
+      if (!firstReplacement) os << ",\n";
+      firstReplacement = false;
+      os << "    {\"originalId\": " << replacement.originalId
+         << ", \"replacementId\": " << replacement.replacementId
+         << ", \"reason\": \"depth-one-memory-to-register\""
+         << ", \"originalName\": \"" << jsonEscape(replacement.originalName)
+         << "\", \"originalWidth\": " << replacement.originalWidth
+         << ", \"originalSign\": " << (replacement.originalSign ? "true" : "false")
+         << ", \"originalDimension\": [";
+      for (size_t i = 0; i < replacement.originalDimension.size(); ++i) {
+        if (i) os << ", ";
+        os << replacement.originalDimension[i];
+      }
+      os << "], \"originalDepth\": " << replacement.originalDepth << "}";
+    }
+    os << "\n  ],\n  \"sourceScopeInventoryComplete\": "
+       << (g->sourceScopeInventoryComplete ? "true" : "false")
+       << ",\n  \"sourceScopes\": [\n";
+    bool firstScope = true;
+    for (const auto& scope : g->sourceScopes) {
+      if (!firstScope) os << ",\n";
+      firstScope = false;
+      os << "    {\"path\": \"" << jsonEscape(scope.path)
+         << "\", \"module\": \"" << jsonEscape(scope.module)
+         << "\", \"line\": " << scope.line << ", \"instanceLine\": " << scope.instanceLine
+         << ", \"kind\": \"" << (scope.external ? "external" : "module") << "\", \"semanticPath\": [";
+      for (size_t i = 0; i < scope.semanticPath.size(); ++i) {
+        if (i) os << ',';
+        os << '\"' << jsonEscape(scope.semanticPath[i]) << '\"';
+      }
+      os << "]}";
     }
     os << "\n  ],\n  \"edges\": [\n";
     bool firstEdge = true;
@@ -352,6 +447,76 @@ class GraphJsonDumper {
   }
 
  private:
+  void dumpNode(const Node* node) {
+    os << "    {\"id\": " << node->id << ", "
+         << "\"name\": \"" << jsonEscape(node->name) << "\", "
+         << "\"type\": \"" << nodeTypeToStr(node->type) << "\", "
+         << "\"status\": \"" << nodeStatusToStr(node->status) << "\", "
+         << "\"width\": " << node->width << ", "
+         << "\"sign\": " << node->sign << ", "
+         << "\"dimension\": [";
+    for (size_t i = 0; i < node->dimension.size(); ++i) {
+      if (i) os << ", ";
+      os << node->dimension[i];
+    }
+    os << "], "
+         << "\"lineno\": " << node->lineno << ", "
+         << "\"super\": " << (node->super ? node->super->id : -1);
+    if (node->type == NODE_MEMORY) {
+      os << ", \"depth\": " << node->depth
+         << ", \"readLatency\": " << node->rlatency
+         << ", \"writeLatency\": " << node->wlatency
+         << ", \"readUnderWrite\": \"" << jsonEscape(node->extraInfo) << "\""
+         << ", \"portIds\": ";
+      dumpMemberIds(node);
+    }
+    if (node->type == NODE_EXT) {
+      os << ", \"externalDefname\": \"" << jsonEscape(node->extraInfo) << "\""
+         << ", \"memberIds\": ";
+      dumpMemberIds(node);
+      os << ", \"clockId\": " << (node->clock ? node->clock->id : -1);
+      os << ", \"boundaryPortIds\": [";
+      bool first = true;
+      for (const Node* port : node->externalPorts) {
+        if (!port) continue;
+        if (!first) os << ", ";
+        first = false;
+        os << port->id;
+      }
+      os << "]";
+    }
+    if (node->parent) os << ", \"parentId\": " << node->parent->id;
+    dumpSemantic(os, node);
+    if (node->sourceKind != Node::SourceKind::None) {
+      os << ", \"sourceKind\": \""
+         << (node->sourceKind == Node::SourceKind::WhenCondition ? "when-condition" : "memory-read-address")
+         << "\", \"sourceLine\": " << node->sourceLine
+         << ", \"sourceOwnerId\": " << node->sourceOwnerId;
+    }
+    if (node->type == NODE_REG_SRC || node->type == NODE_REG_DST) {
+      os << ", \"regNextId\": " << (node->regNext ? node->regNext->id : -1)
+         << ", \"regSourceId\": " << (node->type == NODE_REG_SRC ? node->id : node->regNext ? node->regNext->id : -1)
+         << ", \"regDestinationId\": " << (node->type == NODE_REG_DST ? node->id : node->regNext ? node->regNext->id : -1);
+    }
+    if (globalConfig.DumpAssignTree) {
+      os << ", \"assignTrees\": ";
+      dumpAssignTrees(node);
+    }
+    os << "}";
+  }
+
+  void dumpMemberIds(const Node* node) {
+    os << "[";
+    bool first = true;
+    for (const Node* member : node->member) {
+      if (!member) continue;
+      if (!first) os << ", ";
+      first = false;
+      os << member->id;
+    }
+    os << "]";
+  }
+
   void dumpAssignTrees(const Node* node) {
     os << "[";
     bool firstTree = true;
@@ -430,6 +595,388 @@ class GraphJsonDumper {
       os << "]}";
     }
     os << "\n    ]}";
+  }
+
+  std::ostream& os;
+};
+
+class ExpressionJsonlDumper {
+ public:
+  explicit ExpressionJsonlDumper(std::ostream& os) : os(os) {}
+
+  void dump(const graph* g, const std::string& stage) {
+    std::vector<const Node*> inventory = collectGraphNodes(g);
+    std::sort(inventory.begin(), inventory.end(), [](const Node* a, const Node* b) {
+      return a->id < b->id;
+    });
+    auto findLive = [&](int id) -> const Node* {
+      const auto found = std::lower_bound(inventory.begin(), inventory.end(), id,
+          [](const Node* node, int value) { return node->id < value; });
+      if (found != inventory.end() && (*found)->id == id) return *found;
+      for (const Node* memory : g->memory) if (memory->id == id) return memory;
+      return nullptr;
+    };
+    std::set<int> requested;
+    if (!globalConfig.ExpressionIdPath.empty()) {
+      std::ifstream input(globalConfig.ExpressionIdPath);
+      Assert(input.good(), "cannot open expression ID file %s", globalConfig.ExpressionIdPath.c_str());
+      std::string line;
+      while (std::getline(input, line)) {
+        if (line.empty()) continue;
+        std::istringstream parser(line);
+        int id;
+        std::string remainder;
+        Assert((parser >> id) && id >= 0 && !(parser >> remainder),
+               "invalid expression seed ID %s", line.c_str());
+        requested.insert(id);
+      }
+    }
+    std::map<int, const Node*> seeds;
+    for (const Node* node : inventory) {
+      if (requested.count(node->id) || globalConfig.ExpressionKinds.count(sourceKind(node))) {
+        seeds.emplace(node->id, node);
+      }
+    }
+    for (const Node* memory : g->memory) if (requested.count(memory->id)) seeds.emplace(memory->id, memory);
+    std::set<int> missingSeeds;
+    for (int id : requested) if (!seeds.count(id)) missingSeeds.insert(id);
+
+    struct SeedUse {
+      int seedId;
+      const char* slot;
+      int treeIndex;
+      const char* role;
+      int expressionId;
+    };
+    std::map<int, std::vector<SeedUse>> seedUses;
+    std::map<int, std::set<int>> consumerIds;
+    std::map<int, const Node*> roots = seeds;
+    auto inspectConsumer = [&](const Node* node) {
+      eachTreeSlot(node, [&](const ExpTree* tree, const char* slot, int index) {
+        if (!tree) return;
+        auto inspect = [&](const ENode* start, const char* role) {
+          std::unordered_set<const ENode*> visited;
+          std::vector<const ENode*> pending{start};
+          while (!pending.empty()) {
+            const ENode* expression = pending.back();
+            pending.pop_back();
+            if (!expression || !visited.insert(expression).second) continue;
+            if (expression->nodePtr && seeds.count(expression->nodePtr->id)) {
+              const int seedId = expression->nodePtr->id;
+              seedUses[node->id].push_back({seedId, slot, index, role, expression->id});
+              consumerIds[seedId].insert(node->id);
+              roots.emplace(node->id, node);
+            }
+            for (const ENode* child : expression->child) pending.push_back(child);
+          }
+        };
+        inspect(tree->getRoot(), "root");
+        // The lvalue's owner leaf is a destination, not a value read. Dynamic
+        // index children are reads and retain their original expression IDs.
+        if (tree->getlval()) for (const ENode* child : tree->getlval()->child) inspect(child, "lvalue-index");
+      });
+    };
+    for (const Node* node : inventory) inspectConsumer(node);
+    for (const Node* memory : g->memory) inspectConsumer(memory);
+    for (auto current = roots.begin(); current != roots.end(); ++current) {
+      const Node* node = current->second;
+      if ((node->type == NODE_REG_SRC || node->type == NODE_REG_DST) && node->regNext) {
+        roots.emplace(node->regNext->id, node->regNext);
+      }
+    }
+    std::map<int, const Node*> splitSources;
+    for (const auto& [original, members] : g->splitArraySources()) splitSources.emplace(original->id, original);
+    auto findSource = [&](int id) -> const Node* {
+      if (const Node* node = findLive(id)) return node;
+      const auto found = splitSources.find(id);
+      return found == splitSources.end() ? nullptr : found->second;
+    };
+    std::map<int, const Node*> selected;
+    std::vector<const Node*> work;
+    bool capped = false;
+    auto add = [&](const Node* node) {
+      if (!node) return;
+      const auto found = selected.find(node->id);
+      if (found != selected.end()) {
+        Assert(found->second == node, "expression nodes share physical ID %d", node->id);
+        return;
+      }
+      if (selected.size() >= globalConfig.ExpressionMaxNodes) {
+        capped = true;
+        return;
+      }
+      selected.emplace(node->id, node);
+      work.push_back(node);
+    };
+    for (const auto& [id, node] : roots) add(node);
+    std::set<int> unresolvedOwners;
+    for (size_t i = 0; i < work.size(); ++i) {
+      const Node* node = work[i];
+      if (globalConfig.ExpressionClosure == "none" ||
+          boundaryReason(node, roots.count(node->id))) continue;
+      add(node->clock);
+      add(node->regNext);
+      add(node->parent);
+      for (const Node* member : node->member) add(member);
+      const auto split = g->splitArraySources().find(const_cast<Node*>(node));
+      if (split != g->splitArraySources().end()) for (const Node* member : split->second) add(member);
+      if (node->sourceOwnerId >= 0) {
+        const Node* owner = findSource(node->sourceOwnerId);
+        if (owner) add(owner);
+        else unresolvedOwners.insert(node->sourceOwnerId);
+      }
+      std::unordered_set<const ENode*> visited;
+      eachTree(node, [&](const ExpTree* tree) {
+        if (!tree) return;
+        std::vector<const ENode*> pending{tree->getRoot(), tree->getlval()};
+        while (!pending.empty()) {
+          const ENode* expression = pending.back();
+          pending.pop_back();
+          if (!expression || !visited.insert(expression).second) continue;
+          add(expression->nodePtr);
+          add(expression->memoryNode);
+          for (const ENode* child : expression->child) pending.push_back(child);
+        }
+      });
+    }
+    os << "{\"record\":\"header\",\"schema\":\"gsim.expressions.v1\",\"graph\":\""
+       << jsonEscape(g->name) << "\",\"stage\":\"" << jsonEscape(stage)
+       << "\",\"closureMode\":\"" << globalConfig.ExpressionClosure
+       << "\",\"maxNodes\":" << globalConfig.ExpressionMaxNodes << ",\"selectedSeedIds\":[";
+    bool first = true;
+    for (const auto& [id, node] : seeds) {
+      if (!first) os << ',';
+      first = false;
+      os << id;
+    }
+    os << "],\"verificationRootCount\":" << roots.size() << ",\"requestedMissingSeedIds\":";
+    dumpIds(missingSeeds);
+    os << ",\"sourceKinds\":[";
+    first = true;
+    for (const auto& kind : globalConfig.ExpressionKinds) {
+      if (!first) os << ',';
+      first = false;
+      os << '\"' << jsonEscape(kind) << '\"';
+    }
+    os << "]}\n";
+    size_t boundaryCount = 0;
+    for (const auto& [id, node] : selected) {
+      const char* reason = boundaryReason(node, roots.count(id));
+      const bool isBoundary = reason != nullptr;
+      boundaryCount += isBoundary;
+      const char* location = "dependency-only";
+      if (findLive(id) == node) location = node->type == NODE_MEMORY ? "memories" : "nodes";
+      dumpNode(g, node, seeds.count(id), roots.count(id), reason, location);
+      // Each usage row refers to an actual ENode, not graph adjacency names.
+      const auto uses = seedUses.find(id);
+      if (uses != seedUses.end()) {
+        for (const auto& use : uses->second) {
+          os << "{\"record\":\"seed-use\",\"seedId\":" << use.seedId << ",\"consumerId\":" << id
+             << ",\"slot\":\"" << use.slot << "\",\"treeIndex\":" << use.treeIndex
+             << ",\"role\":\"" << use.role << "\",\"nativeExpressionId\":" << use.expressionId << "}\n";
+        }
+      }
+    }
+    const bool complete = !capped && missingSeeds.empty() && unresolvedOwners.empty();
+    os << "{\"record\":\"footer\",\"complete\":true,\"closureComplete\":" << (complete ? "true" : "false")
+       << ",\"nodeCount\":" << selected.size() << ",\"seedCount\":" << seeds.size()
+       << ",\"verificationRootCount\":" << roots.size() << ",\"consumerCount\":" << seedUses.size()
+       << ",\"boundaryCount\":" << boundaryCount << ",\"truncationReasons\":[";
+    first = true;
+    auto reason = [&](const char* text) {
+      if (!first) os << ',';
+      first = false;
+      os << '\"' << text << '\"';
+    };
+    if (capped) reason("node-cap");
+    if (!missingSeeds.empty()) reason("requested-seed-missing");
+    if (!unresolvedOwners.empty()) reason("source-owner-unresolved");
+    os << "],\"unresolvedSourceOwnerIds\":";
+    dumpIds(unresolvedOwners);
+    os << "}\n";
+    Assert(os.good(), "failed to write expression sidecar");
+  }
+
+ private:
+  static const char* sourceKind(const Node* node) {
+    switch (node->sourceKind) {
+      case Node::SourceKind::WhenCondition: return "when-condition";
+      case Node::SourceKind::MemoryReadAddress: return "memory-read-address";
+      default: return "none";
+    }
+  }
+
+  static const char* boundaryReason(const Node* node, bool root) {
+    if (globalConfig.ExpressionClosure != "combinational" && globalConfig.ExpressionClosure != "source-cuts") return nullptr;
+    if (globalConfig.ExpressionClosure == "source-cuts" && !root) {
+      if ((node->type == NODE_OTHERS && node->sourceKind == Node::SourceKind::None) ||
+          node->type == NODE_REG_SRC || node->type == NODE_MEMORY || node->type == NODE_INP ||
+          node->type == NODE_EXT || node->type == NODE_EXT_IN || node->type == NODE_EXT_OUT) {
+        return "source-cut-candidate";
+      }
+    }
+    switch (node->type) {
+      case NODE_REG_SRC: return root ? nullptr : "state-boundary";
+      case NODE_MEMORY: return "memory-boundary";
+      case NODE_INP: return "input-boundary";
+      case NODE_EXT:
+      case NODE_EXT_IN:
+      case NODE_EXT_OUT: return "external-boundary";
+      case NODE_SPECIAL: return "effect-boundary";
+      default: return nullptr;
+    }
+  }
+
+  template <typename F>
+  static void eachTree(const Node* node, F visit) {
+    eachTreeSlot(node, [&](const ExpTree* tree, const char*, int) { visit(tree); });
+  }
+
+  template <typename F>
+  static void eachTreeSlot(const Node* node, F visit) {
+    for (size_t i = 0; i < node->assignTree.size(); ++i) visit(node->assignTree[i], "assignTree", static_cast<int>(i));
+    visit(node->valTree, "valTree", -1);
+    visit(node->resetTree, "resetTree", -1);
+    visit(node->resetCond, "resetCond", -1);
+    visit(node->resetVal, "resetVal", -1);
+    visit(node->memTree, "memTree", -1);
+  }
+
+  void pointerId(const Node* node) {
+    if (node) os << node->id;
+    else os << "null";
+  }
+
+  void dumpIds(const std::set<int>& ids) {
+    os << '[';
+    bool first = true;
+    for (int id : ids) {
+      if (!first) os << ',';
+      first = false;
+      os << id;
+    }
+    os << ']';
+  }
+
+  void dumpTree(const ExpTree* tree) {
+    if (!tree) {
+      os << "null";
+      return;
+    }
+    std::unordered_map<const ENode*, size_t> ids;
+    std::vector<const ENode*> expressions;
+    auto add = [&](const ENode* expression) {
+      if (expression && ids.emplace(expression, expressions.size()).second) expressions.push_back(expression);
+    };
+    add(tree->getRoot());
+    add(tree->getlval());
+    for (size_t i = 0; i < expressions.size(); ++i) for (const ENode* child : expressions[i]->child) add(child);
+    auto expressionId = [&](const ENode* expression) {
+      if (expression) os << ids.at(expression);
+      else os << "null";
+    };
+    os << "{\"root\":";
+    expressionId(tree->getRoot());
+    os << ",\"lvalue\":";
+    expressionId(tree->getlval());
+    os << ",\"nodes\":[";
+    for (size_t i = 0; i < expressions.size(); ++i) {
+      if (i) os << ',';
+      const ENode* expression = expressions[i];
+      os << "{\"id\":" << i << ",\"nativeId\":" << expression->id
+         << ",\"op\":\"" << opTypeToStr(expression->opType) << "\",\"opcode\":" << static_cast<int>(expression->opType)
+         << ",\"width\":" << expression->width << ",\"sign\":" << (expression->sign ? "true" : "false")
+         << ",\"isClock\":" << (expression->isClock ? "true" : "false")
+         << ",\"reset\":" << static_cast<int>(expression->reset) << ",\"usedBit\":" << expression->usedBit
+         << ",\"nodeId\":";
+      pointerId(expression->nodePtr);
+      os << ",\"memoryNodeId\":";
+      pointerId(expression->memoryNode);
+      os << ",\"values\":[";
+      for (size_t j = 0; j < expression->values.size(); ++j) {
+        if (j) os << ',';
+        os << expression->values[j];
+      }
+      os << "],\"strVal\":\"" << jsonEscape(expression->strVal) << "\",\"children\":[";
+      for (size_t j = 0; j < expression->child.size(); ++j) {
+        if (j) os << ',';
+        expressionId(expression->child[j]);
+      }
+      os << "]}";
+    }
+    os << "]}";
+  }
+
+  void dumpNode(const graph* g, const Node* node, bool seed, bool root, const char* reason, const char* location) {
+    const bool isBoundary = reason != nullptr;
+    const bool treesComplete = globalConfig.ExpressionClosure != "source-cuts" || !isBoundary || root;
+    os << "{\"record\":\"node\",\"id\":" << node->id << ",\"name\":\"" << jsonEscape(node->name)
+       << "\",\"type\":\"" << nodeTypeToStr(node->type) << "\",\"status\":\"" << nodeStatusToStr(node->status)
+       << "\",\"inventory\":\"" << location << "\",\"seed\":" << (seed ? "true" : "false")
+       << ",\"verificationRoot\":" << (root ? "true" : "false")
+       << ",\"closureBoundary\":" << (isBoundary ? "true" : "false")
+       << ",\"boundaryReason\":";
+    if (reason) os << '\"' << reason << '\"';
+    else os << "null";
+    os << ",\"treeInventoryComplete\":" << (treesComplete ? "true" : "false")
+       << ",\"width\":" << node->width << ",\"sign\":" << (node->sign ? "true" : "false")
+       << ",\"isClock\":" << (node->isClock ? "true" : "false") << ",\"reset\":" << static_cast<int>(node->reset)
+       << ",\"asReset\":" << static_cast<int>(node->asReset) << ",\"line\":" << node->lineno
+       << ",\"dimension\":[";
+    for (size_t i = 0; i < node->dimension.size(); ++i) {
+      if (i) os << ',';
+      os << node->dimension[i];
+    }
+    os << "],\"sourceKind\":\"" << sourceKind(node) << "\",\"sourceLine\":" << node->sourceLine
+       << ",\"sourceOwnerId\":" << node->sourceOwnerId << ",\"clockId\":";
+    pointerId(node->clock);
+    os << ",\"regNextId\":";
+    pointerId(node->regNext);
+    os << ",\"regSourceId\":";
+    pointerId(node->type == NODE_REG_SRC ? node : node->type == NODE_REG_DST ? node->regNext : nullptr);
+    os << ",\"regDestinationId\":";
+    pointerId(node->type == NODE_REG_DST ? node : node->type == NODE_REG_SRC ? node->regNext : nullptr);
+    os << ",\"parentId\":";
+    pointerId(node->parent);
+    os << ",\"memberIds\":[";
+    for (size_t i = 0; i < node->member.size(); ++i) {
+      if (i) os << ',';
+      pointerId(node->member[i]);
+    }
+    os << "],\"splitMemberIds\":[";
+    const auto split = g->splitArraySources().find(const_cast<Node*>(node));
+    if (split != g->splitArraySources().end()) {
+      for (size_t i = 0; i < split->second.size(); ++i) {
+        if (i) os << ',';
+        pointerId(split->second[i]);
+      }
+    }
+    os << ']';
+    dumpSemantic(os, node);
+    if (node->type == NODE_MEMORY) {
+      os << ",\"depth\":" << node->depth << ",\"readLatency\":" << node->rlatency
+         << ",\"writeLatency\":" << node->wlatency << ",\"readUnderWrite\":\"" << jsonEscape(node->extraInfo) << '\"';
+    }
+    if (!treesComplete) {
+      os << ",\"trees\":null}\n";
+      return;
+    }
+    os << ",\"trees\":{\"assignTree\":[";
+    for (size_t i = 0; i < node->assignTree.size(); ++i) {
+      if (i) os << ',';
+      dumpTree(node->assignTree[i]);
+    }
+    os << "],\"valTree\":";
+    dumpTree(node->valTree);
+    os << ",\"resetTree\":";
+    dumpTree(node->resetTree);
+    os << ",\"resetCond\":";
+    dumpTree(node->resetCond);
+    os << ",\"resetVal\":";
+    dumpTree(node->resetVal);
+    os << ",\"memTree\":";
+    dumpTree(node->memTree);
+    os << "}}\n";
   }
 
   std::ostream& os;
@@ -716,6 +1263,10 @@ void graph::dump(std::string FileName) {
   if (globalConfig.DumpGraphStats) {
     std::ofstream ofs(prefix + "_Stats.json");
     GraphStatsJsonDumper(ofs).dump(this);
+  }
+  if (globalConfig.DumpExpressions) {
+    std::ofstream ofs(prefix + "_Expressions.jsonl");
+    ExpressionJsonlDumper(ofs).dump(this, FileName);
   }
 }
 

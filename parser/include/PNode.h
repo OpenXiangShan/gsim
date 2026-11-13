@@ -121,6 +121,7 @@ class PNode {
   PNodeType type;
   int width = 0;
   int lineno;
+  int sourceLine = -1; // Exact statement-keyword line when captured by the lexer.
   bool sign = 0;
   // AggrType* aggrType = NULL;
   int id = -1;

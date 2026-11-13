@@ -232,6 +232,93 @@ fir-tests: $(GSIM_BIN)
 
 .PHONY: run-fir-test fir-tests
 
+MEMORY_DUMP_TEST_OUTPUT ?= $(FIR_TEST_OUTPUT_DIR)/memory-inventory
+PYTHON ?= python3
+.PHONY: test-memory-inventory
+test-memory-inventory: $(GSIM_BIN)
+	@mkdir -p "$(MEMORY_DUMP_TEST_OUTPUT)"
+	@set -o pipefail; $(GSIM_BIN) --dir "$(MEMORY_DUMP_TEST_OUTPUT)" \
+		--dump-json --dump-stages=TopoSort --stop-after-stage=TopoSort \
+		test/dump-memory-inventory.fir 2>&1 | tee "$(MEMORY_DUMP_TEST_OUTPUT)/driver.log"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -S scripts/check_memory_inventory.py \
+		--input "$(MEMORY_DUMP_TEST_OUTPUT)/DumpMemoryInventory_0TopoSort.json"
+
+AGGREGATE_DUMP_TEST_OUTPUT ?= $(FIR_TEST_OUTPUT_DIR)/aggregate-inventory
+.PHONY: test-source-aggregate-inventory
+test-source-aggregate-inventory: $(GSIM_BIN)
+	@mkdir -p "$(AGGREGATE_DUMP_TEST_OUTPUT)"
+	@set -o pipefail; $(GSIM_BIN) --dir "$(AGGREGATE_DUMP_TEST_OUTPUT)" \
+		--dump-json --sep-aggr=__DOT__ --dump-stages=Init,TopoSort,InferAllWidth \
+		--stop-after-stage=InferAllWidth \
+		--dump-split-array-map="$(AGGREGATE_DUMP_TEST_OUTPUT)/split-array-map.json" \
+		test/dump-source-aggregates.fir 2>&1 | tee "$(AGGREGATE_DUMP_TEST_OUTPUT)/driver.log"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -S scripts/check_source_aggregate_inventory.py \
+		--work "$(AGGREGATE_DUMP_TEST_OUTPUT)"
+
+EXPRESSION_DUMP_TEST_OUTPUT ?= $(FIR_TEST_OUTPUT_DIR)/expression-inventory
+NODE_EVOLUTION_TEST_OUTPUT ?= $(FIR_TEST_OUTPUT_DIR)/node-evolution
+NODE_EVOLUTION_TEST_OBJECTS :=
+$(eval $(call CXX_TEMPLATE,$(GSIM_BUILD_DIR)/test/node-evolution-lifecycle.o,test/node-evolution-lifecycle.cpp,$(CXXFLAGS),NODE_EVOLUTION_TEST_OBJECTS,$(PARSER_GEN_HEADER)))
+-include $(NODE_EVOLUTION_TEST_OBJECTS:.o=.d)
+$(eval $(call LD_TEMPLATE,$(GSIM_BUILD_DIR)/test/node-evolution-lifecycle,$(GSIM_BUILD_DIR)/src/NodeEvolution.o $(NODE_EVOLUTION_TEST_OBJECTS),$(CXXFLAGS)))
+NODE_EVOLUTION_REPLAY_OBJECTS :=
+$(eval $(call CXX_TEMPLATE,$(GSIM_BUILD_DIR)/test/node-evolution-replay.o,test/node-evolution-replay.cpp,$(CXXFLAGS),NODE_EVOLUTION_REPLAY_OBJECTS,$(PARSER_GEN_HEADER)))
+-include $(NODE_EVOLUTION_REPLAY_OBJECTS:.o=.d)
+$(eval $(call LD_TEMPLATE,$(GSIM_BUILD_DIR)/test/node-evolution-replay,$(GSIM_BUILD_DIR)/src/NodeEvolution.o $(NODE_EVOLUTION_REPLAY_OBJECTS),$(CXXFLAGS)))
+.PHONY: test-node-evolution
+test-node-evolution: $(GSIM_BIN) $(GSIM_BUILD_DIR)/test/node-evolution-lifecycle $(GSIM_BUILD_DIR)/test/node-evolution-replay
+	@mkdir -p "$(NODE_EVOLUTION_TEST_OUTPUT)/plain"
+	@set -o pipefail; $(GSIM_BIN) --dir "$(NODE_EVOLUTION_TEST_OUTPUT)" \
+		--dump-json --dump-stages=Init,TopoSort --stop-after-stage=TopoSort \
+		--trace-node-evolution="$(NODE_EVOLUTION_TEST_OUTPUT)/evolution.jsonl" \
+		--trace-input-sha256="$$(sha256sum test/node-evolution.fir | cut -d ' ' -f1)" \
+		test/node-evolution.fir 2>&1 | tee "$(NODE_EVOLUTION_TEST_OUTPUT)/driver.log"
+	@set -o pipefail; $(GSIM_BIN) --dir "$(NODE_EVOLUTION_TEST_OUTPUT)/plain" \
+		--dump-json --dump-stages=Init,TopoSort --stop-after-stage=TopoSort \
+		test/node-evolution.fir 2>&1 | tee "$(NODE_EVOLUTION_TEST_OUTPUT)/plain/driver.log"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -S scripts/check_node_evolution.py --work "$(NODE_EVOLUTION_TEST_OUTPUT)"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -S scripts/check_node_evolution_lifecycle.py \
+		--binary "$(GSIM_BUILD_DIR)/test/node-evolution-lifecycle" --work "$(NODE_EVOLUTION_TEST_OUTPUT)/lifecycle"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -S scripts/check_node_evolution_replay.py \
+		--binary "$(GSIM_BUILD_DIR)/test/node-evolution-replay" --producer "$(GSIM_BIN)" \
+		--work "$(NODE_EVOLUTION_TEST_OUTPUT)/replay"
+	@if $(GSIM_BIN) --trace-input-sha256=invalid test/node-evolution.fir \
+		> "$(NODE_EVOLUTION_TEST_OUTPUT)/invalid-sha.log" 2>&1; then \
+		echo 'Invalid trace identity was accepted' >&2; exit 1; fi
+	@if $(GSIM_BIN) --trace-node-evolution="$(NODE_EVOLUTION_TEST_OUTPUT)/plain" \
+		--stop-after-stage=SplitArray test/node-evolution.fir \
+		> "$(NODE_EVOLUTION_TEST_OUTPUT)/unwritable-trace.log" 2>&1; then \
+		echo 'Unwritable trace was accepted' >&2; exit 1; fi
+
+SEMANTIC_LINEAGE_TEST_OUTPUT ?= $(FIR_TEST_OUTPUT_DIR)/semantic-lineage
+.PHONY: test-semantic-lineage
+test-semantic-lineage: $(GSIM_BIN)
+	@mkdir -p "$(SEMANTIC_LINEAGE_TEST_OUTPUT)"
+	@set -o pipefail; $(GSIM_BIN) --dir "$(SEMANTIC_LINEAGE_TEST_OUTPUT)" \
+		--dump-json --sep-aggr=__DOT__ --dump-stages=Init,TopoSort,InferAllWidth \
+		--stop-after-stage=InferAllWidth test/dump-semantic-lineage.fir \
+		2>&1 | tee "$(SEMANTIC_LINEAGE_TEST_OUTPUT)/driver.log"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -S scripts/check_semantic_lineage.py \
+		--work "$(SEMANTIC_LINEAGE_TEST_OUTPUT)"
+
+EXPRESSION_TEST_OBJECTS :=
+$(eval $(call CXX_TEMPLATE,$(GSIM_BUILD_DIR)/test/dump-expression-synthetic.o,test/dump-expression-synthetic.cpp,$(CXXFLAGS),EXPRESSION_TEST_OBJECTS,$(PARSER_GEN_HEADER)))
+-include $(EXPRESSION_TEST_OBJECTS:.o=.d)
+$(eval $(call LD_TEMPLATE,$(GSIM_BUILD_DIR)/test/dump-expression-synthetic,$(filter-out $(GSIM_BUILD_DIR)/src/main.o,$(GSIM_OBJS)) $(EXPRESSION_TEST_OBJECTS),$(CXXFLAGS) -lgmp))
+.PHONY: test-expression-inventory
+test-expression-inventory: $(GSIM_BIN) $(GSIM_BUILD_DIR)/test/dump-expression-synthetic
+	@mkdir -p "$(EXPRESSION_DUMP_TEST_OUTPUT)/without-sidecar"
+	@set -o pipefail; $(GSIM_BIN) --dir "$(EXPRESSION_DUMP_TEST_OUTPUT)" \
+		--dump-json --dump-expressions=when-condition,memory-read-address \
+		--dump-stages=Init,TopoSort,InferAllWidth --stop-after-stage=InferAllWidth \
+		test/dump-expression-inventory.fir 2>&1 | tee "$(EXPRESSION_DUMP_TEST_OUTPUT)/driver.log"
+	@set -o pipefail; $(GSIM_BIN) --dir "$(EXPRESSION_DUMP_TEST_OUTPUT)/without-sidecar" \
+		--dump-json --dump-stages=Init,TopoSort,InferAllWidth --stop-after-stage=InferAllWidth \
+		test/dump-expression-inventory.fir 2>&1 | tee "$(EXPRESSION_DUMP_TEST_OUTPUT)/without-sidecar/driver.log"
+	$(GSIM_BUILD_DIR)/test/dump-expression-synthetic "$(EXPRESSION_DUMP_TEST_OUTPUT)"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -S scripts/check_expression_inventory.py \
+		--work "$(EXPRESSION_DUMP_TEST_OUTPUT)"
+
 ##############################################
 ### Building EMU from cpp model generated by GSIM
 ##############################################

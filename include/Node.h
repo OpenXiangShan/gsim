@@ -54,6 +54,7 @@ public:
   bool clock = false;
   ResetType reset = UNCERTAIN;
   std::vector<int> dimension;
+  std::vector<int> shapeFieldDepths;
   std::vector<std::pair<Node*, bool>> aggrMember; // all members, if not empty, all other infos above are invalid
   std::vector<AggrParentNode*> aggrParent; // the later the outer
 
@@ -66,7 +67,7 @@ public:
   ResetType getReset() { return reset; }
   void mergeInto(TypeInfo* info);
   bool isAggr() { return aggrParent.size() != 0; }
-  void addDim(int num);
+  void addDim(int num, int fieldDepth = 0);
   void newParent(std::string name);
   void flip();
 };
@@ -79,6 +80,8 @@ e.g. {{a, b}x, {c}y }z;
 class AggrParentNode {  // virtual type_aggregate node, used for aggregate connect
   public:
   std::string name;
+  std::vector<std::string> semanticPath;
+  int semanticScopeDepth = 0;
   std::vector<std::pair<Node*, bool>> member;  // leaf member
   std::vector<AggrParentNode*> parent; // non-leaf member (aggregate type), increasing partial order
   AggrParentNode(std::string _name, TypeInfo* info = nullptr);
@@ -96,6 +99,20 @@ class AggrParentNode {  // virtual type_aggregate node, used for aggregate conne
 class Node {
   static int counter;
  public:
+  enum class SourceKind { None, WhenCondition, MemoryReadAddress };
+  SourceKind sourceKind = SourceKind::None;
+  int sourceLine = -1;
+  int sourceOwnerId = -1;
+  std::string sourceEffectKind;
+  std::string sourceOriginRole;
+  int sourceMemoryDepth = -1;
+  // Source identity is captured from AST tokens, before physical renaming.
+  std::vector<std::string> semanticPath;
+  int semanticScopeDepth = 0;
+  std::vector<int> semanticShape;
+  std::vector<int> semanticShapeFieldDepths;
+  std::vector<int> semanticIndices;
+  std::vector<int> semanticAxes;
 
   Node(NodeType _type = NODE_OTHERS) {
     type    = _type;
@@ -127,6 +144,7 @@ class Node {
   SuperNode* super = nullptr;
   std::vector<Node*> member;
   /* for extmodule */
+  std::vector<Node*> externalPorts;
   std::vector<std::pair<bool, std::string>> params; // <isInt, value>
   /* only used in AST2Graph */
   ExpTree* valTree = nullptr;
@@ -195,6 +213,8 @@ class Node {
     depth = _depth;
     rlatency = r;
     wlatency = w;
+    sourceOriginRole = "memory-storage";
+    sourceMemoryDepth = _depth;
   }
   void add_member(Node* _member) {
     member.push_back(_member);

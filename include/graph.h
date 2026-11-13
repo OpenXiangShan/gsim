@@ -5,6 +5,36 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
+struct SourceAggregate {
+  int id;
+  std::string name;
+  std::vector<int> memberIds;
+  std::vector<int> originalMemberIds;
+  std::vector<bool> memberFlips;
+  std::vector<int> nestedAggregateIds;
+  std::vector<std::string> semanticPath;
+  int semanticScopeDepth = 0;
+};
+
+struct SourceReplacement {
+  int originalId;
+  int replacementId;
+  std::string originalName;
+  int originalWidth;
+  bool originalSign;
+  std::vector<int> originalDimension;
+  int originalDepth;
+};
+
+struct SourceScope {
+  std::string path;
+  std::string module;
+  int line;
+  int instanceLine;
+  bool external;
+  std::vector<std::string> semanticPath;
+};
+
 class graph {
   FILE *srcFp;
   int srcFileIdx;
@@ -46,7 +76,7 @@ class graph {
   void mergeOut1();
   void mergeIn1();
   void mergeSublings();
-  void splitArrayNode(Node* node);
+  void splitArrayNode(Node* node, const char* reason);
   void checkNodeSplit(Node* node);
   void splitOptionalArray();
   void constantMemory();
@@ -59,6 +89,13 @@ class graph {
   void detectSortedSuperLoop();
   void when2mux();
  public:
+  bool sourceAggregateInventoryComplete = false;
+  std::vector<SourceAggregate> sourceAggregates;
+  bool sourceScopeInventoryComplete = false;
+  std::vector<SourceScope> sourceScopes;
+  bool sourceReplacementInventoryComplete = false;
+  std::vector<SourceReplacement> sourceReplacements;
+  const std::map<Node*, std::vector<Node*>>& splitArraySources() const;
   std::vector<Node*> allNodes;
   std::vector<Node*> input;
   std::vector<Node*> output;

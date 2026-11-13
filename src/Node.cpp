@@ -132,6 +132,7 @@ void Node::updateInfo(TypeInfo* info) {
   width = info->width;
   sign = info->sign;
   dimension.insert(dimension.end(), info->dimension.begin(), info->dimension.end());
+  semanticShapeFieldDepths = info->shapeFieldDepths;
   if (info->isClock()) isClock = true;
   reset = info->getReset();
 }
@@ -144,6 +145,18 @@ Node* Node::dup(NodeType _type, std::string _name) {
   duplicate->isClock = isClock;
   duplicate->reset = reset;
   duplicate->lineno = lineno;
+  duplicate->sourceKind = sourceKind;
+  duplicate->sourceLine = sourceLine;
+  duplicate->sourceOwnerId = sourceOwnerId;
+  duplicate->sourceEffectKind = sourceEffectKind;
+  duplicate->sourceOriginRole = sourceOriginRole;
+  duplicate->sourceMemoryDepth = sourceMemoryDepth;
+  duplicate->semanticPath = semanticPath;
+  duplicate->semanticScopeDepth = semanticScopeDepth;
+  duplicate->semanticShape = semanticShape;
+  duplicate->semanticShapeFieldDepths = semanticShapeFieldDepths;
+  duplicate->semanticIndices = semanticIndices;
+  duplicate->semanticAxes = semanticAxes;
   for (int dim : dimension) duplicate->dimension.push_back(dim);
   for (auto param : params) duplicate->params.push_back(param);
 
@@ -164,13 +177,17 @@ void TypeInfo::mergeInto(TypeInfo* info) {
   aggrParent.insert(aggrParent.end(), info->aggrParent.begin(), info->aggrParent.end());
 }
 
-void TypeInfo::addDim(int num) {
+void TypeInfo::addDim(int num, int fieldDepth) {
   if (isAggr()) {
-    for (auto entry : aggrMember) entry.first->dimension.insert(entry.first->dimension.begin(), num);
+    for (auto entry : aggrMember) {
+      entry.first->dimension.insert(entry.first->dimension.begin(), num);
+      entry.first->semanticShapeFieldDepths.insert(entry.first->semanticShapeFieldDepths.begin(), fieldDepth);
+    }
     dimension.insert(dimension.begin(), num);
   } else {
     dimension.insert(dimension.begin(), num);
   }
+  shapeFieldDepths.insert(shapeFieldDepths.begin(), fieldDepth);
 }
 
 void TypeInfo::newParent(std::string name) {

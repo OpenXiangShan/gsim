@@ -73,8 +73,9 @@ static char* emptyStr = NULL;
 %token <typeRUW> Ruw
 %token <strVal> Info
 %token Flip Mux Validif Invalidate Mem SMem CMem Wire Reg RegReset Inst Of Node Attach
-%token When Else Stop Printf Skip Input Output Assert
-%token Module Extmodule Defname Parameter Intmodule Intrinsic Circuit Connect Public
+%token When Else Skip Input Output
+%token <intVal> Stop Printf Assert Intrinsic
+%token Module Extmodule Defname Parameter Intmodule Circuit Connect Public
 %token Define Const
 %token Firrtl Version INDENT DEDENT
 %token RightArrow "=>"
@@ -279,16 +280,17 @@ statement: Wire ALLID ':' type info    { $$ = newNode(P_WIRE_DEF, $4->lineno, $5
     | Define reference '=' expr info { $$ = newNode(P_CONNECT, synlineno(), $5, NULL, 2, $2, $4); }
     | Attach '(' references ')' info { TODO(); }
     | When expr ':' info INDENT statements DEDENT when_else   { $$ = newNode(P_WHEN, $2->lineno, $4, NULL, 3, $2, $6, $8); } /* expected newline before statement */
-    | Stop '(' expr ',' expr ',' INT ')' info   { $$ = newNode(P_STOP, synlineno(), $9, NULL, 2, $3, $5); $$->appendExtraInfo($7); }
-    | Stop '(' expr ',' expr ',' INT ')' ':' ALLID info   { $$ = newNode(P_STOP, synlineno(), $11, $10, 2, $3, $5); $$->appendExtraInfo($7); }
-    | Printf '(' expr ',' expr ',' String exprs ')' ':' ALLID info { $$ = newNode(P_PRINTF, synlineno(), $12, $11, 3, $3, $5, $8); $$->appendExtraInfo($7); }
-    | Printf '(' expr ',' expr ',' String exprs ')' info    { $$ = newNode(P_PRINTF, synlineno(), $10, NULL, 3, $3, $5, $8); $$->appendExtraInfo($7); }
-    | Assert '(' expr ',' expr ',' expr ',' String ')' ':' ALLID info { $$ = newNode(P_ASSERT, synlineno(), $13, $12, 3, $3, $5, $7); $$->appendExtraInfo($9); }
-    | Assert '(' expr ',' expr ',' expr ',' String ')' info { $$ = newNode(P_ASSERT, synlineno(), $11, NULL, 3, $3, $5, $7); $$->appendExtraInfo($9); }
+    | Stop '(' expr ',' expr ',' INT ')' info   { $$ = newNode(P_STOP, synlineno(), $9, NULL, 2, $3, $5); $$->sourceLine = $1; $$->appendExtraInfo($7); }
+    | Stop '(' expr ',' expr ',' INT ')' ':' ALLID info   { $$ = newNode(P_STOP, synlineno(), $11, $10, 2, $3, $5); $$->sourceLine = $1; $$->appendExtraInfo($7); }
+    | Printf '(' expr ',' expr ',' String exprs ')' ':' ALLID info { $$ = newNode(P_PRINTF, synlineno(), $12, $11, 3, $3, $5, $8); $$->sourceLine = $1; $$->appendExtraInfo($7); }
+    | Printf '(' expr ',' expr ',' String exprs ')' info    { $$ = newNode(P_PRINTF, synlineno(), $10, NULL, 3, $3, $5, $8); $$->sourceLine = $1; $$->appendExtraInfo($7); }
+    | Assert '(' expr ',' expr ',' expr ',' String ')' ':' ALLID info { $$ = newNode(P_ASSERT, synlineno(), $13, $12, 3, $3, $5, $7); $$->sourceLine = $1; $$->appendExtraInfo($9); }
+    | Assert '(' expr ',' expr ',' expr ',' String ')' info { $$ = newNode(P_ASSERT, synlineno(), $11, NULL, 3, $3, $5, $7); $$->sourceLine = $1; $$->appendExtraInfo($9); }
     | Intrinsic '(' ALLID intrinsic_params ',' expr ',' expr ',' expr intrinsic_extra ')' info {
         if (strcmp($3, "circt_chisel_ifelsefatal") == 0) {
           const char* msg = $4 ? $4 : $3;
           $$ = newNode(P_ASSERT, synlineno(), $13, NULL, 3, $6, $8, $10);
+          $$->sourceLine = $1;
           $$->appendExtraInfo(msg);
         } else {
           // TODO: Returning NULL for unrecognized intrinsics could lead to issues if the parser

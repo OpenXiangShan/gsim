@@ -315,7 +315,7 @@ public:
     void getRelyNodes(std::set<Node*>& allNodes);
     void updateWithSplittedNode();
     void clearComponent();
-    void updateWithSplittedArray(Node* node, Node* array, std::vector<Node*>& arrayMember);
+    bool updateWithSplittedArray(Node* node, Node* array, std::vector<Node*>& arrayMember);
     bool isReadTree();
     ExpTree* dup();
 };

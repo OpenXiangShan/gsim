@@ -37,6 +37,8 @@ void fillEmptyWhen(ExpTree* newTree, ENode* oldNode);
 static std::map<std::string, PNode*> moduleMap;
 /* prefix trace. module1, module1$module2 module1$a_b_c...*/
 static std::stack<std::string> prefixTrace;
+static std::vector<std::string> semanticPrefix;
+static int semanticScopeDepth = 0;
 static std::map<std::string, Node*> allSignals;
 static std::map<std::string, AggrParentNode*> allAggr; // CHECK: any other aggr nodes ?
 static std::vector<std::pair<bool, Node*>> whenTrace;
@@ -58,7 +60,17 @@ static inline Node* allocNode(NodeType type = NODE_OTHERS, std::string name = ""
   Node* node = new Node(type);
   node->name = name;
   node->lineno = lineno;
+  node->semanticPath = semanticPrefix;
+  node->semanticScopeDepth = semanticScopeDepth;
+  if (type == NODE_SPECIAL) node->semanticPath.push_back("effect@" + std::to_string(lineno));
   return node;
+}
+
+static void setEffectSource(Node* node, const PNode* statement, const char* kind) {
+  node->sourceEffectKind = kind;
+  Assert(statement->sourceLine >= 0, "effect source keyword position missing");
+  node->sourceLine = statement->sourceLine;
+  node->semanticPath.back() = "effect@" + std::to_string(node->sourceLine);
 }
 
 static inline void addSignal(std::string s, Node* n) {
@@ -107,10 +119,12 @@ static inline std::string prefixName(std::string ch, std::string name) {
 
 static inline void prefix_append(std::string ch, std::string str) {
   prefixTrace.push(prefix(ch) + str);
+  semanticPrefix.push_back(str);
 }
 
 static inline void prefix_pop() {
   prefixTrace.pop();
+  semanticPrefix.pop_back();
 }
 
 static inline std::string replacePrefix(std::string oldPrefix, std::string newPrefix, std::string str) {
@@ -177,6 +191,7 @@ TypeInfo* visitFields(graph* g, PNode* fields, NodeType parentType) {
     }
     if (!fieldInfo->isAggr()) { // The type of field is ground
       Node* fieldNode = allocNode(curType, prefixName(SEP_AGGR, field->name), fields->lineno);
+      fieldNode->semanticPath.push_back(field->name);
       fieldNode->updateInfo(fieldInfo);
       info->add(fieldNode, field->type == P_FLIP_FIELD);
     } else { // The type of field is aggregate
@@ -222,11 +237,14 @@ TypeInfo* visitType(graph* g, PNode* ptype, NodeType parentType) {
     case P_AG_FIELDS:
       info = visitFields(g, ptype, parentType);
       info->newParent(topPrefix());
+      info->aggrParent.back()->semanticPath = semanticPrefix;
+      info->aggrParent.back()->semanticScopeDepth = semanticScopeDepth;
       break;
     case P_AG_ARRAY:
       TYPE_CHECK(ptype, 1, 1, P_AG_ARRAY);
       info = visitType(g, ptype->getChild(0), parentType);
-      info->addDim(p_stoi(ptype->getExtra(0).c_str()));
+      info->addDim(p_stoi(ptype->getExtra(0).c_str()),
+                   static_cast<int>(semanticPrefix.size()) - semanticScopeDepth - 1);
       break;
     default:
       Panic();
@@ -531,6 +549,7 @@ void visitExtModule(graph* g, PNode* module) {
     Assert(ports->getChild(0)->name == "TE" && ports->getChild(1)->name == "E" && ports->getChild(2)->name == "CK" && ports->getChild(3)->name == "Q", "invalid clockgate ports");
     auto addGatePort = [&](std::string name, bool isClock) {
       Node* node = allocNode(NODE_OTHERS, prefixName(SEP_MODULE, name), module->lineno);
+      node->semanticPath.push_back(name);
       node->width = 1; node->sign = false; node->isClock = isClock;
       addSignal(node->name, node);
       return node;
@@ -555,6 +574,7 @@ void visitExtModule(graph* g, PNode* module) {
     for (int i = 0; i < ports->getChildNum(); i ++) {
       TypeInfo* portInfo = visitPort(g, ports->getChild(i), P_EXTMOD);
       for (auto entry : portInfo->aggrMember) {
+        extNode->externalPorts.push_back(entry.first);
         if (entry.first->isClock) {
           if (!extNode->clock) extNode->clock = entry.first;
           else entry.first->type = NODE_OTHERS;
@@ -685,6 +705,11 @@ static inline TypeInfo* visitMemType(graph* g, PNode* dataType) {
 static Node* allocAddrNode(graph* g, Node* port) {
   ENode* addr_enode = port->memTree->getRoot()->getChild(0);
   Node* addr_src = allocNode(NODE_REG_SRC, format("%s%s%s", port->name.c_str(), SEP_AGGR, "ADDR"), port->lineno);
+  addr_src->sourceKind = Node::SourceKind::MemoryReadAddress;
+  addr_src->sourceLine = port->lineno;
+  addr_src->sourceOwnerId = port->id;
+  addr_src->semanticPath = port->semanticPath;
+  addr_src->semanticScopeDepth = port->semanticScopeDepth;
   g->addReg(addr_src);
   Node* addr_dst = addr_src->dup();
   addr_dst->type = NODE_REG_DST;
@@ -721,7 +746,11 @@ static Node* visitChirrtlPort(graph* g, PNode* port, int width, int depth, bool 
   } else TODO();
 
   Node* ret = allocNode(type, topPrefix() + suffix, port->lineno);
+  // Rebase the original memory leaf path onto the actual mport declaration.
+  ret->semanticPath.insert(ret->semanticPath.end(),
+      node->semanticPath.begin() + node->semanticScopeDepth + 1, node->semanticPath.end());
   ret->dimension = node->dimension;
+  ret->semanticShapeFieldDepths = node->semanticShapeFieldDepths;
   ENode* enode = new ENode(op);
   enode->memoryNode = node;
   enode->addChild(addr_enode);
@@ -755,14 +784,26 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
     memoryMembers.push_back(portNode);
   }
 
+  std::map<const AggrParentNode*, AggrParentNode*> portAggregates;
   for (AggrParentNode* memParent : memoryMap[memName].second) {
     std::string suffix = replacePrefix(memName, "", memParent->name).c_str();
     AggrParentNode* parent = new AggrParentNode(prefixName(SEP_MODULE, port->name) + suffix);
+    parent->semanticPath = semanticPrefix;
+    parent->semanticScopeDepth = semanticScopeDepth;
+    parent->semanticPath.push_back(port->name);
+    parent->semanticPath.insert(parent->semanticPath.end(),
+        memParent->semanticPath.begin() + semanticScopeDepth + 1, memParent->semanticPath.end());
     for (auto entry : memParent->member) {
       std::string memberSuffix = replacePrefix(memName, "", entry.first->name).c_str();
       Node* memberNode = getSignal(prefixName(SEP_MODULE, port->name) + memberSuffix);
       parent->addMember(memberNode, entry.second);
     }
+    for (const auto* nested : memParent->parent) {
+      const auto found = portAggregates.find(nested);
+      Assert(found != portAggregates.end(), "memory port %s has an unordered nested aggregate", port->name.c_str());
+      parent->addParent(found->second);
+    }
+    portAggregates.emplace(memParent, parent);
     addAggr(parent->name, parent);
   }
 }
@@ -780,6 +821,7 @@ static void visitChirrtlMemory(graph* g, PNode* mem) {
   TypeInfo* type = visitMemType(g, mem->getChild(0));
   int depth = type->dimension.front();
   type->dimension.erase(type->dimension.begin());
+  type->shapeFieldDepths.erase(type->shapeFieldDepths.begin());
   // Convert to firrtl memory
   int rlatency = isSeq;
   int wlatency = 1;
@@ -794,6 +836,7 @@ static void visitChirrtlMemory(graph* g, PNode* mem) {
     memoryMap[topPrefix()] = std::make_pair(std::vector<Node*>(), std::vector<AggrParentNode*>());
     for (auto& entry : type->aggrMember) {
       entry.first->dimension.erase(entry.first->dimension.begin());
+      entry.first->semanticShapeFieldDepths.erase(entry.first->semanticShapeFieldDepths.begin());
       auto* node = entry.first;
       node->type = NODE_MEMORY;
       node->extraInfo = ruw;
@@ -823,7 +866,11 @@ void visitInst(graph* g, PNode* inst) {
                "Module %s is not defined!\n", inst->getExtra(0).c_str());
   PNode* module = moduleMap[inst->getExtra(0)];
   prefix_append(SEP_MODULE, inst->name);
+  const int previousScopeDepth = semanticScopeDepth;
+  semanticScopeDepth = static_cast<int>(semanticPrefix.size());
   moduleInstances.insert(topPrefix());
+  g->sourceScopes.push_back({topPrefix(), module->name, module->lineno, inst->lineno, module->type == P_EXTMOD,
+                             semanticPrefix});
   switch(module->type) {
     case P_MOD: visitModule(g, module); break;
     case P_EXTMOD: visitExtModule(g, module); break;
@@ -831,11 +878,14 @@ void visitInst(graph* g, PNode* inst) {
     default:
       Panic();
   }
+  semanticScopeDepth = previousScopeDepth;
   prefix_pop();
 }
 
 AggrParentNode* allocNodeFromAggr(graph* g, AggrParentNode* parent) {
   AggrParentNode* ret = new AggrParentNode(topPrefix());
+  ret->semanticPath = semanticPrefix;
+  ret->semanticScopeDepth = semanticScopeDepth;
   std::string oldPrefix = parent->name;
   /* alloc all real nodes */
   for (auto entry : parent->member) {
@@ -843,6 +893,13 @@ AggrParentNode* allocNodeFromAggr(graph* g, AggrParentNode* parent) {
     std::string name = replacePrefix(oldPrefix, topPrefix(), member->name);
     /* the type of parent can be registers, thus the node->type cannot set to member->type */
     Node* node = member->dup(NODE_OTHERS, name); // SEP_AGGR is already in name
+    node->semanticPath = semanticPrefix;
+    node->semanticPath.insert(node->semanticPath.end(),
+        member->semanticPath.begin() + parent->semanticPath.size(), member->semanticPath.end());
+    node->semanticScopeDepth = semanticScopeDepth;
+    const int depthDelta = static_cast<int>(semanticPrefix.size() - semanticScopeDepth) -
+        static_cast<int>(parent->semanticPath.size() - member->semanticScopeDepth);
+    for (int& depth : node->semanticShapeFieldDepths) depth = std::max(0, depth + depthDelta);
   
     addSignal(node->name, node);
     ret->addMember(node, entry.second);
@@ -851,6 +908,10 @@ AggrParentNode* allocNodeFromAggr(graph* g, AggrParentNode* parent) {
   for (AggrParentNode* aggrMember : parent->parent) {
     // create new aggr node
     AggrParentNode* aggrNode = new AggrParentNode(replacePrefix(oldPrefix, topPrefix(), aggrMember->name));
+    aggrNode->semanticPath = semanticPrefix;
+    aggrNode->semanticScopeDepth = semanticScopeDepth;
+    aggrNode->semanticPath.insert(aggrNode->semanticPath.end(),
+        aggrMember->semanticPath.begin() + parent->semanticPath.size(), aggrMember->semanticPath.end());
     // update member and parent in new aggrNode
     for (auto entry : aggrMember->member) {
       aggrNode->addMember(getSignal(replacePrefix(oldPrefix, topPrefix(), entry.first->name)), entry.second);
@@ -899,6 +960,8 @@ void visitNode(graph* g, PNode* node) {
       aggrNode->member[i].first->valTree = new ExpTree(exp->getAggr(i), aggrNode->member[i].first);
       aggrNode->member[i].first->dimension.clear();
       std::vector<int> dims = exp->getAggr(i)->getDim();
+      auto& depths = aggrNode->member[i].first->semanticShapeFieldDepths;
+      if (depths.size() > dims.size()) depths.erase(depths.begin(), depths.end() - dims.size());
       aggrNode->member[i].first->dimension.insert(aggrNode->member[i].first->dimension.end(), dims.begin(), dims.end());
     }
     addAggr(aggrNode->name, aggrNode);
@@ -906,6 +969,7 @@ void visitNode(graph* g, PNode* node) {
     Node* n = allocNode(NODE_OTHERS, topPrefix(), node->lineno);
     std::vector<int> dims = exp->getExpRoot()->getDim();
     n->dimension.insert(n->dimension.end(), dims.begin(), dims.end());
+    n->semanticShapeFieldDepths.assign(dims.size(), 0);
 
     n->valTree = new ExpTree(exp->getExpRoot(), n);
     addSignal(n->name, n);
@@ -1181,6 +1245,7 @@ void visitWhenConnect(graph* g, PNode* connect) {
 void visitWhenPrintf(graph* g, PNode* print) {
   TYPE_CHECK(print, 3, 3, P_PRINTF);
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, "PRINTF_" + std::to_string(print->lineno)), print->lineno);
+  setEffectSource(n, print, "printf");
   ASTExpTree* exp = visitExpr(g, print->getChild(1)); // cond
 
   ENode* expRoot = exp->getExpRoot();
@@ -1214,6 +1279,7 @@ void visitWhenAssert(graph* g, PNode* ass) {
   TYPE_CHECK(ass, 3, 3, P_ASSERT);
   std::string assertName = ass->name.empty() ? format("ASSERT_%d", ass->lineno) : ass->name;
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, assertName), ass->lineno);
+  setEffectSource(n, ass, "assert");
 
   ASTExpTree* pred = visitExpr(g, ass->getChild(1));
   ASTExpTree* en = visitExpr(g, ass->getChild(2));
@@ -1248,6 +1314,7 @@ void visitWhenStop(graph* g, PNode* stop) {
   TYPE_CHECK(stop, 2, 2, P_STOP);
   std::string stopName = stop->name.empty() ? format("STOP_%d", stop->lineno) : stop->name;
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stopName), stop->lineno);
+  setEffectSource(n, stop, "stop");
 
   ASTExpTree* exp = visitExpr(g, stop->getChild(1));
 
@@ -1305,6 +1372,9 @@ void visitWhenStmts(graph* g, PNode* stmts) {
 
 Node* allocCondNode(ASTExpTree* condExp, PNode* when) {
   Node* cond = allocNode(NODE_OTHERS, prefixName(SEP_MODULE, "WHEN_COND_" + std::to_string(when->lineno)), when->lineno);
+  cond->sourceKind = Node::SourceKind::WhenCondition;
+  cond->sourceLine = when->lineno;
+  cond->semanticPath.push_back("when@" + std::to_string(when->lineno));
   cond->valTree = new ExpTree(condExp->getExpRoot(), cond);
   addSignal(cond->name, cond);
   return cond;
@@ -1335,6 +1405,7 @@ void visitWhen(graph* g, PNode* when) {
 void visitPrintf(graph* g, PNode* print) {
   TYPE_CHECK(print, 3, 3, P_PRINTF);
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, print->name), print->lineno);
+  setEffectSource(n, print, "printf");
   ASTExpTree* exp = visitExpr(g, print->getChild(1));
 
   ENode* enode = new ENode(OP_PRINTF);
@@ -1369,6 +1440,7 @@ void visitStop(graph* g, PNode* stop) {
 
   std::string stopName = stop->name.empty() ? format("STOP_%d", stop->lineno) : stop->name;
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, stopName), stop->lineno);
+  setEffectSource(n, stop, "stop");
   n->valTree = new ExpTree(enode, new ENode(n));
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
@@ -1382,6 +1454,7 @@ void visitAssert(graph* g, PNode* ass) {
   TYPE_CHECK(ass, 3, 3, P_ASSERT);
   std::string assertName = ass->name.empty() ? format("ASSERT_%d", ass->lineno) : ass->name;
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, assertName), ass->lineno);
+  setEffectSource(n, ass, "assert");
 
   ASTExpTree* pred = visitExpr(g, ass->getChild(1));
   ASTExpTree* en = visitExpr(g, ass->getChild(2));
@@ -1478,6 +1551,7 @@ void visitStmts(graph* g, PNode* stmts) {
 */
 void visitTopModule(graph* g, PNode* topModule) {
   TYPE_CHECK(topModule, 2, 2, P_MOD);
+  g->sourceScopes.push_back({"", topModule->name, topModule->lineno, -1, false, {}});
   visitTopPorts(g, topModule->getChild(0));
   visitStmts(g, topModule->getChild(1));
 }
@@ -1622,6 +1696,19 @@ graph* AST2Graph(PNode* root) {
 #endif
     }
   }
+  // Freeze source geometry before singleton removal and splitting. Axes retain
+  // the correspondence between current physical dimensions and source ones.
+  auto freezeGeometry = [](Node* node) {
+    node->semanticShape = node->dimension;
+    node->semanticIndices.assign(node->dimension.size(), -1);
+    node->semanticAxes.clear();
+    for (size_t i = 0; i < node->dimension.size(); ++i)
+      node->semanticAxes.push_back(static_cast<int>(i));
+    Assert(node->semanticShapeFieldDepths.size() == node->dimension.size(),
+           "source dimension metadata mismatch for %s", node->name.c_str());
+  };
+  for (const auto& entry : allSignals) freezeGeometry(entry.second);
+  for (Node* memory : g->memory) freezeGeometry(memory);
   removeDummyDim(g);
 
   for (Node* reg : g->regsrc) {
@@ -1690,6 +1777,68 @@ graph* AST2Graph(PNode* root) {
   std::sort(g->allNodes.begin(), g->allNodes.end(), [](const Node* a, const Node* b) {
     return a->id < b->id;
   });
+  // Freeze source aggregate identity before splitArray can rename or replace
+  // its physical leaf nodes. Aggregate IDs use their own stable namespace.
+  auto sourceAggregateObjects = allAggr;
+  std::vector<AggrParentNode*> aggregateWork;
+  for (const auto& [key, aggregate] : allAggr) aggregateWork.push_back(aggregate);
+  for (const auto& [key, memory] : memoryMap) {
+    for (auto* aggregate : memory.second) {
+      const auto [found, inserted] = sourceAggregateObjects.emplace(aggregate->name, aggregate);
+      Assert(inserted || found->second == aggregate, "memory aggregate %s has a conflicting source key", aggregate->name.c_str());
+      if (inserted) aggregateWork.push_back(aggregate);
+    }
+  }
+  for (size_t i = 0; i < aggregateWork.size(); ++i) {
+    for (auto* nested : aggregateWork[i]->parent) {
+      const auto [found, inserted] = sourceAggregateObjects.emplace(nested->name, nested);
+      Assert(inserted || found->second == nested, "nested aggregate %s has a conflicting source key", nested->name.c_str());
+      if (inserted) aggregateWork.push_back(nested);
+    }
+  }
+  std::map<const AggrParentNode*, int> aggregateIds;
+  std::map<int, int> sourceReplacements;
+  std::set<int> replacementIds;
+  std::sort(g->sourceReplacements.begin(), g->sourceReplacements.end(), [](const SourceReplacement& a, const SourceReplacement& b) {
+    return a.originalId < b.originalId;
+  });
+  for (const auto& replacement : g->sourceReplacements) {
+    Assert(sourceReplacements.emplace(replacement.originalId, replacement.replacementId).second,
+           "source node %d has multiple replacements", replacement.originalId);
+    Assert(replacementIds.insert(replacement.replacementId).second,
+           "replacement node %d has multiple original sources", replacement.replacementId);
+  }
+  g->sourceAggregates.reserve(sourceAggregateObjects.size());
+  for (const auto& [key, aggregate] : sourceAggregateObjects) {
+    const int id = static_cast<int>(g->sourceAggregates.size()) + 1;
+    Assert(aggregateIds.emplace(aggregate, id).second, "aggregate %s has multiple source keys", key.c_str());
+    g->sourceAggregates.push_back({id, key, {}, {}, {}, {}, aggregate->semanticPath,
+                                   aggregate->semanticScopeDepth});
+  }
+  for (const auto& [key, aggregate] : sourceAggregateObjects) {
+    auto& source = g->sourceAggregates[aggregateIds.at(aggregate) - 1];
+    source.memberIds.reserve(aggregate->member.size());
+    source.originalMemberIds.reserve(aggregate->member.size());
+    source.memberFlips.reserve(aggregate->member.size());
+    for (const auto& [member, flip] : aggregate->member) {
+      Assert(member, "aggregate %s has a null member", key.c_str());
+      source.originalMemberIds.push_back(member->id);
+      const auto replacement = sourceReplacements.find(member->id);
+      source.memberIds.push_back(replacement == sourceReplacements.end() ? member->id : replacement->second);
+      source.memberFlips.push_back(flip);
+    }
+    source.nestedAggregateIds.reserve(aggregate->parent.size());
+    for (const auto* nested : aggregate->parent) {
+      const auto found = aggregateIds.find(nested);
+      Assert(found != aggregateIds.end(), "aggregate %s has an unregistered nested aggregate", key.c_str());
+      source.nestedAggregateIds.push_back(found->second);
+    }
+  }
+  g->sourceAggregateInventoryComplete = true;
+  std::sort(g->sourceScopes.begin(), g->sourceScopes.end(), [](const SourceScope& a, const SourceScope& b) {
+    return a.path < b.path;
+  });
+  g->sourceScopeInventoryComplete = true;
   return g;
 }
 
@@ -1711,11 +1860,12 @@ bool nameExist(std::string str) {
   return allSignals.find(str) != allSignals.end();
 }
 
-void changeName(std::string oldName, std::string newName) {
+Node* changeName(std::string oldName, std::string newName) {
   Assert(allSignals.find(oldName) != allSignals.end(), "signal %s not found", oldName.c_str());
   allSignals[oldName]->name = newName;
   allSignals[newName] = allSignals[oldName];
   allSignals.erase(oldName);
+  return allSignals[newName];
 }
 
 void writer2Reg(ExpTree* tree) {
@@ -1779,6 +1929,12 @@ void removeDummyDim(graph* g) {
         validDim.push_back(node->dimension[i]);
       }
     }
+    std::vector<int> sourceAxes;
+    for (size_t i = 0; i < node->dimension.size(); ++i) {
+      if (node->dimension[i] == 1) node->semanticIndices[node->semanticAxes[i]] = 0;
+      else sourceAxes.push_back(node->semanticAxes[i]);
+    }
+    node->semanticAxes = std::move(sourceAxes);
     if (validIndex.size() == node->dimension.size()) continue;
     arrayMap[node] = std::vector<int>(validIndex);
 
@@ -1801,6 +1957,12 @@ void removeDummyDim(graph* g) {
         validDim.push_back((mem->dimension[i]));
       }
     }
+    std::vector<int> sourceAxes;
+    for (size_t i = 0; i < mem->dimension.size(); ++i) {
+      if (mem->dimension[i] == 1) mem->semanticIndices[mem->semanticAxes[i]] = 0;
+      else sourceAxes.push_back(mem->semanticAxes[i]);
+    }
+    mem->semanticAxes = std::move(sourceAxes);
     if (validDim.size() == mem->dimension.size()) continue;
     mem->dimension = std::vector<int>(validDim);
   }
@@ -1820,6 +1982,8 @@ void removeDummyDim(graph* g) {
     Assert(writerCount == 1 && readerCount > 0, "memory %s has multiple writers", mem->name.c_str());
     /* creating registers */
     Node* regSrc = mem->dup(NODE_REG_SRC, mem->name);
+    g->sourceReplacements.push_back({mem->id, regSrc->id, mem->name, mem->width,
+                                    mem->sign, mem->dimension, mem->depth});
     Node* regDst = regSrc->dup(NODE_REG_DST, mem->name + "$NEXT");
     regSrc->bindReg(regDst);
     g->addReg(regSrc);
@@ -1849,4 +2013,5 @@ void removeDummyDim(graph* g) {
     std::remove_if(g->memory.begin(), g->memory.end(), [](const Node* n) {return n->status == DEAD_NODE; }),
     g->memory.end()
   );
+  g->sourceReplacementInventoryComplete = true;
 }

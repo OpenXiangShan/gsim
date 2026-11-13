@@ -7,10 +7,17 @@ struct Config {
   bool DumpGraphJson;
   bool DumpGraphStats;
   bool DumpAssignTree;
+  bool DumpExpressions;
+  std::set<std::string> ExpressionKinds;
+  std::string ExpressionIdPath;
+  std::string ExpressionClosure;
+  size_t ExpressionMaxNodes;
   bool DumpConstStatus;
   std::string OutputDir;
   std::string StopAfterStage;
   std::string SplitArrayMapPath;
+  std::string NodeEvolutionTracePath;
+  std::string NodeEvolutionInputSha256;
   int SuperNodeMaxSize;
   uint32_t cppMaxSizeKB;
   std::string sep_module;
