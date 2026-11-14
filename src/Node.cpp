@@ -149,6 +149,10 @@ Node* Node::dup(NodeType _type, std::string _name) {
   duplicate->isClock = isClock;
   duplicate->reset = reset;
   duplicate->lineno = lineno;
+  duplicate->rcDomainGuarded = rcDomainGuarded;
+  duplicate->rcDomainGuardTrigger = rcDomainGuardTrigger;
+  duplicate->rcDomainGuardControl = rcDomainGuardControl;
+  duplicate->rcDomainGuard = rcDomainGuard;
   for (int dim : dimension) duplicate->dimension.push_back(dim);
   for (auto param : params) duplicate->params.push_back(param);
 

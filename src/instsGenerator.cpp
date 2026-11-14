@@ -273,7 +273,10 @@ valInfo* ENode::instsMux(Node* node, std::string lvalue, bool isRoot) {
     } else if (ChildInfo(2, status) == VAL_CONSTANT && mpz_sgn(ChildInfo(2, consVal)) != 0) {
       ret->valStr = format("((!%s) | %s)", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str());
     } else {
-      if (MUX_OPT) {
+      const bool branchless = MUX_OPT &&
+                              ChildInfo(1, opNum) <= 1 &&
+                              ChildInfo(2, opNum) <= 1;
+      if (branchless) {
         ret->valStr = format("((%s & %s) | ((!%s) & %s))", ChildInfo(0, valStr).c_str(), ChildInfo(1, valStr).c_str(), ChildInfo(0, valStr).c_str(), ChildInfo(2, valStr).c_str());
       } else {
         std::string trueStr = ChildInfo(1, valStr);

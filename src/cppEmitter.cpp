@@ -49,6 +49,7 @@ static int rcCommitChunks[64];
 static bool rcDeferForeign = false;
 static bool rcHasCommitPend = false;
 static FILE* rcHeader = nullptr;
+
 // One bit per committed register that has readers on another partition.
 // The owner sets it while comparing old and new; readers apply it after the
 // commit barrier. Local readers still update their own activeFlags directly.
@@ -64,6 +65,7 @@ static bool rcHasRegChanges = false;
 static std::vector<SuperNode*> rcEvalSupers[64];
 static std::vector<SuperNode*> rcCommitSupers[64];
 static std::vector<SuperNode*> rcResetSupers;
+static std::unordered_map<Node*, std::vector<SuperNode*>> rcDomainGuardWakes;
 static std::unordered_map<Node*, std::vector<std::pair<int, int>>> rcForeign;
 static std::unordered_map<Node*, std::vector<Node*>> rcReaders;
 struct RcMemWakeGroup {
@@ -322,6 +324,10 @@ void graph::genInterfaceInput(Node* input) {
     };
     for (Node* next : input->next) note(next);
     for (Node* next : repCutBoundaryNext(input)) note(next);
+    auto wake = rcDomainGuardWakes.find(input);
+    if (wake != rcDomainGuardWakes.end()) {
+      for (SuperNode* guarded : wake->second) note(guarded->member.front());
+    }
     for (auto& group : groups) {
       RcFlags guard("activeFlags" + std::to_string(group.first), group.first);
       emitActiveMask(group.second, 2);
@@ -774,6 +780,23 @@ int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
 static std::vector<Node*> rcBulkCommitNodes(SuperNode* super);
 
 void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { // current indent = 2
+  std::string domainGuard;
+  bool anyDomainGuarded = false;
+  bool allDomainGuarded = !super->member.empty();
+  for (Node* member : super->member) {
+    anyDomainGuarded |= member->rcDomainGuarded;
+    allDomainGuarded &= member->rcDomainGuarded;
+    if (!member->rcDomainGuarded) continue;
+    if (domainGuard.empty()) domainGuard = member->rcDomainGuard;
+    else if (domainGuard != member->rcDomainGuard) allDomainGuarded = false;
+  }
+  if (anyDomainGuarded) {
+    Assert(allDomainGuarded && !domainGuard.empty(),
+           "RepCut super %d merged incompatible domain nodes", super->id);
+  }
+  if (!domainGuard.empty()) {
+    emitBodyLock(indent++, "if (unlikely(%s)) {\n", domainGuard.c_str());
+  }
   if (super->superType == SUPER_EXTMOD) { // TODO: normalize
     auto emitExtAsyncReset = [&](Node* extOut) {
       if (globalConfig.RepCutMode || !extOut->isAsyncReset()) return;
@@ -860,6 +883,7 @@ void graph::genSuperEval(SuperNode* super, std::string flagName, int indent) { /
     emitBodyLock(-- indent, "}\n");
     emitBodyLock(indent, "#endif\n");
   }
+  if (!domainGuard.empty()) emitBodyLock(--indent, "}\n");
 }
 
 
@@ -1178,6 +1202,12 @@ static void repCutActivate(Node* node) {
     else if (node->super->findIndex(node) >= node->super->findIndex(nextNode)) add(node->super);
   }
   for (Node* nextNode : repCutBoundaryNext(node)) add(nextNode->super);
+  if (node->rcDomainGuardTrigger) {
+    auto wake = rcDomainGuardWakes.find(node);
+    if (wake != rcDomainGuardWakes.end()) {
+      for (SuperNode* guarded : wake->second) add(guarded);
+    }
+  }
   if (node->type == NODE_REG_DST) add(node->getSrc()->super);
   if ((node->type == NODE_WRITER || node->type == NODE_READWRITER) && node->parent != nullptr) {
     auto readers = rcReaders.find(node->parent);
@@ -1217,6 +1247,7 @@ static void assignRepCutIds(const std::vector<SuperNode*>& sortedSuper) {
   rcMemFlushWakes.clear();
   rcMemFlushReady = false;
   rcResetSupers.clear();
+  rcDomainGuardWakes.clear();
   for (int part = 0; part < 64; ++part) {
     rcEvalSupers[part].clear();
     rcCommitSupers[part].clear();
@@ -1256,6 +1287,12 @@ static void assignRepCutIds(const std::vector<SuperNode*>& sortedSuper) {
     if (item.super->member.front()->rcResetSource) rcResetSupers.push_back(item.super);
     else if (item.commit) rcCommitSupers[item.part].push_back(item.super);
     else rcEvalSupers[item.part].push_back(item.super);
+    bool allDomainGuarded = !item.super->member.empty();
+    for (Node* member : item.super->member) allDomainGuarded &= member->rcDomainGuarded;
+    if (allDomainGuarded) {
+      Node* control = item.super->member.front()->rcDomainGuardControl;
+      if (control != nullptr) rcDomainGuardWakes[control].push_back(item.super);
+    }
     ++superId;
   }
   for (int part = 0; part < threads; ++part) {

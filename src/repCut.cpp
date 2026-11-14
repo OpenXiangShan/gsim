@@ -44,6 +44,69 @@ int repCutThreadsFromEnv() {
   return static_cast<int>(value);
 }
 
+static bool repCutDomainGuardEnabled() {
+  const char* text = std::getenv("GSIM_REPCUT_DOMAIN_GUARD");
+  return text != nullptr && std::strcmp(text, "1") == 0;
+}
+
+static bool repCutDomainWhenEnabled() {
+  const char* text = std::getenv("GSIM_REPCUT_DOMAIN_WHEN");
+  return text != nullptr && std::strcmp(text, "1") == 0;
+}
+
+static bool repCutDomainEarlyTopoEnabled() {
+  const char* text = std::getenv("GSIM_REPCUT_DOMAIN_EARLY_TOPO");
+  return text != nullptr && std::strcmp(text, "1") == 0;
+}
+
+static bool repCutDomainGuardAuditEnabled() {
+  const char* text = std::getenv("GSIM_REPCUT_DOMAIN_GUARD_AUDIT");
+  return text != nullptr && std::strcmp(text, "1") == 0;
+}
+
+static double repCutDomainMinCost() {
+  const char* text = std::getenv("GSIM_REPCUT_DOMAIN_MIN_COST");
+  if (text == nullptr || text[0] == '\0') return 32.0;
+  char* end = nullptr;
+  const double value = std::strtod(text, &end);
+  if (end == text || *end != '\0' || value < 1.0) {
+    fprintf(stderr, "[repcut] GSIM_REPCUT_DOMAIN_MIN_COST must be >= 1, got '%s'\n", text);
+    exit(1);
+  }
+  return value;
+}
+
+static size_t repCutDomainNodeBudget() {
+  const char* text = std::getenv("GSIM_REPCUT_DOMAIN_NODE_BUDGET");
+  if (text == nullptr || text[0] == '\0') return 4096;
+  char* end = nullptr;
+  const long value = std::strtol(text, &end, 10);
+  if (end == text || *end != '\0' || value < 1 || value > 100000) {
+    fprintf(stderr, "[repcut] GSIM_REPCUT_DOMAIN_NODE_BUDGET must be in [1,100000], got '%s'\n", text);
+    exit(1);
+  }
+  return static_cast<size_t>(value);
+}
+
+template <typename Fn>
+void walkAssign(Node* node, Fn&& fn);
+
+static bool repCutDomainPureBase(Node* node) {
+  if (node == nullptr || (node->type != NODE_OTHERS && node->type != NODE_OUT)) return false;
+  bool pure = true;
+  walkAssign(node, [&](ENode* enode) {
+    switch (enode->opType) {
+      case OP_READ_MEM: case OP_WRITE_MEM: case OP_EXT_FUNC:
+      case OP_PRINTF: case OP_ASSERT: case OP_EXIT:
+        pure = false;
+        break;
+      default:
+        break;
+    }
+  });
+  return pure;
+}
+
 // State sources must stay with their register destinations.  The original
 // RepCut objective only prices the combinational sink cones, so this separate
 // weight lets the partitioner account for the commit work without moving a
@@ -152,6 +215,12 @@ double repCutActiveBodyCost(Node* node) {
     }
   }
   return std::max(1.0, words + static_cast<double>(fan) + 0.5 * simple + muls * words + 2.0 * divs * words);
+}
+
+static bool repCutDomainPure(Node* node) {
+  return node != nullptr && node->status == VALID_NODE &&
+         (node->type == NODE_OTHERS || node->type == NODE_OUT) &&
+         repCutDomainPureBase(node);
 }
 
 void retargetTree(ExpTree* tree, int part,
@@ -391,6 +460,16 @@ bool repCutCommitOnly(SuperNode* super) { return commitOnlySuper(super); }
 
 bool repCutMergeOk(SuperNode* a, SuperNode* b) {
   if (!globalConfig.RepCutMode) return true;
+  bool leftGuarded = false;
+  bool rightGuarded = false;
+  for (Node* node : a->member) leftGuarded |= node->rcDomainGuarded;
+  for (Node* node : b->member) rightGuarded |= node->rcDomainGuarded;
+  if (leftGuarded || rightGuarded) {
+    if (!leftGuarded || !rightGuarded) return false;
+    for (Node* node : a->member) if (!node->rcDomainGuarded) return false;
+    for (Node* node : b->member) if (!node->rcDomainGuarded) return false;
+    if (a->member.front()->rcDomainGuard != b->member.front()->rcDomainGuard) return false;
+  }
   const int left = partOf(a);
   const int right = partOf(b);
   if (left == -2 || right == -2) return false;
@@ -403,6 +482,347 @@ bool repCutMergeOk(SuperNode* a, SuperNode* b) {
   return true;
 }
 
+// A positive unsigned comparison proves its source is nonzero. Multiple
+// selectors with different thresholds can thus share a single guard without
+// knowing the RTL signal names or the array shape.
+static ENode* rcDomainStripCast(ENode* e) {
+  while (e != nullptr && e->getChildNum() == 1 &&
+         (e->opType == OP_PAD || e->opType == OP_ASUINT || e->opType == OP_BITS_NOSHIFT))
+    e = e->getChild(0);
+  return e;
+}
+
+static Node* rcDomainNonzeroControl(ENode* selector) {
+  if (selector == nullptr || selector->nodePtr == nullptr) return nullptr;
+  Node* predicate = selector->nodePtr;
+  // Any one-bit selector is itself a reusable demand domain. A threshold
+  // comparison below lets distinct selectors share a wider source domain.
+  Node* direct = predicate->width == 1 ? predicate : nullptr;
+  if (predicate->assignTree.size() != 1 || predicate->assignTree[0] == nullptr) return direct;
+  ENode* cmp = predicate->assignTree[0]->getRoot();
+  if (cmp == nullptr || cmp->opType != OP_GT || cmp->getChildNum() != 2 || cmp->sign) return direct;
+  ENode* lhs = rcDomainStripCast(cmp->getChild(0));
+  ENode* rhs = rcDomainStripCast(cmp->getChild(1));
+  if (lhs == nullptr || rhs == nullptr || lhs->nodePtr == nullptr || lhs->sign ||
+      rhs->opType != OP_INT || rhs->sign || rhs->strVal.empty() || rhs->strVal[0] == '-') return direct;
+  // Any nonnegative literal works for an unsigned GT: x > k => x != 0.
+  return lhs->nodePtr;
+}
+
+void graph::splitRepCutDomainGuardSupers() {
+  const bool audit = repCutDomainGuardAuditEnabled();
+  const bool includeWhen = repCutDomainWhenEnabled();
+  std::unordered_set<Node*> observableOutputs(output.begin(), output.end());
+  std::unordered_map<Node*, size_t> selectorCount;
+  std::unordered_set<Node*> thresholdControls;
+  std::unordered_map<SuperNode*, size_t> order;
+  for (size_t i = 0; i < sortedSuper.size(); ++i) {
+    SuperNode* super = sortedSuper[i];
+    order[super] = i;
+    if (super->superType != SUPER_VALID) continue;
+    for (Node* owner : super->member) {
+      for (ExpTree* tree : owner->assignTree) {
+        if (tree == nullptr) continue;
+        walkEnode(tree->getRoot(), [&](ENode* expr) {
+          const bool mux = expr->opType == OP_MUX && expr->getChildNum() == 3;
+          const bool when = includeWhen && expr->opType == OP_WHEN &&
+                            expr->getChildNum() >= 2 && !owner->rcCommitOnly &&
+                            !owner->rcResetSource;
+          if (!mux && !when) return;
+          Node* control = rcDomainNonzeroControl(expr->getChild(0));
+          if (control != nullptr && control->rcPart == owner->rcPart) {
+            ++selectorCount[control];
+            if (control != expr->getChild(0)->nodePtr) thresholdControls.insert(control);
+          }
+        });
+      }
+    }
+  }
+  // Bound inspection of highly reused one-bit selectors in very large RTL.
+  // Prioritize controls by static fanout, reserving slots for threshold
+  // aggregates that share a domain across *different* predicates. Neither
+  // choice uses node names or runtime selector statistics.
+  std::vector<std::pair<Node*, size_t>> ranked, rankedThreshold;
+  for (const auto& entry : selectorCount) {
+    if (entry.second < 4) continue;
+    ranked.push_back(entry);
+    if (thresholdControls.count(entry.first)) rankedThreshold.push_back(entry);
+  }
+  auto more = [](const auto& left, const auto& right) {
+    if (left.second != right.second) return left.second > right.second;
+    return left.first->name < right.first->name;
+  };
+  std::sort(ranked.begin(), ranked.end(), more);
+  std::sort(rankedThreshold.begin(), rankedThreshold.end(), more);
+  std::unordered_set<Node*> selectedControls;
+  for (size_t i = 0; i < std::min(size_t{256}, ranked.size()); ++i)
+    selectedControls.insert(ranked[i].first);
+  // Optionally give every worker an equal static selector budget. Global
+  // fanout ranking otherwise favors large Decode replicas and never even
+  // inspects smaller, independent compute partitions.
+  const char* perWorkerText = std::getenv("GSIM_REPCUT_DOMAIN_PER_WORKER");
+  if (perWorkerText != nullptr && std::strcmp(perWorkerText, "1") == 0) {
+    std::vector<int> perWorker(repCutThreadsFromEnv(), 0);
+    for (const auto& [control, count] : ranked) {
+      const int part = control->rcPart;
+      if (part >= 0 && part < static_cast<int>(perWorker.size()) &&
+          perWorker[part]++ < 16) selectedControls.insert(control);
+    }
+    for (size_t i = 0; i < perWorker.size(); ++i)
+      fprintf(stderr, "[repcut-domain-control-budget] worker=%zu eligible=%d\n", i, perWorker[i]);
+  }
+  for (size_t i = 0; i < std::min(size_t{64}, rankedThreshold.size()); ++i)
+    selectedControls.insert(rankedThreshold[i].first);
+  std::unordered_map<Node*, std::unordered_map<Node*, std::unordered_set<Node*>>> masked;
+  const size_t multiSelectors = ranked.size();
+  for (SuperNode* super : sortedSuper) {
+    if (super->superType != SUPER_VALID) continue;
+    for (Node* owner : super->member) {
+      std::unordered_map<Node*, Node*> uses;
+      auto visit = [&](ENode* root) {
+        std::vector<std::pair<ENode*, Node*>> stack{{root, nullptr}};
+        while (!stack.empty()) {
+          auto [expr, controlling] = stack.back(); stack.pop_back();
+          if (expr == nullptr) continue;
+          if (expr->nodePtr != nullptr) {
+            auto [it, inserted] = uses.emplace(expr->nodePtr, controlling);
+            if (!inserted && it->second != controlling) it->second = nullptr;
+          }
+          const bool mux = expr->opType == OP_MUX && expr->getChildNum() == 3;
+          const bool when = includeWhen && expr->opType == OP_WHEN &&
+                            expr->getChildNum() >= 2 && !owner->rcCommitOnly &&
+                            !owner->rcResetSource;
+          if (mux || when) {
+            Node* control = rcDomainNonzeroControl(expr->getChild(0));
+            if (control != nullptr && selectedControls.count(control) &&
+                control->rcPart == owner->rcPart && controlling == nullptr) {
+              if (expr->getChildNum() > 2) stack.push_back({expr->getChild(2), nullptr});
+              stack.push_back({expr->getChild(1), control});
+              stack.push_back({expr->getChild(0), nullptr});
+              continue;
+            }
+          }
+          for (ENode* child : expr->child) stack.push_back({child, controlling});
+        }
+      };
+      for (ExpTree* tree : owner->assignTree) {
+        if (tree == nullptr) continue;
+        visit(tree->getRoot());
+        visit(tree->getlval());
+      }
+      for (auto [ref, control] : uses) {
+        if (control != nullptr && ref != control && ref->rcPart == owner->rcPart &&
+            repCutDomainPure(ref) && !observableOutputs.count(ref))
+          masked[control][ref].insert(owner);
+      }
+    }
+  }
+
+  fprintf(stderr, "[repcut-domain-pre] eligible_controls=%zu inspected_controls=%zu masked=%zu\n",
+          multiSelectors, selectedControls.size(), masked.size());
+  size_t totalCandidates = 0, domains = 0;
+  std::vector<double> partCandidateCost(repCutThreadsFromEnv(), 0);
+  double cost = 0;
+  std::vector<std::pair<Node*, std::set<Node*>>> selected;
+  for (auto& entry : masked) {
+    Node* control = entry.first;
+    if (control->rcPart < 0 || control->rcResetSource || control->super == nullptr ||
+        order.find(control->super) == order.end()) continue;
+    auto& edges = entry.second;
+    // A guard cannot run after its producer. If a producer was previously
+    // scheduled early only because of an arbitrary topological tie, moving
+    // it after the control is legal; never introduce a back-edge through a
+    // value/ordering ancestor of the control.
+    std::unordered_set<Node*> ancestors;
+    std::vector<Node*> ancestorsPending{control};
+    while (!ancestorsPending.empty()) {
+      Node* node = ancestorsPending.back(); ancestorsPending.pop_back();
+      if (node == nullptr || !ancestors.insert(node).second) continue;
+      for (Node* prev : node->prev) ancestorsPending.push_back(prev);
+      for (Node* prev : node->depPrev) ancestorsPending.push_back(prev);
+    }
+    std::set<Node*> cone;
+    std::vector<Node*> pending;
+    for (const auto& seed : edges) pending.push_back(seed.first);
+    while (!pending.empty()) {
+      Node* node = pending.back(); pending.pop_back();
+      if (node == control || node->rcPart != control->rcPart ||
+          !repCutDomainPure(node) || observableOutputs.count(node) ||
+          node->rcResetSource || node->super == nullptr ||
+          order.find(node->super) == order.end() ||
+          (control->type != NODE_INP &&
+           (ancestors.count(node) || node->super == control->super)) ||
+          !cone.insert(node).second) continue;
+      for (Node* prev : node->prev) pending.push_back(prev);
+    }
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      for (auto it = cone.begin(); it != cone.end();) {
+        Node* node = *it;
+        bool safe = true;
+        for (Node* next : node->next) {
+          if (next == nullptr || next->status != VALID_NODE || cone.count(next)) continue;
+          auto maskedNode = edges.find(node);
+          if (maskedNode == edges.end() || !maskedNode->second.count(next)) {
+            safe = false; break;
+          }
+        }
+        if (safe) {
+          for (Node* next : node->depNext) {
+            if (next != nullptr && next->status == VALID_NODE && !cone.count(next)) {
+              auto maskedNode = edges.find(node);
+              if (std::find(node->next.begin(), node->next.end(), next) == node->next.end() ||
+                  maskedNode == edges.end() || !maskedNode->second.count(next)) {
+                safe = false; break;
+              }
+            }
+          }
+        }
+        if (safe) ++it;
+        else { it = cone.erase(it); changed = true; }
+      }
+    }
+    double domainCost = 0;
+    size_t reordered = 0;
+    for (Node* node : cone) {
+      domainCost += repCutActiveBodyCost(node);
+      reordered += control->type != NODE_INP &&
+                   order[node->super] < order[control->super];
+    }
+    if (audit && sortedSuper.size() < 1000)
+      fprintf(stderr, "[repcut-domain-probe] control=%s selectors=%zu seeds=%zu surviving=%zu cost=%.0f\n", control->name.c_str(), selectorCount[control], edges.size(), cone.size(), domainCost);
+    if (domainCost < repCutDomainMinCost()) continue;
+    ++domains;
+    for (Node* node : cone) {
+      ++totalCandidates;
+      const double nodeCost = repCutActiveBodyCost(node);
+      cost += nodeCost;
+      partCandidateCost[node->rcPart] += nodeCost;
+    }
+    if (audit && cone.size() > 64)
+      fprintf(stderr, "[repcut-domain] control=%s part=%d selectors=%zu nodes=%zu cost=%.0f reordered=%zu\n",
+              control->name.c_str(), control->rcPart, selectorCount[control], cone.size(), domainCost, reordered);
+    selected.push_back({control, std::move(cone)});
+  }
+  fprintf(stderr, "[repcut-domain-audit] eligible_controls=%zu domains=%zu candidate_nodes=%zu candidate_cost=%.0f\n",
+          multiSelectors, domains, totalCandidates, cost);
+  if (audit) {
+    for (size_t part = 0; part < partCandidateCost.size(); ++part) {
+      if (partCandidateCost[part])
+        fprintf(stderr, "[repcut-domain-part] worker=%zu candidate_cost=%.0f\n",
+                part, partCandidateCost[part]);
+    }
+    return;
+  }
+  std::sort(selected.begin(), selected.end(), [&](const auto& a, const auto& b) {
+    const bool aThreshold = thresholdControls.count(a.first) != 0;
+    const bool bThreshold = thresholdControls.count(b.first) != 0;
+    if (aThreshold != bThreshold) return aThreshold;
+    const auto bodyCost = [](const auto& domain) {
+      double total = 0;
+      for (Node* node : domain.second) total += repCutActiveBodyCost(node);
+      return total;
+    };
+    const double aCost = bodyCost(a), bCost = bodyCost(b);
+    if (aCost != bCost) return aCost > bCost;
+    return a.first->name < b.first->name;
+  });
+  size_t appliedNodes = 0;
+  std::vector<std::pair<Node*, Node*>> orderingEdges;
+  std::unordered_set<Node*> assigned;
+  const size_t budget = repCutDomainNodeBudget();
+  for (auto& [control, cone] : selected) {
+    if (assigned.size() + cone.size() > budget) continue;
+    bool conflict = false;
+    for (Node* node : cone) {
+      if (assigned.count(node) || node->rcDomainGuarded) {
+        conflict = true;
+        break;
+      }
+    }
+    if (conflict) continue;
+    const std::string guard = "(" + control->name + " != 0)";
+    for (Node* node : cone) {
+      node->rcDomainGuarded = true;
+      node->rcDomainGuard = guard;
+      node->rcDomainGuardControl = control;
+      assigned.insert(node);
+      ++appliedNodes;
+      // Retain a scheduling dependency when the control is computed in the
+      // worker, so resorting cannot move a dormant producer above it.
+      if (control->type != NODE_INP) orderingEdges.push_back({control, node});
+    }
+    control->rcDomainGuardTrigger = true;
+    fprintf(stderr, "[repcut-domain-applied] control=%s nodes=%zu threshold=%d\n",
+            control->name.c_str(), cone.size(), thresholdControls.count(control) != 0);
+  }
+  if (appliedNodes == 0) return;
+  std::vector<SuperNode*> rebuilt;
+  rebuilt.reserve(sortedSuper.size());
+  size_t created = 0;
+  for (SuperNode* super : sortedSuper) {
+    if (super->superType != SUPER_VALID) { rebuilt.push_back(super); continue; }
+    std::map<std::string, std::vector<Node*>> groups;
+    for (Node* node : super->member)
+      groups[node->rcDomainGuarded ? node->rcDomainGuard : "common"].push_back(node);
+    if (groups.size() == 1) { rebuilt.push_back(super); continue; }
+    bool first = true;
+    for (auto& group : groups) {
+      SuperNode* target = first ? super : new SuperNode();
+      if (!first) {
+        target->superType = super->superType;
+        target->resetNode = super->resetNode;
+        ++created;
+      }
+      target->member.clear();
+      for (Node* node : group.second) target->add_member(node);
+      rebuilt.push_back(target);
+      first = false;
+    }
+  }
+  sortedSuper.swap(rebuilt);
+  // Restore value/ordering relations for the new SuperNode membership, then
+  // apply the extra guard edges. Use a stable topological ordering rather than
+  // the stack-based global resort: unmodified supers retain their prior order.
+  if (created != 0 || !orderingEdges.empty()) {
+    reconnectAll();
+    for (auto [control, node] : orderingEdges) {
+      node->depPrev.insert(control);
+      control->depNext.insert(node);
+    }
+    reconnectSuper();
+    const std::vector<SuperNode*> before = sortedSuper;
+    std::unordered_map<SuperNode*, size_t> oldIndex;
+    oldIndex.reserve(before.size());
+    for (size_t i = 0; i < before.size(); ++i) oldIndex[before[i]] = i;
+    std::vector<size_t> remaining(before.size());
+    std::set<size_t> ready;
+    for (size_t i = 0; i < before.size(); ++i) {
+      remaining[i] = 0;
+      for (SuperNode* prev : before[i]->depPrev) remaining[i] += oldIndex.count(prev);
+      // External supers are not emitted by RepCut and cannot participate in
+      // the local schedule; their ordering relations already existed before
+      // adding this guard and must not strand our local topological queue.
+      if (remaining[i] == 0) ready.insert(i);
+    }
+    sortedSuper.clear();
+    while (!ready.empty()) {
+      size_t id = *ready.begin(); ready.erase(ready.begin());
+      SuperNode* super = before[id];
+      sortedSuper.push_back(super);
+      for (SuperNode* next : super->depNext) {
+        auto found = oldIndex.find(next);
+        if (found != oldIndex.end() && --remaining[found->second] == 0)
+          ready.insert(found->second);
+      }
+    }
+    Assert(sortedSuper.size() == before.size(), "domain guard creates an ordering cycle");
+    orderAllNodes();
+  }
+  fprintf(stderr, "[repcut-domain-guard] applied_nodes=%zu created_supers=%zu\n", appliedNodes, created);
+}
+
 void graph::repCutSplit() {
   const int threads = repCutThreadsFromEnv();
   globalConfig.RepCutThreads = threads;
@@ -413,6 +833,10 @@ void graph::repCutSplit() {
   snapshotOrder.clear();
   orderAllNodes();
   mergeResetAll();
+  if (repCutDomainGuardEnabled() && repCutDomainEarlyTopoEnabled()) {
+    reconnectAll();
+    resort();
+  }
 
   std::vector<Node*> nodes;
   for (SuperNode* super : sortedSuper) {
@@ -1008,6 +1432,7 @@ void graph::repCutSplit() {
     }
   }
   reconnectAll(); resort();
+  if (repCutDomainGuardEnabled() || repCutDomainGuardAuditEnabled()) splitRepCutDomainGuardSupers();
   FILE* report = std::fopen((globalConfig.OutputDir+"/repcut-partitions.csv").c_str(),"w");
   Assert(report,"cannot write RepCut partition report");
   fprintf(report,"worker,sinks,original_nodes,replica_nodes,structural_cost,state_cost,combined_cost,regdst_count,regdst_bits,shared_intermediates,exclusive_intermediates\n");
@@ -1021,6 +1446,7 @@ void graph::repCutSplit() {
   fclose(report);
   fprintf(stderr,"[repcut] threads=%d nonempty=%d sinks=%zu resource-groups=%zu replicated=%zu deferred-memories=%zu\n",
           threads,nonempty,sinks.size(),static_cast<size_t>(groupCount),replicated,snapshotOrder.size());
+  if (repCutDomainGuardAuditEnabled()) std::exit(0);
   localGraph = true;
 }
 

@@ -162,6 +162,10 @@ class Node {
   bool rcCommitOnly = false;
   // Reset-condition/value cones are refreshed by the serial state phase.
   bool rcResetSource = false;
+  bool rcDomainGuarded = false;
+  bool rcDomainGuardTrigger = false;
+  Node* rcDomainGuardControl = nullptr;
+  std::string rcDomainGuard;
 
 /* used in cppEmitter */
   std::set<int> nextActiveId;

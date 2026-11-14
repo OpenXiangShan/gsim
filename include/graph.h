@@ -53,6 +53,7 @@ class graph {
   void genMemWrite(FILE* fp);
   void saveDiffRegs();
   void genResetAll();
+  void splitRepCutDomainGuardSupers();
   void genResetDef(SuperNode* super, bool isUIntReset, int indent);
   void genResetActivation(SuperNode* super, bool isUIntReset, int indent, int resetId);
   void genResetDecl(FILE* fp);
