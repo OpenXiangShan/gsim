@@ -1,0 +1,364 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1660" height="960" viewBox="0 0 1660 960">
+<rect width="100%" height="100%" fill="white"/>
+<text x="115" y="34" font-family="sans-serif" font-size="23" font-weight="600">Steady cycle 20256: worker phase timeline</text>
+<text x="115" y="59" font-family="sans-serif" font-size="14" fill="#444">Absolute monotonic time from earliest worker start; gray entry gaps are active-count instrumentation.</text>
+<rect x="115" y="72" width="13" height="13" fill="#b8c2cc"/>
+<text x="133" y="83" font-family="sans-serif" font-size="12">entry count</text>
+<rect x="238" y="72" width="13" height="13" fill="#2878a8"/>
+<text x="256" y="83" font-family="sans-serif" font-size="12">commit</text>
+<rect x="326" y="72" width="13" height="13" fill="#a9b8c4"/>
+<text x="344" y="83" font-family="sans-serif" font-size="12">commit barrier</text>
+<rect x="470" y="72" width="13" height="13" fill="#e87527"/>
+<text x="488" y="83" font-family="sans-serif" font-size="12">reset</text>
+<rect x="551" y="72" width="13" height="13" fill="#f0bd85"/>
+<text x="569" y="83" font-family="sans-serif" font-size="12">reset barrier</text>
+<rect x="688" y="72" width="13" height="13" fill="#4a9a66"/>
+<text x="706" y="83" font-family="sans-serif" font-size="12">merge</text>
+<rect x="769" y="72" width="13" height="13" fill="#c6cbd0"/>
+<text x="787" y="83" font-family="sans-serif" font-size="12">eval-entry count</text>
+<rect x="927" y="72" width="13" height="13" fill="#c9473b"/>
+<text x="945" y="83" font-family="sans-serif" font-size="12">eval</text>
+<line x1="115.0" y1="105" x2="115.0" y2="812" stroke="#e4e7eb"/>
+<text x="115.0" y="835" text-anchor="middle" font-family="sans-serif" font-size="12">0 us</text>
+<line x1="278.1" y1="105" x2="278.1" y2="812" stroke="#e4e7eb"/>
+<text x="278.1" y="835" text-anchor="middle" font-family="sans-serif" font-size="12">5 us</text>
+<line x1="441.3" y1="105" x2="441.3" y2="812" stroke="#e4e7eb"/>
+<text x="441.3" y="835" text-anchor="middle" font-family="sans-serif" font-size="12">10 us</text>
+<line x1="604.4" y1="105" x2="604.4" y2="812" stroke="#e4e7eb"/>
+<text x="604.4" y="835" text-anchor="middle" font-family="sans-serif" font-size="12">15 us</text>
+<line x1="767.5" y1="105" x2="767.5" y2="812" stroke="#e4e7eb"/>
+<text x="767.5" y="835" text-anchor="middle" font-family="sans-serif" font-size="12">20 us</text>
+<line x1="930.7" y1="105" x2="930.7" y2="812" stroke="#e4e7eb"/>
+<text x="930.7" y="835" text-anchor="middle" font-family="sans-serif" font-size="12">25 us</text>
+<line x1="1093.8" y1="105" x2="1093.8" y2="812" stroke="#e4e7eb"/>
+<text x="1093.8" y="835" text-anchor="middle" font-family="sans-serif" font-size="12">30 us</text>
+<line x1="1257.0" y1="105" x2="1257.0" y2="812" stroke="#e4e7eb"/>
+<text x="1257.0" y="835" text-anchor="middle" font-family="sans-serif" font-size="12">35 us</text>
+<line x1="1420.1" y1="105" x2="1420.1" y2="812" stroke="#e4e7eb"/>
+<text x="1420.1" y="835" text-anchor="middle" font-family="sans-serif" font-size="12">40 us</text>
+<line x1="1583.2" y1="105" x2="1583.2" y2="812" stroke="#e4e7eb"/>
+<text x="1583.2" y="835" text-anchor="middle" font-family="sans-serif" font-size="12">45 us</text>
+<line x1="1746.4" y1="105" x2="1746.4" y2="812" stroke="#e4e7eb"/>
+<text x="1746.4" y="835" text-anchor="middle" font-family="sans-serif" font-size="12">50 us</text>
+<text x="101" y="121" text-anchor="end" font-family="sans-serif" font-size="12">00</text>
+<line x1="115" y1="129" x2="1625" y2="129" stroke="#f1f2f4"/>
+<rect x="116.96" y="113" width="1.31" height="12" rx="1" fill="#b8c2cc"><title>worker 0, entry count: 0.040 us</title></rect>
+<rect x="118.26" y="113" width="97.88" height="12" rx="1" fill="#2878a8"><title>worker 0, commit: 3.000 us</title></rect>
+<rect x="216.15" y="113" width="261.02" height="12" rx="1" fill="#a9b8c4"><title>worker 0, commit barrier: 8.000 us</title></rect>
+<rect x="477.17" y="113" width="5.87" height="12" rx="1" fill="#e87527"><title>worker 0, reset: 0.180 us</title></rect>
+<rect x="483.04" y="113" width="66.23" height="12" rx="1" fill="#f0bd85"><title>worker 0, reset barrier: 2.030 us</title></rect>
+<rect x="549.27" y="113" width="10.11" height="12" rx="1" fill="#4a9a66"><title>worker 0, merge: 0.310 us</title></rect>
+<rect x="559.39" y="113" width="0.80" height="12" rx="1" fill="#c6cbd0"><title>worker 0, eval-entry count: 0.020 us</title></rect>
+<rect x="560.04" y="113" width="583.71" height="12" rx="1" fill="#c9473b"><title>worker 0, eval: 17.890 us</title></rect>
+<text x="101" y="143" text-anchor="end" font-family="sans-serif" font-size="12">01</text>
+<line x1="115" y1="151" x2="1625" y2="151" stroke="#f1f2f4"/>
+<rect x="116.63" y="135" width="1.63" height="12" rx="1" fill="#b8c2cc"><title>worker 1, entry count: 0.050 us</title></rect>
+<rect x="118.26" y="135" width="7.50" height="12" rx="1" fill="#2878a8"><title>worker 1, commit: 0.230 us</title></rect>
+<rect x="125.77" y="135" width="352.05" height="12" rx="1" fill="#a9b8c4"><title>worker 1, commit barrier: 10.790 us</title></rect>
+<rect x="477.82" y="135" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 1, reset: 0.020 us</title></rect>
+<rect x="478.47" y="135" width="71.45" height="12" rx="1" fill="#f0bd85"><title>worker 1, reset barrier: 2.190 us</title></rect>
+<rect x="549.92" y="135" width="11.75" height="12" rx="1" fill="#4a9a66"><title>worker 1, merge: 0.360 us</title></rect>
+<rect x="561.67" y="135" width="1.31" height="12" rx="1" fill="#c6cbd0"><title>worker 1, eval-entry count: 0.040 us</title></rect>
+<rect x="562.98" y="135" width="770.99" height="12" rx="1" fill="#c9473b"><title>worker 1, eval: 23.630 us</title></rect>
+<text x="101" y="165" text-anchor="end" font-family="sans-serif" font-size="12">02</text>
+<line x1="115" y1="173" x2="1625" y2="173" stroke="#f1f2f4"/>
+<rect x="117.94" y="157" width="1.63" height="12" rx="1" fill="#b8c2cc"><title>worker 2, entry count: 0.050 us</title></rect>
+<rect x="119.57" y="157" width="128.55" height="12" rx="1" fill="#2878a8"><title>worker 2, commit: 3.940 us</title></rect>
+<rect x="248.12" y="157" width="225.46" height="12" rx="1" fill="#a9b8c4"><title>worker 2, commit barrier: 6.910 us</title></rect>
+<rect x="473.58" y="157" width="0.98" height="12" rx="1" fill="#e87527"><title>worker 2, reset: 0.030 us</title></rect>
+<rect x="474.55" y="157" width="79.28" height="12" rx="1" fill="#f0bd85"><title>worker 2, reset barrier: 2.430 us</title></rect>
+<rect x="553.84" y="157" width="9.79" height="12" rx="1" fill="#4a9a66"><title>worker 2, merge: 0.300 us</title></rect>
+<rect x="563.63" y="157" width="0.80" height="12" rx="1" fill="#c6cbd0"><title>worker 2, eval-entry count: 0.020 us</title></rect>
+<rect x="564.28" y="157" width="267.22" height="12" rx="1" fill="#c9473b"><title>worker 2, eval: 8.190 us</title></rect>
+<text x="101" y="187" text-anchor="end" font-family="sans-serif" font-size="12">03</text>
+<line x1="115" y1="195" x2="1625" y2="195" stroke="#f1f2f4"/>
+<rect x="117.94" y="179" width="3.26" height="12" rx="1" fill="#b8c2cc"><title>worker 3, entry count: 0.100 us</title></rect>
+<rect x="121.20" y="179" width="257.10" height="12" rx="1" fill="#2878a8"><title>worker 3, commit: 7.880 us</title></rect>
+<rect x="378.30" y="179" width="97.23" height="12" rx="1" fill="#a9b8c4"><title>worker 3, commit barrier: 2.980 us</title></rect>
+<rect x="475.53" y="179" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 3, reset: 0.020 us</title></rect>
+<rect x="476.19" y="179" width="78.63" height="12" rx="1" fill="#f0bd85"><title>worker 3, reset barrier: 2.410 us</title></rect>
+<rect x="554.82" y="179" width="64.60" height="12" rx="1" fill="#4a9a66"><title>worker 3, merge: 1.980 us</title></rect>
+<rect x="619.42" y="179" width="2.94" height="12" rx="1" fill="#c6cbd0"><title>worker 3, eval-entry count: 0.090 us</title></rect>
+<rect x="622.36" y="179" width="725.31" height="12" rx="1" fill="#c9473b"><title>worker 3, eval: 22.230 us</title></rect>
+<text x="101" y="209" text-anchor="end" font-family="sans-serif" font-size="12">04</text>
+<line x1="115" y1="217" x2="1625" y2="217" stroke="#f1f2f4"/>
+<rect x="118.92" y="201" width="1.31" height="12" rx="1" fill="#b8c2cc"><title>worker 4, entry count: 0.040 us</title></rect>
+<rect x="120.22" y="201" width="139.65" height="12" rx="1" fill="#2878a8"><title>worker 4, commit: 4.280 us</title></rect>
+<rect x="259.87" y="201" width="215.02" height="12" rx="1" fill="#a9b8c4"><title>worker 4, commit barrier: 6.590 us</title></rect>
+<rect x="474.88" y="201" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 4, reset: 0.020 us</title></rect>
+<rect x="475.53" y="201" width="75.37" height="12" rx="1" fill="#f0bd85"><title>worker 4, reset barrier: 2.310 us</title></rect>
+<rect x="550.90" y="201" width="23.82" height="12" rx="1" fill="#4a9a66"><title>worker 4, merge: 0.730 us</title></rect>
+<rect x="574.72" y="201" width="1.31" height="12" rx="1" fill="#c6cbd0"><title>worker 4, eval-entry count: 0.040 us</title></rect>
+<rect x="576.03" y="201" width="366.41" height="12" rx="1" fill="#c9473b"><title>worker 4, eval: 11.230 us</title></rect>
+<text x="101" y="231" text-anchor="end" font-family="sans-serif" font-size="12">05</text>
+<line x1="115" y1="239" x2="1625" y2="239" stroke="#f1f2f4"/>
+<rect x="115.00" y="223" width="2.28" height="12" rx="1" fill="#b8c2cc"><title>worker 5, entry count: 0.070 us</title></rect>
+<rect x="117.28" y="223" width="260.37" height="12" rx="1" fill="#2878a8"><title>worker 5, commit: 7.980 us</title></rect>
+<rect x="377.65" y="223" width="98.54" height="12" rx="1" fill="#a9b8c4"><title>worker 5, commit barrier: 3.020 us</title></rect>
+<rect x="476.19" y="223" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 5, reset: 0.020 us</title></rect>
+<rect x="476.84" y="223" width="76.35" height="12" rx="1" fill="#f0bd85"><title>worker 5, reset barrier: 2.340 us</title></rect>
+<rect x="553.19" y="223" width="36.22" height="12" rx="1" fill="#4a9a66"><title>worker 5, merge: 1.110 us</title></rect>
+<rect x="589.40" y="223" width="2.61" height="12" rx="1" fill="#c6cbd0"><title>worker 5, eval-entry count: 0.080 us</title></rect>
+<rect x="592.01" y="223" width="398.71" height="12" rx="1" fill="#c9473b"><title>worker 5, eval: 12.220 us</title></rect>
+<text x="101" y="253" text-anchor="end" font-family="sans-serif" font-size="12">06</text>
+<line x1="115" y1="261" x2="1625" y2="261" stroke="#f1f2f4"/>
+<rect x="119.89" y="245" width="1.96" height="12" rx="1" fill="#b8c2cc"><title>worker 6, entry count: 0.060 us</title></rect>
+<rect x="121.85" y="245" width="35.89" height="12" rx="1" fill="#2878a8"><title>worker 6, commit: 1.100 us</title></rect>
+<rect x="157.74" y="245" width="321.05" height="12" rx="1" fill="#a9b8c4"><title>worker 6, commit barrier: 9.840 us</title></rect>
+<rect x="478.80" y="245" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 6, reset: 0.020 us</title></rect>
+<rect x="479.45" y="245" width="54.49" height="12" rx="1" fill="#f0bd85"><title>worker 6, reset barrier: 1.670 us</title></rect>
+<rect x="533.94" y="245" width="14.36" height="12" rx="1" fill="#4a9a66"><title>worker 6, merge: 0.440 us</title></rect>
+<rect x="548.29" y="245" width="0.80" height="12" rx="1" fill="#c6cbd0"><title>worker 6, eval-entry count: 0.020 us</title></rect>
+<rect x="548.95" y="245" width="1076.05" height="12" rx="1" fill="#c9473b"><title>worker 6, eval: 32.980 us</title></rect>
+<text x="101" y="275" text-anchor="end" font-family="sans-serif" font-size="12">07</text>
+<line x1="115" y1="283" x2="1625" y2="283" stroke="#f1f2f4"/>
+<rect x="116.31" y="267" width="2.28" height="12" rx="1" fill="#b8c2cc"><title>worker 7, entry count: 0.070 us</title></rect>
+<rect x="118.59" y="267" width="279.94" height="12" rx="1" fill="#2878a8"><title>worker 7, commit: 8.580 us</title></rect>
+<rect x="398.53" y="267" width="77.98" height="12" rx="1" fill="#a9b8c4"><title>worker 7, commit barrier: 2.390 us</title></rect>
+<rect x="476.51" y="267" width="0.98" height="12" rx="1" fill="#e87527"><title>worker 7, reset: 0.030 us</title></rect>
+<rect x="477.49" y="267" width="75.70" height="12" rx="1" fill="#f0bd85"><title>worker 7, reset barrier: 2.320 us</title></rect>
+<rect x="553.19" y="267" width="31.97" height="12" rx="1" fill="#4a9a66"><title>worker 7, merge: 0.980 us</title></rect>
+<rect x="585.16" y="267" width="0.98" height="12" rx="1" fill="#c6cbd0"><title>worker 7, eval-entry count: 0.030 us</title></rect>
+<rect x="586.14" y="267" width="998.40" height="12" rx="1" fill="#c9473b"><title>worker 7, eval: 30.600 us</title></rect>
+<text x="101" y="297" text-anchor="end" font-family="sans-serif" font-size="12">08</text>
+<line x1="115" y1="305" x2="1625" y2="305" stroke="#f1f2f4"/>
+<rect x="122.18" y="289" width="4.89" height="12" rx="1" fill="#b8c2cc"><title>worker 8, entry count: 0.150 us</title></rect>
+<rect x="127.07" y="289" width="42.09" height="12" rx="1" fill="#2878a8"><title>worker 8, commit: 1.290 us</title></rect>
+<rect x="169.16" y="289" width="308.00" height="12" rx="1" fill="#a9b8c4"><title>worker 8, commit barrier: 9.440 us</title></rect>
+<rect x="477.17" y="289" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 8, reset: 0.020 us</title></rect>
+<rect x="477.82" y="289" width="79.61" height="12" rx="1" fill="#f0bd85"><title>worker 8, reset barrier: 2.440 us</title></rect>
+<rect x="557.43" y="289" width="12.07" height="12" rx="1" fill="#4a9a66"><title>worker 8, merge: 0.370 us</title></rect>
+<rect x="569.50" y="289" width="0.98" height="12" rx="1" fill="#c6cbd0"><title>worker 8, eval-entry count: 0.030 us</title></rect>
+<rect x="570.48" y="289" width="193.81" height="12" rx="1" fill="#c9473b"><title>worker 8, eval: 5.940 us</title></rect>
+<text x="101" y="319" text-anchor="end" font-family="sans-serif" font-size="12">09</text>
+<line x1="115" y1="327" x2="1625" y2="327" stroke="#f1f2f4"/>
+<rect x="123.81" y="311" width="1.31" height="12" rx="1" fill="#b8c2cc"><title>worker 9, entry count: 0.040 us</title></rect>
+<rect x="125.11" y="311" width="10.44" height="12" rx="1" fill="#2878a8"><title>worker 9, commit: 0.320 us</title></rect>
+<rect x="135.56" y="311" width="339.33" height="12" rx="1" fill="#a9b8c4"><title>worker 9, commit barrier: 10.400 us</title></rect>
+<rect x="474.88" y="311" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 9, reset: 0.020 us</title></rect>
+<rect x="475.53" y="311" width="86.79" height="12" rx="1" fill="#f0bd85"><title>worker 9, reset barrier: 2.660 us</title></rect>
+<rect x="562.32" y="311" width="0.98" height="12" rx="1" fill="#4a9a66"><title>worker 9, merge: 0.030 us</title></rect>
+<rect x="563.30" y="311" width="1.63" height="12" rx="1" fill="#c6cbd0"><title>worker 9, eval-entry count: 0.050 us</title></rect>
+<rect x="564.93" y="311" width="37.52" height="12" rx="1" fill="#c9473b"><title>worker 9, eval: 1.150 us</title></rect>
+<text x="101" y="341" text-anchor="end" font-family="sans-serif" font-size="12">10</text>
+<line x1="115" y1="349" x2="1625" y2="349" stroke="#f1f2f4"/>
+<rect x="125.77" y="333" width="2.61" height="12" rx="1" fill="#b8c2cc"><title>worker 10, entry count: 0.080 us</title></rect>
+<rect x="128.38" y="333" width="300.83" height="12" rx="1" fill="#2878a8"><title>worker 10, commit: 9.220 us</title></rect>
+<rect x="429.20" y="333" width="44.70" height="12" rx="1" fill="#a9b8c4"><title>worker 10, commit barrier: 1.370 us</title></rect>
+<rect x="473.90" y="333" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 10, reset: 0.020 us</title></rect>
+<rect x="474.55" y="333" width="86.79" height="12" rx="1" fill="#f0bd85"><title>worker 10, reset barrier: 2.660 us</title></rect>
+<rect x="561.34" y="333" width="38.83" height="12" rx="1" fill="#4a9a66"><title>worker 10, merge: 1.190 us</title></rect>
+<rect x="600.17" y="333" width="2.61" height="12" rx="1" fill="#c6cbd0"><title>worker 10, eval-entry count: 0.080 us</title></rect>
+<rect x="602.78" y="333" width="373.91" height="12" rx="1" fill="#c9473b"><title>worker 10, eval: 11.460 us</title></rect>
+<text x="101" y="363" text-anchor="end" font-family="sans-serif" font-size="12">11</text>
+<line x1="115" y1="371" x2="1625" y2="371" stroke="#f1f2f4"/>
+<rect x="122.18" y="355" width="2.94" height="12" rx="1" fill="#b8c2cc"><title>worker 11, entry count: 0.090 us</title></rect>
+<rect x="125.11" y="355" width="33.93" height="12" rx="1" fill="#2878a8"><title>worker 11, commit: 1.040 us</title></rect>
+<rect x="159.05" y="355" width="316.81" height="12" rx="1" fill="#a9b8c4"><title>worker 11, commit barrier: 9.710 us</title></rect>
+<rect x="475.86" y="355" width="0.98" height="12" rx="1" fill="#e87527"><title>worker 11, reset: 0.030 us</title></rect>
+<rect x="476.84" y="355" width="83.85" height="12" rx="1" fill="#f0bd85"><title>worker 11, reset barrier: 2.570 us</title></rect>
+<rect x="560.69" y="355" width="22.19" height="12" rx="1" fill="#4a9a66"><title>worker 11, merge: 0.680 us</title></rect>
+<rect x="582.88" y="355" width="1.31" height="12" rx="1" fill="#c6cbd0"><title>worker 11, eval-entry count: 0.040 us</title></rect>
+<rect x="584.18" y="355" width="173.25" height="12" rx="1" fill="#c9473b"><title>worker 11, eval: 5.310 us</title></rect>
+<text x="101" y="385" text-anchor="end" font-family="sans-serif" font-size="12">12</text>
+<line x1="115" y1="393" x2="1625" y2="393" stroke="#f1f2f4"/>
+<rect x="125.77" y="377" width="2.61" height="12" rx="1" fill="#b8c2cc"><title>worker 12, entry count: 0.080 us</title></rect>
+<rect x="128.38" y="377" width="15.66" height="12" rx="1" fill="#2878a8"><title>worker 12, commit: 0.480 us</title></rect>
+<rect x="144.04" y="377" width="331.50" height="12" rx="1" fill="#a9b8c4"><title>worker 12, commit barrier: 10.160 us</title></rect>
+<rect x="475.53" y="377" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 12, reset: 0.020 us</title></rect>
+<rect x="476.19" y="377" width="82.55" height="12" rx="1" fill="#f0bd85"><title>worker 12, reset barrier: 2.530 us</title></rect>
+<rect x="558.73" y="377" width="4.24" height="12" rx="1" fill="#4a9a66"><title>worker 12, merge: 0.130 us</title></rect>
+<rect x="562.98" y="377" width="1.96" height="12" rx="1" fill="#c6cbd0"><title>worker 12, eval-entry count: 0.060 us</title></rect>
+<rect x="564.93" y="377" width="64.93" height="12" rx="1" fill="#c9473b"><title>worker 12, eval: 1.990 us</title></rect>
+<text x="101" y="407" text-anchor="end" font-family="sans-serif" font-size="12">13</text>
+<line x1="115" y1="415" x2="1625" y2="415" stroke="#f1f2f4"/>
+<rect x="125.11" y="399" width="1.31" height="12" rx="1" fill="#b8c2cc"><title>worker 13, entry count: 0.040 us</title></rect>
+<rect x="126.42" y="399" width="31.00" height="12" rx="1" fill="#2878a8"><title>worker 13, commit: 0.950 us</title></rect>
+<rect x="157.42" y="399" width="315.83" height="12" rx="1" fill="#a9b8c4"><title>worker 13, commit barrier: 9.680 us</title></rect>
+<rect x="473.25" y="399" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 13, reset: 0.020 us</title></rect>
+<rect x="473.90" y="399" width="87.77" height="12" rx="1" fill="#f0bd85"><title>worker 13, reset barrier: 2.690 us</title></rect>
+<rect x="561.67" y="399" width="13.70" height="12" rx="1" fill="#4a9a66"><title>worker 13, merge: 0.420 us</title></rect>
+<rect x="575.37" y="399" width="1.31" height="12" rx="1" fill="#c6cbd0"><title>worker 13, eval-entry count: 0.040 us</title></rect>
+<rect x="576.68" y="399" width="195.44" height="12" rx="1" fill="#c9473b"><title>worker 13, eval: 5.990 us</title></rect>
+<text x="101" y="429" text-anchor="end" font-family="sans-serif" font-size="12">14</text>
+<line x1="115" y1="437" x2="1625" y2="437" stroke="#f1f2f4"/>
+<rect x="123.48" y="421" width="2.28" height="12" rx="1" fill="#b8c2cc"><title>worker 14, entry count: 0.070 us</title></rect>
+<rect x="125.77" y="421" width="31.32" height="12" rx="1" fill="#2878a8"><title>worker 14, commit: 0.960 us</title></rect>
+<rect x="157.09" y="421" width="317.14" height="12" rx="1" fill="#a9b8c4"><title>worker 14, commit barrier: 9.720 us</title></rect>
+<rect x="474.23" y="421" width="0.98" height="12" rx="1" fill="#e87527"><title>worker 14, reset: 0.030 us</title></rect>
+<rect x="475.21" y="421" width="82.87" height="12" rx="1" fill="#f0bd85"><title>worker 14, reset barrier: 2.540 us</title></rect>
+<rect x="558.08" y="421" width="11.09" height="12" rx="1" fill="#4a9a66"><title>worker 14, merge: 0.340 us</title></rect>
+<rect x="569.17" y="421" width="1.31" height="12" rx="1" fill="#c6cbd0"><title>worker 14, eval-entry count: 0.040 us</title></rect>
+<rect x="570.48" y="421" width="80.59" height="12" rx="1" fill="#c9473b"><title>worker 14, eval: 2.470 us</title></rect>
+<text x="101" y="451" text-anchor="end" font-family="sans-serif" font-size="12">15</text>
+<line x1="115" y1="459" x2="1625" y2="459" stroke="#f1f2f4"/>
+<rect x="123.48" y="443" width="5.55" height="12" rx="1" fill="#b8c2cc"><title>worker 15, entry count: 0.170 us</title></rect>
+<rect x="129.03" y="443" width="163.46" height="12" rx="1" fill="#2878a8"><title>worker 15, commit: 5.010 us</title></rect>
+<rect x="292.49" y="443" width="184.02" height="12" rx="1" fill="#a9b8c4"><title>worker 15, commit barrier: 5.640 us</title></rect>
+<rect x="476.51" y="443" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 15, reset: 0.020 us</title></rect>
+<rect x="477.17" y="443" width="82.22" height="12" rx="1" fill="#f0bd85"><title>worker 15, reset barrier: 2.520 us</title></rect>
+<rect x="559.39" y="443" width="31.32" height="12" rx="1" fill="#4a9a66"><title>worker 15, merge: 0.960 us</title></rect>
+<rect x="590.71" y="443" width="2.28" height="12" rx="1" fill="#c6cbd0"><title>worker 15, eval-entry count: 0.070 us</title></rect>
+<rect x="592.99" y="443" width="147.48" height="12" rx="1" fill="#c9473b"><title>worker 15, eval: 4.520 us</title></rect>
+<text x="101" y="473" text-anchor="end" font-family="sans-serif" font-size="12">16</text>
+<line x1="115" y1="481" x2="1625" y2="481" stroke="#f1f2f4"/>
+<rect x="122.18" y="465" width="1.96" height="12" rx="1" fill="#b8c2cc"><title>worker 16, entry count: 0.060 us</title></rect>
+<rect x="124.14" y="465" width="101.80" height="12" rx="1" fill="#2878a8"><title>worker 16, commit: 3.120 us</title></rect>
+<rect x="225.93" y="465" width="240.46" height="12" rx="1" fill="#a9b8c4"><title>worker 16, commit barrier: 7.370 us</title></rect>
+<rect x="466.40" y="465" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 16, reset: 0.020 us</title></rect>
+<rect x="467.05" y="465" width="99.51" height="12" rx="1" fill="#f0bd85"><title>worker 16, reset barrier: 3.050 us</title></rect>
+<rect x="566.56" y="465" width="24.80" height="12" rx="1" fill="#4a9a66"><title>worker 16, merge: 0.760 us</title></rect>
+<rect x="591.36" y="465" width="1.96" height="12" rx="1" fill="#c6cbd0"><title>worker 16, eval-entry count: 0.060 us</title></rect>
+<rect x="593.32" y="465" width="311.59" height="12" rx="1" fill="#c9473b"><title>worker 16, eval: 9.550 us</title></rect>
+<text x="101" y="495" text-anchor="end" font-family="sans-serif" font-size="12">17</text>
+<line x1="115" y1="503" x2="1625" y2="503" stroke="#f1f2f4"/>
+<rect x="127.40" y="487" width="3.92" height="12" rx="1" fill="#b8c2cc"><title>worker 17, entry count: 0.120 us</title></rect>
+<rect x="131.31" y="487" width="323.34" height="12" rx="1" fill="#2878a8"><title>worker 17, commit: 9.910 us</title></rect>
+<rect x="454.65" y="487" width="10.11" height="12" rx="1" fill="#a9b8c4"><title>worker 17, commit barrier: 0.310 us</title></rect>
+<rect x="464.77" y="487" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 17, reset: 0.020 us</title></rect>
+<rect x="465.42" y="487" width="98.54" height="12" rx="1" fill="#f0bd85"><title>worker 17, reset barrier: 3.020 us</title></rect>
+<rect x="563.95" y="487" width="47.31" height="12" rx="1" fill="#4a9a66"><title>worker 17, merge: 1.450 us</title></rect>
+<rect x="611.26" y="487" width="2.94" height="12" rx="1" fill="#c6cbd0"><title>worker 17, eval-entry count: 0.090 us</title></rect>
+<rect x="614.20" y="487" width="495.61" height="12" rx="1" fill="#c9473b"><title>worker 17, eval: 15.190 us</title></rect>
+<text x="101" y="517" text-anchor="end" font-family="sans-serif" font-size="12">18</text>
+<line x1="115" y1="525" x2="1625" y2="525" stroke="#f1f2f4"/>
+<rect x="124.14" y="509" width="2.28" height="12" rx="1" fill="#b8c2cc"><title>worker 18, entry count: 0.070 us</title></rect>
+<rect x="126.42" y="509" width="152.04" height="12" rx="1" fill="#2878a8"><title>worker 18, commit: 4.660 us</title></rect>
+<rect x="278.46" y="509" width="188.59" height="12" rx="1" fill="#a9b8c4"><title>worker 18, commit barrier: 5.780 us</title></rect>
+<rect x="467.05" y="509" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 18, reset: 0.020 us</title></rect>
+<rect x="467.70" y="509" width="97.23" height="12" rx="1" fill="#f0bd85"><title>worker 18, reset barrier: 2.980 us</title></rect>
+<rect x="564.93" y="509" width="21.86" height="12" rx="1" fill="#4a9a66"><title>worker 18, merge: 0.670 us</title></rect>
+<rect x="586.79" y="509" width="1.96" height="12" rx="1" fill="#c6cbd0"><title>worker 18, eval-entry count: 0.060 us</title></rect>
+<rect x="588.75" y="509" width="271.46" height="12" rx="1" fill="#c9473b"><title>worker 18, eval: 8.320 us</title></rect>
+<text x="101" y="539" text-anchor="end" font-family="sans-serif" font-size="12">19</text>
+<line x1="115" y1="547" x2="1625" y2="547" stroke="#f1f2f4"/>
+<rect x="122.83" y="531" width="2.61" height="12" rx="1" fill="#b8c2cc"><title>worker 19, entry count: 0.080 us</title></rect>
+<rect x="125.44" y="531" width="102.78" height="12" rx="1" fill="#2878a8"><title>worker 19, commit: 3.150 us</title></rect>
+<rect x="228.22" y="531" width="237.53" height="12" rx="1" fill="#a9b8c4"><title>worker 19, commit barrier: 7.280 us</title></rect>
+<rect x="465.75" y="531" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 19, reset: 0.020 us</title></rect>
+<rect x="466.40" y="531" width="96.58" height="12" rx="1" fill="#f0bd85"><title>worker 19, reset barrier: 2.960 us</title></rect>
+<rect x="562.98" y="531" width="29.69" height="12" rx="1" fill="#4a9a66"><title>worker 19, merge: 0.910 us</title></rect>
+<rect x="592.67" y="531" width="3.59" height="12" rx="1" fill="#c6cbd0"><title>worker 19, eval-entry count: 0.110 us</title></rect>
+<rect x="596.26" y="531" width="476.36" height="12" rx="1" fill="#c9473b"><title>worker 19, eval: 14.600 us</title></rect>
+<text x="101" y="561" text-anchor="end" font-family="sans-serif" font-size="12">20</text>
+<line x1="115" y1="569" x2="1625" y2="569" stroke="#f1f2f4"/>
+<rect x="124.46" y="553" width="2.28" height="12" rx="1" fill="#b8c2cc"><title>worker 20, entry count: 0.070 us</title></rect>
+<rect x="126.75" y="553" width="53.84" height="12" rx="1" fill="#2878a8"><title>worker 20, commit: 1.650 us</title></rect>
+<rect x="180.58" y="553" width="288.43" height="12" rx="1" fill="#a9b8c4"><title>worker 20, commit barrier: 8.840 us</title></rect>
+<rect x="469.01" y="553" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 20, reset: 0.020 us</title></rect>
+<rect x="469.66" y="553" width="96.25" height="12" rx="1" fill="#f0bd85"><title>worker 20, reset barrier: 2.950 us</title></rect>
+<rect x="565.91" y="553" width="20.56" height="12" rx="1" fill="#4a9a66"><title>worker 20, merge: 0.630 us</title></rect>
+<rect x="586.47" y="553" width="1.31" height="12" rx="1" fill="#c6cbd0"><title>worker 20, eval-entry count: 0.040 us</title></rect>
+<rect x="587.77" y="553" width="151.39" height="12" rx="1" fill="#c9473b"><title>worker 20, eval: 4.640 us</title></rect>
+<text x="101" y="583" text-anchor="end" font-family="sans-serif" font-size="12">21</text>
+<line x1="115" y1="591" x2="1625" y2="591" stroke="#f1f2f4"/>
+<rect x="123.48" y="575" width="2.94" height="12" rx="1" fill="#b8c2cc"><title>worker 21, entry count: 0.090 us</title></rect>
+<rect x="126.42" y="575" width="61.99" height="12" rx="1" fill="#2878a8"><title>worker 21, commit: 1.900 us</title></rect>
+<rect x="188.41" y="575" width="279.94" height="12" rx="1" fill="#a9b8c4"><title>worker 21, commit barrier: 8.580 us</title></rect>
+<rect x="468.36" y="575" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 21, reset: 0.020 us</title></rect>
+<rect x="469.01" y="575" width="94.29" height="12" rx="1" fill="#f0bd85"><title>worker 21, reset barrier: 2.890 us</title></rect>
+<rect x="563.30" y="575" width="17.29" height="12" rx="1" fill="#4a9a66"><title>worker 21, merge: 0.530 us</title></rect>
+<rect x="580.59" y="575" width="2.61" height="12" rx="1" fill="#c6cbd0"><title>worker 21, eval-entry count: 0.080 us</title></rect>
+<rect x="583.20" y="575" width="168.36" height="12" rx="1" fill="#c9473b"><title>worker 21, eval: 5.160 us</title></rect>
+<text x="101" y="605" text-anchor="end" font-family="sans-serif" font-size="12">22</text>
+<line x1="115" y1="613" x2="1625" y2="613" stroke="#f1f2f4"/>
+<rect x="126.75" y="597" width="2.61" height="12" rx="1" fill="#b8c2cc"><title>worker 22, entry count: 0.080 us</title></rect>
+<rect x="129.36" y="597" width="79.28" height="12" rx="1" fill="#2878a8"><title>worker 22, commit: 2.430 us</title></rect>
+<rect x="208.64" y="597" width="261.35" height="12" rx="1" fill="#a9b8c4"><title>worker 22, commit barrier: 8.010 us</title></rect>
+<rect x="469.99" y="597" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 22, reset: 0.020 us</title></rect>
+<rect x="470.64" y="597" width="94.62" height="12" rx="1" fill="#f0bd85"><title>worker 22, reset barrier: 2.900 us</title></rect>
+<rect x="565.26" y="597" width="34.91" height="12" rx="1" fill="#4a9a66"><title>worker 22, merge: 1.070 us</title></rect>
+<rect x="600.17" y="597" width="1.96" height="12" rx="1" fill="#c6cbd0"><title>worker 22, eval-entry count: 0.060 us</title></rect>
+<rect x="602.13" y="597" width="224.48" height="12" rx="1" fill="#c9473b"><title>worker 22, eval: 6.880 us</title></rect>
+<text x="101" y="627" text-anchor="end" font-family="sans-serif" font-size="12">23</text>
+<line x1="115" y1="635" x2="1625" y2="635" stroke="#f1f2f4"/>
+<rect x="121.20" y="619" width="1.96" height="12" rx="1" fill="#b8c2cc"><title>worker 23, entry count: 0.060 us</title></rect>
+<rect x="123.16" y="619" width="160.20" height="12" rx="1" fill="#2878a8"><title>worker 23, commit: 4.910 us</title></rect>
+<rect x="283.36" y="619" width="185.98" height="12" rx="1" fill="#a9b8c4"><title>worker 23, commit barrier: 5.700 us</title></rect>
+<rect x="469.33" y="619" width="0.98" height="12" rx="1" fill="#e87527"><title>worker 23, reset: 0.030 us</title></rect>
+<rect x="470.31" y="619" width="91.36" height="12" rx="1" fill="#f0bd85"><title>worker 23, reset barrier: 2.800 us</title></rect>
+<rect x="561.67" y="619" width="31.97" height="12" rx="1" fill="#4a9a66"><title>worker 23, merge: 0.980 us</title></rect>
+<rect x="593.65" y="619" width="2.28" height="12" rx="1" fill="#c6cbd0"><title>worker 23, eval-entry count: 0.070 us</title></rect>
+<rect x="595.93" y="619" width="302.13" height="12" rx="1" fill="#c9473b"><title>worker 23, eval: 9.260 us</title></rect>
+<text x="101" y="649" text-anchor="end" font-family="sans-serif" font-size="12">24</text>
+<line x1="115" y1="657" x2="1625" y2="657" stroke="#f1f2f4"/>
+<rect x="119.57" y="641" width="1.31" height="12" rx="1" fill="#b8c2cc"><title>worker 24, entry count: 0.040 us</title></rect>
+<rect x="120.87" y="641" width="20.56" height="12" rx="1" fill="#2878a8"><title>worker 24, commit: 0.630 us</title></rect>
+<rect x="141.43" y="641" width="332.47" height="12" rx="1" fill="#a9b8c4"><title>worker 24, commit barrier: 10.190 us</title></rect>
+<rect x="473.90" y="641" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 24, reset: 0.020 us</title></rect>
+<rect x="474.55" y="641" width="78.63" height="12" rx="1" fill="#f0bd85"><title>worker 24, reset barrier: 2.410 us</title></rect>
+<rect x="553.19" y="641" width="12.40" height="12" rx="1" fill="#4a9a66"><title>worker 24, merge: 0.380 us</title></rect>
+<rect x="565.59" y="641" width="0.98" height="12" rx="1" fill="#c6cbd0"><title>worker 24, eval-entry count: 0.030 us</title></rect>
+<rect x="566.56" y="641" width="46.00" height="12" rx="1" fill="#c9473b"><title>worker 24, eval: 1.410 us</title></rect>
+<text x="101" y="671" text-anchor="end" font-family="sans-serif" font-size="12">25</text>
+<line x1="115" y1="679" x2="1625" y2="679" stroke="#f1f2f4"/>
+<rect x="117.28" y="663" width="1.31" height="12" rx="1" fill="#b8c2cc"><title>worker 25, entry count: 0.040 us</title></rect>
+<rect x="118.59" y="663" width="6.85" height="12" rx="1" fill="#2878a8"><title>worker 25, commit: 0.210 us</title></rect>
+<rect x="125.44" y="663" width="346.50" height="12" rx="1" fill="#a9b8c4"><title>worker 25, commit barrier: 10.620 us</title></rect>
+<rect x="471.94" y="663" width="0.98" height="12" rx="1" fill="#e87527"><title>worker 25, reset: 0.030 us</title></rect>
+<rect x="472.92" y="663" width="80.92" height="12" rx="1" fill="#f0bd85"><title>worker 25, reset barrier: 2.480 us</title></rect>
+<rect x="553.84" y="663" width="5.22" height="12" rx="1" fill="#4a9a66"><title>worker 25, merge: 0.160 us</title></rect>
+<rect x="559.06" y="663" width="4.89" height="12" rx="1" fill="#c6cbd0"><title>worker 25, eval-entry count: 0.150 us</title></rect>
+<rect x="563.95" y="663" width="26.10" height="12" rx="1" fill="#c9473b"><title>worker 25, eval: 0.800 us</title></rect>
+<text x="101" y="693" text-anchor="end" font-family="sans-serif" font-size="12">26</text>
+<line x1="115" y1="701" x2="1625" y2="701" stroke="#f1f2f4"/>
+<rect x="121.53" y="685" width="1.31" height="12" rx="1" fill="#b8c2cc"><title>worker 26, entry count: 0.040 us</title></rect>
+<rect x="122.83" y="685" width="79.94" height="12" rx="1" fill="#2878a8"><title>worker 26, commit: 2.450 us</title></rect>
+<rect x="202.77" y="685" width="270.48" height="12" rx="1" fill="#a9b8c4"><title>worker 26, commit barrier: 8.290 us</title></rect>
+<rect x="473.25" y="685" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 26, reset: 0.020 us</title></rect>
+<rect x="473.90" y="685" width="82.87" height="12" rx="1" fill="#f0bd85"><title>worker 26, reset barrier: 2.540 us</title></rect>
+<rect x="556.78" y="685" width="18.92" height="12" rx="1" fill="#4a9a66"><title>worker 26, merge: 0.580 us</title></rect>
+<rect x="575.70" y="685" width="4.89" height="12" rx="1" fill="#c6cbd0"><title>worker 26, eval-entry count: 0.150 us</title></rect>
+<rect x="580.59" y="685" width="293.97" height="12" rx="1" fill="#c9473b"><title>worker 26, eval: 9.010 us</title></rect>
+<text x="101" y="715" text-anchor="end" font-family="sans-serif" font-size="12">27</text>
+<line x1="115" y1="723" x2="1625" y2="723" stroke="#f1f2f4"/>
+<rect x="120.55" y="707" width="2.28" height="12" rx="1" fill="#b8c2cc"><title>worker 27, entry count: 0.070 us</title></rect>
+<rect x="122.83" y="707" width="36.87" height="12" rx="1" fill="#2878a8"><title>worker 27, commit: 1.130 us</title></rect>
+<rect x="159.70" y="707" width="312.90" height="12" rx="1" fill="#a9b8c4"><title>worker 27, commit barrier: 9.590 us</title></rect>
+<rect x="472.60" y="707" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 27, reset: 0.020 us</title></rect>
+<rect x="473.25" y="707" width="84.18" height="12" rx="1" fill="#f0bd85"><title>worker 27, reset barrier: 2.580 us</title></rect>
+<rect x="557.43" y="707" width="20.23" height="12" rx="1" fill="#4a9a66"><title>worker 27, merge: 0.620 us</title></rect>
+<rect x="577.66" y="707" width="1.31" height="12" rx="1" fill="#c6cbd0"><title>worker 27, eval-entry count: 0.040 us</title></rect>
+<rect x="578.96" y="707" width="270.16" height="12" rx="1" fill="#c9473b"><title>worker 27, eval: 8.280 us</title></rect>
+<text x="101" y="737" text-anchor="end" font-family="sans-serif" font-size="12">28</text>
+<line x1="115" y1="745" x2="1625" y2="745" stroke="#f1f2f4"/>
+<rect x="121.85" y="729" width="1.63" height="12" rx="1" fill="#b8c2cc"><title>worker 28, entry count: 0.050 us</title></rect>
+<rect x="123.48" y="729" width="45.68" height="12" rx="1" fill="#2878a8"><title>worker 28, commit: 1.400 us</title></rect>
+<rect x="169.16" y="729" width="301.15" height="12" rx="1" fill="#a9b8c4"><title>worker 28, commit barrier: 9.230 us</title></rect>
+<rect x="470.31" y="729" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 28, reset: 0.020 us</title></rect>
+<rect x="470.97" y="729" width="83.85" height="12" rx="1" fill="#f0bd85"><title>worker 28, reset barrier: 2.570 us</title></rect>
+<rect x="554.82" y="729" width="12.07" height="12" rx="1" fill="#4a9a66"><title>worker 28, merge: 0.370 us</title></rect>
+<rect x="566.89" y="729" width="1.31" height="12" rx="1" fill="#c6cbd0"><title>worker 28, eval-entry count: 0.040 us</title></rect>
+<rect x="568.20" y="729" width="214.69" height="12" rx="1" fill="#c9473b"><title>worker 28, eval: 6.580 us</title></rect>
+<text x="101" y="759" text-anchor="end" font-family="sans-serif" font-size="12">29</text>
+<line x1="115" y1="767" x2="1625" y2="767" stroke="#f1f2f4"/>
+<rect x="120.55" y="751" width="1.31" height="12" rx="1" fill="#b8c2cc"><title>worker 29, entry count: 0.040 us</title></rect>
+<rect x="121.85" y="751" width="90.38" height="12" rx="1" fill="#2878a8"><title>worker 29, commit: 2.770 us</title></rect>
+<rect x="212.23" y="751" width="258.74" height="12" rx="1" fill="#a9b8c4"><title>worker 29, commit barrier: 7.930 us</title></rect>
+<rect x="470.97" y="751" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 29, reset: 0.020 us</title></rect>
+<rect x="471.62" y="751" width="86.79" height="12" rx="1" fill="#f0bd85"><title>worker 29, reset barrier: 2.660 us</title></rect>
+<rect x="558.41" y="751" width="22.51" height="12" rx="1" fill="#4a9a66"><title>worker 29, merge: 0.690 us</title></rect>
+<rect x="580.92" y="751" width="1.31" height="12" rx="1" fill="#c6cbd0"><title>worker 29, eval-entry count: 0.040 us</title></rect>
+<rect x="582.23" y="751" width="370.65" height="12" rx="1" fill="#c9473b"><title>worker 29, eval: 11.360 us</title></rect>
+<text x="101" y="781" text-anchor="end" font-family="sans-serif" font-size="12">30</text>
+<line x1="115" y1="789" x2="1625" y2="789" stroke="#f1f2f4"/>
+<rect x="118.59" y="773" width="1.63" height="12" rx="1" fill="#b8c2cc"><title>worker 30, entry count: 0.050 us</title></rect>
+<rect x="120.22" y="773" width="42.74" height="12" rx="1" fill="#2878a8"><title>worker 30, commit: 1.310 us</title></rect>
+<rect x="162.96" y="773" width="305.72" height="12" rx="1" fill="#a9b8c4"><title>worker 30, commit barrier: 9.370 us</title></rect>
+<rect x="468.68" y="773" width="0.98" height="12" rx="1" fill="#e87527"><title>worker 30, reset: 0.030 us</title></rect>
+<rect x="469.66" y="773" width="85.81" height="12" rx="1" fill="#f0bd85"><title>worker 30, reset barrier: 2.630 us</title></rect>
+<rect x="555.47" y="773" width="19.25" height="12" rx="1" fill="#4a9a66"><title>worker 30, merge: 0.590 us</title></rect>
+<rect x="574.72" y="773" width="1.31" height="12" rx="1" fill="#c6cbd0"><title>worker 30, eval-entry count: 0.040 us</title></rect>
+<rect x="576.03" y="773" width="130.84" height="12" rx="1" fill="#c9473b"><title>worker 30, eval: 4.010 us</title></rect>
+<text x="101" y="803" text-anchor="end" font-family="sans-serif" font-size="12">31</text>
+<line x1="115" y1="811" x2="1625" y2="811" stroke="#f1f2f4"/>
+<rect x="117.61" y="795" width="5.22" height="12" rx="1" fill="#b8c2cc"><title>worker 31, entry count: 0.160 us</title></rect>
+<rect x="122.83" y="795" width="102.78" height="12" rx="1" fill="#2878a8"><title>worker 31, commit: 3.150 us</title></rect>
+<rect x="225.61" y="795" width="244.05" height="12" rx="1" fill="#a9b8c4"><title>worker 31, commit barrier: 7.480 us</title></rect>
+<rect x="469.66" y="795" width="0.80" height="12" rx="1" fill="#e87527"><title>worker 31, reset: 0.020 us</title></rect>
+<rect x="470.31" y="795" width="87.44" height="12" rx="1" fill="#f0bd85"><title>worker 31, reset barrier: 2.680 us</title></rect>
+<rect x="557.75" y="795" width="15.66" height="12" rx="1" fill="#4a9a66"><title>worker 31, merge: 0.480 us</title></rect>
+<rect x="573.42" y="795" width="1.31" height="12" rx="1" fill="#c6cbd0"><title>worker 31, eval-entry count: 0.040 us</title></rect>
+<rect x="574.72" y="795" width="243.07" height="12" rx="1" fill="#c9473b"><title>worker 31, eval: 7.450 us</title></rect>
+<text x="870.0" y="861" text-anchor="middle" font-family="sans-serif" font-size="13">time from earliest worker start</text>
+</svg>

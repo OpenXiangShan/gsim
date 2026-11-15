@@ -1657,16 +1657,15 @@ void graph::genRepCutStep() {
             "void rcRunPart(int part);\n"
             "void rcBarrier(int part, int phase);\n"
             "void rcCycle(int part);\n"
-            "struct alignas(64) RcPhaseFlag { std::atomic<uint8_t> parity{0}; };\n"
-            "RcPhaseFlag rcArrive[2][%d]{};\n"
-            "RcPhaseFlag rcRelease[2]{};\n"
+            "struct alignas(64) RcBarrierState { std::atomic<uint32_t> arrived{0}; std::atomic<uint8_t> parity{0}; };\n"
+            "RcBarrierState rcBarrierState[2]{};\n"
             "struct alignas(64) RcEpoch { std::atomic<uint64_t> v; };\n"
             "RcEpoch rcEpoch{};\n"
             "struct alignas(64) RcJoin { std::atomic<uint64_t> v; };\n"
             "RcJoin rcJoin[%d]{};\n"
             "pthread_t rcThreads[%d]{};\nRcPack rcPacks[%d]{};\nbool rcStarted = false;\n"
             "~S%s();\nS%s(const S%s&) = delete;\nS%s& operator=(const S%s&) = delete;\n",
-            name.c_str(), threads, threads, threads - 1, threads,
+            name.c_str(), threads, threads - 1, threads,
             name.c_str(), name.c_str(), name.c_str(), name.c_str(), name.c_str());
   }
   if (threads > 1) {
@@ -1683,21 +1682,17 @@ void graph::genRepCutStep() {
     emitFuncDecl(0,
                  "void S%s::rcBarrier(int part, int phase) {\n"
                  "  const uint8_t parity = static_cast<uint8_t>(rcEpoch.v.load(std::memory_order_acquire) & 1);\n"
-                 "  if (part == 0) {\n"
-                 "    for (int i = 1; i < %d; ++i) {\n"
-                 "      while (rcArrive[phase][i].parity.load(std::memory_order_acquire) != parity) {\n"
-                 "        asm volatile(\"pause\" ::: \"memory\");\n"
-                 "      }\n"
-                 "    }\n"
-                 "    rcRelease[phase].parity.store(parity, std::memory_order_release);\n"
+                 "  RcBarrierState& state = rcBarrierState[phase];\n"
+                 "  if (state.arrived.fetch_add(1, std::memory_order_acq_rel) == %d) {\n"
+                 "    state.arrived.store(0, std::memory_order_relaxed);\n"
+                 "    state.parity.store(parity, std::memory_order_release);\n"
                  "  } else {\n"
-                 "    rcArrive[phase][part].parity.store(parity, std::memory_order_release);\n"
-                 "    while (rcRelease[phase].parity.load(std::memory_order_acquire) != parity) {\n"
+                 "    while (state.parity.load(std::memory_order_acquire) != parity) {\n"
                  "      asm volatile(\"pause\" ::: \"memory\");\n"
                  "    }\n"
                  "  }\n"
                  "}\n",
-                 name.c_str(), threads);
+                 name.c_str(), threads - 1);
     bool rcHasAsync = false;
     for (SuperNode* reset : allReset) {
       if (reset->superType == SUPER_ASYNC_RESET && reset->resetNode->status != CONSTANT_NODE) rcHasAsync = true;
