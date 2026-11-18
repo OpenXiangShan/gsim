@@ -50,14 +50,15 @@ void ExpTree::replace(std::map<Node*, ENode*>& aliasMap) {
     s.pop();
     for (size_t i = 0; i < top->getChildNum(); i ++) {
       if (!top->getChild(i)) continue;
-      s.push(top->getChild(i));
       Node* replaceNode = top->getChild(i)->getNode();
-      if (!replaceNode) continue;
-      if (aliasMap.find(replaceNode) != aliasMap.end()) {
+      if (replaceNode && aliasMap.find(replaceNode) != aliasMap.end()) {
         ENode* newChild = top->getChild(i)->mergeSubTree(aliasMap[replaceNode]);
         newChild->width = top->getChild(i)->width;
         top->setChild(i, newChild);
       }
+      // mergeSubTree copies index expressions. Traverse the attached replacement,
+      // not the detached child, so aliases in those copies are replaced as well.
+      s.push(top->getChild(i));
     }
   }
 }
