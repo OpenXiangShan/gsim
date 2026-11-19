@@ -1044,6 +1044,7 @@ void graph::cppEmitter() {
   fstWaveNodeSet.clear();
   fstOldValueOffsets.clear();
   if (globalConfig.TraceFst) {
+    const size_t fstWaveWidthLimit = globalConfig.FstMaxArrayWidth;
     const size_t fstWaveLimit = globalConfig.FstMaxArrayElems;
     auto collectWaveNode = [&](Node* n) {
       if (!isTopField(n)) return;
@@ -1052,19 +1053,26 @@ void graph::cppEmitter() {
         if (nm.size() >= 5 && nm.rfind("$NEXT") == nm.size() - 5) return;
       }
       auto dims = nodeArrayDims(n);
-      if (!dims.empty() && fstWaveLimit != 0) {
+      size_t limit = fstWaveLimit;
+      if (fstWaveWidthLimit != 0 && n->width != 0) {
+        size_t widthLimit = fstWaveWidthLimit / n->width;
+        if (widthLimit == 0)
+          return;
+        limit = limit == 0 ? widthLimit : std::min(limit, widthLimit);
+      }
+      if (!dims.empty() && limit != 0) {
         size_t total = 1;
         for (int dim : dims) {
           if (dim <= 0) continue;
-          if (total > fstWaveLimit / static_cast<size_t>(dim)) {
-            total = fstWaveLimit + 1;
+          if (total > limit / static_cast<size_t>(dim)) {
+            total = limit + 1;
             break;
           }
           total *= static_cast<size_t>(dim);
         }
-        if (total > fstWaveLimit) {
+        if (total > limit) {
           fprintf(stderr, "[gsim] skip waveform for %s: %zu elements exceed limit %zu\n",
-                  n->name.c_str(), total, fstWaveLimit);
+                  n->name.c_str(), total, limit);
           return;
         }
       }
