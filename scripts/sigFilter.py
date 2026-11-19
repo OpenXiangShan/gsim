@@ -2,6 +2,9 @@ import sys
 import os
 import re
 
+REF_SIGNAL = re.compile(r'^\s*(?:alignas\([^)]*\)\s+)?'
+                        r'(?:[CSIQ]Data|VlWide<\d+>)\s*/\*(\d+):(\d+)\*/\s+(\w+)\s*;')
+
 class SigFilter():
   def __init__(self, name):
     self.srcfp = None
@@ -27,15 +30,6 @@ class SigFilter():
     self.dstfp.writelines("bool ret = false;\n")
     self.fileIdx += 1
     self.varNum = 0
-
-  def width(self, data):
-    endIdx = len(data) - 1
-    while data[endIdx] != ':':
-      endIdx -= 1
-    startIdx = endIdx
-    while data[startIdx-1] != '*':
-      startIdx -= 1
-    return int(data[startIdx : endIdx]) + 1
 
   def genDiffCode(self, modName, refName, line, mod_width, ref_width):
     self.diffSigNum += 1
@@ -95,12 +89,11 @@ class SigFilter():
     self.reffp = open(refFile, "r")
     # self.dstfp = open(dstFile, "w")
     all_sigs = {}
-    for line in self.reffp.readlines():
-      match = re.search(r'/\*[0-9]*:[0-9]*\*/ ', line)
+    for line in self.reffp:
+      match = REF_SIGNAL.match(line)
       if match:
-        line = line.strip(" ;\n")
-        line = line.split(" ")
-        all_sigs[line[len(line) - 1]] = self.width(line[0])
+        msb, lsb, name = match.groups()
+        all_sigs[name] = abs(int(msb) - int(lsb)) + 1
 
     self.newDstFile()
 
