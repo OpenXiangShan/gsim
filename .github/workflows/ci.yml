@@ -6,25 +6,18 @@ on:
   pull_request:
     branches: ["master"]
 
-env:
-  CLANG_VERSION: 21.1.8
-
 jobs:
   fir-regression:
     runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/openxiangshan/xs-env:stable
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: true
-      - name: Install dependencies
-        run: |
-          sudo ./scripts/install-dependencies.sh
-      - name: Install LLVM toolchain
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.CLANG_VERSION }}
       - name: Build gsim
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           make -j "$(nproc)" build-gsim
       - name: Run FIR regression tests
         run: |
@@ -34,6 +27,9 @@ jobs:
 
   difftest:
     runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/openxiangshan/xs-env:stable
+      options: ${{ matrix.dutName == 'minimal-xiangshan' && '--privileged --volume /mnt:/mnt' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -42,21 +38,6 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: true
-      - uses: actions/setup-python@v7
-        with:
-          python-version: 3.x
-      - name: Install dependencies
-        run: |
-          sudo ./scripts/install-dependencies.sh
-      - name: Install LLVM toolchain
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.CLANG_VERSION }}
-      - name: Install verilator
-        uses: YosysHQ/setup-oss-cad-suite@v4
-        with:
-          version: "2025-04-24"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Enlarge swap
         if: matrix.dutName == 'minimal-xiangshan'
         run: |
@@ -64,14 +45,14 @@ jobs:
           sudo chmod 600 /mnt/swapfile2
           sudo mkswap /mnt/swapfile2
           sudo swapon /mnt/swapfile2
-      - name: Check resources
+      - name: Check & init resources
         run: |
           echo "nproc = `nproc`"
           free -h
           df -h
           verilator --version
-      - name: Untar resources
-        run: make init
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          make init
       - name: Run ${{ matrix.dutName }} (difftest with verilator)
         run: |
           sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
@@ -80,33 +61,20 @@ jobs:
 
   bolt-ysyx3:
     runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/openxiangshan/xs-env:stable
     steps:
       - uses: actions/checkout@v7
         with:
             submodules: true
-      - uses: actions/setup-python@v7
-        with:
-          python-version: 3.x
-      - name: Install dependencies
-        run: |
-          sudo ./scripts/install-dependencies.sh
-      - name: Install LLVM toolchain
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.CLANG_VERSION }}
-      - name: Install verilator
-        uses: YosysHQ/setup-oss-cad-suite@v4
-        with:
-          version: "2025-04-24"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Check resources
+      - name: Check & init resources
         run: |
           echo "nproc = `nproc`"
           free -h
           df -h
           verilator --version
-      - name: Untar resources
-        run: make init
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          make init
       - name: Run ysyx3 (with bolt)
         run: |
           sed -i -e "s/--threads [^ ]*/--threads `nproc`/" Makefile
