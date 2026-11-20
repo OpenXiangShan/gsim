@@ -37,3 +37,7 @@
   declaration per signal (`shared`, `cross`) and their values over four samples.
   Before the fix, the model computes correctly but both FST signals are missing.
   Run it with `make run-fir-test FIR_TEST=fst-activation-fields`.
+
+- array-alias-index.fir: Checks that array alias replacement traverses copied
+  dynamic subscript expressions, including chained index aliases. The runtime
+  compares same-cycle allocation and event updates against an independent model.
