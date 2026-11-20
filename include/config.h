@@ -13,6 +13,7 @@ struct Config {
   bool DumpConstStatus;
   bool TraceFst;
   size_t FstMaxArrayElems;
+  size_t FstMaxArrayWidth;
   bool TraceFstNoNext;
   std::string OutputDir;
   int SuperNodeMaxSize;
