@@ -20,15 +20,19 @@ ENode* Node::isAlias() {
       return assignTree[0]->getRoot();
     }
     return nullptr;
-  }
-  if (assignTree.size() != 1) return nullptr;
-  if (!assignTree[0]->getRoot()->getNode()) return nullptr;
-  if (prev.size() != 1) return nullptr;
-  return assignTree[0]->getRoot();
+  }// For a Scalar node to be a 'my_alias = value' form
+  if (assignTree.size() != 1) return nullptr; // It has only one assignTree
+  if (!assignTree[0]->getRoot()->getNode()) return nullptr; // It's root is already a leaf ENode (not a compute)
+  if (prev.size() != 1) return nullptr; // It only rely on one node (no cond, nor dyn array)
+  return assignTree[0]->getRoot(); // Then 'my_alias' is a alias of 'value' so return 'value'
 }
 
 ENode* ENode::mergeSubTree(ENode* newSubTree) {
+  // We can't just change this->nodePtr: for y=a[0] and z=add(y,1)
+  // changing E(y)->nodePtr with a would yield E(a) instead of E(a[0])// so we must clone newSubTree first
   ENode* ret = newSubTree->dup();
+  // For b=a; c=b[x]; this is E(b[x]), newSubTree is E(a), and [x] is in the child of 'this', addChild so ret is a[x]
+  // This function also handle b=a[0] c=b[x], ret will be E(a[0][x])
   for (ENode* childENode : child) ret->addChild(childENode->dup());
   return ret;
 }
@@ -56,9 +60,7 @@ void ExpTree::replace(std::map<Node*, ENode*>& aliasMap) {
         newChild->width = top->getChild(i)->width;
         top->setChild(i, newChild);
       }
-      // mergeSubTree copies index expressions. Traverse the attached replacement,
-      // not the detached child, so aliases in those copies are replaced as well.
-      s.push(top->getChild(i));
+      s.push(top->getChild(i)); // This ENode or newChild may contains alias
     }
   }
 }
@@ -81,9 +83,9 @@ void graph::aliasAnalysis() {
       ENode* enode = member->isAlias(); // may be a[0]
       if (!enode) continue;
       aliasNum ++;
-      Node* aliasNode = enode->getNode();
-      ENode* aliasENode = enode;
-      if (aliasMap.find(aliasNode) != aliasMap.end()) {
+      Node* aliasNode = enode->getNode(); // the Node being aliased
+      ENode* aliasENode = enode; // the Enode containing the Node being aliased
+      if (aliasMap.find(aliasNode) != aliasMap.end()) { // Is such Node already an alias?
         aliasENode = enode->mergeSubTree(aliasMap[aliasNode]);
       }
       member->status = DEAD_NODE;
