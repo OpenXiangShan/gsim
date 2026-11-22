@@ -322,40 +322,68 @@ FILE* graph::genHeaderStart() {
 
 void graph::genInterfaceInput(Node* input) {
   /* set by string */
-  emitFuncDecl(0, "void S%s::set_%s(%s val) {\n", name.c_str(), input->name.c_str(), widthUType(input->width).c_str());
-  // usedBits can narrow a port below its C++ storage width.
-  if (input->width == 0) {
-    emitBodyLock(1, "val = 0;\n");
-  } else if (input->width < (int)widthBits(input->width)) {
-    if (input->sign) {
-      int shift = widthBits(input->width) - input->width;
-      emitBodyLock(1, "val = %s(val << %d) >> %d;\n", Cast(input->width, true).c_str(), shift, shift);
-    } else {
-      emitBodyLock(1, "val &= %s;\n", bitMask(input->width).c_str());
+  emitFuncDecl(0, "void S%s::set_%s(%s val", name.c_str(), input->name.c_str(), widthUType(input->width).c_str());
+  for (const auto &d : input->dimension)
+    emitFuncDecl(0, "[%d]", upperPower2(d));
+  emitFuncDecl(0, ") {\n");
+  if (input->dimension.size()) {
+    emitBodyLock(1, "memcpy(%s, val, sizeof(%s));\n", input->name.c_str(), input->name.c_str());
+    /* update nodes in the same superNode */
+    std::set<int> allNext;
+    for (Node* next : input->next) {
+      if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
     }
+    std::map<uint64_t, ActiveType> bitMapInfo;
+    activeSet2bitMap(allNext, bitMapInfo, -1);
+    for (auto iter : bitMapInfo) {
+      emitBodyLock(1, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+    }
+  } else {
+    // usedBits can narrow a port below its C++ storage width.
+    if (input->width == 0) {
+      emitBodyLock(1, "val = 0;\n");
+    } else if (input->width < (int)widthBits(input->width)) {
+      if (input->sign) {
+        int shift = widthBits(input->width) - input->width;
+        emitBodyLock(1, "val = %s(val << %d) >> %d;\n", Cast(input->width, true).c_str(), shift, shift);
+      } else {
+        emitBodyLock(1, "val &= %s;\n", bitMask(input->width).c_str());
+      }
+    }
+    emitBodyLock(1, "if (%s != val) { \n", input->name.c_str());
+    emitBodyLock(2, "%s = val;\n", input->name.c_str());
+    /* update nodes in the same superNode */
+    std::set<int> allNext;
+    for (Node* next : input->next) {
+      if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
+    }
+    std::map<uint64_t, ActiveType> bitMapInfo;
+    activeSet2bitMap(allNext, bitMapInfo, -1);
+    for (auto iter : bitMapInfo) {
+      emitBodyLock(2, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
+    }
+    emitBodyLock(1, "}\n");
   }
-  emitBodyLock(1, "if (%s != val) { \n", input->name.c_str());
-  emitBodyLock(2, "%s = val;\n", input->name.c_str());
-  /* update nodes in the same superNode */
-  std::set<int> allNext;
-  for (Node* next : input->next) {
-    if (next->super->cppId >= 0) allNext.insert(next->super->cppId);
-  }
-  std::map<uint64_t, ActiveType> bitMapInfo;
-  activeSet2bitMap(allNext, bitMapInfo, -1);
-  for (auto iter : bitMapInfo) {
-    emitBodyLock(2, "%s // %s\n", updateActiveStr(iter.first, ACTIVE_MASK(iter.second)).c_str(), ACTIVE_COMMENT(iter.second).c_str());
-  }
-  emitBodyLock(1, "}\n");
   emitBodyLock(0, "}\n");
 }
 
 void graph::genInterfaceOutput(Node* output) {
-  emitFuncDecl(0, "%s S%s::get_%s() {\n"
-               "  return %s;\n"
+  emitFuncDecl(0, "%s ", widthUType(output->width).c_str());
+  switch (output->dimension.size()) {
+    case 1:
+      emitFuncDecl(0, "*");
+    case 0:
+      emitFuncDecl(0, "S%s::get_%s() {\n", name.c_str(), output->name.c_str());
+      break;
+    default:
+      emitFuncDecl(0, "(*S%s::get_%s())", name.c_str(), output->name.c_str());
+      for (int i = 1; i < output->dimension.size(); ++i)
+        emitFuncDecl(0, "[%d]", upperPower2(output->dimension[i]));
+      emitFuncDecl(0, " {\n");
+  }
+  emitFuncDecl(0, "  return %s;\n"
                "}\n",
-               widthUType(output->width).c_str(), name.c_str(),
-               output->name.c_str(), output->status == CONSTANT_NODE ? output->computeInfo->valStr.c_str() : output->name.c_str());
+               output->status == CONSTANT_NODE ? output->computeInfo->valStr.c_str() : output->name.c_str());
 }
 
 void graph::genHeaderEnd(FILE* fp) {
@@ -1391,11 +1419,26 @@ void graph::cppEmitter() {
 
    /* input/output interface */
   for (Node* node : input) {
-    fprintf(header, "void set_%s(%s val);\n", node->name.c_str(), widthUType(node->width).c_str());
+    fprintf(header, "void set_%s(%s val", node->name.c_str(), widthUType(node->width).c_str());
+    for (const auto &d : node->dimension)
+      fprintf(header, "[%d]", upperPower2(d));
+    fprintf(header, ");\n");
     genInterfaceInput(node);
   }
   for (Node* node : output) {
-    fprintf(header, "%s get_%s();\n", widthUType(node->width).c_str(), node->name.c_str());
+    fprintf(header, "%s ", widthUType(node->width).c_str());
+    switch (node->dimension.size()) {
+      case 1:
+        fprintf(header, "*");
+      case 0:
+        fprintf(header, "get_%s();\n", node->name.c_str());
+        break;
+      default:
+        fprintf(header, "(*get_%s())", node->name.c_str());
+        for (int i = 1; i < node->dimension.size(); ++i)
+          fprintf(header, "[%d]", upperPower2(node->dimension[i]));
+        fprintf(header, ";\n");
+    } 
     genInterfaceOutput(node);
   }
 
