@@ -1460,21 +1460,32 @@ valInfo* ENode::instsAssert() {
   std::string predStr = ChildInfo(0, valStr);
   std::string enStr = ChildInfo(1, valStr);
   std::string assertInst;
-  if (ChildInfo(0, status) == VAL_CONSTANT) { // pred is constant
-    if (mpz_cmp_ui(ChildInfo(0, consVal), 0) == 0) {
-      assertInst = "gAssert(!" + enStr + ", " + strVal + ");";
-    } else { // pred is always satisfied
-      assertInst = "";
-    }
-  } else if (ChildInfo(1, status) == VAL_CONSTANT) { // en is constant pred is not constant
-    if (mpz_cmp_ui(ChildInfo(1, consVal), 0) == 0) assertInst = "";
-    else {
-      assertInst = "gAssert(" + predStr + ", " + strVal + ");";
-    }
+
+  if ((ChildInfo(1, status) == VAL_CONSTANT && mpz_cmp_ui(ChildInfo(1, consVal), 0) == 0) ||
+      (ChildInfo(0, status) == VAL_CONSTANT && mpz_cmp_ui(ChildInfo(0, consVal), 0) != 0)) {
+    assertInst = "";
+  } else if (ChildInfo(1, status) == VAL_CONSTANT) { // en is constant non-zero
+    assertInst = "gAssert(" + predStr + ", " + strVal;
+  } else if (ChildInfo(0, status) == VAL_CONSTANT) { // pred is constant 0, en is not constant
+    assertInst = "gAssert(!" + enStr + ", " + strVal;
   } else {
-    assertInst = "gAssert(!" + enStr + " || " + predStr + ", " + strVal + ");";
+    assertInst = "gAssert(!" + enStr + " || " + predStr + ", " + strVal;
   }
   
+  if (!assertInst.empty()) {
+    for (size_t i = 2; i < getChildNum(); i++) {
+      int argBits = ChildInfo(i, width);
+      assertInst += ", " + std::to_string(argBits);
+      if (argBits <= 32) {
+        assertInst += ", (uint32_t)(" + ChildInfo(i, valStr) + ")";
+      } else if (argBits <= 64) {
+        assertInst += ", (uint64_t)(" + ChildInfo(i, valStr) + ")";
+      } else {
+        assertInst += ", " + ChildInfo(i, valStr);
+      }
+    }
+    assertInst += ");";
+  }
   ret->valStr = assertInst;
   ret->opNum = -1;
   return ret;

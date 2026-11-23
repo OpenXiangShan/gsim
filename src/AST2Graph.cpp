@@ -38,7 +38,7 @@ static std::map<std::string, PNode*> moduleMap;
 static std::stack<std::string> prefixTrace;
 static std::map<std::string, Node*> allSignals;
 static std::map<std::string, AggrParentNode*> allAggr; // CHECK: any other aggr nodes ?
-static std::vector<std::pair<bool, Node*>> whenTrace;
+static std::vector<std::pair<bool/* Which branch */, Node* /* Condition of this branch */>> whenTrace;  // Are we inside a when branch? If so, how deep?
 static std::set<std::string> moduleInstances;
 
 static std::set<Node*> stmtsNodes;
@@ -1212,7 +1212,7 @@ void visitWhenPrintf(graph* g, PNode* print) {
 }
 
 void visitWhenAssert(graph* g, PNode* ass) {
-  TYPE_CHECK(ass, 3, 3, P_ASSERT);
+  TYPE_CHECK(ass, 3, 4, P_ASSERT);
   std::string assertName = ass->name.empty() ? format("ASSERT_%d", ass->lineno) : ass->name;
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, assertName), ass->lineno);
 
@@ -1220,13 +1220,13 @@ void visitWhenAssert(graph* g, PNode* ass) {
   ASTExpTree* en = visitExpr(g, ass->getChild(2));
 
   ENode* enRoot = en->getExpRoot();
-  for (size_t i = 0; i < whenTrace.size(); i ++) {
+  for (size_t i = 0; i < whenTrace.size(); i ++) { // Prepend the when tree to the predicate
     ENode* andNode = new ENode(OP_AND);
     andNode->addChild(enRoot);
     ENode* condNode = new ENode(whenTrace[i].second);
     if (whenTrace[i].first) {
       andNode->addChild(condNode);
-    } else {
+    } else { // Add a NOT to the when if we are on the false branch
       ENode* notNode = new ENode(OP_NOT);
       notNode->addChild(condNode);
       andNode->addChild(notNode);
@@ -1240,6 +1240,14 @@ void visitWhenAssert(graph* g, PNode* ass) {
   enode->addChild(pred->getExpRoot());
   enode->addChild(enRoot);
   
+  if (ass->getChildNum() > 3) {
+    PNode* exprs = ass->getChild(3);
+    for (int i = 0; i < exprs->getChildNum(); i++){
+      ASTExpTree* val = visitExpr(g, exprs->getChild(i));
+      enode->addChild(val->getExpRoot());
+    }
+  }
+
   n->valTree = new ExpTree(enode, new ENode(n));
   addSignal(n->name, n);
   g->specialNodes.push_back(n);
@@ -1380,7 +1388,7 @@ void visitStop(graph* g, PNode* stop) {
     | Assert '(' expr ',' expr ',' expr ',' String ')' info { $$ = newNode(P_ASSERT, synlineno(), $11, NULL, 3, $3, $5, $7); $$->appendExtraInfo($9); }
 */
 void visitAssert(graph* g, PNode* ass) {
-  TYPE_CHECK(ass, 3, 3, P_ASSERT);
+  TYPE_CHECK(ass, 3, 4, P_ASSERT);
   std::string assertName = ass->name.empty() ? format("ASSERT_%d", ass->lineno) : ass->name;
   Node* n = allocNode(NODE_SPECIAL, prefixName(SEP_MODULE, assertName), ass->lineno);
 
@@ -1392,6 +1400,14 @@ void visitAssert(graph* g, PNode* ass) {
 
   enode->addChild(pred->getExpRoot());
   enode->addChild(en->getExpRoot());
+
+  if (ass->getChildNum() > 3) {
+    PNode* exprs = ass->getChild(3);
+    for (int i = 0; i < exprs->getChildNum(); i++){
+      ASTExpTree* val = visitExpr(g, exprs->getChild(i));
+      enode->addChild(val->getExpRoot());
+    }
+  }
 
   n->valTree = new ExpTree(enode, new ENode(n));
   addSignal(n->name, n);
