@@ -1015,9 +1015,13 @@ void graph::emitPrintf() {
   "    char c = fmt[fmt_idx ++];\n"
   "    switch (c) {\n"
   "      case '%%': break;\n"
-  "      case 0: return;\n"
+  "      case 0: va_end(args); return;\n"  /* Normal end */
   "      default: fputc(c, fp); continue;\n"
   "    }\n"
+  "\n"
+  "    c = fmt[fmt_idx ++];\n"
+  "    if (c == '%%') { fputc('%%', fp); continue; }\n" /* End with %% */
+  "    if (c == 0) { va_end(args); return; }\n" /* End with % */
   "\n"
   "    uint64_t lval = 0;\n"
   "    int bits = va_arg(args, uint32_t);\n"
@@ -1025,7 +1029,6 @@ void graph::emitPrintf() {
   "    else if (bits <= 64) { lval = va_arg(args, uint64_t); }\n"
   "    else                 { assert(0); }\n"
   "\n"
-  "    c = fmt[fmt_idx ++];\n"
   "    switch (c) {\n"
   "      case 'd': fprintf(fp, \"%%ld\", lval); break;\n"
   "      case 'c': fputc(lval & 0xff, fp); break;\n"
