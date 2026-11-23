@@ -1438,7 +1438,7 @@ valInfo* ENode::instsPrintf() {
       printfInst += ", " + ChildInfo(i, valStr);
     }
   }
-  printfInst += "); fflush(stdout);";
+  printfInst += ");";
 
   ret->valStr = printfInst;
   ret->opNum = -1;
