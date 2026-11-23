@@ -1428,8 +1428,15 @@ valInfo* ENode::instsPrintf() {
   ret->status = VAL_VALID;
   std::string printfInst = format("gprintf(%s", strVal.c_str());
   for (size_t i = 0; i < getChildNum(); i ++) {
-    printfInst += ", " + std::to_string(ChildInfo(i, typeWidth));
-    printfInst += ", " + ChildInfo(i, valStr);
+    int argBits = ChildInfo(i, typeWidth);
+    printfInst += ", " + std::to_string(argBits);
+    if (argBits <= 32) {
+      printfInst += ", (uint32_t)(" + ChildInfo(i, valStr) + ")";
+    } else if (argBits <= 64) {
+      printfInst += ", (uint64_t)(" + ChildInfo(i, valStr) + ")";
+    } else {
+      printfInst += ", " + ChildInfo(i, valStr);
+    }
   }
   printfInst += "); fflush(stdout);";
 
