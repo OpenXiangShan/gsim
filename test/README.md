@@ -41,3 +41,9 @@
 - array-alias-index.fir: Checks that array alias replacement traverses copied
   dynamic subscript expressions, including chained index aliases. The runtime
   compares same-cycle allocation and event updates against an independent model.
+
+- chisel7-assert-args.fir: Checks Chisel 7 `circt_chisel_ifelsefatal` asserts
+  with format arguments (`%d`, `%x`, `%b`, `%c`, `%%`, 64-bit and constant
+  operands, both top-level and inside `when`/`layerblock`), missing `format`
+  fallback, legacy 3-operand FIRRTL `assert` compatibility, and elimination of
+  `pred=0` asserts whose enable folds to `0` during instruction generation.

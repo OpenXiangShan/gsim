@@ -321,7 +321,7 @@ public:
 };
 
 class ASTExpTree { // used in AST2Graph, support aggregate nodes
-  ENode* expRoot = nullptr;
+  ENode* expRoot = nullptr; // TODO(MEM): AST2Graph sometime just use this class as a holder for ASTExpTree(see call to getExpRoot). So Free ASTExpTree != Free expRoot at least for those situations
   // ASTENode* aggrRoot = nullptr;
   std::vector<std::pair<ENode*, bool>> aggrForest;
   // std::vector<std::string> name; // aggr member name, used for creating new nodes in visitNode

@@ -281,7 +281,7 @@ FILE* graph::genHeaderStart() {
   fprintf(header, "\n#define gAssert(cond, ...) do {"
                      "if (!(cond)) {"
                        "fprintf(stderr, \"\\33[1;31m\");"
-                       "fprintf(stderr, __VA_ARGS__);"
+                       "gprintf(__VA_ARGS__);"
                        "fprintf(stderr, \"\\33[0m\\n\");"
                        "if (gsim_assert) gsim_assert(__FILE__, __LINE__);"
                        "else { assert(cond); }"
@@ -992,7 +992,7 @@ void graph::emitPrintf() {
   "    }\n"
   "\n"
   "    c = fmt[fmt_idx ++];\n"
-  "    if (c == '%%') { fputc('%%', fp); continue; }\n" /* End with %% */
+  "    if (c == '%%') { fputc('%%', fp); continue; }\n" /* %% as single %*/
   "    if (c == 0) { va_end(args); return; }\n" /* End with % */
   "\n"
   "    uint64_t lval = 0;\n"
