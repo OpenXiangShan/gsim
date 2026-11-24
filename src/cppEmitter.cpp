@@ -277,14 +277,13 @@ FILE* graph::genHeaderStart() {
     newLine(header);
   }
 
+  fprintf(header, "#define likely(x) __builtin_expect(!!(x), 1)\n");
+  fprintf(header, "#define unlikely(x) __builtin_expect(!!(x), 0)\n");
+
   fprintf(header, "\n#define GSIM_HAS_ASSERT_HANDLER 1\n");
   fprintf(header, "\n#define gAssert(cond, ...) do {"
-                     "if (!(cond)) {"
-                       "fprintf(stderr, \"\\33[1;31m\");"
-                       "gprintf(__VA_ARGS__);"
-                       "fprintf(stderr, \"\\33[0m\\n\");"
-                       "if (gsim_assert) gsim_assert(__FILE__, __LINE__);"
-                       "else { assert(cond); }"
+                     "if (unlikely(!(cond))) {"
+                       "gAssert_impl(#cond, __FILE__, __LINE__, __VA_ARGS__);"
                      "}"
                    "} while (0)\n");
   fprintf(header, "#define gdiv(a, b) ((b) == 0 ? 0 : (a) / (b))\n");
@@ -300,9 +299,7 @@ FILE* graph::genHeaderStart() {
   fprintf(header, "#endif\n");
   fprintf(header, "#endif // __clang__ \n\n");
 
-  fprintf(header, "#define likely(x) __builtin_expect(!!(x), 1)\n");
-  fprintf(header, "#define unlikely(x) __builtin_expect(!!(x), 0)\n");
-  fprintf(header, "void gprintf(const char *fmt, ...);\n\n");
+  fprintf(header, "__attribute__((cold, noinline)) void gprintf(const char *fmt, ...);\n");
 
   for (int num = 2; num <= maxConcatNum; num ++) {
     std::string param;
@@ -1004,24 +1001,42 @@ bool graph::__emitSrc(int indent, bool canNewFile, bool alreadyEndFunc, const ch
   return newFile;
 }
 
-void graph::emitPrintf() {
-  emitFuncDecl(0, "void gprintf(const char *fmt, ...) {\n");
+void graph::emitAssert() {
+  emitFuncDecl(0, "void S%s::gAssert_impl(const char *condStr, const char *file, long long line, const char *fmt, ...) {\n", name.c_str());
   emitBodyLock(0,
-  "  FILE *fp = stderr;\n"
+    "  fputs(\"\\33[1;31m\", stderr);\n"
   "  va_list args;\n"
   "  va_start(args, fmt);\n"
+  "  vgprintf(fmt, args);\n"
+  "  va_end(args);\n"
+  "  fputs(\"\\33[0m\\n\", stderr);\n"
+  "  fflush(stderr);\n"
+  "  if (gsim_assert) {\n"
+  "    gsim_assert(file, line);\n"
+  "  }else{\n"
+  "    fprintf(stderr, \"%%s:%%lld: Assertion `%%s` failed.\\n\", file, line, condStr);\n" /* func is omitted since it's not related to the circuit */
+  "    abort();\n"
+  "  }\n"
+  "}\n\n"
+  );
+}
+
+void graph::emitPrintf() {
+  emitFuncDecl(0, "__attribute__((cold)) static void vgprintf(const char *fmt, va_list args) {\n");
+  emitBodyLock(0,
+  "  FILE *fp = stderr;\n"
   "  int fmt_idx = 0;\n"
   "  while (true) {\n"
   "    char c = fmt[fmt_idx ++];\n"
   "    switch (c) {\n"
   "      case '%%': break;\n"
-  "      case 0: va_end(args); return;\n"  /* Normal end */
+  "      case 0: return;\n"  /* Normal end */
   "      default: fputc(c, fp); continue;\n"
   "    }\n"
   "\n"
   "    c = fmt[fmt_idx ++];\n"
   "    if (c == '%%') { fputc('%%', fp); continue; }\n" /* %% as single %*/
-  "    if (c == 0) { va_end(args); return; }\n" /* End with % */
+  "    if (c == 0) return;\n" /* End with % */
   "\n"
   "    uint64_t lval = 0;\n"
   "    int bits = va_arg(args, uint32_t);\n"
@@ -1039,7 +1054,15 @@ void graph::emitPrintf() {
   "      default: assert(0);\n"
   "    }\n"
   "  }\n"
-  "}\n"
+  "}\n\n"
+  );
+  emitFuncDecl(0, "void gprintf(const char *fmt, ...) {\n");
+  emitBodyLock(0,
+    "  va_list args;\n"
+    "  va_start(args, fmt);\n"
+    "  vgprintf(fmt, args);\n"
+    "  va_end(args);\n"
+    "}\n"
   );
 }
 
@@ -1155,6 +1178,7 @@ void graph::cppEmitter() {
   fprintf(header, "using assertFunc = void (*)(const char*, long long);\n");
   fprintf(header, "assertFunc gsim_assert = nullptr;\n");
   fprintf(header, "void register_assert(assertFunc fn) { gsim_assert = fn; }\n");
+  fprintf(header, "__attribute__((cold, noinline, preserve_most)) void gAssert_impl(const char *condStr, const char *file, long long line, const char *fmt, ...);\n");
   fprintf(header, "uint64_t cycles;\n");
   fprintf(header, "uint64_t LOG_START, LOG_END;\n");
   fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
@@ -1184,6 +1208,7 @@ void graph::cppEmitter() {
   fprintf(header, "size_t nodeNum[%d];\n", superId);
 #endif
   emitPrintf();
+  emitAssert();
   /* constrcutor */
   if (globalConfig.TraceFst) {
     emitFuncDecl(0, "S%s::S%s() {\n"
