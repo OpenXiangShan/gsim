@@ -42,6 +42,14 @@
   dynamic subscript expressions, including chained index aliases. The runtime
   compares same-cycle allocation and event updates against an independent model.
 
+- fst-custom-timestamp.fir: Checks caller-provided FST dump timestamps (including
+  `t = 0` and non-unit steps independent of `gsim_cycle`), `const`-qualified
+  `get_cycles()`, the 0-arg `dump()` overload, `stderr` warnings and ignore
+  behavior for duplicate/non-monotonic timestamps, timestamp state reset across
+  `setWaveformPath()`, disabled-waveform suppression, and non-collision with
+  top-level FIRRTL signals named `last_dump` / `didDump`.
+  Run it with `make run-fir-test FIR_TEST=fst-custom-timestamp`.
+ 
 - chisel7-assert-args.fir: Checks Chisel 7 `circt_chisel_ifelsefatal` asserts
   with format arguments (`%d`, `%x`, `%b`, `%c`, `%%`, 64-bit and constant
   operands, both top-level and inside `when`/`layerblock`), missing `format`

@@ -283,7 +283,7 @@ void dut_cycle(int n) {
   while (n --){
     dut->step();
 #ifdef GSIM_TRACE_FST
-    dut->dump();
+    dut->dump(dut->get_cycles());
 #endif
   }
 }
