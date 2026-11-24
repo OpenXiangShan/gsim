@@ -12,6 +12,7 @@ class graph {
 
   bool __emitSrc(int indent, bool canNewFile, bool alreadyEndFunc, const char *nextFuncDef, const char *fmt, ...);
   void emitPrintf();
+  void emitAssert();
   void activateNext(Node* node, std::set<int>& nextNodeId, std::string oldName, bool inStep, std::string flagName, int indent);
   void activateUncondNext(Node* node, std::set<int>& activateId, bool inStep, std::string flagName, int indent);
 

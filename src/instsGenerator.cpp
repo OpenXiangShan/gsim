@@ -1469,7 +1469,22 @@ valInfo* ENode::instsAssert() {
   } else if (ChildInfo(0, status) == VAL_CONSTANT) { // pred is constant 0, en is not constant
     assertInst = "gAssert(!" + enStr + ", " + strVal;
   } else {
-    assertInst = "gAssert(!" + enStr + " || " + predStr + ", " + strVal;
+    // A guarded assertion conceptually checks `if (!(!en || pred))`.
+    // With logical `||` (or even `i1` bitwise `|`), the compiler typically lowers
+    // this into two short-circuit branches. Because `en` (e.g., handshake valid)
+    // can toggle dynamically across cycles, the first short-circuit branch is
+    // often taken and hard to predict, consuming BTB entries and causing
+    // mispredictions even though assertions almost never fail.
+    //
+    // Since both `en` and `pred` are strictly 1-bit unsigned values ({0, 1}),
+    // `(!en || pred)` is equivalent to `(en <= pred)`:
+    //   (0 <= 0) -> true,  (0 <= 1) -> true,
+    //   (1 <= 1) -> true,  (1 <= 0) -> false (the only failure case).
+    // This folds the check into a single `cmp + ja` pair, eliminating the
+    // short-circuit branch and leaving only one strictly never-taken branch
+    // in normal execution.
+    assertInst = "gAssert((" + enStr + ") <= (" + predStr + "), " + strVal;
+    //assertInst = "gAssert(!" + enStr + " || " + predStr + ", " + strVal;
   }
   
   if (!assertInst.empty()) {

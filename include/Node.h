@@ -93,6 +93,8 @@ class AggrParentNode {  // virtual type_aggregate node, used for aggregate conne
   }
 };
 
+// Node: Relationship between FIRRTL expression
+// ENode: Inside an expression
 class Node {
   static int counter;
  public:
