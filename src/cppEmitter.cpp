@@ -255,6 +255,7 @@ FILE* graph::genHeaderStart() {
   fprintf(header, "#ifndef %s_H\n#define %s_H\n", name.c_str(), name.c_str());
   /* include all libs */
   includeLib(header, "iostream", true);
+  includeLib(header, "cstdio", true);
   includeLib(header, "vector", true);
   includeLib(header, "assert.h", true);
   includeLib(header, "stdlib.h", true);
@@ -936,7 +937,7 @@ void graph::genDump(){
     }
     emitBodyLock(0, "}\n");
   }
-  emitFuncDecl(0, "void S%s::dump() {\n", name.c_str());
+  emitFuncDecl(0, "void S%s::dump(uint64_t dump_cycle) {\n", name.c_str());
   emitBodyLock(1, "dumpWaveformFlag = waveformEnabled;\n");
   emitBodyLock(1, "if (dumpWaveformFlag && !fstDumpInitialized) {\n");
   emitBodyLock(2, "resetFstHandles();\n");
@@ -964,7 +965,14 @@ void graph::genDump(){
   emitBodyLock(2, "fstDumpInitialized = true;\n");
   emitBodyLock(1, "}\n");
   emitBodyLock(1, "if (dumpWaveformFlag && fstCtx) {\n");
-  emitBodyLock(2, "fstWriterEmitTimeChange(fstCtx, cycles);\n");
+  emitBodyLock(2, "if (fstDidDump && fstLastDumpTime >= dump_cycle) {\n");
+  emitBodyLock(3, "fprintf(stderr, \"WARNING: previous dump at t=%%llu, requesting t=%%llu, dump call ignored\\n\",\n");
+  emitBodyLock(4, "static_cast<unsigned long long>(fstLastDumpTime), static_cast<unsigned long long>(dump_cycle));\n");
+  emitBodyLock(3, "return;\n");
+  emitBodyLock(2, "}\n");
+  emitBodyLock(2, "fstDidDump = true;\n");
+  emitBodyLock(2, "fstLastDumpTime = dump_cycle;\n");
+  emitBodyLock(2, "fstWriterEmitTimeChange(fstCtx, dump_cycle);\n");
   emitBodyLock(2, "emitAllSignalValues();\n");
   emitBodyLock(1, "}\n");
 
@@ -1178,12 +1186,15 @@ void graph::cppEmitter() {
   fprintf(header, "using assertFunc = void (*)(const char*, long long);\n");
   fprintf(header, "assertFunc gsim_assert = nullptr;\n");
   fprintf(header, "void register_assert(assertFunc fn) { gsim_assert = fn; }\n");
+  fprintf(header, "uint64_t get_cycles() const { return cycles; }\n");
+  fprintf(header, "uint64_t cycles; // How many times step() was called\n");
   fprintf(header, "__attribute__((cold, noinline, preserve_most)) void gAssert_impl(const char *condStr, const char *file, long long line, const char *fmt, ...);\n");
-  fprintf(header, "uint64_t cycles;\n");
   fprintf(header, "uint64_t LOG_START, LOG_END;\n");
   fprintf(header, "uint%d_t activeFlags[%d];\n", ACTIVE_WIDTH, activeFlagNum); // or super.size() if id == idx
   if (globalConfig.TraceFst) {
     fprintf(header, "bool waveformEnabled;\n");
+    fprintf(header, "bool fstDidDump;\n");
+    fprintf(header, "uint64_t fstLastDumpTime;\n");
     fprintf(header, "void *fstCtx;\n");
     fprintf(header, "fstHandle fstHandle_gsim_cycle;\n");
     for (Node* node : fstWaveNodes) {
@@ -1234,6 +1245,8 @@ void graph::cppEmitter() {
 
     emitFuncDecl(0, "void S%s::resetFstHandles() {\n", name.c_str());
     emitBodyLock(1, "std::vector<uint64_t>().swap(fstOldValues);\n");
+    emitBodyLock(1, "fstDidDump = false;\n");
+    emitBodyLock(1, "fstLastDumpTime = 0;\n");
     emitBodyLock(1, "fstOldValuesValid = false;\n");
     emitBodyLock(1, "fstHandle_gsim_cycle = 0;\n");
     for (size_t chunk = 0; chunk < fstWaveChunkCount(); chunk ++) {
@@ -1488,7 +1501,8 @@ void graph::cppEmitter() {
   genStep(subStepIdxMax);
 
   if (globalConfig.TraceFst){
-    fprintf(header, "void dump();\n");
+    fprintf(header, "void dump(uint64_t dump_cycle);\n");
+    fprintf(header, "void dump() { dump(cycles); }\n");
     genDump();
   }
 
