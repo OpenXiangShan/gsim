@@ -45,7 +45,6 @@ static std::set<int> alwaysActive;
 static std::map<Node*, std::pair<int, int>> super2ResetId;  // uint & async reset
 static std::map<int, size_t> resetChunkNum;
 static std::vector<Node*> fstWaveNodes;
-static std::set<Node*> fstWaveNodeSet;
 // Word offsets in the model's contiguous packed cache; word 0 is gsim_cycle.
 static std::vector<size_t> fstOldValueOffsets;
 
@@ -191,9 +190,10 @@ std::string strReplace(std::string s, std::string oldStr, std::string newStr) {
 }
 
 static bool isTopField(Node* node) {
-  if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || node->status != VALID_NODE) return false;
-  if (node->type == NODE_REG_DST && !node->regSplit) return false;
-  if (node->type == NODE_WRITER) return false;
+  if (node->width < 0) return false;
+  if (node->type == NODE_SPECIAL) return false;
+  if (node->type == NODE_REG_RESET && !(globalConfig.TraceFst && node->isRetained())) return false;
+  if (node->type == NODE_WRITER && !(globalConfig.TraceFst && node->isRetained())) return false;
   return !node->isLocal();
 }
 
@@ -322,8 +322,8 @@ void graph::genInterfaceInput(Node* input) {
   /* set by string */
   emitFuncDecl(0, "void S%s::set_%s(%s val", name.c_str(), input->name.c_str(), widthUType(input->width).c_str());
   for (const auto &d : input->dimension)
-    emitFuncDecl(0, "[%d]", upperPower2(d));
-  emitFuncDecl(0, ") {\n");
+    emitBodyLock(0, "[%d]", upperPower2(d));
+  emitBodyLock(0, ") {\n");
   if (input->dimension.size()) {
     emitBodyLock(1, "memcpy(%s, val, sizeof(%s));\n", input->name.c_str(), input->name.c_str());
     /* update nodes in the same superNode */
@@ -369,17 +369,17 @@ void graph::genInterfaceOutput(Node* output) {
   emitFuncDecl(0, "%s ", widthUType(output->width).c_str());
   switch (output->dimension.size()) {
     case 1:
-      emitFuncDecl(0, "*");
+      emitBodyLock(0, "*");
     case 0:
-      emitFuncDecl(0, "S%s::get_%s() {\n", name.c_str(), output->name.c_str());
+      emitBodyLock(0, "S%s::get_%s() {\n", name.c_str(), output->name.c_str());
       break;
     default:
-      emitFuncDecl(0, "(*S%s::get_%s())", name.c_str(), output->name.c_str());
+      emitBodyLock(0, "(*S%s::get_%s())", name.c_str(), output->name.c_str());
       for (int i = 1; i < output->dimension.size(); ++i)
-        emitFuncDecl(0, "[%d]", upperPower2(output->dimension[i]));
-      emitFuncDecl(0, " {\n");
+        emitBodyLock(0, "[%d]", upperPower2(output->dimension[i]));
+      emitBodyLock(0, " {\n");
   }
-  emitFuncDecl(0, "  return %s;\n"
+  emitBodyLock(0, "  return %s;\n"
                "}\n",
                output->status == CONSTANT_NODE ? output->computeInfo->valStr.c_str() : output->name.c_str());
 }
@@ -485,7 +485,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   for (int dim : node->dimension) fprintf(fp, "[%d]", upperPower2(dim));
   fprintf(fp, "; // width = %d, lineno = %d\n", node->width, node->lineno);
   int w = node->width;
-  bool needInitMask = (node->type != NODE_MEMORY && node->type != NODE_WRITER) &&
+  bool needInitMask = (node->width > 0 && node->type != NODE_MEMORY && node->type != NODE_WRITER) &&
     (((w < 64) && (w != 8 && w != 16 && w != 32 && w != 64)) || ((w > 64) && (w % 32 != 0)));
   if (needInitMask) {
     if (node->dimension.empty()) {
@@ -653,7 +653,7 @@ int graph::genNodeStepEnd(SuperNode* node, int indent) {
 }
 
 bool Node::isLocal() { // TODO: isArray is OK
-  return status == VALID_NODE && type == NODE_OTHERS && !anyNextActive() && !isArray() && !isReset();
+  return status == VALID_NODE && (!isRetained() || !globalConfig.TraceFst) && type == NODE_OTHERS && !anyNextActive() && !isArray() && !isReset();
 }
 
 int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
@@ -1179,41 +1179,43 @@ void graph::cppEmitter() {
   }
 
   fstWaveNodes.clear();
-  fstWaveNodeSet.clear();
   fstOldValueOffsets.clear();
   if (globalConfig.TraceFst) {
+    std::set<Node*> fstWaveNodeSet;
     const size_t fstWaveWidthLimit = globalConfig.FstMaxArrayWidth;
     const size_t fstWaveLimit = globalConfig.FstMaxArrayElems;
-    auto collectWaveNode = [&](Node* n) {
-      if (!isTopField(n)) return;
-      if (globalConfig.TraceFstNoNext) {
-        const std::string& nm = n->name;
-        if (nm.size() >= 5 && nm.rfind("$NEXT") == nm.size() - 5) return;
-      }
+    auto withinWaveLimit = [&](Node* n) {
       auto dims = nodeArrayDims(n);
       size_t limit = fstWaveLimit;
       if (fstWaveWidthLimit != 0 && n->width != 0) {
         size_t widthLimit = fstWaveWidthLimit / n->width;
-        if (widthLimit == 0)
-          return;
+        if (widthLimit == 0) return false;
         limit = limit == 0 ? widthLimit : std::min(limit, widthLimit);
       }
-      if (!dims.empty() && limit != 0) {
-        size_t total = 1;
-        for (int dim : dims) {
-          if (dim <= 0) continue;
-          if (total > limit / static_cast<size_t>(dim)) {
-            total = limit + 1;
-            break;
-          }
-          total *= static_cast<size_t>(dim);
+      if (dims.empty() || limit == 0) return true;
+      size_t total = 1;
+      for (int dim : dims) {
+        if (dim <= 0) continue;
+        if (total > limit / static_cast<size_t>(dim)) {
+          total = limit + 1;
+          break;
         }
-        if (total > limit) {
-          fprintf(stderr, "[gsim] skip waveform for %s: %zu elements exceed limit %zu\n",
-                  n->name.c_str(), total, limit);
-          return;
-        }
+        total *= static_cast<size_t>(dim);
       }
+      if (total > limit) {
+        fprintf(stderr, "[gsim] skip waveform for %s: %zu elements exceed limit %zu\n",
+                n->name.c_str(), total, limit);
+        return false;
+      }
+      return true;
+    };
+    auto collectWaveNode = [&](Node* n, bool optimized = false) {
+      if (!optimized && !isTopField(n)) return;
+      if (globalConfig.TraceFstNoNext) {
+        const std::string& nm = n->name;
+        if (nm.size() >= 5 && nm.rfind("$NEXT") == nm.size() - 5) return;
+      }
+      if (!withinWaveLimit(n)) return;
       fstWaveNodeSet.insert(n);
     };
     for (SuperNode* super : sortedSuper) {
@@ -1225,6 +1227,7 @@ void graph::cppEmitter() {
       }
     }
     for (Node* mem : memory) collectWaveNode(mem);
+    for (const auto& entry : waveformNodes) collectWaveNode(entry.first, true);
     fstWaveNodes.assign(fstWaveNodeSet.begin(), fstWaveNodeSet.end());
     std::sort(fstWaveNodes.begin(), fstWaveNodes.end(), [](Node* a, Node* b) {
       return a->name < b->name;
@@ -1383,6 +1386,9 @@ void graph::cppEmitter() {
     }
     if (super->superType == SUPER_EXTMOD) {
       for (size_t i = 1; i < super->member.size(); i ++) genNodeDef(header, super->member[i]);
+      if (!super->member.empty() && super->member[0]->type == NODE_EXT) {
+        for (Node* port : super->member[0]->member) genNodeDef(header, port);
+      }
     }
   }
   /* memory definition */
@@ -1503,18 +1509,35 @@ void graph::cppEmitter() {
       for (size_t nodeIdx = begin; nodeIdx < end; nodeIdx ++) {
         Node* node = fstWaveNodes[nodeIdx];
         std::vector<int> dims = nodeArrayDims(node);
+        auto signalIt = waveformNodes.find(node);
+        const WaveformNode* signal = signalIt == waveformNodes.end() ? nullptr : &signalIt->second;
         if (dims.empty()) {
-          emitBodyLock(1, "updateFstSignal(fstHandle_%s, &%s, %d, %zu);\n", node->name.c_str(), node->name.c_str(), node->width,
-                       fstOldValueOffsets[nodeIdx]);
+          std::string accessStr = node->name;
+          if (signal && signal->kind == WaveformNodeKind::Alias) {
+            accessStr = signal->source->name;
+          } else if (signal && (signal->kind == WaveformNodeKind::Constant ||
+                                signal->kind == WaveformNodeKind::Expression)) {
+            const char* valueName = signal->kind == WaveformNodeKind::Constant ? "fstConstant" : "fstExpression";
+            accessStr = format("%s%zu", valueName, nodeIdx);
+            emitBodyLock(1, "%s %s%zu = %s;\n", widthUType(node->width).c_str(), valueName, nodeIdx,
+                         signal->value.c_str());
+          }
+          emitBodyLock(1, "updateFstSignal(fstHandle_%s, &%s, %d, %zu);\n", node->name.c_str(),
+                       accessStr.c_str(), node->width, fstOldValueOffsets[nodeIdx]);
         } else {
           int indent = 1;
+          std::string accessStr = signal && signal->kind == WaveformNodeKind::Alias ? signal->source->name : node->name;
+          if (signal && signal->kind == WaveformNodeKind::Constant) {
+            emitBodyLock(indent, "%s fstConstant%zu = %s;\n", widthUType(node->width).c_str(), nodeIdx,
+                         signal->value.c_str());
+            accessStr = format("fstConstant%zu", nodeIdx);
+          }
           for (size_t i = 0; i < dims.size(); i ++) {
             emitBodyLock(indent ++, "for (int i%zu = 0; i%zu < %d; i%zu ++) {\n", i, i, dims[i], i);
           }
-          std::string accessStr = node->name;
           emitBodyLock(indent, "size_t handle_idx = 0;\n");
           for (size_t i = 0; i < dims.size(); i ++) {
-            accessStr += format("[i%zu]", i);
+            if (!signal || signal->kind != WaveformNodeKind::Constant) accessStr += format("[i%zu]", i);
             emitBodyLock(indent, "handle_idx = handle_idx * %d + i%zu;\n", dims[i], i);
           }
           emitBodyLock(indent, "updateFstSignal(fstHandle_%s[handle_idx], &%s, %d, %zu + handle_idx * %zu);\n",

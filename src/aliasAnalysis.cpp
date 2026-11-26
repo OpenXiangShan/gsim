@@ -82,15 +82,43 @@ void graph::aliasAnalysis() {
       if (member->status != VALID_NODE) continue;
       ENode* enode = member->isAlias(); // may be a[0]
       if (!enode) continue;
-      aliasNum ++;
       Node* aliasNode = enode->getNode(); // the Node being aliased
       ENode* aliasENode = enode; // the Enode containing the Node being aliased
       if (aliasMap.find(aliasNode) != aliasMap.end()) { // Is such Node already an alias?
         aliasENode = enode->mergeSubTree(aliasMap[aliasNode]);
       }
+
+      // A retained node may be removed only after its waveform alias has been
+      // recorded. Dead-node and split-node passes deliberately do not have
+      // this escape hatch.
+      if (member->isRetained() && globalConfig.TraceFst) {
+        if (aliasENode->getChildNum() != 0 || !aliasENode->getNode() ||
+            !preserveWaveformAlias(member, aliasENode->getNode())) continue;
+        member->retained = false;
+      } else {
+        member->retained = false;
+      }
+
+      aliasNum ++;
       member->status = DEAD_NODE;
       aliasMap[member] = aliasENode;
     }
+  }
+  // The expression rewrite does not update waveform metadata. Follow the
+  // complete alias chain before removing any of its intermediate nodes.
+  for (auto& [node, signal] : waveformNodes) {
+    if (signal.kind != WaveformNodeKind::Alias) continue;
+    Node* source = signal.source;
+    auto it = aliasMap.find(source);
+    while (it != aliasMap.end()) {
+      ENode* replacement = it->second;
+      Assert(replacement->getNode() && replacement->getChildNum() == 0,
+             "waveform alias %s cannot follow %s", node->name.c_str(), source->name.c_str());
+      source = replacement->getNode();
+      it = aliasMap.find(source);
+    }
+    signal.source = source;
+    source->retained = true;
   }
   /* update assignTree */
   for (SuperNode* super : sortedSuper) {

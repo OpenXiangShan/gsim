@@ -31,6 +31,8 @@ GSIM accepts chirrtl, and compiles it to C++
 + Graph dumps: `--dump` turns on both DOT and JSON dumps for every stage; `--dump-json` / `--dump-dot` turn on a single format. Combine with `--dump-stages=a,b,c` to limit which stages emit (e.g., `AfterSplitNodes,ConstantAnalysis`). Set `--dir=tmp-out/gsim-dumps` to choose the output directory.
 + Extra debugging artifacts: `--dump-assign-tree` includes assignTree structure in JSON dumps; `--dump-const-status` writes `<name>_<stage>_ConstStatus.json` with per-node constant-analysis status.
 + Example: `build/gsim/gsim --dir tmp-out/gsim-dumps --dump --dump-stages=AfterSplitNodes,ConstantAnalysis --dump-assign-tree --log-level=1 ready-to-run/TestHarness-rocket.fir`
++ Node retention levels are selected with `--node-optimization-level=1|2|3` (default `3`). Level 1 preserves nodes whose leaf name does not start with `_`; level 2 preserves module IO and top-level IO; level 3 keeps the current aggressive optimization behavior. Levels 1 and 2 also skip structural node splitting so retained names remain available in the generated model.
++ With the Makefile flow, use `make NODE_OPTIMIZATION_LEVEL=1 ...` or `make NODE_OPTIMIZATION_LEVEL=2 ...`. Add `WAVEFORM=1` when FST output is also needed.
 
 
 ## Papers and Presentations

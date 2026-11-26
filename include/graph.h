@@ -6,6 +6,20 @@
 #define GRAPH_H
 
 class graph {
+ public:
+  enum class WaveformNodeKind {
+    Alias,
+    Constant,
+    Expression
+  };
+
+  struct WaveformNode {
+    WaveformNodeKind kind;
+    Node* source = nullptr;
+    std::string value;
+  };
+
+ private:
   FILE *srcFp;
   int srcFileIdx;
   int srcFileBytes;
@@ -39,6 +53,7 @@ class graph {
   int translateInst(InstInfo inst, int indent, std::string flagName);
   void genSuperEval(SuperNode* super, std::string flagName, int indent);
   void removeNodesNoConnect(NodeStatus status);
+  WaveformNode* findWaveformNode(Node* node);
   void reconnectSuper();
   void reconnectAll();
   void resetAnalysis();
@@ -75,6 +90,7 @@ class graph {
   /* used after toposort */
   std::vector<SuperNode*> sortedSuper;
   std::vector<SuperNode*> allReset;
+  std::map<Node*, WaveformNode> waveformNodes;
   std::vector<std::string> extDecl;
   std::string name;
   int nodeNum = 0;
@@ -91,6 +107,9 @@ class graph {
   void splitArray();
   void removeDeadNodes();
   void aliasAnalysis();
+  bool preserveWaveformAlias(Node* node, Node* source);
+  bool preserveWaveformConstant(Node* node, const std::string& value);
+  bool preserveWaveformExpression(Node* node, std::set<Node*>& runtimeDependencies);
   size_t countNodes();
   void removeEmptySuper();
   void removeNodes(NodeStatus status);

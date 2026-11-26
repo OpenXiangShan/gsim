@@ -11,6 +11,7 @@
 #include <sstream>
 #include <thread>
 #include <getopt.h>
+#include <filesystem>
 #include <sched.h>
 #include <cstdlib>
 #include <sys/mman.h>
@@ -66,6 +67,7 @@ Config::Config() {
   FstMaxArrayElems = 1 << 20; // 1M elements cap for waveform handle emission
   FstMaxArrayWidth = 1 << 24;
   TraceFstNoNext = true;      // drop xxx$NEXT signals by default
+  NodeOptimizationLevel = 3;       // 1: named nodes, 2: module IO, 3: current behavior
   OutputDir = ".";
   SuperNodeMaxSize = 35;
   cppMaxSizeKB = -1;
@@ -150,6 +152,7 @@ static void printUsage(const char* ProgName) {
 	    << "      --trace-fst-max-elems=[num]  Max array elements to emit FST handles (0 for unlimited, default: 1048576).\n"
 	    << "      --trace-fst-max-width=[num]  Max total array width in bits to emit FST handles (0 for unlimited, default: 16777216).\n"
             << "      --trace-fst-no-next=[0|1]    Filter next-state signals (xxx$NEXT); default 1 = filter out.\n"
+            << "      --node-optimization-level=[1|2|3] Preserve nodes; 1=non-_ names, 2=module IO, 3=current optimization.\n"
             ;
 }
 
@@ -183,6 +186,7 @@ static char* parseCommandLine(int argc, char** argv) {
     OPT_TRACE_FST_MAX_ELEMS,
     OPT_TRACE_FST_MAX_WIDTH,
     OPT_TRACE_FST_NO_NEXT,
+    OPT_NODE_OPTIMIZATION_LEVEL,
   };
 
   const struct option Table[] = {
@@ -207,6 +211,7 @@ static char* parseCommandLine(int argc, char** argv) {
       {"trace-fst-max-elems", required_argument, nullptr, 0},
       {"trace-fst-max-width", required_argument, nullptr, 0},
       {"trace-fst-no-next", required_argument, nullptr, 0},
+      {"node-optimization-level", required_argument, nullptr, 0},
       {nullptr, no_argument, nullptr, 0},
   };
 
@@ -302,6 +307,18 @@ static char* parseCommandLine(int argc, char** argv) {
                   globalConfig.TraceFstNoNext = (v != 0);
                   break;
                 }
+                case OPT_NODE_OPTIMIZATION_LEVEL: {
+                  int level = 0;
+                  if (sscanf(optarg, "%d", &level) != 1 || level < 1 || level > 3) {
+                    fprintf(stderr, "Error: --node-optimization-level expects 1, 2, or 3, got '%s'.\n", optarg);
+                    printUsage(argv[0]);
+                    std::cout.flush();
+                    fflush(nullptr);
+                    _exit(EXIT_FAILURE);
+                  }
+                  globalConfig.NodeOptimizationLevel = level;
+                  break;
+                }
                 default: printUsage(argv[0]); std::cout.flush(); fflush(nullptr); _exit(EXIT_SUCCESS);
               }
               break;
@@ -355,6 +372,14 @@ int main(int argc, char** argv) {
   graph* g = NULL;
   static int dumpIdx = 0;
   const char *InputFileName = parseCommandLine(argc, argv);
+
+  std::error_code outputDirError;
+  std::filesystem::create_directories(globalConfig.OutputDir, outputDirError);
+  if (outputDirError) {
+    fprintf(stderr, "Error: cannot create output directory '%s': %s\n",
+            globalConfig.OutputDir.c_str(), outputDirError.message().c_str());
+    return EXIT_FAILURE;
+  }
 
   size_t size = 0, mapSize = 0;
   char *strbuf;

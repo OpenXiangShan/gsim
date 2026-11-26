@@ -152,9 +152,23 @@ void graph::commonExpr() {
       Node* aliasNode = iter.second[0];
       for (size_t i = 1; i < iter.second.size(); i ++) {
         Node* node = iter.second[i];
+        if (node->isRetained()) {
+          if (globalConfig.TraceFst && (node->width != aliasNode->width ||
+              !preserveWaveformAlias(node, aliasNode))) continue;
+          node->retained = false;
+        }
         aliasMap[node] = aliasNode;
         node->status = DEAD_NODE;
       }
+    }
+  }
+
+  for (auto& [node, signal] : waveformNodes) {
+    if (signal.kind != WaveformNodeKind::Alias) continue;
+    auto it = aliasMap.find(signal.source);
+    if (it != aliasMap.end()) {
+      signal.source = it->second;
+      signal.source->retained = true;
     }
   }
 
