@@ -43,6 +43,7 @@ static std::map<int, SuperNode*> cppId2Super;
 static std::set<int> alwaysActive;
 
 static std::map<Node*, std::pair<int, int>> super2ResetId;  // uint & async reset
+static std::map<int, size_t> resetChunkNum;
 static std::vector<Node*> fstWaveNodes;
 static std::set<Node*> fstWaveNodeSet;
 // Word offsets in the model's contiguous packed cache; word 0 is gsim_cycle.
@@ -781,14 +782,72 @@ int graph::genActivate() {
 }
 
 void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
-  emitBodyLock(indent ++, "void S%s::subReset%d(){ // %s reset\n", name.c_str(), resetFuncNum, isUIntReset ? "uint" : "async");
+  const int resetId = resetFuncNum;
   if (super2ResetId.find(super->resetNode) != super2ResetId.end()) {
     super2ResetId[super->resetNode] = std::make_pair(-1, -1);
   }
-  if (isUIntReset) super2ResetId[super->resetNode].first = resetFuncNum;
-  else super2ResetId[super->resetNode].second = resetFuncNum;
+  if (isUIntReset) super2ResetId[super->resetNode].first = resetId;
+  else super2ResetId[super->resetNode].second = resetId;
   resetFuncNum ++;
   std::string resetName = super->resetNode->type == NODE_REG_SRC ? RESET_NAME(super->resetNode).c_str() : super->resetNode->name.c_str();
+
+  /*
+   * A reset body can contain tens of thousands of independent assignments.
+   * Keep control-flow blocks intact, but move large bodies into complete
+   * helper functions so the source-file size limit can be enforced between
+   * functions and the compiler does not optimize one enormous function.
+   */
+  std::vector<std::vector<InstInfo>> resetChunks;
+  bool chunksRunUnderReset = false;
+  std::vector<InstInfo> chunkSource;
+  if (super->insts.size() > RESET_PER_FUNC) {
+    /* StmtTree normally emits the reset condition as one outer block.  Strip
+     * that block before chunking so its independent statements become split
+     * points while the condition remains in subResetN(). */
+    const std::string resetGuard = format("if (%s) {", resetName.c_str());
+    if (super->insts.size() >= 2 &&
+        super->insts.front().infoType == SUPER_INFO_IF &&
+        super->insts.front().inst == resetGuard &&
+        super->insts.back().infoType == SUPER_INFO_DEDENT) {
+      chunksRunUnderReset = true;
+      chunkSource.assign(super->insts.begin() + 1, super->insts.end() - 1);
+    } else {
+      chunkSource = super->insts;
+    }
+
+    /* Assignment markers are metadata used by normal evaluation emission;
+     * reset emission has always ignored them, so do not let them consume a
+     * chunk without contributing generated statements. */
+    chunkSource.erase(std::remove_if(chunkSource.begin(), chunkSource.end(),
+                                     [](const InstInfo& inst) {
+                                       return inst.infoType == SUPER_INFO_ASSIGN_BEG ||
+                                              inst.infoType == SUPER_INFO_ASSIGN_END;
+                                     }),
+                      chunkSource.end());
+
+    std::vector<InstInfo> chunk;
+    int blockDepth = 0;
+    for (const InstInfo& inst : chunkSource) {
+      chunk.push_back(inst);
+      if (inst.infoType == SUPER_INFO_IF) {
+        blockDepth ++;
+      } else if (inst.infoType == SUPER_INFO_DEDENT) {
+        Assert(blockDepth > 0, "invalid reset statement nesting in reset %d", resetId);
+        blockDepth --;
+      }
+      if (blockDepth == 0 && chunk.size() >= RESET_PER_FUNC) {
+        resetChunks.push_back(std::move(chunk));
+        chunk.clear();
+      }
+    }
+    Assert(blockDepth == 0, "unterminated reset statement block in reset %d", resetId);
+    if (!chunk.empty()) resetChunks.push_back(std::move(chunk));
+  }
+  resetChunkNum[resetId] = resetChunks.size();
+
+  /* A reset definition starts at a function boundary, so it may start a new
+   * generated source file after the previous complete function. */
+  emitFuncDecl(indent ++, "void S%s::subReset%d(){ // %s reset\n", name.c_str(), resetId, isUIntReset ? "uint" : "async");
   emitBodyLock(indent ++, "if(unlikely(%s)) {\n", resetName.c_str());
   std::set<int> allNext;
   for (size_t i = 0; i < super->member.size(); i ++) {
@@ -808,23 +867,45 @@ void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
     }
   }
   emitBodyLock(-- indent, "}\n");
-  for (InstInfo inst : super->insts) {
-    switch (inst.infoType) {
-      case SUPER_INFO_IF:
-        emitBodyLock(indent ++, "%s\n", inst.inst.c_str());
-        break;
-      case SUPER_INFO_DEDENT:
-        emitBodyLock(--indent, "%s\n", inst.inst.c_str());
-        break;
-      case SUPER_INFO_ELSE:
-      case SUPER_INFO_STR:
-        emitBodyLock(indent, "%s\n", inst.inst.c_str());
-        break;
-      default:
-        break;
+
+  auto emitResetInsts = [&](const std::vector<InstInfo>& insts, int bodyIndent) {
+    int currentIndent = bodyIndent;
+    for (const InstInfo& inst : insts) {
+      switch (inst.infoType) {
+        case SUPER_INFO_IF:
+          emitBodyLock(currentIndent ++, "%s\n", inst.inst.c_str());
+          break;
+        case SUPER_INFO_DEDENT:
+          emitBodyLock(--currentIndent, "%s\n", inst.inst.c_str());
+          break;
+        case SUPER_INFO_ELSE:
+        case SUPER_INFO_STR:
+          emitBodyLock(currentIndent, "%s\n", inst.inst.c_str());
+          break;
+        default:
+          break;
+      }
     }
+    Assert(currentIndent == bodyIndent, "unbalanced reset chunk %d", resetId);
+  };
+
+  if (resetChunks.empty()) {
+    emitResetInsts(super->insts, indent);
+  } else {
+    if (chunksRunUnderReset) emitBodyLock(indent ++, "if (%s) {\n", resetName.c_str());
+    for (size_t chunk = 0; chunk < resetChunks.size(); chunk ++) {
+      emitBodyLock(indent, "subReset%dChunk%zu();\n", resetId, chunk);
+    }
+    if (chunksRunUnderReset) emitBodyLock(--indent, "}\n");
   }
   emitBodyLock(-- indent, "}\n");
+
+  for (size_t chunk = 0; chunk < resetChunks.size(); chunk ++) {
+    emitFuncDecl(0, "__attribute__((noinline)) __attribute__((optnone)) void S%s::subReset%dChunk%zu(){\n",
+                 name.c_str(), resetId, chunk);
+    emitResetInsts(resetChunks[chunk], 1);
+    emitBodyLock(0, "}\n");
+  }
 }
 
 void graph::genResetActivation(SuperNode* super, bool isUIntReset, int indent, int resetId) {
@@ -1068,6 +1149,9 @@ void graph::emitPrintf() {
 
 void graph::cppEmitter() {
   definedNode.clear();
+  resetFuncNum = 0;
+  resetChunkNum.clear();
+  super2ResetId.clear();
   for (SuperNode* super : sortedSuper) {
     if (!super->instsEmpty() || super->superType == SUPER_EXTMOD || super->superType == SUPER_ASYNC_RESET) {
       super->cppId = superId ++;
@@ -1475,6 +1559,12 @@ void graph::cppEmitter() {
   genResetAll();
   for (int i = 0; i < resetFuncNum; i ++) {
     fprintf(header, "void subReset%d();\n", i);
+    auto chunks = resetChunkNum.find(i);
+    if (chunks != resetChunkNum.end()) {
+      for (size_t chunk = 0; chunk < chunks->second; chunk ++) {
+        fprintf(header, "void subReset%dChunk%zu();\n", i, chunk);
+      }
+    }
   }
 
   /* main evaluation loop (step) */
