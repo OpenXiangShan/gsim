@@ -10,6 +10,7 @@ THIS_MAKEFILE = Makefile
 
 WAVEFORM ?= 0
 WAVEFORM_PATH ?= $(WORK_DIR)/waveform.fst
+NODE_OPTIMIZATION_LEVEL ?= 3
 
 ifeq ($(dutName),ysyx3)
 	NAME ?= newtop
@@ -64,6 +65,7 @@ TIME = /usr/bin/time
 LOG_FILE = $(WORK_DIR)/$(dutName).log
 WAVE_LOG_FILE = $(WORK_DIR)/$(dutName)-wave.log
 EMU_RUN_ENV :=
+GSIM_FLAGS_EXTRA += --node-optimization-level=$(NODE_OPTIMIZATION_LEVEL)
 ifeq ($(WAVEFORM),1)
 GSIM_FLAGS_EXTRA += --trace-fst
 EMU_RUN_ENV += GSIM_ENABLE_WAVEFORM=1 GSIM_WAVEFORM_PATH=$(WAVEFORM_PATH)

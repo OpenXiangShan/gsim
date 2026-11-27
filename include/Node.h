@@ -150,6 +150,8 @@ class Node {
 /* used for reg & memory */
   Node* clock = nullptr;
   bool isClock = false;
+  bool isModuleIO = false;
+  bool retained = false;
   ResetType reset = UNCERTAIN;
   AsReset asReset = EMPTY;
   bool inAggr = false;
@@ -260,6 +262,8 @@ class Node {
   bool isExt() {
     return type == NODE_EXT || type == NODE_EXT_IN || type == NODE_EXT_OUT;
   }
+  void markRetained(const std::string& declarationName = "");
+  bool isRetained() const { return retained; }
   void clear_relation();
   void addPrev(Node* node);
   void addPrev(std::set<Node*>& super);

@@ -54,38 +54,61 @@ void graph::removeDeadNodes() {
   };
   for (Node* outNode : output) add(outNode);
   for (Node* special : specialNodes) add(special);
+  for (Node* mem : memory) {
+    if (globalConfig.TraceFst && mem->isRetained()) add(mem);
+  }
   for (SuperNode* super : sortedSuper) {
     for (Node* member : super->member) {
       if (member->type == NODE_EXT || member->type == NODE_EXT_IN || member->type == NODE_EXT_OUT) add(member);
     }
   }
-  while (!s.empty()) {
-    Node* top = s.top();
-    s.pop();
-    for (Node* prev : top->prev) {
-      add(prev);
-    }
-    if (top->type == NODE_REG_SRC) {
-      add(top->getDst());
-      std::set<Node*> resetNodes;
-      if (top->resetTree) top->resetTree->getRelyNodes(resetNodes);
-      for (Node* node : resetNodes) add(node);
-    } else if (top->type == NODE_READER) {
-      Node* memory = top->parent;
-      for (Node* port : memory->member) {
-        if (port->type == NODE_WRITER) add(port);
-        if (port->type == NODE_READWRITER) add(port);
+  auto visitDependencies = [&]() {
+    while (!s.empty()) {
+      Node* top = s.top();
+      s.pop();
+      for (Node* prev : top->prev) {
+        add(prev);
       }
-    } else if (top->type == NODE_EXT_OUT) {
-      Node* ext = top->parent;
-      for (Node* member : ext->member) add(member);
+      if (top->type == NODE_REG_SRC) {
+        add(top->getDst());
+        std::set<Node*> resetNodes;
+        if (top->resetTree) top->resetTree->getRelyNodes(resetNodes);
+        for (Node* node : resetNodes) add(node);
+      } else if (top->type == NODE_READER) {
+        Node* memory = top->parent;
+        for (Node* port : memory->member) {
+          if (port->type == NODE_WRITER) add(port);
+          if (port->type == NODE_READWRITER) add(port);
+        }
+      } else if (top->type == NODE_EXT_OUT) {
+        Node* ext = top->parent;
+        for (Node* member : ext->member) add(member);
+      }
     }
+  };
+  visitDependencies();
+
+  if (globalConfig.TraceFst) {
+    for (SuperNode* super : sortedSuper) {
+      for (Node* member : super->member) {
+        if (!member->isRetained() || visited.find(member) != visited.end()) continue;
+        std::set<Node*> dependencies;
+        if (preserveWaveformExpression(member, dependencies)) {
+          member->retained = false;
+          for (Node* dependency : dependencies) add(dependency);
+        } else {
+          add(member);
+        }
+      }
+    }
+    visitDependencies();
   }
 
   for (SuperNode* super : sortedSuper) {
     for (Node* node : super->member) {
       if (node->type == NODE_INP || node->type == NODE_OUT) continue;
       if (visited.find(node) == visited.end()) {
+        if (globalConfig.TraceFst && node->isRetained()) continue;
         if (globalConfig.LogLevel > 1) {
           fprintf(stderr, "[RemoveDeadNodes] pass %d mark dead: %s type=%d super=%d line=%d\n",
                   curPass, node->name.c_str(), node->type, super->id, __LINE__);
@@ -101,17 +124,21 @@ void graph::removeDeadNodes() {
 
   removeNodes(DEAD_NODE);
   regsrc.erase(
-    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
+    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){
+      return n->status == DEAD_NODE && (!n->isRetained() || !globalConfig.TraceFst);
+    }),
         regsrc.end()
   );
 
   for (size_t i = 0; i < memory.size(); i ++) {
     Node* mem = memory[i];
     mem->member.erase(
-      std::remove_if(mem->member.begin(), mem->member.end(), [](const Node* n) {return n->status == DEAD_NODE; }),
+      std::remove_if(mem->member.begin(), mem->member.end(), [](const Node* n) {
+        return n->status == DEAD_NODE && (!n->isRetained() || !globalConfig.TraceFst);
+      }),
       mem->member.end()
     );
-    if (mem->member.size() == 0) {
+    if (mem->member.size() == 0 && (!mem->isRetained() || !globalConfig.TraceFst)) {
       mem->status = DEAD_NODE;
       memory.erase(memory.begin() + i);
       i --;

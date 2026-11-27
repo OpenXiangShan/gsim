@@ -15,6 +15,7 @@ struct Config {
   size_t FstMaxArrayElems;
   size_t FstMaxArrayWidth;
   bool TraceFstNoNext;
+  int NodeOptimizationLevel;
   std::string OutputDir;
   int SuperNodeMaxSize;
   uint32_t cppMaxSizeKB;

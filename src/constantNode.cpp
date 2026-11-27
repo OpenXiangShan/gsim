@@ -950,7 +950,9 @@ void graph::constantMemory() {
     if (recomputeQueue.empty()) break;
     recomputeAllNodes();
     memory.erase(
-      std::remove_if(memory.begin(), memory.end(), [](const Node* n){ return n->status == CONSTANT_NODE; }),
+      std::remove_if(memory.begin(), memory.end(), [](const Node* n){
+        return n->status == CONSTANT_NODE && (!n->isRetained() || !globalConfig.TraceFst);
+      }),
         memory.end()
     );
   }
@@ -1278,6 +1280,12 @@ void graph::constantAnalysis() {
         consNum ++;
         member->computeInfo = consMap[member];
         member->computeInfo->updateConsVal();
+        // Constants are safe to remove after their waveform value is saved.
+        // Retained constants that cannot be represented stay as runtime nodes.
+        if (member->isRetained() &&
+            preserveWaveformConstant(member, member->computeInfo->valStr)) {
+          member->retained = false;
+        }
       }
     }
   }
@@ -1370,8 +1378,16 @@ void graph::constantAnalysis() {
 
   removeNodes(CONSTANT_NODE);
   regsrc.erase(
-    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == CONSTANT_NODE; }),
+    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){
+      return n->status == CONSTANT_NODE && (!n->isRetained() || !globalConfig.TraceFst);
+    }),
         regsrc.end()
+  );
+  memory.erase(
+    std::remove_if(memory.begin(), memory.end(), [](const Node* n) {
+      return n->status == CONSTANT_NODE && (!n->isRetained() || !globalConfig.TraceFst);
+    }),
+    memory.end()
   );
 
   reconnectAll();

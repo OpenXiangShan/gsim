@@ -43,8 +43,8 @@ static std::map<int, SuperNode*> cppId2Super;
 static std::set<int> alwaysActive;
 
 static std::map<Node*, std::pair<int, int>> super2ResetId;  // uint & async reset
+static std::map<int, size_t> resetChunkNum;
 static std::vector<Node*> fstWaveNodes;
-static std::set<Node*> fstWaveNodeSet;
 // Word offsets in the model's contiguous packed cache; word 0 is gsim_cycle.
 static std::vector<size_t> fstOldValueOffsets;
 
@@ -190,9 +190,10 @@ std::string strReplace(std::string s, std::string oldStr, std::string newStr) {
 }
 
 static bool isTopField(Node* node) {
-  if (node->type == NODE_SPECIAL || node->type == NODE_REG_RESET || node->status != VALID_NODE) return false;
-  if (node->type == NODE_REG_DST && !node->regSplit) return false;
-  if (node->type == NODE_WRITER) return false;
+  if (node->width < 0) return false;
+  if (node->type == NODE_SPECIAL) return false;
+  if (node->type == NODE_REG_RESET && !(globalConfig.TraceFst && node->isRetained())) return false;
+  if (node->type == NODE_WRITER && !(globalConfig.TraceFst && node->isRetained())) return false;
   return !node->isLocal();
 }
 
@@ -322,8 +323,8 @@ void graph::genInterfaceInput(Node* input) {
   /* set by string */
   emitFuncDecl(0, "void S%s::set_%s(%s val", name.c_str(), input->name.c_str(), widthUType(input->width).c_str());
   for (const auto &d : input->dimension)
-    emitFuncDecl(0, "[%d]", upperPower2(d));
-  emitFuncDecl(0, ") {\n");
+    emitBodyLock(0, "[%d]", upperPower2(d));
+  emitBodyLock(0, ") {\n");
   if (input->dimension.size()) {
     emitBodyLock(1, "memcpy(%s, val, sizeof(%s));\n", input->name.c_str(), input->name.c_str());
     /* update nodes in the same superNode */
@@ -369,17 +370,17 @@ void graph::genInterfaceOutput(Node* output) {
   emitFuncDecl(0, "%s ", widthUType(output->width).c_str());
   switch (output->dimension.size()) {
     case 1:
-      emitFuncDecl(0, "*");
+      emitBodyLock(0, "*");
     case 0:
-      emitFuncDecl(0, "S%s::get_%s() {\n", name.c_str(), output->name.c_str());
+      emitBodyLock(0, "S%s::get_%s() {\n", name.c_str(), output->name.c_str());
       break;
     default:
-      emitFuncDecl(0, "(*S%s::get_%s())", name.c_str(), output->name.c_str());
+      emitBodyLock(0, "(*S%s::get_%s())", name.c_str(), output->name.c_str());
       for (int i = 1; i < output->dimension.size(); ++i)
-        emitFuncDecl(0, "[%d]", upperPower2(output->dimension[i]));
-      emitFuncDecl(0, " {\n");
+        emitBodyLock(0, "[%d]", upperPower2(output->dimension[i]));
+      emitBodyLock(0, " {\n");
   }
-  emitFuncDecl(0, "  return %s;\n"
+  emitBodyLock(0, "  return %s;\n"
                "}\n",
                output->status == CONSTANT_NODE ? output->computeInfo->valStr.c_str() : output->name.c_str());
 }
@@ -485,7 +486,7 @@ void graph::genNodeDef(FILE* fp, Node* node) {
   for (int dim : node->dimension) fprintf(fp, "[%d]", upperPower2(dim));
   fprintf(fp, "; // width = %d, lineno = %d\n", node->width, node->lineno);
   int w = node->width;
-  bool needInitMask = (node->type != NODE_MEMORY && node->type != NODE_WRITER) &&
+  bool needInitMask = (node->width > 0 && node->type != NODE_MEMORY && node->type != NODE_WRITER) &&
     (((w < 64) && (w != 8 && w != 16 && w != 32 && w != 64)) || ((w > 64) && (w % 32 != 0)));
   if (needInitMask) {
     if (node->dimension.empty()) {
@@ -653,7 +654,7 @@ int graph::genNodeStepEnd(SuperNode* node, int indent) {
 }
 
 bool Node::isLocal() { // TODO: isArray is OK
-  return status == VALID_NODE && type == NODE_OTHERS && !anyNextActive() && !isArray() && !isReset();
+  return status == VALID_NODE && (!isRetained() || !globalConfig.TraceFst) && type == NODE_OTHERS && !anyNextActive() && !isArray() && !isReset();
 }
 
 int graph::translateInst(InstInfo inst, int indent, std::string flagName) {
@@ -782,14 +783,72 @@ int graph::genActivate() {
 }
 
 void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
-  emitBodyLock(indent ++, "void S%s::subReset%d(){ // %s reset\n", name.c_str(), resetFuncNum, isUIntReset ? "uint" : "async");
+  const int resetId = resetFuncNum;
   if (super2ResetId.find(super->resetNode) != super2ResetId.end()) {
     super2ResetId[super->resetNode] = std::make_pair(-1, -1);
   }
-  if (isUIntReset) super2ResetId[super->resetNode].first = resetFuncNum;
-  else super2ResetId[super->resetNode].second = resetFuncNum;
+  if (isUIntReset) super2ResetId[super->resetNode].first = resetId;
+  else super2ResetId[super->resetNode].second = resetId;
   resetFuncNum ++;
   std::string resetName = super->resetNode->type == NODE_REG_SRC ? RESET_NAME(super->resetNode).c_str() : super->resetNode->name.c_str();
+
+  /*
+   * A reset body can contain tens of thousands of independent assignments.
+   * Keep control-flow blocks intact, but move large bodies into complete
+   * helper functions so the source-file size limit can be enforced between
+   * functions and the compiler does not optimize one enormous function.
+   */
+  std::vector<std::vector<InstInfo>> resetChunks;
+  bool chunksRunUnderReset = false;
+  std::vector<InstInfo> chunkSource;
+  if (super->insts.size() > RESET_PER_FUNC) {
+    /* StmtTree normally emits the reset condition as one outer block.  Strip
+     * that block before chunking so its independent statements become split
+     * points while the condition remains in subResetN(). */
+    const std::string resetGuard = format("if (%s) {", resetName.c_str());
+    if (super->insts.size() >= 2 &&
+        super->insts.front().infoType == SUPER_INFO_IF &&
+        super->insts.front().inst == resetGuard &&
+        super->insts.back().infoType == SUPER_INFO_DEDENT) {
+      chunksRunUnderReset = true;
+      chunkSource.assign(super->insts.begin() + 1, super->insts.end() - 1);
+    } else {
+      chunkSource = super->insts;
+    }
+
+    /* Assignment markers are metadata used by normal evaluation emission;
+     * reset emission has always ignored them, so do not let them consume a
+     * chunk without contributing generated statements. */
+    chunkSource.erase(std::remove_if(chunkSource.begin(), chunkSource.end(),
+                                     [](const InstInfo& inst) {
+                                       return inst.infoType == SUPER_INFO_ASSIGN_BEG ||
+                                              inst.infoType == SUPER_INFO_ASSIGN_END;
+                                     }),
+                      chunkSource.end());
+
+    std::vector<InstInfo> chunk;
+    int blockDepth = 0;
+    for (const InstInfo& inst : chunkSource) {
+      chunk.push_back(inst);
+      if (inst.infoType == SUPER_INFO_IF) {
+        blockDepth ++;
+      } else if (inst.infoType == SUPER_INFO_DEDENT) {
+        Assert(blockDepth > 0, "invalid reset statement nesting in reset %d", resetId);
+        blockDepth --;
+      }
+      if (blockDepth == 0 && chunk.size() >= RESET_PER_FUNC) {
+        resetChunks.push_back(std::move(chunk));
+        chunk.clear();
+      }
+    }
+    Assert(blockDepth == 0, "unterminated reset statement block in reset %d", resetId);
+    if (!chunk.empty()) resetChunks.push_back(std::move(chunk));
+  }
+  resetChunkNum[resetId] = resetChunks.size();
+
+  /* A reset definition starts at a function boundary, so it may start a new
+   * generated source file after the previous complete function. */
+  emitFuncDecl(indent ++, "void S%s::subReset%d(){ // %s reset\n", name.c_str(), resetId, isUIntReset ? "uint" : "async");
   emitBodyLock(indent ++, "if(unlikely(%s)) {\n", resetName.c_str());
   std::set<int> allNext;
   for (size_t i = 0; i < super->member.size(); i ++) {
@@ -809,23 +868,45 @@ void graph::genResetDef(SuperNode* super, bool isUIntReset, int indent) {
     }
   }
   emitBodyLock(-- indent, "}\n");
-  for (InstInfo inst : super->insts) {
-    switch (inst.infoType) {
-      case SUPER_INFO_IF:
-        emitBodyLock(indent ++, "%s\n", inst.inst.c_str());
-        break;
-      case SUPER_INFO_DEDENT:
-        emitBodyLock(--indent, "%s\n", inst.inst.c_str());
-        break;
-      case SUPER_INFO_ELSE:
-      case SUPER_INFO_STR:
-        emitBodyLock(indent, "%s\n", inst.inst.c_str());
-        break;
-      default:
-        break;
+
+  auto emitResetInsts = [&](const std::vector<InstInfo>& insts, int bodyIndent) {
+    int currentIndent = bodyIndent;
+    for (const InstInfo& inst : insts) {
+      switch (inst.infoType) {
+        case SUPER_INFO_IF:
+          emitBodyLock(currentIndent ++, "%s\n", inst.inst.c_str());
+          break;
+        case SUPER_INFO_DEDENT:
+          emitBodyLock(--currentIndent, "%s\n", inst.inst.c_str());
+          break;
+        case SUPER_INFO_ELSE:
+        case SUPER_INFO_STR:
+          emitBodyLock(currentIndent, "%s\n", inst.inst.c_str());
+          break;
+        default:
+          break;
+      }
     }
+    Assert(currentIndent == bodyIndent, "unbalanced reset chunk %d", resetId);
+  };
+
+  if (resetChunks.empty()) {
+    emitResetInsts(super->insts, indent);
+  } else {
+    if (chunksRunUnderReset) emitBodyLock(indent ++, "if (%s) {\n", resetName.c_str());
+    for (size_t chunk = 0; chunk < resetChunks.size(); chunk ++) {
+      emitBodyLock(indent, "subReset%dChunk%zu();\n", resetId, chunk);
+    }
+    if (chunksRunUnderReset) emitBodyLock(--indent, "}\n");
   }
   emitBodyLock(-- indent, "}\n");
+
+  for (size_t chunk = 0; chunk < resetChunks.size(); chunk ++) {
+    emitFuncDecl(0, "__attribute__((noinline)) __attribute__((optnone)) void S%s::subReset%dChunk%zu(){\n",
+                 name.c_str(), resetId, chunk);
+    emitResetInsts(resetChunks[chunk], 1);
+    emitBodyLock(0, "}\n");
+  }
 }
 
 void graph::genResetActivation(SuperNode* super, bool isUIntReset, int indent, int resetId) {
@@ -1076,6 +1157,9 @@ void graph::emitPrintf() {
 
 void graph::cppEmitter() {
   definedNode.clear();
+  resetFuncNum = 0;
+  resetChunkNum.clear();
+  super2ResetId.clear();
   for (SuperNode* super : sortedSuper) {
     if (!super->instsEmpty() || super->superType == SUPER_EXTMOD || super->superType == SUPER_ASYNC_RESET) {
       super->cppId = superId ++;
@@ -1103,41 +1187,43 @@ void graph::cppEmitter() {
   }
 
   fstWaveNodes.clear();
-  fstWaveNodeSet.clear();
   fstOldValueOffsets.clear();
   if (globalConfig.TraceFst) {
+    std::set<Node*> fstWaveNodeSet;
     const size_t fstWaveWidthLimit = globalConfig.FstMaxArrayWidth;
     const size_t fstWaveLimit = globalConfig.FstMaxArrayElems;
-    auto collectWaveNode = [&](Node* n) {
-      if (!isTopField(n)) return;
-      if (globalConfig.TraceFstNoNext) {
-        const std::string& nm = n->name;
-        if (nm.size() >= 5 && nm.rfind("$NEXT") == nm.size() - 5) return;
-      }
+    auto withinWaveLimit = [&](Node* n) {
       auto dims = nodeArrayDims(n);
       size_t limit = fstWaveLimit;
       if (fstWaveWidthLimit != 0 && n->width != 0) {
         size_t widthLimit = fstWaveWidthLimit / n->width;
-        if (widthLimit == 0)
-          return;
+        if (widthLimit == 0) return false;
         limit = limit == 0 ? widthLimit : std::min(limit, widthLimit);
       }
-      if (!dims.empty() && limit != 0) {
-        size_t total = 1;
-        for (int dim : dims) {
-          if (dim <= 0) continue;
-          if (total > limit / static_cast<size_t>(dim)) {
-            total = limit + 1;
-            break;
-          }
-          total *= static_cast<size_t>(dim);
+      if (dims.empty() || limit == 0) return true;
+      size_t total = 1;
+      for (int dim : dims) {
+        if (dim <= 0) continue;
+        if (total > limit / static_cast<size_t>(dim)) {
+          total = limit + 1;
+          break;
         }
-        if (total > limit) {
-          fprintf(stderr, "[gsim] skip waveform for %s: %zu elements exceed limit %zu\n",
-                  n->name.c_str(), total, limit);
-          return;
-        }
+        total *= static_cast<size_t>(dim);
       }
+      if (total > limit) {
+        fprintf(stderr, "[gsim] skip waveform for %s: %zu elements exceed limit %zu\n",
+                n->name.c_str(), total, limit);
+        return false;
+      }
+      return true;
+    };
+    auto collectWaveNode = [&](Node* n, bool optimized = false) {
+      if (!optimized && !isTopField(n)) return;
+      if (globalConfig.TraceFstNoNext) {
+        const std::string& nm = n->name;
+        if (nm.size() >= 5 && nm.rfind("$NEXT") == nm.size() - 5) return;
+      }
+      if (!withinWaveLimit(n)) return;
       fstWaveNodeSet.insert(n);
     };
     for (SuperNode* super : sortedSuper) {
@@ -1149,6 +1235,7 @@ void graph::cppEmitter() {
       }
     }
     for (Node* mem : memory) collectWaveNode(mem);
+    for (const auto& entry : waveformNodes) collectWaveNode(entry.first, true);
     fstWaveNodes.assign(fstWaveNodeSet.begin(), fstWaveNodeSet.end());
     std::sort(fstWaveNodes.begin(), fstWaveNodes.end(), [](Node* a, Node* b) {
       return a->name < b->name;
@@ -1312,6 +1399,9 @@ void graph::cppEmitter() {
     }
     if (super->superType == SUPER_EXTMOD) {
       for (size_t i = 1; i < super->member.size(); i ++) genNodeDef(header, super->member[i]);
+      if (!super->member.empty() && super->member[0]->type == NODE_EXT) {
+        for (Node* port : super->member[0]->member) genNodeDef(header, port);
+      }
     }
   }
   /* memory definition */
@@ -1432,18 +1522,35 @@ void graph::cppEmitter() {
       for (size_t nodeIdx = begin; nodeIdx < end; nodeIdx ++) {
         Node* node = fstWaveNodes[nodeIdx];
         std::vector<int> dims = nodeArrayDims(node);
+        auto signalIt = waveformNodes.find(node);
+        const WaveformNode* signal = signalIt == waveformNodes.end() ? nullptr : &signalIt->second;
         if (dims.empty()) {
-          emitBodyLock(1, "updateFstSignal(fstHandle_%s, &%s, %d, %zu);\n", node->name.c_str(), node->name.c_str(), node->width,
-                       fstOldValueOffsets[nodeIdx]);
+          std::string accessStr = node->name;
+          if (signal && signal->kind == WaveformNodeKind::Alias) {
+            accessStr = signal->source->name;
+          } else if (signal && (signal->kind == WaveformNodeKind::Constant ||
+                                signal->kind == WaveformNodeKind::Expression)) {
+            const char* valueName = signal->kind == WaveformNodeKind::Constant ? "fstConstant" : "fstExpression";
+            accessStr = format("%s%zu", valueName, nodeIdx);
+            emitBodyLock(1, "%s %s%zu = %s;\n", widthUType(node->width).c_str(), valueName, nodeIdx,
+                         signal->value.c_str());
+          }
+          emitBodyLock(1, "updateFstSignal(fstHandle_%s, &%s, %d, %zu);\n", node->name.c_str(),
+                       accessStr.c_str(), node->width, fstOldValueOffsets[nodeIdx]);
         } else {
           int indent = 1;
+          std::string accessStr = signal && signal->kind == WaveformNodeKind::Alias ? signal->source->name : node->name;
+          if (signal && signal->kind == WaveformNodeKind::Constant) {
+            emitBodyLock(indent, "%s fstConstant%zu = %s;\n", widthUType(node->width).c_str(), nodeIdx,
+                         signal->value.c_str());
+            accessStr = format("fstConstant%zu", nodeIdx);
+          }
           for (size_t i = 0; i < dims.size(); i ++) {
             emitBodyLock(indent ++, "for (int i%zu = 0; i%zu < %d; i%zu ++) {\n", i, i, dims[i], i);
           }
-          std::string accessStr = node->name;
           emitBodyLock(indent, "size_t handle_idx = 0;\n");
           for (size_t i = 0; i < dims.size(); i ++) {
-            accessStr += format("[i%zu]", i);
+            if (!signal || signal->kind != WaveformNodeKind::Constant) accessStr += format("[i%zu]", i);
             emitBodyLock(indent, "handle_idx = handle_idx * %d + i%zu;\n", dims[i], i);
           }
           emitBodyLock(indent, "updateFstSignal(fstHandle_%s[handle_idx], &%s, %d, %zu + handle_idx * %zu);\n",
@@ -1488,6 +1595,12 @@ void graph::cppEmitter() {
   genResetAll();
   for (int i = 0; i < resetFuncNum; i ++) {
     fprintf(header, "void subReset%d();\n", i);
+    auto chunks = resetChunkNum.find(i);
+    if (chunks != resetChunkNum.end()) {
+      for (size_t chunk = 0; chunk < chunks->second; chunk ++) {
+        fprintf(header, "void subReset%dChunk%zu();\n", i, chunk);
+      }
+    }
   }
 
   /* main evaluation loop (step) */

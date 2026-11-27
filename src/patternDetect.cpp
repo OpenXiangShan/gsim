@@ -22,7 +22,7 @@ static bool isBitsOne(ENode* enode) {
   return (enode->opType == OP_BITS && enode->values[0] == enode->values[1]);
 }
 bool checkPattern1(Node* node) {
-  if (node->isArray() || node->type != NODE_OTHERS || node->assignTree.size() != 1) return false;
+  if ((node->isRetained() && globalConfig.TraceFst) || node->isArray() || node->type != NODE_OTHERS || node->assignTree.size() != 1) return false;
   ENode* root = node->assignTree[0]->getRoot();
   ENode* shiftENode = isDshlOne(root);
   if (!shiftENode) return false;
@@ -64,7 +64,7 @@ static void BITS_mpz(mpz_t rop, const mpz_t op, size_t high_bit, size_t low_bit)
 }
 
 bool checkPattern2(Node *node) {
-    if (node->isArray() || node->type != NODE_OTHERS || node->assignTree.size() != 1) return false;
+    if ((node->isRetained() && globalConfig.TraceFst) || node->isArray() || node->type != NODE_OTHERS || node->assignTree.size() != 1) return false;
     ENode *root = node->assignTree[0]->getRoot();
     ENode *equalNode = root->opType == OP_EQ ? root : nullptr;
     if(!equalNode) return false;

@@ -142,12 +142,33 @@ Node* Node::dup(NodeType _type, std::string _name) {
   duplicate->width = width;
   duplicate->sign = sign;
   duplicate->isClock = isClock;
+  duplicate->isModuleIO = isModuleIO;
+  duplicate->retained = retained;
   duplicate->reset = reset;
   duplicate->lineno = lineno;
   for (int dim : dimension) duplicate->dimension.push_back(dim);
   for (auto param : params) duplicate->params.push_back(param);
 
   return duplicate;
+}
+
+static bool hasModuleIOPath(const std::string& name) {
+  const std::string separators[] = {globalConfig.sep_module, globalConfig.sep_aggr};
+  for (const std::string& separator : separators) {
+    if (separator.empty()) continue;
+    const std::string marker = separator + "io" + separator;
+    if (name.find(marker) != std::string::npos) return true;
+  }
+  return false;
+}
+
+void Node::markRetained(const std::string& declarationName) {
+  if (globalConfig.NodeOptimizationLevel >= 3) return;
+  if (globalConfig.NodeOptimizationLevel == 2) {
+    retained = isModuleIO || type == NODE_INP || type == NODE_OUT || hasModuleIOPath(name);
+    return;
+  }
+  if (!declarationName.empty()) retained = declarationName.front() != '_';
 }
 
 AggrParentNode::AggrParentNode(std::string _name, TypeInfo* info) {

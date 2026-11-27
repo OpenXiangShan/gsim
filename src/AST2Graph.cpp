@@ -64,6 +64,7 @@ static inline void addSignal(std::string s, Node* n) {
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
   Assert(allAggr.find(s) == allAggr.end(), "Signal %s is already in allAggr\n", s.c_str());
   allSignals[s] = n;
+  if (globalConfig.NodeOptimizationLevel == 2) n->markRetained();
   n->whenDepth = whenTrace.size();
   // printf("add signal %s\n", s.c_str());
 }
@@ -249,6 +250,10 @@ TypeInfo* visitPort(graph* g, PNode* port, PNodeType modType) {
     Node* node = allocNode(type, topPrefix(), port->lineno);
     node->updateInfo(info);
     info->add(node, false);
+  }
+  for (auto entry : info->aggrMember) entry.first->markRetained(port->name);
+  if (modType == P_MOD || modType == P_EXTMOD) {
+    for (auto entry : info->aggrMember) entry.first->isModuleIO = true;
   }
   prefix_pop();
   return info;
@@ -530,6 +535,7 @@ void visitExtModule(graph* g, PNode* module) {
     Assert(ports->getChild(0)->name == "TE" && ports->getChild(1)->name == "E" && ports->getChild(2)->name == "CK" && ports->getChild(3)->name == "Q", "invalid clockgate ports");
     auto addGatePort = [&](std::string name, bool isClock) {
       Node* node = allocNode(NODE_OTHERS, prefixName(SEP_MODULE, name), module->lineno);
+      node->markRetained(name);
       node->width = 1; node->sign = false; node->isClock = isClock;
       addSignal(node->name, node);
       return node;
@@ -603,12 +609,14 @@ void visitWireDef(graph* g, PNode* wire) {
   TypeInfo* info = visitType(g, wire->getChild(0), NODE_OTHERS);
 
   for (auto entry : info->aggrMember) {
+    entry.first->markRetained(wire->name);
     addSignal(entry.first->name, entry.first);
   }
   for (AggrParentNode* aggr : info->aggrParent) addAggr(aggr->name, aggr);
   if (!info->isAggr()) {
     Node* node = allocNode(NODE_OTHERS, topPrefix(), wire->lineno);
     node->updateInfo(info);
+    node->markRetained(wire->name);
     addSignal(node->name, node);
   }
 
@@ -634,6 +642,7 @@ void visitRegDef(graph* g, PNode* reg, PNodeType type) {
     src->updateInfo(info);
     info->add(src, false);
   }
+  for (auto entry : info->aggrMember) entry.first->markRetained(reg->name);
   // add reg_src and red_dst to all signals
   for (auto entry : info->aggrMember) {
     Node* src = entry.first;
@@ -751,6 +760,7 @@ static void visitChirrtlMemPort(graph* g, PNode* port) {
     int width = mem->width;
     std::string suffix = replacePrefix(memName, "", mem->name).c_str();
     Node* portNode = visitChirrtlPort(g, port, width, depth, sign, suffix, mem, addr_enode, clock_node);
+    portNode->markRetained(port->name);
     mem->add_member(portNode);
     addSignal(portNode->name, portNode);
     memoryMembers.push_back(portNode);
@@ -897,6 +907,7 @@ void visitNode(graph* g, PNode* node) {
     AggrParentNode* aggrNode = allocNodeFromAggr(g, exp->getParent());
     Assert(aggrNode->size() == exp->getAggrNum(), "aggrMember num %d tree num %d", aggrNode->size(), exp->getAggrNum());
     for (int i = 0; i < aggrNode->size(); i ++) {
+      aggrNode->member[i].first->markRetained(node->name);
       aggrNode->member[i].first->valTree = new ExpTree(exp->getAggr(i), aggrNode->member[i].first);
       aggrNode->member[i].first->dimension.clear();
       std::vector<int> dims = exp->getAggr(i)->getDim();
@@ -905,6 +916,7 @@ void visitNode(graph* g, PNode* node) {
     addAggr(aggrNode->name, aggrNode);
   } else {
     Node* n = allocNode(NODE_OTHERS, topPrefix(), node->lineno);
+    n->markRetained(node->name);
     std::vector<int> dims = exp->getExpRoot()->getDim();
     n->dimension.insert(n->dimension.end(), dims.begin(), dims.end());
 
@@ -1688,7 +1700,7 @@ graph* AST2Graph(PNode* root) {
   for (auto it : allSignals) {
     if ((it.second->type == NODE_OTHERS || it.second->type == NODE_READER || it.second->type == NODE_WRITER || it.second->type == NODE_READWRITER ||
         it.second->type == NODE_SPECIAL || it.second->type == NODE_EXT || it.second->type == NODE_EXT_IN || it.second->type == NODE_OUT)
-        && it.second->super->prev.size() == 0) {
+        && it.second->super->depPrev.size() == 0) {
       g->supersrc.push_back(it.second->super);
     }
     if (it.second->isArray()) {
@@ -1816,6 +1828,7 @@ void removeDummyDim(graph* g) {
   }
   /* transform memory of depth 1 to register */
   for (Node* mem : g->memory) {
+    if (mem->isRetained() && globalConfig.TraceFst) continue;
     if (mem->depth > 1) continue;
     if (mem->dimension.size() != 0) continue;
     /* TODO: all ports must share the same clock */
@@ -1856,7 +1869,9 @@ void removeDummyDim(graph* g) {
       mem->status = DEAD_NODE;
   }
   g->memory.erase(
-    std::remove_if(g->memory.begin(), g->memory.end(), [](const Node* n) {return n->status == DEAD_NODE; }),
+    std::remove_if(g->memory.begin(), g->memory.end(), [](const Node* n) {
+      return n->status == DEAD_NODE && (!n->isRetained() || !globalConfig.TraceFst);
+    }),
     g->memory.end()
   );
 }

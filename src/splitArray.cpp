@@ -311,7 +311,9 @@ void ExpTree::updateWithSplittedArray(Node* node, Node* array, std::vector<Node*
 }
 
 void graph::splitArrayNode(Node* node) {
+  const bool retainParts = node->retained;
   node->status = DEAD_NODE;
+  node->retained = false;
   /* remove prev connection */
   for (Node* prev : node->depPrev) prev->eraseNext(node);
   for (SuperNode* super : node->super->depPrev) super->eraseNext(node->super);
@@ -328,6 +330,7 @@ void graph::splitArrayNode(Node* node) {
   std::vector<Node*> arrayMember;
   for (int i = 0; i < entryNum; i ++) {
     arrayMember.push_back(node->arrayMemberNode(i));
+    arrayMember.back()->retained = retainParts;
   }
   splitArrayMap[node] = arrayMember;
   /* distribute arrayVal */
@@ -378,7 +381,7 @@ void graph::splitArrayNode(Node* node) {
   node->clear_relation();
   for (Node* member : arrayMember) member->constructSuperConnect();
   for (Node* member : arrayMember) {
-    if (member->super->prev.size() == 0) supersrc.push_back(member->super);
+    if (member->super->depPrev.size() == 0) supersrc.push_back(member->super);
   }
 }
 
@@ -446,7 +449,9 @@ void graph::splitArray() {
   splitOptionalArray();
 
   supersrc.erase(
-    std::remove_if(supersrc.begin(), supersrc.end(), [](const SuperNode* n) {return n->member[0]->status == DEAD_NODE; }),
+    std::remove_if(supersrc.begin(), supersrc.end(), [](const SuperNode* n) {
+      return n->member[0]->status == DEAD_NODE;
+    }),
     supersrc.end()
   );
 }
@@ -477,6 +482,9 @@ Node* Node::arrayMemberNode(int idx) {
   Node* member = new Node(type);
   member->name = memberName;
   member->clock = clock;
+  member->isClock = isClock;
+  member->isModuleIO = isModuleIO;
+  member->retained = retained;
   member->reset = reset;
   member->setType(width, sign);
   member->constructSuperNode();
@@ -548,7 +556,9 @@ void graph::splitOptionalArray() {
     checkNodeSplit(node);
   }
   regsrc.erase(
-    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == DEAD_NODE; }),
+    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){
+      return n->status == DEAD_NODE;
+    }),
         regsrc.end()
   );
 #ifdef ORDERED_TOPO_SORT

@@ -834,7 +834,13 @@ void graph::splitNodes() {
       // for (auto cut : nodeSegments[node].first->concatCount) printf("[%d]=%d ", cut.first, cut.second);
       // for (auto cut : nodeSegments[updateNode].second->concatCount) printf("[%d]=%d ", cut.first, cut.second);
       // printf("\n-------\n");
-      if ((node->type != NODE_OTHERS && node->type != NODE_REG_SRC) || node->width == 0 || node->sign || allSplittedNodes.find(node) != allSplittedNodes.end()) continue;
+      // Keep observed nodes as whole runtime values. Alias and constant
+      // optimizations record a waveform mapping before clearing retained;
+      // splitNode has no such reconstruction mapping.
+      if ((globalConfig.TraceFst && (node->isRetained() ||
+           (node->type == NODE_REG_SRC && node->getDst()->isRetained()))) ||
+          (node->type != NODE_OTHERS && node->type != NODE_REG_SRC) || node->width == 0 || node->sign ||
+          allSplittedNodes.find(node) != allSplittedNodes.end()) continue;
       if (arrayMember.find(node) != arrayMember.end()) continue;
       std::set<int>nodeCuts;
       getCut(node, nodeCuts, nodeSegments[node].first, nodeSegments[updateNode].second);
@@ -905,7 +911,9 @@ void graph::splitNodes() {
     }
   }
   regsrc.erase(
-    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){ return n->status == SPLITTED_NODE; }),
+    std::remove_if(regsrc.begin(), regsrc.end(), [](const Node* n){
+      return n->status == SPLITTED_NODE && (!globalConfig.TraceFst || !n->isRetained());
+    }),
         regsrc.end()
   );
   removeNodesNoConnect(SPLITTED_NODE);
